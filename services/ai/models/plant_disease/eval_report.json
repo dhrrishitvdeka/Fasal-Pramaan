@@ -1,0 +1,54 @@
+{
+  "disclaimer": "Measured on synthetic PlantVillage-named subset. Not validated for field insurance decisions or PMFBY payouts. Lab-style leaf crops differ from geo-tagged field photos.",
+  "is_production_validated": false,
+  "architecture": "mobilenet_v2_imagenet_finetuned",
+  "device": "cpu",
+  "num_classes": 15,
+  "train_images": 240,
+  "val_images": 60,
+  "epochs": 3,
+  "training_seconds": 42.4,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 2.0976,
+      "train_acc": 0.25,
+      "val_loss": 1.9364,
+      "val_acc": 0.3667
+    },
+    {
+      "epoch": 2,
+      "train_loss": 1.3852,
+      "train_acc": 0.4125,
+      "val_loss": 1.482,
+      "val_acc": 0.4667
+    },
+    {
+      "epoch": 3,
+      "train_loss": 1.1255,
+      "train_acc": 0.5042,
+      "val_loss": 1.4239,
+      "val_acc": 0.4167
+    }
+  ],
+  "final_val_accuracy": 0.4167,
+  "final_val_loss": 1.4239,
+  "checkpoint": "models/plant_disease/checkpoint.pt",
+  "classes": [
+    "Apple___Apple_scab",
+    "Apple___Black_rot",
+    "Apple___healthy",
+    "Corn_(maize)___Common_rust_",
+    "Corn_(maize)___Northern_Leaf_Blight",
+    "Corn_(maize)___healthy",
+    "Potato___Early_blight",
+    "Potato___Late_blight",
+    "Potato___healthy",
+    "Tomato___Bacterial_spot",
+    "Tomato___Early_blight",
+    "Tomato___Late_blight",
+    "Tomato___Leaf_Mold",
+    "Tomato___Septoria_leaf_spot",
+    "Tomato___healthy"
+  ]
+}

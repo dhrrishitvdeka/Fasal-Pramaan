@@ -1,0 +1,198 @@
+# ==========================================
+# FasalPramaan AI — Production .gitignore
+# ==========================================
+
+# ------------------------------------------
+# Environment files & Secrets
+# ------------------------------------------
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+.envrc
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+private/
+# Local agent/IDE session caches (do not publish)
+.agents/
+.codex/
+
+# ------------------------------------------
+# Python
+# ------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+/lib/
+/lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ------------------------------------------
+# Celery & Redis
+# ------------------------------------------
+celerybeat-schedule
+celerybeat.pid
+
+# ------------------------------------------
+# Node / Next.js / Frontend
+# ------------------------------------------
+node_modules/
+.next/
+out/
+.turbo/
+.cache/
+.npm
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ------------------------------------------
+# Flutter & Dart / Mobile
+# ------------------------------------------
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/.packages
+apps/mobile/build/
+apps/mobile/.pub-cache/
+apps/mobile/.pub/
+*.apk
+*.aab
+*.ipa
+**/*.iml
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/android/.gradle/
+**/android/local.properties
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+**/android/key.properties
+
+# ------------------------------------------
+# IDE & Text Editors
+# ------------------------------------------
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+*~
+*.bak
+
+# ------------------------------------------
+# Docker & Local Infrastructure
+# ------------------------------------------
+data/
+.minio/
+postgres_data/
+redis_data/
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# ------------------------------------------
+# Model Weights (Ignore large binary checkpoints)
+# ------------------------------------------
+services/ai/models/**/*.onnx
+services/ai/models/**/*.pt
+services/ai/models/**/*.pth
+!services/ai/models/**/.gitkeep
+# Preserve the fine-tuned plant-disease checkpoint for demo checks (approx 9MB)
+!services/ai/models/plant_disease/checkpoint.pt
+# Small, quantized public ViT used by the fully local presentation MVP.
+!services/ai/models/crop_vit/crop_leaf_diseases_vit.onnx
+# Locally fine-tuned experimental ViT; 22.2 MB and required for offline Docker.
+!services/ai/models/crop_health_vit_v3/model.onnx
+!services/ai/models/crop_health_dinov2_v14/model.onnx
+
+# ------------------------------------------
+# System & OS Specific
+# ------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+desktop.ini.lnk
+$RECYCLE.BIN/
+
+# ------------------------------------------
+# Temp & Scratch Folders
+# ------------------------------------------
+tmp/
+temp/
+.scratch/
+.scratch_*
+reports/
+# Versioned ML evidence is a deliverable, not a transient root-level report.
+!services/ai/research/reports/
+!services/ai/research/reports/**
+artifacts/
+*.sqlite
+*.sqlite3
+*.db
+# Local scratch dumps (do not publish)
+all_code_dump.txt
+GETTING_STARTED_LOCAL.md
+
+# Local ML research inputs and transient checkpoints. Provenance manifests,
+# evaluation reports, configs, and the selected ONNX model remain versioned.
+services/ai/research/data/
+services/ai/research/runs/
+services/ai/research/.venv/
+services/ai/.research-venv/

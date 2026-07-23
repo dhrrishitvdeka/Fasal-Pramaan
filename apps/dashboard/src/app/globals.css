@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Institutional / government Command Centre — restrained palette */
+:root {
+  --ink: #0f172a;
+  --ink-muted: #475569;
+  --line: #e2e8f0;
+  --surface: #ffffff;
+  --canvas: #f8fafc;
+  --accent: #1e3a5f;
+  --accent-soft: #e8eef5;
+  --focus: #1e3a5f;
+}
+
+body {
+  color: var(--ink);
+  background: var(--canvas);
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial,
+    "Noto Sans", "Noto Sans Devanagari", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+.leaflet-container {
+  font: inherit;
+  z-index: 0;
+  border: 1px solid var(--line);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Shared institutional primitives */
+@layer components {
+  .fp-page-title {
+    @apply text-base font-semibold tracking-tight text-slate-900;
+  }
+  .fp-page-sub {
+    @apply mt-0.5 text-sm text-slate-500;
+  }
+  .fp-panel {
+    @apply border border-slate-200 bg-white;
+  }
+  .fp-input {
+    @apply mt-1 w-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900
+      placeholder:text-slate-400 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500;
+  }
+  .fp-btn-primary {
+    @apply border border-slate-800 bg-slate-800 px-4 py-2 text-sm font-medium text-white
+      hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .fp-btn-secondary {
+    @apply border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800
+      hover:bg-slate-50 disabled:opacity-50;
+  }
+  .fp-btn-danger {
+    @apply border border-slate-400 bg-white px-4 py-2 text-sm font-medium text-slate-900
+      hover:bg-slate-50;
+  }
+  .fp-table {
+    @apply w-full border-collapse text-left text-sm;
+  }
+  .fp-table thead {
+    @apply border-b border-slate-200 bg-slate-50 text-xs font-medium uppercase tracking-wide text-slate-500;
+  }
+  .fp-table th {
+    @apply px-3 py-2.5 font-medium;
+  }
+  .fp-table td {
+    @apply border-t border-slate-100 px-3 py-2.5 text-slate-800;
+  }
+  .fp-table tbody tr:hover {
+    @apply bg-slate-50/80;
+  }
+  .fp-badge {
+    @apply inline-flex items-center border px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide;
+  }
+  .fp-badge-neutral {
+    @apply fp-badge border-slate-300 bg-white text-slate-700;
+  }
+  .fp-badge-warn {
+    @apply fp-badge border-slate-400 bg-slate-100 text-slate-800;
+  }
+  .fp-badge-alert {
+    @apply fp-badge border-slate-700 bg-slate-800 text-white;
+  }
+  .fp-badge-ok {
+    @apply fp-badge border-slate-500 bg-white text-slate-900;
+  }
+}

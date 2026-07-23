@@ -1,0 +1,15 @@
+{
+  "crop_order": ["maize", "paddy", "potato", "wheat"],
+  "conditioned_class_order": ["healthy", "disease", "invalid"],
+  "flat_evaluation_labels": [
+    "maize__healthy",
+    "maize__disease",
+    "paddy__healthy",
+    "paddy__disease",
+    "potato__healthy",
+    "potato__disease",
+    "wheat__healthy",
+    "wheat__disease",
+    "invalid__ood"
+  ]
+}

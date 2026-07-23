@@ -1,0 +1,14 @@
+{
+  "version": "vit-onnx-transfer-parity-v1",
+  "max_absolute_logit_error": 5.7220458984375e-06,
+  "mean_absolute_logit_error": 2.0182476418995066e-06,
+  "argmax_agreement": 1.0,
+  "passed": true,
+  "transfer": {
+    "source_classes": 13,
+    "transferred_tensors": 152,
+    "source": "C:\\Users\\dhrri\\Desktop\\Fasal-Pramaan\\services\\ai\\models\\crop_vit\\crop_leaf_diseases_vit.onnx",
+    "source_head_loaded": true
+  },
+  "is_production_validated": false
+}

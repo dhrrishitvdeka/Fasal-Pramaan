@@ -1,0 +1,71 @@
+{
+  "version": "manifest-summary-v1",
+  "seed": 26007,
+  "manifest_sha256": "99f930cc5266780e8ebc1ca18f61045d46c593c7697085af1f91f43242a83f2e",
+  "rows": 28663,
+  "counts": {
+    "by_split": {
+      "test": 12167,
+      "train": 13897,
+      "validation": 2599
+    },
+    "by_model_class_and_split": {
+      "invalid__ood:test": 2877,
+      "invalid__ood:train": 5118,
+      "invalid__ood:validation": 1036,
+      "maize__disease:test": 1414,
+      "maize__disease:train": 739,
+      "maize__disease:validation": 155,
+      "maize__healthy:test": 427,
+      "maize__healthy:train": 173,
+      "maize__healthy:validation": 30,
+      "paddy__disease:test": 6750,
+      "paddy__disease:train": 5016,
+      "paddy__disease:validation": 878,
+      "paddy__healthy:test": 253,
+      "paddy__healthy:train": 1660,
+      "paddy__healthy:validation": 315,
+      "potato__disease:test": 288,
+      "potato__disease:train": 403,
+      "potato__disease:validation": 55,
+      "potato__healthy:test": 16,
+      "potato__healthy:train": 171,
+      "potato__healthy:validation": 30,
+      "wheat__disease:test": 89,
+      "wheat__disease:train": 249,
+      "wheat__disease:validation": 30,
+      "wheat__healthy:test": 53,
+      "wheat__healthy:train": 368,
+      "wheat__healthy:validation": 70
+    },
+    "by_source": {
+      "maize_mld_ccby": 1996,
+      "multicrop_ccby": 6870,
+      "paddy_doctor_cc0": 10407,
+      "plantdoc_ccby": 2515,
+      "potato_field_ccby": 84,
+      "rice_field_ccby": 5932,
+      "wheat_iari_cc0": 859
+    },
+    "excluded": {
+      "qa_corrected_to_invalid": 1,
+      "synthetic_potato_augmentation": 2267,
+      "unlabelled_paddy_competition_test": 3469
+    }
+  },
+  "deduplication": {
+    "sha256_unique": 27227,
+    "perceptual_clusters": 26541,
+    "embedding_clusters": 27490,
+    "near_duplicate_clusters": 26541,
+    "phash_hamming_threshold": 5,
+    "phash_confirmation_embedding_cosine_threshold": 0.9999,
+    "embedding_candidate_cosine_threshold": 0.99999,
+    "embedding_confirmation_phash_hamming_threshold": 10,
+    "embedding_model": "in_repo_mobilenet_v2_baseline_features",
+    "leakage_split_groups": 13309,
+    "capture_group_rule": "indivisible and merged with all duplicate evidence"
+  },
+  "qa_sample_rows": 345,
+  "is_production_validated": false
+}

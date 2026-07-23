@@ -1,0 +1,16 @@
+{
+  "version": "field-preservation-v3-lock",
+  "frozen_at": "2026-07-23T16:10:00+05:30",
+  "config": "field_preservation_v3.json",
+  "config_sha256": "4a5aed9f85a96cbbbac8e2a7b3bcb72acb501d2b76aaa9b0ca72b66dd5471af8",
+  "base_and_teacher_checkpoint": "research/runs/vit_tiny_crop_aware_v3/best.pt",
+  "base_and_teacher_checkpoint_sha256": "ee623a4cdd455bcb00677315e4551e8cc89db33fcfff338b1b1007750afae4bf",
+  "manifest": "manifest_v2.jsonl",
+  "manifest_sha256": "2915cf91380b58ec7dcad8e99454a91208cb7029a00197b460d71609224ec762",
+  "dataset_audit_sha256": "9dd88d38cb415c56c7dffcc692866c79ef4e6b02019b88e606c86b8c1fb6eedb",
+  "qa_sample_sha256": "bd768f73be9f13d7315667c32fd958ee225d5e035a8d51f87a7fb4e528184895",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "promotion_thresholds": "promotion_thresholds_v1.json",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

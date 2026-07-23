@@ -1,0 +1,58 @@
+{
+  "version": "domain-robust-vit-refinement-v1",
+  "frozen_before_training": true,
+  "seed": 26007,
+  "rationale": "The crop-aware ViT overfit source-specific appearance. This refinement is declared before training and uses only training-source images plus the existing validation split. It adds bounded field-style augmentation and source-balanced sampling; promotion thresholds remain unchanged.",
+  "test_disclosure": "The original frozen test was already observed for earlier candidates and exposed the general domain-shift problem. No test image, label, logit, threshold, or duplicate enters this training run. Independent field validation is still required.",
+  "models": [
+    {
+      "id": "vit_tiny_domain_robust_v4",
+      "provider": "timm",
+      "architecture": "vit_tiny_patch16_224",
+      "initialization": "local_vit_tiny_crop_aware_v3_best_checkpoint",
+      "base_run": "research/runs/vit_tiny_crop_aware_v3/best.pt"
+    }
+  ],
+  "training": {
+    "epochs": 6,
+    "warmup_head_epochs": 0,
+    "batch_size": 32,
+    "dataloader_workers": 4,
+    "optimizer": "adamw",
+    "learning_rate": 0.000012,
+    "head_learning_rate": 0.00006,
+    "weight_decay": 0.025,
+    "label_smoothing": 0.08,
+    "early_stopping_patience": 3,
+    "mixed_precision": true,
+    "gradient_clip_norm": 1.0,
+    "class_weighting": "inverse_sqrt_frequency",
+    "invalid_class_weight_multiplier": 2.0,
+    "source_balanced_sampling": true,
+    "skip_frozen_test_during_training": true,
+    "crop_aware_loss": {
+      "crop_loss_weight": 0.3,
+      "invalid_margin_weight": 0.25,
+      "invalid_margin": 1.0
+    },
+    "max_train_per_class": null,
+    "max_validation_per_class": null
+  },
+  "augmentation": {
+    "random_resized_crop_scale": [0.55, 1.0],
+    "horizontal_flip_probability": 0.5,
+    "rotation_degrees": 28,
+    "color_jitter": [0.32, 0.32, 0.25, 0.08],
+    "random_grayscale_probability": 0.08,
+    "gaussian_blur_probability": 0.18,
+    "perspective_probability": 0.15,
+    "perspective_distortion_scale": 0.25,
+    "randaugment_num_ops": 2,
+    "randaugment_magnitude": 7,
+    "jpeg_quality_range": [35, 100],
+    "random_erasing_probability": 0.25,
+    "synthetic_images_in_validation_or_test": false
+  },
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

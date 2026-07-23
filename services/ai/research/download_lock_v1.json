@@ -1,0 +1,64 @@
+{
+  "version": "download-lock-v1",
+  "generated_at": "2026-07-18T19:12:36.141912+00:00",
+  "sources_config_sha256": "dec51218af6eb6cfa9fc4f4b05fbe144604607af82aabc159a123f57e8163648",
+  "sources": [
+    {
+      "id": "maize_mld_ccby",
+      "archive_name": "maize_mld_ccby.zip",
+      "bytes": 27340926,
+      "sha256": "f15846ec615e6239ea9e282beb0b5506edfec1fb19975dad01df4a5942d1633f",
+      "source_url": "https://data.mendeley.com/datasets/3myfctrgk3/1",
+      "license": "CC BY 4.0"
+    },
+    {
+      "id": "multicrop_ccby",
+      "archive_name": "multicrop_ccby.zip",
+      "bytes": 661739423,
+      "sha256": "4ff1020d0d78686368907591809b183660e0005886dd33942af9d50fa4971e01",
+      "source_url": "https://data.mendeley.com/datasets/z6jp232g5j/1",
+      "license": "CC BY 4.0"
+    },
+    {
+      "id": "paddy_doctor_cc0",
+      "archive_name": "paddy_doctor_cc0.zip",
+      "bytes": 1094204760,
+      "sha256": "876d323f37decef1a27e4b3f6fd2402d3c0781eefa9135b67e153d0b9af72509",
+      "source_url": "https://www.kaggle.com/datasets/imbikramsaha/paddy-doctor",
+      "license": "CC0 1.0"
+    },
+    {
+      "id": "plantdoc_ccby",
+      "archive_name": "plantdoc_ccby.zip",
+      "bytes": 984592720,
+      "sha256": "94e2b99a500a63efbd48923ed48588fbb01f9b1db66a2d3b5c24eed6466da20f",
+      "source_url": "https://github.com/pratikkayal/PlantDoc-Dataset",
+      "license": "CC BY 4.0",
+      "pinned_revision": "5467f6012d78d1c446145d5f582da6096f852ae8"
+    },
+    {
+      "id": "potato_field_ccby",
+      "archive_name": "potato_field_ccby.zip",
+      "bytes": 38393565,
+      "sha256": "549c7f3343422fa2b77b6fb2c5009a52215aa00626b2646435ba19f4826f8192",
+      "source_url": "https://data.mendeley.com/datasets/d5b3fzpw3g/1",
+      "license": "CC BY 4.0"
+    },
+    {
+      "id": "rice_field_ccby",
+      "archive_name": "rice_field_ccby.7z",
+      "bytes": 179355409,
+      "sha256": "b2d5fbef5a8ef6adefa04a83be7ee5150091f412d40162ecdf9fd2b1b5e24aaf",
+      "source_url": "https://data.mendeley.com/datasets/fwcj7stb8r/1",
+      "license": "CC BY 4.0"
+    },
+    {
+      "id": "wheat_iari_cc0",
+      "archive_name": "wheat_iari_cc0.zip",
+      "bytes": 254197767,
+      "sha256": "d09de0fbb42b82dfa5ca44975181fc25f5631201119fb7934e95b271a9bc20fb",
+      "source_url": "https://www.kaggle.com/datasets/jocelyndumlao/wheat-nitrogen-deficiency-and-leaf-rust-image",
+      "license": "CC0 1.0"
+    }
+  ]
+}

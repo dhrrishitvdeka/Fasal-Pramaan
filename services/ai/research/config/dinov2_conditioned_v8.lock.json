@@ -1,0 +1,15 @@
+{
+  "lock_version": "training-config-lock-v1",
+  "frozen_at": "2026-07-23T21:10:00+05:30",
+  "config_filename": "dinov2_conditioned_v8.json",
+  "config_sha256": "627bb2944d1f9c1eab96fe35650ec380117beec846cbe5733416381263fe258e",
+  "manifest_filename": "manifest_v5.jsonl",
+  "manifest_sha256": "2d85160ac400d05b30fa5f606cbea1b606eeedaff0dc17e842f8391782b0800f",
+  "base_checkpoint": "research/runs/dinov2_vits14_pldd_linear_v11/best.pt",
+  "base_checkpoint_bytes": 86588157,
+  "base_checkpoint_sha256": "2c4ddfc3c125c3c1229b7283b2b4bfbf794889b1bd886a5201e63dfcec8ef0ec",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "frozen_test_evaluated_during_training": false,
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

@@ -1,0 +1,80 @@
+{
+  "version": "promotion-decision-v1",
+  "candidate": "vit_tiny_crop_aware_v3_with_expected_crop_hierarchy_v2",
+  "decision": "not_promoted",
+  "failed_gates": [
+    "source_held_out_macro_f1_min",
+    "maximum_ece_after_calibration"
+  ],
+  "gates": {
+    "macro_f1_min": {
+      "threshold": 0.65,
+      "observed": 0.7651547746175289,
+      "passed": true
+    },
+    "macro_f1_improvement_over_baseline_min": {
+      "threshold": 0.15,
+      "observed": 0.7206862520438475,
+      "passed": true
+    },
+    "balanced_accuracy_min": {
+      "threshold": 0.65,
+      "observed": 0.8530841707037068,
+      "passed": true
+    },
+    "balanced_accuracy_improvement_over_baseline_min": {
+      "threshold": 0.15,
+      "observed": 0.7480496187605041,
+      "passed": true
+    },
+    "source_held_out_macro_f1_min": {
+      "threshold": 0.6,
+      "observed": 0.44145802418095875,
+      "passed": false
+    },
+    "minimum_per_crop_recall": {
+      "threshold": 0.5,
+      "observed": 0.6907894736842105,
+      "passed": true
+    },
+    "maximum_ece_after_calibration": {
+      "threshold": 0.12,
+      "observed": 0.20846406966900974,
+      "passed": false
+    },
+    "minimum_ood_rejection_recall": {
+      "threshold": 0.8,
+      "observed": 0.8338547097671185,
+      "passed": true
+    },
+    "minimum_id_coverage_at_ood_threshold": {
+      "threshold": 0.7,
+      "observed": 0.7615715823466093,
+      "passed": true
+    },
+    "maximum_cpu_latency_p95_ms": {
+      "threshold": 300.0,
+      "observed": 13.207899999997608,
+      "passed": true
+    },
+    "maximum_onnx_size_bytes": {
+      "threshold": 104857600,
+      "observed": 22240720.0,
+      "passed": true
+    },
+    "minimum_onnx_top1_parity": {
+      "threshold": 0.99,
+      "observed": 1.0,
+      "passed": true
+    },
+    "maximum_onnx_probability_abs_error": {
+      "threshold": 0.001,
+      "observed": 3.039836883544922e-06,
+      "passed": true
+    }
+  },
+  "integration_status": "experimental_demo_adapter_only",
+  "rollback_adapter": "crop_vit",
+  "human_review_required": true,
+  "is_production_validated": false
+}

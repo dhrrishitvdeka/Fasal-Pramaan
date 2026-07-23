@@ -1,0 +1,63 @@
+{
+  "version": "candidate-experiments-v1",
+  "seed": 26007,
+  "models": [
+    {
+      "id": "efficientnetv2_s",
+      "provider": "torchvision",
+      "architecture": "efficientnet_v2_s",
+      "initialization": "random_local",
+      "initialization_reason": "No separately downloadable weights are required for offline reproduction."
+    },
+    {
+      "id": "convnext_tiny",
+      "provider": "torchvision",
+      "architecture": "convnext_tiny",
+      "initialization": "random_local",
+      "initialization_reason": "No separately downloadable weights are required for offline reproduction."
+    },
+    {
+      "id": "deit_small",
+      "provider": "timm",
+      "architecture": "deit_small_patch16_224",
+      "initialization": "random_local",
+      "initialization_reason": "No separately downloadable weights are required for offline reproduction."
+    },
+    {
+      "id": "vit_tiny",
+      "provider": "timm",
+      "architecture": "vit_tiny_patch16_224",
+      "initialization": "vendored_mit_onnx_transfer_without_source_head",
+      "initialization_artifact": "models/crop_vit/crop_leaf_diseases_vit.onnx",
+      "initialization_sha256": "3cb2ede8723dcbcd70db7d5bb99cc0d61466c304b2c91b26f2d0d54db9fb75f3",
+      "upstream_training_ids_available": false,
+      "upstream_overlap_risk": "Unknown public pretraining IDs; report separately and retain is_production_validated=false."
+    }
+  ],
+  "training": {
+    "epochs": 8,
+    "warmup_head_epochs": 1,
+    "batch_size": 32,
+    "dataloader_workers": 4,
+    "optimizer": "adamw",
+    "learning_rate": 0.0002,
+    "head_learning_rate": 0.001,
+    "weight_decay": 0.01,
+    "label_smoothing": 0.05,
+    "early_stopping_patience": 3,
+    "mixed_precision": true,
+    "gradient_clip_norm": 1.0,
+    "class_weighting": "inverse_sqrt_frequency",
+    "max_train_per_class": 900,
+    "max_validation_per_class": 180
+  },
+  "augmentation": {
+    "random_resized_crop_scale": [0.72, 1.0],
+    "horizontal_flip_probability": 0.5,
+    "rotation_degrees": 18,
+    "color_jitter": [0.18, 0.18, 0.12, 0.03],
+    "jpeg_quality_range": [55, 100],
+    "random_erasing_probability": 0.15,
+    "synthetic_images_in_validation_or_test": false
+  }
+}

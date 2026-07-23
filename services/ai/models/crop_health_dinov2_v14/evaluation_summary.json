@@ -1,0 +1,25 @@
+{
+  "version": "conditioned-dinov2-v14-evaluation-summary",
+  "frozen_test_rows": 12167,
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "macro_f1": 0.8068072168574383,
+  "balanced_accuracy": 0.8192734406109197,
+  "source_held_out_field_macro_f1": 0.6393295840381412,
+  "minimum_per_crop_recall": 0.6546052631578947,
+  "invalid_ood_rejection_recall": 0.935349322210636,
+  "id_coverage": 0.836167922497309,
+  "pre_decision_ece_15_bins": 0.01622760594454513,
+  "onnx_size_bytes": 86698536,
+  "onnx_top1_parity": 1.0,
+  "onnx_max_probability_abs_error": 0.000005930662155151367,
+  "onnx_cpu_latency_p95_ms": 156.97639999780222,
+  "lowest_supported_class": {
+    "class": "potato__healthy",
+    "support": 16,
+    "precision": 0.4444444444444444,
+    "recall": 0.25,
+    "f1": 0.32
+  },
+  "human_review_required": true,
+  "is_production_validated": false
+}

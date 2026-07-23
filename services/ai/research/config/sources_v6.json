@@ -1,0 +1,46 @@
+{
+  "version": "licensed-sources-v6",
+  "extends": "sources_v5.json",
+  "redistribute_raw_images": false,
+  "added_sources": [
+    {
+      "id": "riceleafbd_ccby",
+      "role": "train_validation_source_disjoint_paddy_smartphone_field_domain",
+      "crops": ["paddy"],
+      "dataset": "RiceLeafBD",
+      "source_url": "https://data.mendeley.com/datasets/kx9rx8p2mz/1",
+      "doi": "10.17632/kx9rx8p2mz.1",
+      "license": "CC BY 4.0",
+      "archive_sha256": "3280cc176c2ee9f6ee4386e5728623fc7e8f9204b31c50f4ebb303edc52d9c83",
+      "commercial_use": true,
+      "redistribute_raw_images": false,
+      "field_conditions": "Smartphone images captured in real paddy fields and expert validated; original labels are healthy leaf, bacterial leaf blight, brown spot, and tungro virus"
+    },
+    {
+      "id": "rice_field_weeds_ccby",
+      "role": "train_validation_real_field_ood_rejection_domain",
+      "crops": [],
+      "dataset": "Rice Field Weed Dataset V3",
+      "source_url": "https://data.mendeley.com/datasets/mt72bmxz73/3",
+      "doi": "10.17632/mt72bmxz73.3",
+      "license": "CC BY 4.0",
+      "archive_sha256": "9b3f766c2893b6059515cf309fd4b4822132805c64571942b274d971dc0d1914",
+      "commercial_use": true,
+      "redistribute_raw_images": false,
+      "field_conditions": "Smartphone images of eleven weed species captured in rice fields; treated only as unsupported OOD examples"
+    },
+    {
+      "id": "potato_blight_sample_ccby",
+      "role": "train_validation_source_disjoint_potato_field_domain",
+      "crops": ["potato"],
+      "dataset": "Enhanced Field-Based Detection of Potato Leaf Blight (sample)",
+      "source_url": "https://data.mendeley.com/datasets/pbnw43s6kt/1",
+      "doi": "10.17632/pbnw43s6kt.1",
+      "license": "CC BY 4.0",
+      "archive_sha256": "88cd82644a839cb708cf3ea3b1c21da24ff442061883ac5001701ee1c807bcf0",
+      "commercial_use": true,
+      "redistribute_raw_images": false,
+      "field_conditions": "Original healthy and blight-infected potato leaf photographs collected across locations and capture times under field conditions"
+    }
+  ]
+}

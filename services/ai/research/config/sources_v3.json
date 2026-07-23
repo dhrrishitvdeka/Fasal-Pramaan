@@ -1,0 +1,34 @@
+{
+  "version": "licensed-sources-v3",
+  "extends": "sources_v2.json",
+  "redistribute_raw_images": false,
+  "added_sources": [
+    {
+      "id": "potato_uncontrolled_ccby",
+      "role": "train_validation_uncontrolled_field_domain",
+      "crops": ["potato"],
+      "dataset": "Potato Leaf Disease Dataset in Uncontrolled Environment",
+      "source_url": "https://huggingface.co/datasets/Project-AgML/potato_leaf_disease_classification",
+      "doi": "10.17632/ptz377bwb8.1",
+      "license": "CC BY 4.0",
+      "pinned_revision": "d564ae2b7548f8a6ef99139ba69a1f82f2dfed5e",
+      "source_package_sha256": "cb8df2d785c4ffd044248d6a9601feeaae5ebd4b0acec9088dfc6c79e1b31c00",
+      "commercial_use": true,
+      "redistribute_raw_images": false,
+      "field_conditions": "Uncontrolled-environment potato imagery; seven healthy/disease/pest categories"
+    },
+    {
+      "id": "ricey_field_ccby",
+      "role": "train_validation_original_field_domain",
+      "crops": ["paddy"],
+      "dataset": "RiceyLeafDisease",
+      "source_url": "https://data.mendeley.com/datasets/t46kkgh2yw/1",
+      "doi": "10.17632/t46kkgh2yw.1",
+      "license": "CC BY 4.0",
+      "archive_sha256": "eb1e804ae414250d7a333a1c3820c49a520c2f09e2e6a38f280e90f58a4f62fb",
+      "commercial_use": true,
+      "redistribute_raw_images": false,
+      "field_conditions": "Original-only rice images from multiple Bangladesh locations and outdoor lighting conditions; augmented folder excluded"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "version": "licensed-sources-v5",
+  "extends": "sources_v4.json",
+  "redistribute_raw_images": false,
+  "added_sources": [
+    {
+      "id": "potato_pldd_up_ccby",
+      "role": "train_validation_source_disjoint_whole_plant_field_domain",
+      "crops": ["potato"],
+      "dataset": "PLDD-UP: Potato Leaf Disease Dataset from Uttar Pradesh, India",
+      "source_url": "https://data.mendeley.com/datasets/3j4nfkvp2n/1",
+      "doi": "10.17632/3j4nfkvp2n.1",
+      "license": "CC BY 4.0",
+      "archive_set_sha256": "aa45fc6e55f73edf71e8d77c13587d59c5cb2f7afdcedab86e1a800f4da703af",
+      "commercial_use": true,
+      "redistribute_raw_images": false,
+      "field_conditions": "Original whole-plant potato imagery captured in operational Uttar Pradesh fields under natural light using smartphones and digital cameras; labels are healthy, early blight, and late blight"
+    }
+  ]
+}

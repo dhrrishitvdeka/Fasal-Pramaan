@@ -1,0 +1,20 @@
+{
+  "input_name": "pixel_values",
+  "input_shape": ["batch", 3, 224, 224],
+  "color_space": "RGB",
+  "resize": {
+    "width": 224,
+    "height": 224,
+    "method": "bilinear",
+    "preserve_aspect_ratio": false
+  },
+  "tensor_layout": "NCHW",
+  "value_scale": "uint8 / 255",
+  "normalization_mean": [0.485, 0.456, 0.406],
+  "normalization_std": [0.229, 0.224, 0.225],
+  "output_name": "conditioned_logits",
+  "output_shape": ["batch", 4, 3],
+  "temperature": 1.0000034972115646,
+  "abstention_threshold": 0.52,
+  "multi_view_aggregation": "angle-weighted arithmetic mean of calibrated conditioned probabilities"
+}

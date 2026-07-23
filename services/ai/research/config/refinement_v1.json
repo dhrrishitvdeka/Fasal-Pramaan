@@ -1,0 +1,42 @@
+{
+  "version": "selected-vit-full-data-refinement-v1",
+  "seed": 26007,
+  "rationale": "Frozen before refinement. Use all audited training and validation images after the controlled comparison showed ViT-Tiny as the best architecture. Promotion thresholds are unchanged.",
+  "models": [
+    {
+      "id": "vit_tiny_full_data_v2",
+      "provider": "timm",
+      "architecture": "vit_tiny_patch16_224",
+      "initialization": "local_vit_tiny_candidate_best_checkpoint",
+      "base_run": "research/runs/vit_tiny/best.pt"
+    }
+  ],
+  "training": {
+    "epochs": 5,
+    "warmup_head_epochs": 0,
+    "batch_size": 32,
+    "dataloader_workers": 4,
+    "optimizer": "adamw",
+    "learning_rate": 0.00003,
+    "head_learning_rate": 0.0002,
+    "weight_decay": 0.01,
+    "label_smoothing": 0.03,
+    "early_stopping_patience": 2,
+    "mixed_precision": true,
+    "gradient_clip_norm": 1.0,
+    "class_weighting": "inverse_sqrt_frequency",
+    "max_train_per_class": null,
+    "max_validation_per_class": null
+  },
+  "augmentation": {
+    "random_resized_crop_scale": [0.72, 1.0],
+    "horizontal_flip_probability": 0.5,
+    "rotation_degrees": 18,
+    "color_jitter": [0.18, 0.18, 0.12, 0.03],
+    "jpeg_quality_range": [55, 100],
+    "random_erasing_probability": 0.15,
+    "synthetic_images_in_validation_or_test": false
+  },
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

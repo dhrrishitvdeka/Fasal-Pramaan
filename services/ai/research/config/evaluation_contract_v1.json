@@ -1,0 +1,43 @@
+{
+  "version": "evaluation-contract-v1",
+  "seed": 26007,
+  "image_size": 224,
+  "primary_metrics": ["macro_f1", "balanced_accuracy"],
+  "required_metrics": [
+    "per_class_precision_recall_f1",
+    "per_crop_precision_recall",
+    "confusion_matrix",
+    "expected_calibration_error_15_bins",
+    "reliability_diagram",
+    "invalid_ood_rejection_recall",
+    "id_coverage",
+    "cpu_latency_p50_ms",
+    "cpu_latency_p95_ms",
+    "model_size_bytes"
+  ],
+  "split_policy": {
+    "train_sources": ["multicrop_ccby", "paddy_doctor_cc0", "wheat_iari_cc0"],
+    "validation_fraction_by_group": 0.15,
+    "frozen_field_test_sources": [
+      "maize_mld_ccby",
+      "potato_field_ccby",
+      "rice_field_ccby",
+      "plantdoc_ccby"
+    ],
+    "group_keys": ["source_dataset", "capture_group", "near_duplicate_cluster"],
+    "forbid_cross_split": ["sha256", "near_duplicate_cluster", "embedding_cluster", "capture_group"],
+    "test_is_immutable_after_manifest_freeze": true
+  },
+  "calibration": {
+    "method": "temperature_scaling",
+    "fit_split": "validation",
+    "ece_bins": 15
+  },
+  "ood": {
+    "score": "maximum_softmax_probability_with_invalid_class",
+    "threshold_fit_split": "validation",
+    "threshold_selection": "highest validation macro_f1 among thresholds with invalid recall >= 0.80 and ID coverage >= 0.70; if infeasible, minimize summed constraint shortfall then maximize macro_f1",
+    "unsupported_crop_always_u": true,
+    "crop_mismatch_always_u": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "version": "dinov2-pldd-trusted-crop-contract-v1-validation",
+  "validation_only": true,
+  "frozen_before_contract_test_evaluation": true,
+  "base_checkpoint": "research/runs/dinov2_vits14_pldd_linear_v11/best.pt",
+  "base_checkpoint_sha256": "2c4ddfc3c125c3c1229b7283b2b4bfbf794889b1bd886a5201e63dfcec8ef0ec",
+  "base_checkpoint_selection": "highest unweighted manifest-v5 validation macro-F1 within the pre-frozen three-epoch linear-head schedule",
+  "manifest": "manifest_v5.jsonl",
+  "manifest_sha256": "2d85160ac400d05b30fa5f606cbea1b606eeedaff0dc17e842f8391782b0800f",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "calibration": "equal-source weighting across the six declared field validation sources, with the pre-frozen minimum temperature 1.5",
+  "fixed_thresholds": {
+    "mismatch_threshold": 0.9,
+    "confidence_threshold": 0.0,
+    "selection_source": "preexisting hierarchical_contract_v5.json mismatch policy with no confidence rejection"
+  },
+  "expected_crop_source_in_product": "trusted crop-cycle metadata supplied by the API request",
+  "frozen_test_evaluated": false,
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

@@ -1,0 +1,45 @@
+{
+  "version": "field-expansion-download-lock-v1",
+  "sources": [
+    {
+      "id": "potato_uncontrolled_ccby",
+      "dataset": "Project-AgML/potato_leaf_disease_classification",
+      "revision": "d564ae2b7548f8a6ef99139ba69a1f82f2dfed5e",
+      "license": "CC BY 4.0",
+      "source_url": "https://huggingface.co/datasets/Project-AgML/potato_leaf_disease_classification",
+      "doi": "10.17632/ptz377bwb8.1",
+      "files": [
+        {
+          "filename": "data/train-00000-of-00002.parquet",
+          "bytes": 381298218,
+          "sha256": "b7d1992bcc763ae3148082acc3bb1c987551fcf2859efd8ae1c46c1061254c80",
+          "upstream_blob_sha256": "b7d1992bcc763ae3148082acc3bb1c987551fcf2859efd8ae1c46c1061254c80"
+        },
+        {
+          "filename": "data/train-00001-of-00002.parquet",
+          "bytes": 373181595,
+          "sha256": "5a972eedc52d380725fec634a15d931bd85a534056fc2b503180fbb35125ce78",
+          "upstream_blob_sha256": "5a972eedc52d380725fec634a15d931bd85a534056fc2b503180fbb35125ce78"
+        }
+      ],
+      "rows": 3076,
+      "unique_image_sha256": 3021,
+      "metadata_sha256": "d5713440685e23dfcaa8e692a6ab985339ec92a0a3efa8e30796e03ec864096f"
+    },
+    {
+      "id": "ricey_field_ccby",
+      "dataset": "RiceyLeafDisease",
+      "doi": "10.17632/t46kkgh2yw.1",
+      "dataset_version": 1,
+      "license": "CC BY 4.0",
+      "source_url": "https://data.mendeley.com/datasets/t46kkgh2yw/1",
+      "archive_url": "https://data.mendeley.com/public-files/datasets/t46kkgh2yw/files/ad910789-b1f6-47d3-8115-70b5865605f8/file_downloaded",
+      "archive_bytes": 1664385692,
+      "archive_sha256": "eb1e804ae414250d7a333a1c3820c49a520c2f09e2e6a38f280e90f58a4f62fb",
+      "rows": 1701,
+      "unique_image_sha256": 1652,
+      "metadata_sha256": "030168f4f137614c0b64d82ceacd9c9871739da860f904ad7a0d8f4ae23200ba",
+      "augmentation_policy": "Original Images.zip only; published Augmented folder excluded"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "evaluation": "frozen-field-evaluation-v1 with expected-crop hierarchy-v2",
+  "test_rows": 12167,
+  "macro_f1": 0.7651547746175289,
+  "balanced_accuracy": 0.8530841707037068,
+  "source_held_out_macro_f1": 0.44145802418095875,
+  "minimum_per_crop_recall": 0.6907894736842105,
+  "expected_calibration_error_15_bins": 0.20846406966900974,
+  "invalid_ood_rejection_recall": 0.8338547097671185,
+  "id_coverage": 0.7615715823466093,
+  "baseline_macro_f1": 0.04446852257368141,
+  "onnx_top1_parity": 1.0,
+  "onnx_max_probability_abs_error": 0.000003039836883544922,
+  "cpu_latency_p95_ms": 13.207899999997608,
+  "promotion_decision": "not_promoted",
+  "is_production_validated": false
+}

@@ -1,0 +1,20 @@
+{
+  "lock_version": "dinov2-field-linear-probe-v6-lock",
+  "frozen_before_training": true,
+  "config_filename": "dinov2_field_linear_v6.json",
+  "config_bytes": 3534,
+  "config_sha256": "bf89bc614fc4e18a61010d81bd9c3645211c5b6a852c688f3ab54f1158eb2e40",
+  "manifest_filename": "manifest_v4.jsonl",
+  "manifest_bytes": 35497048,
+  "manifest_sha256": "7af7c29657beeed3ddbd6ba231bcb54d1c158785982b062e3770fa036928e712",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "base_checkpoint": "research/runs/dinov2_vits14_linear_v8/best.pt",
+  "base_checkpoint_bytes": 86587709,
+  "base_checkpoint_sha256": "9ab68d0b694c1e61fb3e33950e66f21f4323e3f4916b63faee31035a9b975aba",
+  "pretrained_weights": "research/data/pretrained/vit_small_patch14_dinov2.lvd142m.bdc84086.safetensors",
+  "pretrained_weights_bytes": 88240510,
+  "pretrained_weights_sha256": "04d27f3400d059fc0cfd7d17dd1909a75bf3ea8fb3eeb48b97cb99e57ee20081",
+  "test_evaluated": false,
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

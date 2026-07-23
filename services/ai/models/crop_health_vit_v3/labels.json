@@ -1,0 +1,13 @@
+{
+  "labels": [
+    "maize__healthy",
+    "maize__disease",
+    "paddy__healthy",
+    "paddy__disease",
+    "potato__healthy",
+    "potato__disease",
+    "wheat__healthy",
+    "wheat__disease",
+    "invalid__ood"
+  ]
+}

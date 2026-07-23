@@ -1,0 +1,26 @@
+{
+  "version": "dinov2-pldd-trusted-crop-contract-v1",
+  "frozen_before_this_contracts_test_evaluation": true,
+  "base_checkpoint": "research/runs/dinov2_vits14_pldd_linear_v11/best.pt",
+  "base_checkpoint_sha256": "2c4ddfc3c125c3c1229b7283b2b4bfbf794889b1bd886a5201e63dfcec8ef0ec",
+  "base_checkpoint_selection": "highest unweighted manifest-v5 validation macro-F1 within the pre-frozen three-epoch linear-head schedule",
+  "manifest": "manifest_v5.jsonl",
+  "manifest_sha256": "2d85160ac400d05b30fa5f606cbea1b606eeedaff0dc17e842f8391782b0800f",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "calibration": "equal-source weighting across the six declared field validation sources, with minimum temperature 1.5",
+  "temperature": 1.5000088610619051,
+  "fixed_thresholds": {
+    "mismatch_threshold": 0.9,
+    "confidence_threshold": 0.0,
+    "validation_invalid_ood_recall": 0.9571428571428572,
+    "validation_id_coverage": 0.9615591880725705,
+    "validation_macro_f1": 0.8993780834643323,
+    "validation_balanced_accuracy": 0.9321828148593373,
+    "validation_ece": 0.09536287158408979,
+    "selection_source": "hierarchical_validation_only_v11_candidate.json; thresholds carry forward the preexisting hierarchical_contract_v5.json policy"
+  },
+  "expected_crop_source_in_product": "trusted crop-cycle metadata supplied by the API request",
+  "test_disclosure": "The immutable test was observed for earlier candidates and disclosed an aggregate potato field-domain gap. This contract records only manifest-v5 validation measurements for the validation-selected v11 checkpoint. No v11 frozen-test image, label, logit, calibration value, threshold, or per-example failure was inspected before this file was frozen.",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

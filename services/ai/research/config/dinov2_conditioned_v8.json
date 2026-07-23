@@ -1,0 +1,64 @@
+{
+  "version": "dinov2-crop-conditioned-heads-v8",
+  "frozen_before_training": true,
+  "config_filename": "dinov2_conditioned_v8.json",
+  "seed": 26017,
+  "manifest_filename": "manifest_v5.jsonl",
+  "manifest_sha256": "2d85160ac400d05b30fa5f606cbea1b606eeedaff0dc17e842f8391782b0800f",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "rationale": "Replace the shared flat head with four crop-conditioned healthy/disease/invalid heads. A supported image trains its declared crop head for health and every other crop head for mismatch rejection; an invalid/OOD image trains all heads for rejection. The DINOv2 encoder stays frozen. Epoch zero exactly maps the validation-selected v11 head so training cannot be selected unless validation improves.",
+  "test_disclosure": "No frozen-test image, label, logit, per-example failure, threshold, or calibration parameter enters this run. The architecture responds to aggregate, previously disclosed field-domain and OOD gaps. Checkpoint selection, calibration, and abstention use manifest-v5 validation only. Promotion gates remain unchanged.",
+  "model": {
+    "id": "dinov2_vits14_conditioned_v12",
+    "base_model_id": "dinov2_vits14_pldd_linear_v11",
+    "base_checkpoint": "runs/dinov2_vits14_pldd_linear_v11/best.pt",
+    "base_checkpoint_sha256": "2c4ddfc3c125c3c1229b7283b2b4bfbf794889b1bd886a5201e63dfcec8ef0ec",
+    "architecture": "vit_small_patch14_dinov2.lvd142m_with_four_3way_heads",
+    "conditioned_crops": ["maize", "paddy", "potato", "wheat"],
+    "conditioned_classes": ["healthy", "disease", "invalid"]
+  },
+  "training": {
+    "epochs": 4,
+    "batch_size": 64,
+    "evaluation_batch_size": 96,
+    "dataloader_workers": 4,
+    "optimizer": "adamw",
+    "head_learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "label_smoothing": 0.02,
+    "mixed_precision": true,
+    "gradient_clip_norm": 1.0,
+    "invalid_target_weight_multiplier": 1.25,
+    "calibration_sources": [
+      "digigreen_ccby",
+      "potato_uncontrolled_ccby",
+      "ricey_field_ccby",
+      "potato_ethiopia_ccby",
+      "maize_seasonal_ccby",
+      "potato_pldd_up_ccby"
+    ],
+    "minimum_temperature": 1.0,
+    "skip_frozen_test_during_training": true
+  },
+  "preprocessing": {
+    "image_size": 224,
+    "normalize_mean": [0.485, 0.456, 0.406],
+    "normalize_std": [0.229, 0.224, 0.225]
+  },
+  "augmentation": {
+    "random_resized_crop_scale": [0.75, 1.0],
+    "horizontal_flip_probability": 0.5,
+    "rotation_degrees": 12,
+    "color_jitter": [0.15, 0.15, 0.1, 0.02],
+    "random_grayscale_probability": 0.0,
+    "gaussian_blur_probability": 0.03,
+    "perspective_probability": 0.02,
+    "perspective_distortion_scale": 0.1,
+    "jpeg_quality_range": [65, 100],
+    "random_erasing_probability": 0.05,
+    "synthetic_images_in_validation_or_test": false
+  },
+  "selection_metric": "unweighted_validation_macro_f1",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

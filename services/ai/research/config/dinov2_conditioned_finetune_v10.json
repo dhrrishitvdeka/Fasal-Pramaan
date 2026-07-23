@@ -1,0 +1,80 @@
+{
+  "version": "dinov2-crop-conditioned-partial-finetune-v10",
+  "frozen_before_training": true,
+  "config_filename": "dinov2_conditioned_finetune_v10.json",
+  "seed": 26023,
+  "manifest_filename": "manifest_v6.jsonl",
+  "manifest_sha256": "fa9b7d2e691feb7feb04d17b80c94d3e1ec72a7cd928c574894c2b1da82a8eff",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "rationale": "The source-balanced, frozen-encoder v13 candidate passed every aggregate gate except source-held-out field macro-F1. Aggregate source/class metrics show persistent domain rejection, so this predeclared run fine-tunes only the final two DINOv2 transformer blocks and final norm at a low learning rate. Equal expected sampling weight per licensed source prevents the large controlled and PLDD sources from dominating. Checkpoint selection uses pooled macro-F1 over declared source-disjoint field validation sources, with global validation macro-F1 as the tie-breaker.",
+  "test_disclosure": "This architecture responds only to aggregate v13 source-held-out field and class metrics. No frozen-test image, per-example prediction, logit, confidence, or failure is used. The schedule, sampler, validation field-source set, optimizer, and promotion gates are frozen before training. The unchanged frozen test will be opened once only after a validation-selected contract is locked.",
+  "model": {
+    "id": "dinov2_vits14_conditioned_finetune_v14",
+    "base_model_id": "dinov2_vits14_pldd_linear_v11",
+    "base_checkpoint": "runs/dinov2_vits14_conditioned_field_v13/best.pt",
+    "base_checkpoint_sha256": "9be92da54ac3ff619ef691d2f58f104211547b0d7700981914d6c8b288b9bdc0",
+    "architecture": "vit_small_patch14_dinov2.lvd142m_with_four_3way_heads_last2_blocks_finetuned",
+    "conditioned_crops": ["maize", "paddy", "potato", "wheat"],
+    "conditioned_classes": ["healthy", "disease", "invalid"]
+  },
+  "training": {
+    "epochs": 3,
+    "batch_size": 32,
+    "evaluation_batch_size": 96,
+    "dataloader_workers": 4,
+    "optimizer": "adamw",
+    "head_learning_rate": 0.00002,
+    "backbone_learning_rate": 0.000005,
+    "backbone_unfreeze_last_blocks": 2,
+    "weight_decay": 0.01,
+    "label_smoothing": 0.02,
+    "mixed_precision": true,
+    "gradient_clip_norm": 1.0,
+    "invalid_target_weight_multiplier": 1.0,
+    "source_balanced_sampling": true,
+    "validation_field_selection_sources": [
+      "digigreen_ccby",
+      "maize_seasonal_ccby",
+      "potato_blight_sample_ccby",
+      "potato_ethiopia_ccby",
+      "potato_pldd_up_ccby",
+      "potato_uncontrolled_ccby",
+      "riceleafbd_ccby",
+      "ricey_field_ccby"
+    ],
+    "calibration_sources": [
+      "digigreen_ccby",
+      "potato_uncontrolled_ccby",
+      "ricey_field_ccby",
+      "potato_ethiopia_ccby",
+      "maize_seasonal_ccby",
+      "potato_pldd_up_ccby",
+      "riceleafbd_ccby",
+      "rice_field_weeds_ccby",
+      "potato_blight_sample_ccby"
+    ],
+    "minimum_temperature": 1.0,
+    "skip_frozen_test_during_training": true
+  },
+  "preprocessing": {
+    "image_size": 224,
+    "normalize_mean": [0.485, 0.456, 0.406],
+    "normalize_std": [0.229, 0.224, 0.225]
+  },
+  "augmentation": {
+    "random_resized_crop_scale": [0.65, 1.0],
+    "horizontal_flip_probability": 0.5,
+    "rotation_degrees": 12,
+    "color_jitter": [0.15, 0.15, 0.1, 0.02],
+    "random_grayscale_probability": 0.0,
+    "gaussian_blur_probability": 0.03,
+    "perspective_probability": 0.04,
+    "perspective_distortion_scale": 0.1,
+    "jpeg_quality_range": [65, 100],
+    "random_erasing_probability": 0.05,
+    "synthetic_images_in_validation_or_test": false
+  },
+  "selection_metric": "pooled_validation_field_source_macro_f1_then_global_macro_f1",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

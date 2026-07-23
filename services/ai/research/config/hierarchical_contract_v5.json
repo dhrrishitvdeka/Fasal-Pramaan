@@ -1,0 +1,30 @@
+{
+  "version": "hierarchical-product-contract-v5",
+  "frozen_before_hierarchical_test_evaluation": true,
+  "base_checkpoint": "research/runs/vit_tiny_field_preserved_v6/best.pt",
+  "base_checkpoint_sha256": "9516748eb10fad948c47325f96caf869e2564ee43fcd2cf9cce41ef1ec7eef7a",
+  "base_checkpoint_selection": "highest unweighted manifest-v2 validation macro_f1 across the frozen three-epoch schedule",
+  "manifest": "manifest_v2.jsonl",
+  "manifest_sha256": "2915cf91380b58ec7dcad8e99454a91208cb7029a00197b460d71609224ec762",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "calibration": "single scalar temperature fit on validation cross-entropy with equal total weight per validation source and a pre-frozen minimum temperature of 1.0",
+  "fixed_thresholds": {
+    "mismatch_threshold": 0.9,
+    "confidence_threshold": 0.0,
+    "origin": "historical selected product thresholds from hierarchical_product_evaluation_v2.json, fixed before v5 or v6 existed"
+  },
+  "expected_crop_source_in_product": "trusted crop-cycle metadata supplied by the API request",
+  "evaluation_expected_crop_for_supported_rows": "canonical crop label",
+  "evaluation_expected_crop_for_ood_rows": "deterministic balanced simulation: sha256('expected:' + image_id) modulo maize,paddy,potato,wheat",
+  "decision": [
+    "temperature-scale logits using validation only without sharpening below temperature 1.0",
+    "aggregate calibrated probabilities by crop",
+    "return U when predicted crop differs from expected crop and its aggregate score is at least 0.9",
+    "otherwise restrict health decision to expected-crop healthy/disease plus invalid",
+    "use no additional confidence abstention"
+  ],
+  "selection": "No v6 threshold fitting. Reuse the pre-v5 product thresholds exactly.",
+  "test_disclosure": "The immutable test was observed for earlier candidates. V6 uses a preservation recipe and the historical product thresholds; no v6 test logit or metric was available when this contract was frozen.",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

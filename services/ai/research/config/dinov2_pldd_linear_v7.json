@@ -1,0 +1,79 @@
+{
+  "version": "dinov2-pldd-linear-probe-v7",
+  "frozen_before_training": true,
+  "config_filename": "dinov2_pldd_linear_v7.json",
+  "seed": 26013,
+  "manifest_filename": "manifest_v5.jsonl",
+  "manifest_sha256": "2d85160ac400d05b30fa5f606cbea1b606eeedaff0dc17e842f8391782b0800f",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "rationale": "Continue only the validation-selected DINOv2 linear head from v10 on audited manifest v5. PLDD-UP adds source-disjoint whole-plant potato imagery from operational Indian fields, directly addressing the frozen field-domain representation gap without changing the backbone or frozen test. The low head learning rate and short schedule limit forgetting of already-strong maize, paddy, wheat, and OOD behavior.",
+  "test_disclosure": "The immutable test was observed for earlier candidates and revealed an aggregate potato field-domain gap. No frozen-test image, label, logit, per-example failure, threshold, or calibration parameter enters this run. Source selection used public dataset provenance and a domain-level audit; checkpoint selection and calibration use manifest-v5 validation only. Promotion gates remain unchanged.",
+  "models": [
+    {
+      "id": "dinov2_vits14_pldd_linear_v11",
+      "provider": "timm",
+      "architecture": "vit_small_patch14_dinov2.lvd142m",
+      "initialization": "dinov2_vits14_field_linear_v10_validation_selected_checkpoint",
+      "base_checkpoint_sha256": "cc40701e2f1ea6508b758ba972e4ba8efe040446c5ffdb2ed24bc2c5b6ba985d",
+      "pretrained_revision": "bdc84086a163e3e7e6745d534c5f44c97dd493ef",
+      "pretrained_sha256": "04d27f3400d059fc0cfd7d17dd1909a75bf3ea8fb3eeb48b97cb99e57ee20081"
+    }
+  ],
+  "training": {
+    "epochs": 3,
+    "warmup_head_epochs": 3,
+    "batch_size": 64,
+    "dataloader_workers": 4,
+    "optimizer": "adamw",
+    "learning_rate": 0.0,
+    "head_learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "label_smoothing": 0.02,
+    "early_stopping_patience": 3,
+    "mixed_precision": true,
+    "gradient_clip_norm": 1.0,
+    "class_weighting": "inverse_sqrt_frequency",
+    "invalid_class_weight_multiplier": 1.5,
+    "source_balanced_sampling": false,
+    "source_sampling_multipliers": {},
+    "calibration_source_balanced": true,
+    "calibration_sources": [
+      "digigreen_ccby",
+      "potato_uncontrolled_ccby",
+      "ricey_field_ccby",
+      "potato_ethiopia_ccby",
+      "maize_seasonal_ccby",
+      "potato_pldd_up_ccby"
+    ],
+    "minimum_temperature": 1.5,
+    "skip_frozen_test_during_training": true,
+    "crop_aware_loss": {
+      "crop_loss_weight": 0.2,
+      "invalid_margin_weight": 0.15,
+      "invalid_margin": 0.8
+    },
+    "max_train_per_class": null,
+    "max_validation_per_class": null
+  },
+  "preprocessing": {
+    "image_size": 224,
+    "normalize_mean": [0.485, 0.456, 0.406],
+    "normalize_std": [0.229, 0.224, 0.225]
+  },
+  "augmentation": {
+    "random_resized_crop_scale": [0.75, 1.0],
+    "horizontal_flip_probability": 0.5,
+    "rotation_degrees": 12,
+    "color_jitter": [0.15, 0.15, 0.1, 0.02],
+    "random_grayscale_probability": 0.0,
+    "gaussian_blur_probability": 0.03,
+    "perspective_probability": 0.02,
+    "perspective_distortion_scale": 0.1,
+    "jpeg_quality_range": [65, 100],
+    "random_erasing_probability": 0.05,
+    "synthetic_images_in_validation_or_test": false
+  },
+  "selection_metric": "unweighted_validation_macro_f1",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

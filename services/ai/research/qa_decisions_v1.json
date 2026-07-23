@@ -1,0 +1,22 @@
+{
+  "version": "manual-label-qa-decisions-v1",
+  "reviewer": "Internal visual review for prototype dataset audit",
+  "reviewed_at": "2026-07-19T01:16:20+05:30",
+  "methodology": "All 345 deterministic samples were reviewed on 22 original-detail contact sheets. Crop identity, health-state mapping, unsupported/OOD handling, and gross image quality were checked; disease subtype labels were retained from source metadata because the MVP predicts only crop plus healthy/disease/invalid.",
+  "reviewed_sample_ids_sha256": "71ff090111e8996207bb4f293f1f14da9faa87c5a2fa17571d753ca28d62748f",
+  "default_status": "accepted",
+  "decisions": {
+    "f1a17f6cbebd922381a3c318": {
+      "status": "accepted_corrected",
+      "notes": "Contact-sheet sample #046 is severely defocused; corrected from maize healthy to explicit blur/OOD.",
+      "override": {
+        "canonical_crop": "invalid",
+        "canonical_disease": "unsupported_or_ood",
+        "health_state": "invalid",
+        "model_class": "invalid__ood",
+        "invalid_category": "blur"
+      }
+    }
+  },
+  "is_production_validated": false
+}

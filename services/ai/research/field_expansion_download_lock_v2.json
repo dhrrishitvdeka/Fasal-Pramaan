@@ -1,0 +1,51 @@
+{
+  "lock_version": "field-expansion-download-lock-v2",
+  "sources": [
+    {
+      "id": "potato_ethiopia_ccby",
+      "lock_version": "potato_ethiopia_ccby-download-lock-v1",
+      "dataset": "Potato Leaf Healthy and Late Blight",
+      "doi": "10.17632/v4w72bsts5.1",
+      "dataset_version": 1,
+      "license": "CC BY 4.0",
+      "source_url": "https://data.mendeley.com/datasets/v4w72bsts5/1",
+      "archive_url": "https://data.mendeley.com/public-files/datasets/v4w72bsts5/files/e5edcf03-1734-4f75-87e0-895f08727b19/file_downloaded",
+      "archive_name": "Local.rar",
+      "archive_bytes": 5334258,
+      "archive_sha256": "6928a86923c15059a838003b1113ac7fbac8c0790e64190b0c37acb4bbd5f5eb",
+      "rows": 430,
+      "unique_image_sha256": 429,
+      "labels": ["Healthy", "Late Blight"],
+      "metadata_sha256": "285965bf5870e28abce0aa0bba0ae6289ebfa7e1ef25c95dce6083b0fe26b092",
+      "only_original_images": true,
+      "synthetic_or_augmented_images_included": false
+    },
+    {
+      "id": "maize_seasonal_ccby",
+      "lock_version": "maize_seasonal_ccby-download-lock-v1",
+      "dataset": "Seasonal Corn Leaf Disease Dataset",
+      "doi": "10.17632/vy629dngm8.1",
+      "dataset_version": 1,
+      "license": "CC BY 4.0",
+      "source_url": "https://data.mendeley.com/datasets/vy629dngm8/1",
+      "archive_url": "https://data.mendeley.com/public-files/datasets/vy629dngm8/files/e086f779-470a-4c7c-ba81-97734e9f8dd6/file_downloaded",
+      "archive_name": "Corn leaf disease dataset.zip",
+      "archive_bytes": 4599036050,
+      "archive_sha256": "575628df92e69c169fa82c8506253d7d5886a8931605bf765f0e2577022dc479",
+      "rows": 2943,
+      "unique_image_sha256": 2339,
+      "labels": [
+        "Bacterial Leaf Streak",
+        "Common_rust",
+        "Gray_leaf_spot",
+        "Healthy",
+        "Maize Chlorotic Mottle Virus"
+      ],
+      "metadata_sha256": "0fc81e0f044187922001f4efe195e51e342b0fd339171320c70bf299d6c5f14e",
+      "only_original_images": true,
+      "synthetic_or_augmented_images_included": false
+    }
+  ],
+  "redistribute_raw_images": false,
+  "is_production_validated": false
+}

@@ -1,0 +1,21 @@
+{
+  "name": "fasalpramaan-crop-health-dinov2-v14",
+  "version": "4.0.0-dinov2-v14",
+  "architecture": "DINOv2 ViT-S/14 with four crop-conditioned healthy/disease/invalid heads",
+  "artifact": "model.onnx",
+  "artifact_sha256": "f53536a738078c6d355ecb4633393c31e2b3fc8ef2ea77a9b29f86aa67b0fe7f",
+  "artifact_size_bytes": 86698536,
+  "opset": 17,
+  "temperature": 1.0000034972115646,
+  "abstention_threshold": 0.52,
+  "crop_mismatch_threshold": 0.8,
+  "manual_review_grade_b_threshold": 0.75,
+  "supported_crop_codes": ["maize", "paddy", "potato", "wheat"],
+  "labels_file": "labels.json",
+  "preprocessing_file": "preprocessing.json",
+  "promotion_status": "internal_frozen_gates_passed_pending_independent_field_governance",
+  "failed_promotion_gates": [],
+  "rollback_adapter": "crop_health_v3",
+  "human_review_required": true,
+  "is_production_validated": false
+}

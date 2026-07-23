@@ -1,0 +1,25 @@
+{
+  "version": "promotion-thresholds-v1",
+  "frozen_before_candidate_training": true,
+  "rationale": "Set after source/licence review and before candidate metrics are observed.",
+  "gates": {
+    "macro_f1_min": 0.65,
+    "macro_f1_improvement_over_baseline_min": 0.15,
+    "balanced_accuracy_min": 0.65,
+    "balanced_accuracy_improvement_over_baseline_min": 0.15,
+    "source_held_out_macro_f1_min": 0.60,
+    "minimum_per_crop_recall": 0.50,
+    "maximum_ece_after_calibration": 0.12,
+    "minimum_ood_rejection_recall": 0.80,
+    "minimum_id_coverage_at_ood_threshold": 0.70,
+    "maximum_cpu_latency_p95_ms": 300.0,
+    "maximum_onnx_size_bytes": 104857600,
+    "minimum_onnx_top1_parity": 0.99,
+    "maximum_onnx_probability_abs_error": 0.001
+  },
+  "non_negotiable": [
+    "No test sample or duplicate cluster may enter training.",
+    "No threshold may be weakened after test metrics are viewed.",
+    "is_production_validated must remain false."
+  ]
+}

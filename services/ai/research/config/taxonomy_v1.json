@@ -1,0 +1,47 @@
+{
+  "version": "crop-health-taxonomy-v1",
+  "model_classes": [
+    "maize__healthy",
+    "maize__disease",
+    "paddy__healthy",
+    "paddy__disease",
+    "potato__healthy",
+    "potato__disease",
+    "wheat__healthy",
+    "wheat__disease",
+    "invalid__ood"
+  ],
+  "supported_crops": ["maize", "paddy", "potato", "wheat"],
+  "health_states": ["healthy", "disease", "invalid"],
+  "grade_mapping": {
+    "healthy": "A",
+    "uncertain": "B",
+    "disease": "C",
+    "invalid_or_ood": "U"
+  },
+  "disease_taxonomy": {
+    "maize": ["blight", "common_rust", "gray_leaf_spot", "other_disease"],
+    "paddy": ["bacterial_leaf_blight", "blast", "brown_spot", "tungro", "other_disease"],
+    "potato": ["early_blight", "late_blight", "bacterial_soft_rot", "leaf_roll", "pvx", "pvy", "other_disease"],
+    "wheat": ["leaf_rust", "stripe_rust", "septoria", "other_disease"]
+  },
+  "unsupported_conditions": [
+    "abiotic_stress",
+    "fall_armyworm",
+    "nitrogen_deficiency",
+    "lodging",
+    "waterlogging",
+    "flooding"
+  ],
+  "invalid_categories": [
+    "unsupported_crop",
+    "unrelated_plant",
+    "soil",
+    "hand_or_tool",
+    "screenshot",
+    "blur",
+    "extreme_darkness",
+    "non_leaf_scene"
+  ],
+  "product_boundary": "Leaf-level health screening only. Human review mandatory; no severity, area, yield, quality, claim, or payout inference."
+}

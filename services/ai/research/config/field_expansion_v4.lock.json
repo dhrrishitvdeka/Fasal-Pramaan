@@ -1,0 +1,18 @@
+{
+  "version": "field-expansion-v4-lock",
+  "frozen_at": "2026-07-23T17:05:00+05:30",
+  "config": "field_expansion_v4.json",
+  "config_sha256": "f601c940a7818678ebf6e42626720ef5e649dc48fd31a549465cf6d0ceb8b7b9",
+  "base_and_teacher_checkpoint": "research/runs/vit_tiny_crop_aware_v3/best.pt",
+  "base_and_teacher_checkpoint_sha256": "ee623a4cdd455bcb00677315e4551e8cc89db33fcfff338b1b1007750afae4bf",
+  "manifest": "manifest_v3.jsonl",
+  "manifest_sha256": "41a73d6e55fc735fcf88d3ef079f2b4fc746d32c07a9cb5671944d2d5f0d5ec2",
+  "dataset_audit_sha256": "2920253262c6c60a542368137dfb421c4c2cf6c3cf35d15a32eb9f483c3c8d84",
+  "qa_sample_sha256": "3986445903a463fdc961815d54c1f988bad5265295cbee082f1938a9cef46608",
+  "source_download_lock_sha256": "56d264ee473ef1501db36127732ae6ed4ad42d32565341a64ccc099e4e2712d7",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "promotion_thresholds": "promotion_thresholds_v1.json",
+  "promotion_thresholds_sha256": "a1896acfaf130a661acc2c870d1914be78586c3166f93660df19fa25ac6e19d8",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

@@ -1,0 +1,14 @@
+{
+  "version": "digigreen-download-lock-v1",
+  "dataset": "DigiGreen/Crop_Disease_Images",
+  "revision": "d47d7eb88b1865062f821edcf58c28d8a7013718",
+  "license": "CC BY 4.0",
+  "source_url": "https://huggingface.co/datasets/DigiGreen/Crop_Disease_Images",
+  "annotations_sha256": "c628b93090847189b432f1a884c1bffdf054be4de5f1b1913028b0548138d3b3",
+  "annotation_rows": 1092,
+  "unique_urls": 1053,
+  "downloaded_and_validated": 1053,
+  "failures": [],
+  "metadata_sha256": "cd466c0e21c034fccac19c7e17534dc86d48431d98d9f9bc7ce76f5205cdf1e7",
+  "image_bytes": 195391903
+}
