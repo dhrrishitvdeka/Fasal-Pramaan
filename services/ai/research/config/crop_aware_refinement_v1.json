@@ -1,0 +1,48 @@
+{
+  "version": "selected-vit-crop-aware-refinement-v1",
+  "seed": 26007,
+  "rationale": "Frozen before training. The full-data ViT improved macro-F1 but still confused unsupported leaves with supported crop classes. Add crop/OOD supervision and an invalid-logit margin; promotion thresholds remain unchanged.",
+  "models": [
+    {
+      "id": "vit_tiny_crop_aware_v3",
+      "provider": "timm",
+      "architecture": "vit_tiny_patch16_224",
+      "initialization": "local_vit_tiny_full_data_v2_best_checkpoint",
+      "base_run": "research/runs/vit_tiny_full_data_v2/best.pt"
+    }
+  ],
+  "training": {
+    "epochs": 4,
+    "warmup_head_epochs": 0,
+    "batch_size": 32,
+    "dataloader_workers": 4,
+    "optimizer": "adamw",
+    "learning_rate": 0.00002,
+    "head_learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "label_smoothing": 0.02,
+    "early_stopping_patience": 2,
+    "mixed_precision": true,
+    "gradient_clip_norm": 1.0,
+    "class_weighting": "inverse_sqrt_frequency",
+    "invalid_class_weight_multiplier": 2.0,
+    "crop_aware_loss": {
+      "crop_loss_weight": 0.3,
+      "invalid_margin_weight": 0.25,
+      "invalid_margin": 1.0
+    },
+    "max_train_per_class": null,
+    "max_validation_per_class": null
+  },
+  "augmentation": {
+    "random_resized_crop_scale": [0.72, 1.0],
+    "horizontal_flip_probability": 0.5,
+    "rotation_degrees": 18,
+    "color_jitter": [0.18, 0.18, 0.12, 0.03],
+    "jpeg_quality_range": [55, 100],
+    "random_erasing_probability": 0.15,
+    "synthetic_images_in_validation_or_test": false
+  },
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

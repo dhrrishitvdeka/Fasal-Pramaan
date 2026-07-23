@@ -1,0 +1,70 @@
+{
+  "version": "manifest-summary-v6",
+  "base_manifest_sha256": "2d85160ac400d05b30fa5f606cbea1b606eeedaff0dc17e842f8391782b0800f",
+  "manifest_sha256": "fa9b7d2e691feb7feb04d17b80c94d3e1ec72a7cd928c574894c2b1da82a8eff",
+  "rows": 58516,
+  "candidate_new_unique_images": 6102,
+  "accepted_new_images": 6102,
+  "excluded_new_images": {},
+  "frozen_test_rows": 12167,
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "counts_by_split": {
+    "test": 12167,
+    "train": 37713,
+    "validation": 8636
+  },
+  "counts_by_model_class_and_split": {
+    "invalid__ood:test": 2877,
+    "invalid__ood:train": 8765,
+    "invalid__ood:validation": 2529,
+    "maize__disease:test": 1414,
+    "maize__disease:train": 1779,
+    "maize__disease:validation": 487,
+    "maize__healthy:test": 427,
+    "maize__healthy:train": 1200,
+    "maize__healthy:validation": 52,
+    "paddy__disease:test": 6750,
+    "paddy__disease:train": 6869,
+    "paddy__disease:validation": 1738,
+    "paddy__healthy:test": 253,
+    "paddy__healthy:train": 1970,
+    "paddy__healthy:validation": 428,
+    "potato__disease:test": 288,
+    "potato__disease:train": 11634,
+    "potato__disease:validation": 2818,
+    "potato__healthy:test": 16,
+    "potato__healthy:train": 4852,
+    "potato__healthy:validation": 473,
+    "wheat__disease:test": 89,
+    "wheat__disease:train": 254,
+    "wheat__disease:validation": 30,
+    "wheat__healthy:test": 53,
+    "wheat__healthy:train": 390,
+    "wheat__healthy:validation": 81
+  },
+  "added_counts": {
+    "invalid__ood:train": 3077,
+    "invalid__ood:validation": 1269,
+    "paddy__disease:train": 818,
+    "paddy__disease:validation": 381,
+    "paddy__healthy:train": 188,
+    "paddy__healthy:validation": 64,
+    "potato__disease:train": 150,
+    "potato__disease:validation": 67,
+    "potato__healthy:train": 60,
+    "potato__healthy:validation": 28
+  },
+  "added_counts_by_source": {
+    "potato_blight_sample_ccby": 305,
+    "rice_field_weeds_ccby": 4346,
+    "riceleafbd_ccby": 1451
+  },
+  "qa_sample_rows": 84,
+  "deduplication": {
+    "exact_sha256_plus_phash_embedding_review": true,
+    "conflicting_exact_label_groups_excluded": true,
+    "capture_sessions_grouped_before_split": true,
+    "new_rows_matching_frozen_test_are_excluded": true
+  },
+  "is_production_validated": false
+}

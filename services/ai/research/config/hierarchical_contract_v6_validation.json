@@ -1,0 +1,18 @@
+{
+  "version": "trusted-crop-health-contract-validation-v1",
+  "frozen_before_validation_evaluation": true,
+  "base_checkpoint": "research/runs/vit_tiny_field_preserved_v6/best.pt",
+  "base_checkpoint_sha256": "9516748eb10fad948c47325f96caf869e2564ee43fcd2cf9cce41ef1ec7eef7a",
+  "manifest": "manifest_v2.jsonl",
+  "manifest_sha256": "2915cf91380b58ec7dcad8e99454a91208cb7029a00197b460d71609224ec762",
+  "calibration": "equal-source validation temperature with minimum 1.0",
+  "fixed_thresholds": {
+    "mismatch_threshold": 1.0,
+    "confidence_threshold": 0.0,
+    "interpretation": "trusted crop-cycle metadata overrides visual crop mismatch; explicit invalid logit remains eligible"
+  },
+  "expected_crop_source_in_product": "trusted crop-cycle metadata supplied by the API request",
+  "validation_scope": "validation only; frozen test must not be evaluated by this exploratory contract",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

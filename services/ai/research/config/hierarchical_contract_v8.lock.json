@@ -1,0 +1,12 @@
+{
+  "version": "trusted-crop-health-contract-v2-lock",
+  "frozen_at": "2026-07-23T17:25:00+05:30",
+  "contract": "hierarchical_contract_v8.json",
+  "contract_sha256": "13cfbc791e47eb4d51e6831b212b3ad051d4aca69d184282f570991ee5793790",
+  "checkpoint_sha256": "86c4ee723edcec2b07bb8a156382faff3f90697c960fa0a1f5b0395fb85b6537",
+  "manifest_sha256": "41a73d6e55fc735fcf88d3ef079f2b4fc746d32c07a9cb5671944d2d5f0d5ec2",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "promotion_thresholds_sha256": "a1896acfaf130a661acc2c870d1914be78586c3166f93660df19fa25ac6e19d8",
+  "frozen_test_evaluated": false,
+  "is_production_validated": false
+}

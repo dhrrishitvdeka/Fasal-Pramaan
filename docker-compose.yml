@@ -1,0 +1,223 @@
+name: fasalpramaan
+
+# Single API image for api + worker + migrate + seed (no duplicate 1.26GB tags).
+x-api: &api-common
+  image: fasalpramaan-api:latest
+  # api builds this shared image; worker/migrate/seed must never try to pull a
+  # nonexistent public image with the same local tag on a fresh clone.
+  pull_policy: never
+  env_file:
+    - path: .env
+      required: false
+  environment: &api-env
+    DATABASE_URL: postgresql+psycopg://fasalpramaan:fasalpramaan_dev_only@db:5432/fasalpramaan
+    REDIS_URL: redis://:${REDIS_PASSWORD:-redis_dev_only}@redis:6379/0
+    CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_dev_only}@redis:6379/0
+    CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_dev_only}@redis:6379/1
+    MINIO_ENDPOINT: minio:9000
+    MINIO_PUBLIC_ENDPOINT: ${PUBLIC_HOST:-localhost}:9000
+    AI_SERVICE_URL: http://ai:8001
+    AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-local-ai-service-token-change-in-production}
+    AI_MODEL_ADAPTER: ${AI_MODEL_ADAPTER:-crop_health_v4}
+  networks:
+    - fp-net
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: fp-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fasalpramaan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fasalpramaan_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-fasalpramaan}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fasalpramaan} -d ${POSTGRES_DB:-fasalpramaan}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - fp-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: fp-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_dev_only}
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-redis_dev_only} ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - fp-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: fp-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin_dev_only}
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:8085,http://127.0.0.1:8085,http://${PUBLIC_HOST:-localhost}:8085
+    ports:
+      - "0.0.0.0:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - fp-net
+
+  api:
+    <<: *api-common
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: fp-api
+    ports:
+      - "0.0.0.0:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ai:
+        condition: service_started
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  # Reuses fasalpramaan-api:latest — no separate worker image build.
+  worker:
+    <<: *api-common
+    container_name: fp-worker
+    # Must consume both queues — task_routes sends recapture jobs to `recapture`
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 -Q evaluation,recapture
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+      ai:
+        condition: service_started
+
+  ai:
+    image: fasalpramaan-ai:latest
+    build:
+      context: ./services/ai
+      dockerfile: Dockerfile
+    container_name: fp-ai
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AI_MODEL_ADAPTER: ${AI_MODEL_ADAPTER:-crop_health_v4}
+      AI_ALLOW_MOCK_FALLBACK: ${AI_ALLOW_MOCK_FALLBACK:-false}
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-local-ai-service-token-change-in-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "0.0.0.0:8001:8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - fp-net
+
+  # Reuses fasalpramaan-api:latest — no separate migrate image.
+  migrate:
+    <<: *api-common
+    container_name: fp-migrate
+    command: alembic upgrade head
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Reuses fasalpramaan-api:latest — no separate seed image.
+  seed:
+    <<: *api-common
+    container_name: fp-seed
+    command: python -m app.db.seed
+    environment:
+      <<: *api-env
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-Demo@12345}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+
+  dashboard:
+    image: fasalpramaan-dashboard:latest
+    build:
+      context: ./apps/dashboard
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /backend
+        NEXT_PUBLIC_MEDIA_ORIGIN: http://${PUBLIC_HOST:-localhost}:9000
+        NEXT_PUBLIC_APP_NAME: FasalPramaan Command Centre
+        NEXT_PUBLIC_TAGLINE: Capture. Verify. Protect.
+    container_name: fp-dashboard
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: /backend
+      NEXT_PUBLIC_MEDIA_ORIGIN: http://${PUBLIC_HOST:-localhost}:9000
+      INTERNAL_API_BASE_URL: http://api:8000
+      NEXT_PUBLIC_APP_NAME: FasalPramaan Command Centre
+      NEXT_PUBLIC_TAGLINE: Capture. Verify. Protect.
+    ports:
+      - "0.0.0.0:3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - fp-net
+
+  mobile:
+    image: fasalpramaan-mobile:latest
+    build:
+      context: ./apps/mobile
+      dockerfile: Dockerfile
+      args:
+        API_BASE_URL: /backend
+    container_name: fp-mobile
+    ports:
+      - "0.0.0.0:8085:8085"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - fp-net
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  fp-net:
+    driver: bridge

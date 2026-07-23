@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "description": "Example manifest format only — no real images bundled",
+  "license": "synthetic-demo",
+  "samples": [
+    {
+      "id": "ex-001",
+      "image_path": "images/ex-001.jpg",
+      "crop": "soybean",
+      "growth_stage": "vegetative",
+      "damage_labels": ["pest"],
+      "severity": "medium",
+      "affected_area_pct": 25,
+      "split": "train"
+    }
+  ]
+}

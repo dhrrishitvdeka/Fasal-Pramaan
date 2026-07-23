@@ -1,0 +1,110 @@
+{
+  "version": "crop-health-promotion-report-v14",
+  "decision": "promote_to_default_local_mvp_adapter",
+  "model_id": "dinov2_vits14_conditioned_finetune_v14",
+  "baseline": {
+    "model": "mobilenet_v2_legacy_15_class",
+    "macro_f1": 0.044468522573681356,
+    "balanced_accuracy": 0.10503455194320267
+  },
+  "candidate": {
+    "macro_f1": 0.8068072168574383,
+    "balanced_accuracy": 0.8192734406109197,
+    "source_held_out_field_macro_f1": 0.6393295840381412,
+    "minimum_per_crop_recall": 0.6546052631578947,
+    "invalid_ood_rejection_recall": 0.935349322210636,
+    "id_coverage": 0.836167922497309,
+    "pre_decision_ece_15_bins": 0.01622760594454513
+  },
+  "numeric_gates": {
+    "macro_f1_min": {
+      "value": 0.8068072168574383,
+      "threshold": 0.65,
+      "operator": ">=",
+      "passed": true
+    },
+    "macro_f1_improvement_over_baseline_min": {
+      "value": 0.7623386942837569,
+      "threshold": 0.15,
+      "operator": ">=",
+      "passed": true
+    },
+    "balanced_accuracy_min": {
+      "value": 0.8192734406109197,
+      "threshold": 0.65,
+      "operator": ">=",
+      "passed": true
+    },
+    "balanced_accuracy_improvement_over_baseline_min": {
+      "value": 0.714238888667717,
+      "threshold": 0.15,
+      "operator": ">=",
+      "passed": true
+    },
+    "source_held_out_macro_f1_min": {
+      "value": 0.6393295840381412,
+      "threshold": 0.6,
+      "operator": ">=",
+      "passed": true
+    },
+    "minimum_per_crop_recall": {
+      "value": 0.6546052631578947,
+      "threshold": 0.5,
+      "operator": ">=",
+      "passed": true
+    },
+    "maximum_ece_after_calibration": {
+      "value": 0.01622760594454513,
+      "threshold": 0.12,
+      "operator": "<=",
+      "passed": true
+    },
+    "minimum_ood_rejection_recall": {
+      "value": 0.935349322210636,
+      "threshold": 0.8,
+      "operator": ">=",
+      "passed": true
+    },
+    "minimum_id_coverage_at_ood_threshold": {
+      "value": 0.836167922497309,
+      "threshold": 0.7,
+      "operator": ">=",
+      "passed": true
+    },
+    "maximum_cpu_latency_p95_ms": {
+      "value": 156.97639999780222,
+      "threshold": 300.0,
+      "operator": "<=",
+      "passed": true
+    },
+    "maximum_onnx_size_bytes": {
+      "value": 86698536,
+      "threshold": 104857600,
+      "operator": "<=",
+      "passed": true
+    },
+    "minimum_onnx_top1_parity": {
+      "value": 1.0,
+      "threshold": 0.99,
+      "operator": ">=",
+      "passed": true
+    },
+    "maximum_onnx_probability_abs_error": {
+      "value": 5.930662155151367e-06,
+      "threshold": 0.001,
+      "operator": "<=",
+      "passed": true
+    }
+  },
+  "checks": {
+    "dataset_audit_v6_passed": true,
+    "frozen_test_hash_exact": true,
+    "onnx_export_checks_passed": true,
+    "all_numeric_promotion_gates_passed": true,
+    "is_production_validated_remains_false": true,
+    "human_review_remains_mandatory": true
+  },
+  "passed": true,
+  "remaining_limit": "Internal promotion does not constitute production validation. Independent protocol-matched field validation and governance review remain required.",
+  "is_production_validated": false
+}

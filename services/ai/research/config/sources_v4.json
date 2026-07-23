@@ -1,0 +1,33 @@
+{
+  "version": "licensed-sources-v4",
+  "extends": "sources_v3.json",
+  "redistribute_raw_images": false,
+  "added_sources": [
+    {
+      "id": "potato_ethiopia_ccby",
+      "role": "train_validation_source_disjoint_field_domain",
+      "crops": ["potato"],
+      "dataset": "Potato Leaf Healthy and Late Blight",
+      "source_url": "https://data.mendeley.com/datasets/v4w72bsts5/1",
+      "doi": "10.17632/v4w72bsts5.1",
+      "license": "CC BY 4.0",
+      "archive_sha256": "6928a86923c15059a838003b1113ac7fbac8c0790e64190b0c37acb4bbd5f5eb",
+      "commercial_use": true,
+      "redistribute_raw_images": false,
+      "field_conditions": "Original Ethiopian potato field images labeled healthy or late blight by plant pathologists"
+    },
+    {
+      "id": "maize_seasonal_ccby",
+      "role": "train_validation_source_disjoint_field_domain",
+      "crops": ["maize"],
+      "dataset": "Seasonal Corn Leaf Disease Dataset",
+      "source_url": "https://data.mendeley.com/datasets/vy629dngm8/1",
+      "doi": "10.17632/vy629dngm8.1",
+      "license": "CC BY 4.0",
+      "archive_sha256": "575628df92e69c169fa82c8506253d7d5886a8931605bf765f0e2577022dc479",
+      "commercial_use": true,
+      "redistribute_raw_images": false,
+      "field_conditions": "Original multi-farm, multi-season maize imagery; no generated augmentation members are present in the pinned archive"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+# Keep source files reproducible across Windows, macOS, Linux, and GitHub Actions.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Binary evidence/model/media must not be line-ending normalized or diffed as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.pt binary
+*.pth binary
+*.onnx binary
+*.apk binary
+*.aab binary

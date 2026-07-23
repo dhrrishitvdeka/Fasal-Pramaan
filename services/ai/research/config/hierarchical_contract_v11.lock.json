@@ -1,0 +1,17 @@
+{
+  "lock_version": "hierarchical-contract-lock-v1",
+  "frozen_at": "2026-07-23T20:50:00+05:30",
+  "contract_filename": "hierarchical_contract_v11.json",
+  "contract_sha256": "52868d5e6ced55c8bdf9d2782ec11d16a0769618b3498d888771ffba634badc4",
+  "validation_report_filename": "hierarchical_validation_only_v11_candidate.json",
+  "validation_report_sha256": "19d2a31dfa15024f0b9d8eaa95672edab0e4cf20cb77ba4d74d212fea45e6dbc",
+  "checkpoint_sha256": "2c4ddfc3c125c3c1229b7283b2b4bfbf794889b1bd886a5201e63dfcec8ef0ec",
+  "manifest_sha256": "2d85160ac400d05b30fa5f606cbea1b606eeedaff0dc17e842f8391782b0800f",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "temperature": 1.5000088610619051,
+  "mismatch_threshold": 0.9,
+  "confidence_threshold": 0.0,
+  "frozen_test_evaluated": false,
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

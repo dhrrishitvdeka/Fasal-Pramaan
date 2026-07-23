@@ -1,0 +1,26 @@
+{
+  "classes": [
+    "Apple___Apple_scab",
+    "Apple___Black_rot",
+    "Apple___healthy",
+    "Corn_(maize)___Common_rust_",
+    "Corn_(maize)___Northern_Leaf_Blight",
+    "Corn_(maize)___healthy",
+    "Potato___Early_blight",
+    "Potato___Late_blight",
+    "Potato___healthy",
+    "Tomato___Bacterial_spot",
+    "Tomato___Early_blight",
+    "Tomato___Late_blight",
+    "Tomato___Leaf_Mold",
+    "Tomato___Septoria_leaf_spot",
+    "Tomato___healthy"
+  ],
+  "per_class": 20,
+  "counts": {
+    "train": 240,
+    "val": 60
+  },
+  "path": "/app/datasets/plantvillage_subset",
+  "note": "Synthetic PlantVillage-named subset for fine-tuning demos"
+}
