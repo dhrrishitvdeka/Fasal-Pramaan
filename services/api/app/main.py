@@ -218,6 +218,12 @@ def health(response: Response) -> HealthOut:
     )
 
 
+@app.get("/ping", tags=["Health"])
+def ping() -> dict:
+    """Lightweight liveness probe."""
+    return {"ping": "pong", "status": "ok"}
+
+
 @app.get("/", tags=["Health"])
 def root() -> dict:
     payload = {
