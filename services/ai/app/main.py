@@ -59,6 +59,12 @@ class AnalyzeRequest(BaseModel):
     adapter: str | None = None
 
 
+@app.get("/ping")
+def ping() -> dict:
+    """Lightweight liveness probe."""
+    return {"ping": "pong", "status": "ok"}
+
+
 @app.get("/health")
 def health() -> JSONResponse:
     pd = PlantDiseaseAdapter()
