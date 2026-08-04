@@ -1,9 +1,8 @@
 # Getting started
 
-This guide prepares a clean local FasalPramaan environment from a **fresh
-GitHub clone**. You can delete any previous local copy; cloning the public repo
-and starting Docker is enough. The ONNX model, Compose stack, seed data, and
-app sources are all versioned.
+This guide starts a clean local FasalPramaan environment from a fresh GitHub
+clone. The ONNX model, Compose stack, seed data, and app sources are all
+versioned in the repository.
 
 It includes four demo login accounts but starts with no farms, plots, crop
 cycles, submissions, images, reviews, alerts, or notifications.

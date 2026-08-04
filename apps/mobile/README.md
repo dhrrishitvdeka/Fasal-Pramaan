@@ -4,7 +4,7 @@ Flutter app for farmer and field-officer evidence capture. It provides guided
 five-angle capture, GPS policy, encrypted offline persistence, resumable
 upload, and submission status.
 
-## Presentation build
+## Docker web build
 
 The app is part of the root Docker Compose stack:
 
@@ -28,8 +28,13 @@ docker build --target tester -t fasalpramaan-mobile-test apps/mobile
 docker compose build mobile
 ```
 
-The production image compiles Flutter in a pinned SDK builder and serves only
-the release web output from Nginx.
+The production image compiles Flutter in a pinned SDK builder, runs
+`flutter analyze` and `flutter test`, and serves only the release web output
+from Nginx.
+
+On the Docker web app over plain HTTP, secure storage falls back to
+SharedPreferences / memory when browser crypto APIs are unavailable. Native
+builds continue to use platform secure storage.
 
 ## Native development
 

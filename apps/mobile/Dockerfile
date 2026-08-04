@@ -1,7 +1,6 @@
 FROM debian:bookworm-slim AS flutter-base
 
 ARG FLUTTER_VERSION=3.44.7
-ARG API_BASE_URL=/backend
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git xz-utils \
@@ -27,6 +26,10 @@ FROM flutter-base AS tester
 RUN flutter analyze && flutter test
 
 FROM flutter-base AS web-builder
+# Re-declare build arg inside the stage (Docker does not inherit pre-FROM ARGs).
+ARG API_BASE_URL=/backend
+# Gate the production image on analyze + unit tests.
+COPY --from=tester /app/pubspec.lock /tmp/.flutter-tests-passed
 RUN flutter build web --release \
     --dart-define=API_BASE_URL=${API_BASE_URL} \
     --dart-define=DEMO_MODE=false

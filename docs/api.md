@@ -8,7 +8,8 @@ Browser clients in Docker call same-origin **`/backend`** (dashboard rewrite / m
 
 Local interactive docs (development environments only): `http://localhost:8000/docs`
 
-This page summarizes the API behavior used by the local demonstration. The OpenAPI interface remains the route-level contract.
+This page summarizes the API surfaces used by the local stack. OpenAPI at
+`/docs` remains the route-level contract.
 
 ## Authentication and sessions
 
@@ -71,6 +72,28 @@ Overrides require an `override_reason`. A rejection clears any misleading final 
 | `GET /dashboard/notifications` | Authorized user |
 | `GET /health` | Local stack health |
 
+## Evidence reminders
+
+| Route | Purpose |
+|---|---|
+| `GET /evidence-reminders` | List plans for the authenticated farmer |
+| `PUT /evidence-reminders/{cycle_id}` | Update cadence, photo count, pause/resume for a crop cycle |
+| `POST /evidence-reminders/{cycle_id}/snooze` | Snooze a plan (1–7 days) |
+
+Plans are created when a crop cycle is created. Local seed creates accounts and
+catalogs only — no farms or crop cycles.
+
+## Voice assistant (farmer only)
+
+| Route | Purpose |
+|---|---|
+| `POST /voice/session-token` | Mint a short-lived Gemini Live session payload |
+| `WS /voice/live` | Same-origin Live proxy (browser → API → Gemini) |
+| `POST /voice/actions/audit` | Record allowlisted tool outcomes |
+
+Requires `VOICE_ASSISTANT_ENABLED=true` and a server-side `GEMINI_API_KEY`. See
+[VOICE_ASSISTANT_DEMO.md](./VOICE_ASSISTANT_DEMO.md).
+
 ## Error behavior
 
 - Authentication and authorization failures return `401` or `403` without revealing protected-object details.
@@ -78,4 +101,5 @@ Overrides require an `override_reason`. A rejection clears any misleading final 
 - Unexpected failures are sanitized and include a correlation ID for local diagnostics.
 - Outside development/test/local environments, OpenAPI/docs routes are disabled.
 
-For the exact endpoint schemas, start the local stack and use `/docs`. For the presentation sequence, use [demo-walkthrough.md](./demo-walkthrough.md).
+For exact endpoint schemas, start the local stack and open `/docs`. For an
+end-to-end walkthrough, see [demo-walkthrough.md](./demo-walkthrough.md).

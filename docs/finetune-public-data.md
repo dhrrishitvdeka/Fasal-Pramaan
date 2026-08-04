@@ -9,7 +9,7 @@
 **Honesty bar:** After any public fine-tune, keep `is_production_validated: false`.
 Leaf / PlantVillage-style accuracy ≠ multi-peril Indian field insurance accuracy (flood, lodging, hail, etc.).
 
-**Constraint:** You have **no private labelled farm data**. All steps below use **internet / public** datasets only.
+**Constraint:** This research path uses **public / internet datasets only**. It does not assume private labelled farm data.
 
 ---
 

@@ -18,7 +18,9 @@ flowchart LR
 ## Local safeguards
 
 - Payload and image media are encrypted using AES-GCM with key material held in secure storage (field-level envelopes on native SQLite paths; not full SQLCipher).
-- Web Docker demo uses the same sync protocol; offline media encryption on pure web is limited compared with native.
+- Web Docker build uses the same sync protocol; offline media encryption on pure
+  web is limited compared with native. Token and passphrase storage may fall
+  back when browser secure storage is unavailable over plain HTTP.
 - GPS/quality policies run before an item is queued (mock / weak GPS refused on device).
 - A generated device identifier and client operation IDs support sync tracing and idempotency.
 - The local record is retained until the server confirms its authoritative status.
@@ -32,8 +34,10 @@ flowchart LR
 5. If the app is interrupted after finalization, the client resumes from the saved server ID rather than re-uploading blindly.
 6. Retry uses increasing delay with jitter; the server remains authoritative for status.
 
-## Presentation wording
+## Boundary wording
 
-“The app can store evidence securely while offline and resume the same server case when connectivity returns. It does not claim that a client device alone proves GPS authenticity.”
+The app can store evidence securely while offline and resume the same server
+case when connectivity returns. A client device alone does not prove GPS
+authenticity.
 
-Flutter/device verification remains an explicit pre-presentation check when the mobile app is shown. See [apps/mobile/README.md](../apps/mobile/README.md).
+For native device setup, see [apps/mobile/README.md](../apps/mobile/README.md).

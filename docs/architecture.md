@@ -1,6 +1,8 @@
 # Architecture and solution structure
 
-FasalPramaan is a local, presentation-ready implementation of an evidence-first crop-assessment workflow. It separates capture, evidence storage, asynchronous AI assistance, and human review so no model response silently becomes a final outcome.
+FasalPramaan is a local, Dockerized implementation of an evidence-first crop
+assessment workflow. It separates capture, evidence storage, asynchronous model
+assistance, and human review so no model response becomes a final outcome.
 
 ## System boundaries
 
@@ -116,10 +118,14 @@ apps/
 services/
   api/                    FastAPI routes, auth, models, Alembic, Celery tasks
   ai/                     Adapters + DINOv2/ONNX artifacts (default crop_health_v4)
-docs/                     Presentation and engineering documentation
+docs/                     Architecture, operations, model, and security docs
 scripts/                  start-portable, fp.ps1, demo-model, verify-e2e helpers
-docker-compose.yml        Full local stack: db, redis, minio, api, worker, ai, migrate, seed, dashboard, mobile
+docker-compose.yml        Full local stack: db, redis, minio, api, worker, beat, ai, migrate, seed, dashboard, mobile
 ```
+
+Optional voice path (Fasal Saathi): farmer app → same-origin `/backend/api/v1/voice/live`
+→ API Live proxy → Gemini ephemeral session. Tool calls execute only through the
+client allowlist. See [VOICE_ASSISTANT_DEMO.md](./VOICE_ASSISTANT_DEMO.md).
 
 ## Client → API linking
 
@@ -131,7 +137,7 @@ docker-compose.yml        Full local stack: db, redis, minio, api, worker, ai, m
 
 Default AI adapter is `crop_health_v4` in Compose, API settings, and the AI service. Rollbacks: `crop_health_v3`, `crop_vit`, legacy `plant_disease`.
 
-## Architectural decisions for the demo
+## Design principles
 
 1. **Human-in-the-loop:** the model cannot make a final claim outcome.
 2. **Evidence before inference:** the server verifies uploaded bytes before processing.
@@ -139,4 +145,4 @@ Default AI adapter is `crop_health_v4` in Compose, API settings, and the AI serv
 4. **Replaceable AI:** adapters isolate experimental model choices from the evidence/review workflow.
 5. **Auditable decisions:** reviewer changes and overrides include reasons and audit history.
 
-See [README.md](../README.md) for the presentation narrative, [ai-service.md](./ai-service.md) for the current model, and [SVH26007 audit readiness](./SVH26007_AUDIT_READINESS_2026-07-18.md) for historical audit evidence (read the current-status addendum first).
+See [README.md](../README.md) for product overview and [ai-service.md](./ai-service.md) for the current model.

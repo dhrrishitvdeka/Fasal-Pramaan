@@ -747,11 +747,11 @@ class _TranscriptBubble extends StatelessWidget {
             ),
             const SizedBox(height: 3),
             Text(
-              text,
+              text.trim(),
               style: const TextStyle(
                 color: Color(0xFF0F172A),
                 fontSize: 13.5,
-                height: 1.35,
+                height: 1.45,
               ),
             ),
           ],

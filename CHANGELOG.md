@@ -6,6 +6,26 @@ All notable changes will be documented in this file. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Hindi/English Fasal Saathi transcript bubbles no longer glue words together
+  (preserve stream token spacing; Devanagari word-boundary merge).
+- Field-app Docker build re-declares `API_BASE_URL` and gates the image on
+  `flutter analyze` + `flutter test`.
+- Web secure-storage fallback when browser crypto is unavailable over plain HTTP.
+- Makefile migrate/seed targets no longer reference a missing Compose profile;
+  `beat` is started with the full stack.
+
+### Changed
+
+- Service and app package versions aligned to **1.1.0**.
+- Documentation refreshed to match proxy-based voice Live path, evidence
+  reminder routes, empty operational seed, and removed broken doc links.
+
+### Added
+
+- Voice system instruction asks for short, clearly spaced Hindi/English replies.
+
 ## [1.1.0] — 2026-08-04
 
 ### Added
@@ -42,6 +62,6 @@ All notable changes will be documented in this file. The format follows
 
 ### Notes
 
-- AI remains assistive screening only; human review is mandatory.
-- Voice assistant is a local/demo feature requiring `VOICE_ASSISTANT_ENABLED`
-  and a server-side `GEMINI_API_KEY`.
+- Model output remains assistive screening only; human review is mandatory.
+- Voice assistant is a local feature requiring `VOICE_ASSISTANT_ENABLED` and a
+  server-side `GEMINI_API_KEY`.

@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:fasalpramaan/core/config.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fasalpramaan/services/safe_storage.dart';
 import 'package:uuid/uuid.dart';
 
 class ApiClient {
@@ -56,7 +56,7 @@ class ApiClient {
   }
 
   late final Dio _dio;
-  final _storage = const FlutterSecureStorage();
+  final _storage = const SafeStorage();
 
   Dio get dio => _dio;
 

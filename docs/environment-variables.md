@@ -1,6 +1,7 @@
 # Environment variables
 
-For the local presentation, copy `.env.example` to `.env` and keep its development defaults. Do not share or commit `.env`.
+For local Docker use, copy `.env.example` to `.env` and keep the development
+defaults unless you intentionally change them. Do not share or commit `.env`.
 
 | Group | Variables | Purpose |
 |---|---|---|
@@ -10,6 +11,7 @@ For the local presentation, copy `.env.example` to `.env` and keep its developme
 | Auth | `JWT_SECRET_KEY`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_DAYS`, `DEMO_PASSWORD` | Local demo authentication |
 | Storage | `MINIO_*`, `S3_REGION`, `S3_BUCKET_VERSIONING`, `S3_ADDRESSING_STYLE` | Evidence object storage |
 | AI | `AI_SERVICE_URL`, `AI_SERVICE_TOKEN`, `AI_MODEL_ADAPTER` (default **`crop_health_v4`**), `AI_ALLOW_MOCK_FALLBACK` | AI service boundary; rollbacks `crop_health_v3` / `crop_vit` / legacy `plant_disease` |
+| Voice (Fasal Saathi) | `VOICE_ASSISTANT_ENABLED`, `GEMINI_API_KEY`, `GEMINI_LIVE_MODEL`, `GEMINI_LIVE_VOICE`, `GEMINI_LIVE_SESSION_MINUTES` | Server-only Gemini Live config; key never leaves the API |
 | Native mobile development | `MOBILE_API_BASE_URL` | Host API URL used by helper scripts/native builds; Docker web uses same-origin `/backend` |
 | Rate limit | `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_BACKEND`, `TRUSTED_PROXY_IPS` | Client throttling and proxy handling |
 | Operations | `SENTRY_DSN`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `SEED_ON_STARTUP` | Optional observability and local seed behavior |
