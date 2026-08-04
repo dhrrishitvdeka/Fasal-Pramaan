@@ -69,9 +69,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="FasalPramaan AI API",
     description=(
-        "FasalPramaan AI – Smart Crop Evidence and Assessment Platform (SVH26007). "
+        "FasalPramaan AI – Smart Crop Evidence and Assessment Platform. "
         "हर फसल का डिजिटल प्रमाण / Capture. Verify. Protect. "
-        "AI is assistive and non-production unless explicitly validated."
+        "Model output is assistive screening only; human review is required."
     ),
     version=__version__,
     lifespan=lifespan,

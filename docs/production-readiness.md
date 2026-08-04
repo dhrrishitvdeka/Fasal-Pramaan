@@ -1,6 +1,7 @@
 # Production-readiness gates
 
-**Current decision:** local, controlled presentation demo only. This checklist is intentionally not marked complete by a successful local Docker run.
+**Current status:** local and controlled LAN reference deployment only. A
+successful Docker run does not satisfy this checklist.
 
 ## Platform and security
 
@@ -26,4 +27,5 @@
 - [ ] Prospective field pilot, model card, drift monitoring, rollback and authority approval.
 - [ ] Explicit policy defining where a human must decide.
 
-Until every relevant gate is met, use the approved presentation wording in [known-limitations.md](./known-limitations.md).
+Until every relevant gate is met, keep claims within the bounds in
+[known-limitations.md](./known-limitations.md).

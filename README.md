@@ -11,27 +11,25 @@ weights at runtime.
 > severity, produce quality, claim eligibility, or insurance settlement.
 > Human review is mandatory.
 
-## Fully packed and reusable
+## What a clone includes
 
-You can delete this folder from your machine and still get the **same** local
-product from GitHub alone. Everything needed for a Dockerized demo is versioned
-in the repository:
+Everything needed for the local Docker stack is versioned in the repository:
 
 | Included on clone | Notes |
 |---|---|
 | Flutter field app + Next.js dashboard | Built inside Docker images |
-| FastAPI, Celery worker, migrations, seed | Single API image reused by worker/migrate/seed |
+| FastAPI, Celery worker/beat, migrations, seed | Single API image reused by worker, beat, migrate, and seed |
 | PostgreSQL/PostGIS, Redis, MinIO | Compose services; no host installs |
 | DINOv2 ONNX model (`crop_health_v4`) | `services/ai/models/.../model.onnx` (~87 MB), no runtime download |
-| Demo accounts + crop catalogs | Created by the `seed` job |
-| `.env.example` + start scripts | Copy once; launcher fills local URLs |
+| Demo accounts + crop catalogs | Created by the `seed` job (no farms or submissions) |
+| `.env.example` + start scripts | Copy once; launcher sets local URLs |
 
-**Not required on the host:** Flutter SDK, Node.js, Python, PostgreSQL, Redis,
-or MinIO. Only Docker Desktop/Engine with Compose v2 is required.
+**Host requirements:** Docker Desktop or Docker Engine with Compose v2. Flutter,
+Node.js, Python, PostgreSQL, Redis, and MinIO are not required on the host for
+the containerized stack.
 
 Recommended free disk for the first build: **~12 GB** (base images + Flutter
-build stage + named volumes). After the first successful `docker compose up`,
-subsequent starts reuse local image layers.
+build stage + named volumes). Later starts reuse local image layers.
 
 ### Fresh clone on any machine
 
@@ -79,7 +77,7 @@ Windows / macOS / Linux start commands from the repo root.
 | AI health | `http://localhost:8001/health` | — |
 | MinIO console | `http://localhost:9001` | `minioadmin` / `minioadmin_dev_only` |
 
-## Farmer voice assistant demo
+## Farmer voice assistant (Fasal Saathi)
 
 The farmer app includes **Fasal Saathi**, a Hindi/English Gemini Live voice
 assistant that can read farmer data, navigate allowlisted screens, and operate
@@ -94,12 +92,13 @@ GEMINI_API_KEY=your_google_ai_studio_key
 ```
 
 The long-lived key never enters the Flutter client. The authenticated API mints
-a constrained, one-use ephemeral token for each voice session. See
-[Farmer voice assistant demo](docs/VOICE_ASSISTANT_DEMO.md) for the spoken demo
-script, supported actions, safety boundary, and current limitations.
+a constrained, one-use ephemeral token. On the Docker web app, audio traffic
+uses the same-origin Live proxy (`/backend/api/v1/voice/live`). See
+[Fasal Saathi](docs/VOICE_ASSISTANT_DEMO.md) for configuration, spoken script,
+tool boundaries, and limitations.
 
 The field app and dashboard use same-origin `/backend` proxies, so no browser
-configuration is required.
+API base-URL configuration is required.
 
 ## Use from another device
 

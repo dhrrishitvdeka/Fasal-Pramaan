@@ -1,4 +1,4 @@
-# Known limitations and honest presentation boundaries
+# Known limitations and product boundaries
 
 ## Model limitations
 
@@ -8,9 +8,9 @@ checksum-locked 58,516-image manifest includes controlled and field-style
 sources, and it passed the pre-frozen internal promotion gates on an immutable
 12,167-image test. This still is not a representative deployment study:
 capture protocols, locations, devices, seasons, and class support vary, and
-there is no independent field validation. A/B/C/U are presentation screening
-buckets only. Potato healthy is the disclosed weakest class (16 test examples,
-recall 0.25, F1 0.32). The legacy `plant_disease` MobileNet evaluation remains
+there is no independent field validation. A/B/C/U are screening buckets only.
+Potato healthy is the disclosed weakest class (16 test examples, recall 0.25,
+F1 0.32). The legacy `plant_disease` MobileNet evaluation remains
 **25/60 (41.67%)** on synthetic PlantVillage-style validation images.
 
 It must not be presented as able to:
@@ -23,12 +23,13 @@ It must not be presented as able to:
 
 The application preserves this boundary by marking predictions non-production and routing incomplete/uncertain cases to recapture or physical inspection.
 
-## Presentation-data limitations
+## Local-data limitations
 
-- Seed accounts, farms, locations, submissions and alerts are synthetic.
-- The local MinIO bucket is a demo evidence store, not a governed retention system.
+- Seed creates demo accounts and reference catalogs only; farms, cycles, and
+  submissions are created during use.
+- The local MinIO bucket is a development evidence store, not a governed retention system.
 - Docker field app is available at `http://localhost:8085`; native Android/iOS still need a local Flutter toolchain.
-- The demo can show workflow behavior; it cannot prove field accuracy, farmer adoption, or programme integration.
+- The local stack demonstrates workflow behavior; it does not prove field accuracy, farmer adoption, or programme integration.
 
 ## Platform limitations still open
 
@@ -44,10 +45,12 @@ The application preserves this boundary by marking predictions non-production an
 | Mobile verification | Docker web + unit tests; physical-device CI optional | Device-lab / CI Flutter jobs |
 | Model readiness | Internal gates passed; non-production assist only | Independent, protocol-matched field validation |
 
-## Approved wording
+## Accurate product claims
 
-Use: “AI-assisted evidence review with mandatory human validation.”
+Accurate: “AI-assisted evidence review with mandatory human validation.”
 
-Do not use: “AI insurance approval,” “production-validated model,” or “live PMFBY/YESTECH integration.”
+Inaccurate: “AI insurance approval,” “production-validated model,” or “live
+PMFBY/YESTECH integration.”
 
-See [ai-service.md](./ai-service.md) for model details and [GETTING_STARTED.md](../GETTING_STARTED.md) for the presentation script.
+See [ai-service.md](./ai-service.md) for model details and
+[demo-walkthrough.md](./demo-walkthrough.md) for an end-to-end local walkthrough.

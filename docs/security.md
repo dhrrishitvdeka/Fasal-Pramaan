@@ -1,6 +1,7 @@
-# Security boundary for the local demo
+# Security boundary for the local stack
 
-This document records the implemented application controls and the limits that remain. It is not a production security certification.
+This document records implemented application controls and remaining limits.
+It is not a production security certification.
 
 ## Controls implemented
 
@@ -40,13 +41,13 @@ flowchart LR
   Operation --> Audit["Write audit event where relevant"]
 ```
 
-## Local-demo rules
+## Local-stack rules
 
-- Prefer loopback-only access when a single-machine demo is enough; open LAN ports only on trusted Wi-Fi.
+- Prefer loopback-only access for a single machine; open LAN ports only on trusted Wi-Fi.
 - Use only the seeded accounts and synthetic evidence.
-- Keep `.env` private and never display its values during a presentation.
-- Do not present the MinIO console or demo credentials as a production design.
-- Rotate `JWT_SECRET_KEY`, `DEMO_PASSWORD`, `AI_SERVICE_TOKEN`, and MinIO credentials before any shared-network demo beyond a personal machine.
+- Keep `.env` private; never commit or publish its values.
+- Do not treat the MinIO console or demo credentials as a production design.
+- Rotate `JWT_SECRET_KEY`, `DEMO_PASSWORD`, `AI_SERVICE_TOKEN`, and MinIO credentials before any shared-network use beyond a personal machine.
 
 ## Remaining security and programme work
 
@@ -57,4 +58,5 @@ flowchart LR
 - Always-on AI service token even in development when AI is bound to non-loopback interfaces.
 - A server-side BFF/httpOnly browser session is a future hardening option; the current dashboard reduces exposure by retaining tokens only in memory.
 
-See [production-readiness.md](./production-readiness.md) for deployment gates and [SVH26007 audit readiness](./SVH26007_AUDIT_READINESS_2026-07-18.md) for historical verification evidence (with the current-status addendum at the top of that file).
+See [production-readiness.md](./production-readiness.md) for deployment gates
+and [known-limitations.md](./known-limitations.md) for product and model boundaries.

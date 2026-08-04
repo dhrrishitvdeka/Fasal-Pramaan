@@ -29,9 +29,9 @@ setup:
 	$(COMPOSE) up -d db redis minio
 	@echo "Waiting for database..."
 	@sleep 8
-	$(COMPOSE) --profile tools run --rm migrate
-	$(COMPOSE) --profile tools run --rm seed
-	$(COMPOSE) up -d ai api worker dashboard mobile
+	$(COMPOSE) run --rm migrate
+	$(COMPOSE) run --rm seed
+	$(COMPOSE) up -d ai api worker beat dashboard mobile
 	@echo ""
 	@echo "FasalPramaan AI is starting. Run: make health"
 	@echo "Dashboard: http://localhost:3000"
@@ -42,9 +42,9 @@ dev up:
 	@test -f .env || cp .env.example .env
 	$(COMPOSE) up -d db redis minio
 	@sleep 6
-	$(COMPOSE) --profile tools run --rm migrate
-	$(COMPOSE) --profile tools run --rm seed
-	$(COMPOSE) up -d ai api worker dashboard mobile
+	$(COMPOSE) run --rm migrate
+	$(COMPOSE) run --rm seed
+	$(COMPOSE) up -d ai api worker beat dashboard mobile
 
 down:
 	$(COMPOSE) down
@@ -53,13 +53,13 @@ clean:
 	$(COMPOSE) down -v --remove-orphans
 
 migrate:
-	$(COMPOSE) --profile tools run --rm migrate
+	$(COMPOSE) run --rm migrate
 
 seed:
-	$(COMPOSE) --profile tools run --rm seed
+	$(COMPOSE) run --rm seed
 
 test:
-	$(COMPOSE) run --rm -e DATABASE_URL=postgresql+psycopg://fasalpramaan:fasalpramaan_dev_only@db:5432/fasalpramaan api pytest -q
+	$(COMPOSE) run --rm api pytest -q
 	$(COMPOSE) run --rm ai pytest -q
 
 lint:
@@ -67,7 +67,7 @@ lint:
 	$(COMPOSE) run --rm ai ruff check app tests
 
 build:
-	# Build api once (shared by worker/migrate/seed) + ai + both user interfaces
+	# Build api once (shared by worker/migrate/seed/beat) + ai + both UIs
 	$(COMPOSE) build api ai dashboard mobile
 
 prune-redundant-images:

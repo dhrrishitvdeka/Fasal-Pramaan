@@ -139,7 +139,7 @@ class SettingsScreen extends ConsumerWidget {
             child: Column(
               children: [
                 const Text(
-                  'FasalPramaan AI v0.1.0 (SVH26007)',
+                  'FasalPramaan AI v1.1.0',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,

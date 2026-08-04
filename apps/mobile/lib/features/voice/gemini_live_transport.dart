@@ -250,8 +250,12 @@ GeminiLiveMessageParse parseGeminiLiveMessage(Map<String, dynamic> message) {
 
 String? _transcriptionText(dynamic raw) {
   if (raw is! Map) return null;
-  final text = raw['text']?.toString().trim() ?? '';
-  return text.isEmpty ? null : text;
+  final text = raw['text']?.toString() ?? '';
+  // Gemini Live often streams word deltas with a leading space (" की", " world").
+  // Full-string trim() stripped those separators and glued Hindi into one run-on
+  // blob in the chat bubble. Only drop pure-whitespace fragments.
+  if (text.trim().isEmpty) return null;
+  return text;
 }
 
 String _describeGeminiError(Object error) {

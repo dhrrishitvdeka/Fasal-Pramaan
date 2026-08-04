@@ -1,6 +1,6 @@
 # Deployment boundary
 
-## Local presentation and LAN deployment
+## Local and LAN deployment
 
 The checked-in Compose stack is the supported local reference deployment:
 

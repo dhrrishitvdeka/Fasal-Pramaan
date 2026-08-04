@@ -10,8 +10,8 @@
 | [environment-variables.md](environment-variables.md) | `.env` reference |
 | [security.md](security.md) | Auth, secrets, and safety boundaries |
 | [offline-sync.md](offline-sync.md) | Offline queue and sync contract |
-| [demo-walkthrough.md](demo-walkthrough.md) | End-to-end demo script |
-| [VOICE_ASSISTANT_DEMO.md](VOICE_ASSISTANT_DEMO.md) | Fasal Saathi Gemini Live voice demo |
+| [demo-walkthrough.md](demo-walkthrough.md) | End-to-end local walkthrough |
+| [VOICE_ASSISTANT_DEMO.md](VOICE_ASSISTANT_DEMO.md) | Fasal Saathi Gemini Live voice assistant |
 | [EVIDENCE_REMINDERS.md](EVIDENCE_REMINDERS.md) | Evidence reminder jobs |
 | [production-readiness.md](production-readiness.md) | Hardening checklist before real use |
 | [known-limitations.md](known-limitations.md) | Explicit product and model limits |

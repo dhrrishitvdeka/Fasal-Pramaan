@@ -1,8 +1,9 @@
 # FasalPramaan Command Centre
 
-The Command Centre is the reviewer-facing Next.js dashboard used in the presentation. It shows operational overview, map markers, review cases, alerts, health, and audit-oriented detail.
+Reviewer-facing Next.js dashboard for operational overview, map markers, review
+cases, alerts, health, and audit-oriented case detail.
 
-## Presentation use
+## Docker use
 
 1. From the repository root, start the stack:
    ```powershell
@@ -12,11 +13,17 @@ The Command Centre is the reviewer-facing Next.js dashboard used in the presenta
    Or: `docker compose up -d --build`
 2. Open http://localhost:3000.
 3. Sign in as `reviewer@fasalpramaan.local` / `Demo@12345`.
-4. Show Overview → Map → Review Queue → case detail → human correction with reason.
+4. Work through Overview → Map → Review Queue → case detail → human correction
+   with a reason.
 
-In Docker, the browser calls **`/backend`** (same origin). Next.js rewrites that path to the API container (`INTERNAL_API_BASE_URL=http://api:8000`). Evidence image previews use MinIO presigned URLs; CSP allows `NEXT_PUBLIC_MEDIA_ORIGIN` (default `http://localhost:9000`).
+In Docker, the browser calls **`/backend`** (same origin). Next.js rewrites that
+path to the API container (`INTERNAL_API_BASE_URL=http://api:8000`). Evidence
+image previews use MinIO presigned URLs; CSP allows `NEXT_PUBLIC_MEDIA_ORIGIN`
+(default `http://localhost:9000`).
 
-The dashboard holds access/refresh credentials in memory during the current session and clears the session on failed refresh/401. It is a local presentation client, not a production BFF/session architecture.
+The dashboard holds access/refresh credentials in memory for the current browser
+session and clears them on failed refresh/401. This is a local SPA client, not a
+production BFF/session architecture.
 
 ## Local development
 
@@ -44,11 +51,12 @@ npm run build
 | `INTERNAL_API_BASE_URL` | `http://api:8000` | unused when the browser talks to the API directly |
 | `NEXT_PUBLIC_MEDIA_ORIGIN` | `http://localhost:9000` (or `PUBLIC_HOST`) | same |
 
-## User-facing boundaries
+## Product boundaries
 
-- Reviewers make or correct final assessments; the AI result is non-production assistance.
-- Default model grades (A/B/C/U) do not include severity or affected area — use **Correct & verify**, not blind Accept, when those fields are empty.
-- Seed map locations and cases are synthetic.
-- Do not demonstrate admin capabilities to an audience unless they are necessary to the story.
+- Reviewers make or correct final assessments; the model result is non-production assistance.
+- Default grades (A/B/C/U) do not include severity or affected area — use
+  **Correct & verify**, not blind Accept, when those fields are empty.
+- Seed creates accounts and catalogs only; farms and cases are created during use.
 
-See the root [presentation guide](../../GETTING_STARTED.md) and [architecture](../../docs/architecture.md).
+See [GETTING_STARTED.md](../../GETTING_STARTED.md) and
+[architecture](../../docs/architecture.md).

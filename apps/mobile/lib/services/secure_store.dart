@@ -3,7 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:cryptography/cryptography.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fasalpramaan/services/safe_storage.dart';
 
 /// Authenticated encryption helpers for offline evidence and cached payloads.
 class SecureStoreConfig {
@@ -72,11 +72,11 @@ String generateDbPassphrase({int bytes = 32}) {
 String? _cachedPassphrase;
 
 /// Resolve (or create) the offline DB encryption passphrase from secure storage.
-Future<String> resolveDbPassphrase({FlutterSecureStorage? storage}) async {
+Future<String> resolveDbPassphrase({SafeStorage? storage}) async {
   if (_cachedPassphrase != null && _cachedPassphrase!.isNotEmpty) {
     return _cachedPassphrase!;
   }
-  final store = storage ?? const FlutterSecureStorage();
+  final store = storage ?? const SafeStorage();
   var existing = await store.read(key: SecureStoreConfig.dbPasswordKey);
   if (existing == null || existing.isEmpty) {
     existing = generateDbPassphrase();
