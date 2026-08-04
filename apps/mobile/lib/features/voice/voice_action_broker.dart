@@ -1,8 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:fasalpramaan/features/voice/voice_capture_bridge.dart';
 import 'package:fasalpramaan/services/api_client.dart';
+import 'package:fasalpramaan/services/evidence_notification_service.dart';
 import 'package:fasalpramaan/services/offline_db.dart';
 import 'package:fasalpramaan/services/sync_service.dart';
-import 'package:fasalpramaan/services/evidence_notification_service.dart';
 
 enum VoiceActionOutcome {
   succeeded('succeeded'),
@@ -749,17 +750,27 @@ class VoiceActionBroker {
     Map<String, dynamic> arguments,
     int userTurn,
   ) {
-    final plotId = _identifier(arguments['plot_id']);
-    final cropTypeId = _identifier(arguments['crop_type_id']);
+    final plotId = _uuid(arguments['plot_id']);
+    final cropTypeId = _uuid(arguments['crop_type_id']);
     final growthStageId = arguments['growth_stage_id'] == null
         ? null
-        : _identifier(arguments['growth_stage_id']);
+        : _uuid(arguments['growth_stage_id']);
     final year = _optionalInt(arguments['season_year']);
     final season = arguments['season']?.toString().trim().toLowerCase();
-    if (plotId == null) return _invalidIdentifier('plot');
-    if (cropTypeId == null) return _invalidIdentifier('crop type');
+    if (plotId == null) {
+      return _invalid(
+        'A valid plot UUID is required. Call list_plots first and use an exact id.',
+      );
+    }
+    if (cropTypeId == null) {
+      return _invalid(
+        'A valid crop-type UUID is required. Call list_crop_types first and use an exact id.',
+      );
+    }
     if (arguments['growth_stage_id'] != null && growthStageId == null) {
-      return _invalidIdentifier('growth stage');
+      return _invalid(
+        'A valid growth-stage UUID is required, or omit growth_stage_id.',
+      );
     }
     if (year == null || year < 2000 || year > 2200) {
       return _invalid('Season year must be between 2000 and 2200.');
@@ -912,6 +923,22 @@ class VoiceActionBroker {
 
     // Consume first so a repeated tool call cannot replay a sensitive action.
     _pending = null;
+    try {
+      return await _executeConfirmed(pending);
+    } on DioException catch (error) {
+      return VoiceToolResult(
+        outcome: VoiceActionOutcome.failed,
+        message: _dioErrorMessage(error),
+      );
+    } catch (error) {
+      return VoiceToolResult(
+        outcome: VoiceActionOutcome.failed,
+        message: 'Could not complete the action: ${_safeError(error)}',
+      );
+    }
+  }
+
+  Future<VoiceToolResult> _executeConfirmed(_PendingAction pending) async {
     switch (pending.kind) {
       case _PendingKind.syncQueue:
         final count = await gateway.syncOfflineQueue();
@@ -960,12 +987,35 @@ class VoiceActionBroker {
         );
       case _PendingKind.createCropCycle:
         final args = pending.arguments;
+        final plotId = _uuid(args['plot_id']);
+        final cropTypeId = _uuid(args['crop_type_id']);
+        final year = _optionalInt(args['season_year']);
+        final season = args['season']?.toString().trim().toLowerCase();
+        final growthStageId = args['growth_stage_id'] == null
+            ? null
+            : _uuid(args['growth_stage_id']);
+        if (plotId == null) {
+          return _invalid(
+            'The plot id is invalid. List plots first, then create the cycle.',
+          );
+        }
+        if (cropTypeId == null) {
+          return _invalid(
+            'The crop type id is invalid. List crop types first, then create the cycle.',
+          );
+        }
+        if (year == null || season == null ||
+            !const {'kharif', 'rabi', 'zaid'}.contains(season)) {
+          return _invalid(
+            'Season year and season (kharif/rabi/zaid) are required.',
+          );
+        }
         final value = await _extended.createCropCycle(
-          plotId: args['plot_id'] as String,
-          cropTypeId: args['crop_type_id'] as String,
-          seasonYear: args['season_year'] as int,
-          season: args['season'] as String,
-          growthStageId: args['growth_stage_id'] as String?,
+          plotId: plotId,
+          cropTypeId: cropTypeId,
+          seasonYear: year,
+          season: season,
+          growthStageId: growthStageId,
         );
         return VoiceToolResult(
           outcome: VoiceActionOutcome.succeeded,
@@ -1052,6 +1102,46 @@ class VoiceActionBroker {
       return null;
     }
     return text;
+  }
+
+  static final RegExp _uuidPattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
+  /// Stricter id for API UUID fields (plot/crop/cycle). Prevents 422 noise when
+  /// the model invents non-UUID placeholders.
+  static String? _uuid(dynamic value) {
+    final text = _identifier(value);
+    if (text == null || !_uuidPattern.hasMatch(text)) return null;
+    return text;
+  }
+
+  static String _dioErrorMessage(DioException error) {
+    final status = error.response?.statusCode;
+    final data = error.response?.data;
+    if (data is Map) {
+      final detail = data['detail'];
+      if (detail is String && detail.trim().isNotEmpty) {
+        return detail.trim();
+      }
+      if (detail is List && detail.isNotEmpty) {
+        final first = detail.first;
+        if (first is Map && first['msg'] != null) {
+          return 'Request invalid: ${first['msg']}';
+        }
+        return 'Request invalid (${detail.length} validation error(s)).';
+      }
+    }
+    if (status == 422) {
+      return 'The server rejected the request (invalid data). List farms/plots/crops first, then try again.';
+    }
+    if (status == 403) {
+      return 'You are not allowed to change that farm or plot.';
+    }
+    if (status == 404) {
+      return 'That farm, plot, or crop was not found. List them first.';
+    }
+    return 'Network error${status != null ? ' ($status)' : ''}. Try again.';
   }
 
   static double? _optionalDouble(dynamic value) {
