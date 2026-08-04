@@ -1,0 +1,32 @@
+{
+  "version": "dinov2-crop-conditioned-product-contract-v1",
+  "frozen_before_this_contracts_test_evaluation": true,
+  "model_id": "dinov2_vits14_conditioned_v12",
+  "checkpoint": "runs/dinov2_vits14_conditioned_v12/best.pt",
+  "checkpoint_bytes": 86596413,
+  "checkpoint_sha256": "0fa86d75e8c4db26e1b748ed2d8445ece359dba4bf1b475a85864612b1be8973",
+  "checkpoint_selection": "highest unweighted manifest-v5 validation macro-F1 across mapped epoch zero and the pre-frozen four-epoch conditioned-head schedule",
+  "selected_epoch": 2,
+  "training_config": "dinov2_conditioned_v8.json",
+  "training_config_sha256": "627bb2944d1f9c1eab96fe35650ec380117beec846cbe5733416381263fe258e",
+  "training_validation_report_sha256": "2aac828bfa041446f38128b532d447ccb592e1d55f82427f216bab38d42a45e1",
+  "manifest": "manifest_v5.jsonl",
+  "manifest_sha256": "2d85160ac400d05b30fa5f606cbea1b606eeedaff0dc17e842f8391782b0800f",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "conditioned_crops": ["maize", "paddy", "potato", "wheat"],
+  "conditioned_classes": ["healthy", "disease", "invalid"],
+  "calibration": "equal-source weighting across the six declared field validation sources, minimum temperature 1.0",
+  "temperature": 1.0000034972115646,
+  "abstention_threshold": 0.5,
+  "validation_metrics": {
+    "macro_f1": 0.9182805714100153,
+    "balanced_accuracy": 0.9332731959390816,
+    "invalid_ood_recall": 0.9380952380952381,
+    "id_coverage": 0.9737740255074546,
+    "expected_calibration_error_15_bins": 0.02544580538590308
+  },
+  "expected_crop_source_in_product": "trusted crop-cycle metadata supplied by the API request",
+  "test_disclosure": "The architecture was selected and all numerical parameters were frozen from manifest-v5 validation. No v12 frozen-test image, label, logit, metric, threshold, calibration value, or per-example failure was inspected before this contract was frozen.",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

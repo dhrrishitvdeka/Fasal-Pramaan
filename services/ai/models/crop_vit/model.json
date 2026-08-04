@@ -1,0 +1,32 @@
+{
+  "name": "crop_leaf_diseases_vit_onnx",
+  "source_model": "wambugu71/crop_leaf_diseases_vit",
+  "source_onnx": "wambugu71/crop_leaf_diseases_vit_onnx",
+  "source_url": "https://huggingface.co/wambugu71/crop_leaf_diseases_vit_onnx",
+  "license": "MIT",
+  "architecture": "ViT-Tiny patch16 224, quantized ONNX",
+  "sha256": "3cb2ede8723dcbcd70db7d5bb99cc0d61466c304b2c91b26f2d0d54db9fb75f3",
+  "input": {
+    "name": "pixel_values",
+    "shape": ["batch", 3, 224, 224],
+    "mean": [0.5, 0.5, 0.5],
+    "std": [0.5, 0.5, 0.5]
+  },
+  "labels": [
+    "Corn___Common_Rust",
+    "Corn___Gray_Leaf_Spot",
+    "Corn___Healthy",
+    "Invalid",
+    "Potato___Early_Blight",
+    "Potato___Healthy",
+    "Potato___Late_Blight",
+    "Rice___Brown_Spot",
+    "Rice___Healthy",
+    "Rice___Leaf_Blast",
+    "Wheat___Brown_Rust",
+    "Wheat___Healthy",
+    "Wheat___Yellow_Rust"
+  ],
+  "supported_crop_codes": ["maize", "paddy", "potato", "wheat"],
+  "use_boundary": "Presentation-only crop-health screening. It does not estimate loss severity, affected area, yield, or claim eligibility."
+}

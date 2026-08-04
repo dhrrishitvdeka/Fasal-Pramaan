@@ -1,0 +1,15 @@
+fastapi==0.139.0
+uvicorn[standard]==0.34.0
+pydantic==2.10.3
+pydantic-settings==2.6.1
+numpy==2.1.3
+Pillow==12.3.0
+httpx==0.28.1
+pytest==9.0.3
+ruff==0.8.4
+python-multipart==0.0.32
+# Small local ViT inference path. Training dependencies intentionally stay out
+# of the presentation image so clone-to-Docker startup remains lightweight.
+onnxruntime==1.27.0
+# OpenCV/imagehash and Torch/Transformers are optional research dependencies,
+# not required by the offline ViT presentation runtime.

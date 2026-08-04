@@ -1,0 +1,28 @@
+{
+  "version": "experimental-vit-onnx-export-v1",
+  "model_id": "vit_tiny_crop_aware_v3",
+  "checkpoint_sha256": "ee623a4cdd455bcb00677315e4551e8cc89db33fcfff338b1b1007750afae4bf",
+  "onnx_sha256": "0cdefe58fb8007dc4d9d275db963e25b2fd3bfc46eed4bcd6b95d289bcb573fa",
+  "onnx_size_bytes": 22240720,
+  "opset": 17,
+  "classes": [
+    "maize__healthy",
+    "maize__disease",
+    "paddy__healthy",
+    "paddy__disease",
+    "potato__healthy",
+    "potato__disease",
+    "wheat__healthy",
+    "wheat__disease",
+    "invalid__ood"
+  ],
+  "parity_rows": 64,
+  "onnx_top1_parity": 1.0,
+  "maximum_probability_absolute_error": 3.039836883544922e-06,
+  "cpu_latency_p50_ms": 11.182899999994333,
+  "cpu_latency_p95_ms": 13.207899999997608,
+  "quantized": false,
+  "quantization_reason": "Not needed: the FP32 ONNX artifact is below the frozen 100 MiB size gate.",
+  "promotion_status": "experimental_not_promoted_due_field_and_calibration_gates",
+  "is_production_validated": false
+}

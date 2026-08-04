@@ -1,0 +1,35 @@
+{
+  "version": "hierarchical-product-contract-v4",
+  "frozen_before_hierarchical_test_evaluation": true,
+  "base_checkpoint": "research/runs/vit_tiny_field_adapted_v5/best.pt",
+  "base_checkpoint_sha256": "5557afa211651719aecb3cb24150712cae7fbdde7e8682e106df3b144b16d721",
+  "base_checkpoint_selection": "highest unweighted manifest-v2 validation macro_f1 across the frozen four-epoch schedule",
+  "manifest": "manifest_v2.jsonl",
+  "manifest_sha256": "2915cf91380b58ec7dcad8e99454a91208cb7029a00197b460d71609224ec762",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "calibration": "single scalar temperature fit on validation cross-entropy with equal total weight per validation source",
+  "expected_crop_source_in_product": "trusted crop-cycle metadata supplied by the API request",
+  "evaluation_expected_crop_for_supported_rows": "canonical crop label",
+  "evaluation_expected_crop_for_ood_rows": "deterministic balanced simulation: sha256('expected:' + image_id) modulo maize,paddy,potato,wheat",
+  "decision": [
+    "temperature-scale logits using validation only",
+    "aggregate calibrated probabilities by crop",
+    "return U when a confident predicted crop differs from expected crop",
+    "otherwise restrict health decision to expected-crop healthy/disease plus invalid",
+    "return U below the validation-fitted confidence threshold"
+  ],
+  "threshold_grid": {
+    "crop_mismatch": [0.4, 0.9, 0.05],
+    "confidence": [0.0, 0.95, 0.05]
+  },
+  "selection": {
+    "primary": "highest validation macro_f1 among pairs with invalid recall >= 0.80 and ID coverage >= 0.70",
+    "exact_tie_break_1": "highest crop-mismatch threshold",
+    "exact_tie_break_2": "lowest confidence threshold",
+    "fallback": "minimum summed constraint shortfall then highest validation macro_f1",
+    "numeric_tolerance": 1e-12
+  },
+  "test_disclosure": "The same immutable test was observed for prior candidates. This contract, checkpoint, temperature policy, and threshold grid were frozen without using v5 test logits or metrics.",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

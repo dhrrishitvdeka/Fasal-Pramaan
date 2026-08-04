@@ -1,0 +1,30 @@
+{
+  "version": "trusted-crop-health-contract-v2",
+  "frozen_before_this_contracts_test_evaluation": true,
+  "base_checkpoint": "research/runs/vit_tiny_field_expanded_v7/best.pt",
+  "base_checkpoint_sha256": "86c4ee723edcec2b07bb8a156382faff3f90697c960fa0a1f5b0395fb85b6537",
+  "base_checkpoint_selection": "highest unweighted manifest-v3 validation macro-F1 across the frozen four-epoch schedule",
+  "manifest": "manifest_v3.jsonl",
+  "manifest_sha256": "41a73d6e55fc735fcf88d3ef079f2b4fc746d32c07a9cb5671944d2d5f0d5ec2",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "calibration": "equal-source weighting across the three added field validation sources, with minimum temperature 1.0",
+  "temperature": 1.0000034972115646,
+  "fixed_thresholds": {
+    "mismatch_threshold": 1.0,
+    "confidence_threshold": 0.0,
+    "validation_invalid_ood_recall": 0.9841269841269841,
+    "validation_id_coverage": 0.9786729857819905,
+    "validation_macro_f1": 0.930067769166232,
+    "selection_source": "hierarchical_validation_only_v8_candidate.json; thresholds themselves carry forward the preexisting trusted-crop product semantics from hierarchical_contract_v7.json"
+  },
+  "expected_crop_source_in_product": "trusted crop-cycle metadata supplied by the API request",
+  "decision": [
+    "temperature-scale logits using field validation only without sharpening below temperature 1.0",
+    "treat trusted crop-cycle metadata as authoritative for the supported crop",
+    "restrict the health decision to expected-crop healthy/disease plus the explicit invalid logit",
+    "use no visual crop-mismatch or additional confidence rejection"
+  ],
+  "test_disclosure": "The immutable test was observed for earlier candidates. This contract carries forward already frozen trusted-crop semantics and records only v3-manifest validation measurements from the new candidate. No v7 frozen-test example, label, logit, calibration value, or per-example failure was inspected before this file was frozen.",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

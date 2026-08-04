@@ -1,0 +1,119 @@
+{
+  "lock_version": "field-expansion-download-lock-v4",
+  "extends": "field_expansion_download_lock_v3.json",
+  "sources": [
+    {
+      "id": "riceleafbd_ccby",
+      "lock_version": "riceleafbd_ccby-download-lock-v1",
+      "dataset": "RiceLeafBD",
+      "doi": "10.17632/kx9rx8p2mz.1",
+      "dataset_version": 1,
+      "license": "CC BY 4.0",
+      "source_url": "https://data.mendeley.com/datasets/kx9rx8p2mz/1",
+      "files": [
+        {
+          "filename": "Original Images.zip",
+          "url": "https://data.mendeley.com/public-files/datasets/kx9rx8p2mz/files/fdab2bd9-ed8b-4156-8d96-0b5d8f18f4ed/file_downloaded",
+          "bytes": 497906237,
+          "sha256": "3280cc176c2ee9f6ee4386e5728623fc7e8f9204b31c50f4ebb303edc52d9c83"
+        }
+      ],
+      "rows": 1560,
+      "unique_image_sha256": 1451,
+      "labels": {
+        "Bacterial Leaf Blight": 422,
+        "Brown Spot": 356,
+        "Healthy Leaf": 252,
+        "Tungro Virus": 530
+      },
+      "health_states": {
+        "disease": 1308,
+        "healthy": 252
+      },
+      "metadata_sha256": "79ddbf4b6ea92d48df39cce94422fb8c207fd9d432b3e4c743e3258ecffbba09",
+      "resized_cache_policy": "longest edge <=512px, RGB JPEG quality 92, LANCZOS",
+      "only_original_images": true,
+      "synthetic_or_augmented_images_included": false
+    },
+    {
+      "id": "rice_field_weeds_ccby",
+      "lock_version": "rice_field_weeds_ccby-download-lock-v1",
+      "dataset": "Rice Field Weed Dataset V3",
+      "doi": "10.17632/mt72bmxz73.3",
+      "dataset_version": 3,
+      "license": "CC BY 4.0",
+      "source_url": "https://data.mendeley.com/datasets/mt72bmxz73/3",
+      "files": [
+        {
+          "filename": "Rice Field weed BD Dataset_V3.zip",
+          "url": "https://data.mendeley.com/public-files/datasets/mt72bmxz73/files/fa2ad794-0a3a-4d15-89b4-361f5686d676/file_downloaded",
+          "bytes": 259896693,
+          "sha256": "9b3f766c2893b6059515cf309fd4b4822132805c64571942b274d971dc0d1914"
+        }
+      ],
+      "rows": 4367,
+      "unique_image_sha256": 4346,
+      "labels": {
+        "W_CL_01_Alternanthera philoxeroide": 133,
+        "W_CL_02_Centella asiatica": 437,
+        "W_CL_03_Commelina benghalensis": 384,
+        "W_CL_04_Cyperus ochraceus": 207,
+        "W_CL_05_Fimbristylis littoralis": 198,
+        "W_CL_06_Ipomoea aquatic": 904,
+        "W_CL_07_Marsilea minuta": 379,
+        "W_CL_08_Panicum repens": 310,
+        "W_CL_09_Paspalum scrobiculatum": 514,
+        "W_CL_10_Pteris vittata": 451,
+        "W_CL_11_Synedrella nodiflora": 450
+      },
+      "health_states": {
+        "invalid": 4367
+      },
+      "metadata_sha256": "f6aaf9c1221b3cf2a948f2bbe4e0a1ae009135c1262f9cc87f771fa60064cf17",
+      "resized_cache_policy": "longest edge <=512px, RGB JPEG quality 92, LANCZOS",
+      "only_original_images": true,
+      "synthetic_or_augmented_images_included": false
+    },
+    {
+      "id": "potato_blight_sample_ccby",
+      "lock_version": "potato_blight_sample_ccby-download-lock-v1",
+      "dataset": "Enhanced Field-Based Detection of Potato Leaf Blight (sample)",
+      "doi": "10.17632/pbnw43s6kt.1",
+      "dataset_version": 1,
+      "license": "CC BY 4.0",
+      "source_url": "https://data.mendeley.com/datasets/pbnw43s6kt/1",
+      "files": [
+        {
+          "filename": "pbnw43s6kt-v1.zip",
+          "url": "https://data.mendeley.com/public-api/zip/pbnw43s6kt/download/1",
+          "bytes": 1006245483,
+          "sha256": "88cd82644a839cb708cf3ea3b1c21da24ff442061883ac5001701ee1c807bcf0"
+        }
+      ],
+      "rows": 305,
+      "unique_image_sha256": 305,
+      "labels": {
+        "Blight infected potato leaf": 217,
+        "Healthy potato leaf": 88
+      },
+      "health_states": {
+        "disease": 217,
+        "healthy": 88
+      },
+      "metadata_sha256": "84b8cfce12d59a29166fa177daec15e2d7c3edc69e3911d23c9501dbe9a4d375",
+      "resized_cache_policy": "longest edge <=512px, RGB JPEG quality 92, LANCZOS",
+      "only_original_images": true,
+      "synthetic_or_augmented_images_included": false,
+      "official_folder_file_counts": {
+        "healthy_rgb": 88,
+        "blight_train": 217
+      },
+      "official_folder_total_bytes": {
+        "healthy_rgb": 429318596,
+        "blight_train": 585711173
+      }
+    }
+  ],
+  "redistribute_raw_images": false,
+  "is_production_validated": false
+}

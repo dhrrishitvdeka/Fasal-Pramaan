@@ -1,0 +1,25 @@
+{
+  "version": "dinov2-trusted-crop-contract-v1",
+  "frozen_before_this_contracts_test_evaluation": true,
+  "base_checkpoint": "research/runs/dinov2_vits14_linear_v8/best.pt",
+  "base_checkpoint_sha256": "9ab68d0b694c1e61fb3e33950e66f21f4323e3f4916b63faee31035a9b975aba",
+  "base_checkpoint_selection": "highest unweighted manifest-v3 validation macro-F1 across the frozen five-epoch linear-probe schedule",
+  "manifest": "manifest_v3.jsonl",
+  "manifest_sha256": "41a73d6e55fc735fcf88d3ef079f2b4fc746d32c07a9cb5671944d2d5f0d5ec2",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "calibration": "equal-source weighting across the three added field validation sources, with minimum temperature 1.5",
+  "temperature": 1.5000088610619051,
+  "fixed_thresholds": {
+    "mismatch_threshold": 0.9,
+    "confidence_threshold": 0.0,
+    "validation_invalid_ood_recall": 0.9626984126984127,
+    "validation_id_coverage": 0.9451591062965471,
+    "validation_macro_f1": 0.8879444953720879,
+    "validation_ece": 0.09263987101589721,
+    "selection_source": "hierarchical_validation_only_v9_candidate.json; thresholds carry forward the preexisting hierarchical_contract_v5.json policy"
+  },
+  "expected_crop_source_in_product": "trusted crop-cycle metadata supplied by the API request",
+  "test_disclosure": "The immutable test was observed for earlier ViT-Tiny candidates. This contract carries forward an already frozen crop-mismatch policy and records only manifest-v3 validation measurements from the DINOv2 linear probe. No DINOv2 frozen-test example, label, logit, calibration value, or per-example failure was inspected before this file was frozen.",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

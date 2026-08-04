@@ -1,0 +1,111 @@
+{
+  "version": "licensed-sources-v1",
+  "redistribute_raw_images": false,
+  "sources": [
+    {
+      "id": "multicrop_ccby",
+      "role": "train_validation",
+      "crops": ["maize", "paddy", "potato"],
+      "dataset": "Multi-Crop Leaf Disease Dataset: Corn, Potato, Rice, Tomato, and Cashew",
+      "source_url": "https://data.mendeley.com/datasets/z6jp232g5j/1",
+      "doi": "10.17632/z6jp232g5j.1",
+      "license": "CC BY 4.0",
+      "archive_url": "https://data.mendeley.com/public-files/datasets/z6jp232g5j/files/1a203abd-332b-412a-b211-d1f60762eb59/file_downloaded",
+      "archive_name": "multicrop_ccby.zip",
+      "archive_sha256": "4ff1020d0d78686368907591809b183660e0005886dd33942af9d50fa4971e01",
+      "expected_bytes": 661739423,
+      "commercial_use": true
+    },
+    {
+      "id": "paddy_doctor_cc0",
+      "role": "train_validation",
+      "crops": ["paddy"],
+      "dataset": "Paddy Disease Classification all 480x640 px image",
+      "source_url": "https://www.kaggle.com/datasets/imbikramsaha/paddy-doctor",
+      "license": "CC0 1.0",
+      "archive_url": "https://www.kaggle.com/api/v1/datasets/download/imbikramsaha/paddy-doctor?datasetVersionNumber=1",
+      "archive_name": "paddy_doctor_cc0.zip",
+      "archive_sha256": "876d323f37decef1a27e4b3f6fd2402d3c0781eefa9135b67e153d0b9af72509",
+      "expected_bytes": 1094204760,
+      "commercial_use": true
+    },
+    {
+      "id": "wheat_iari_cc0",
+      "role": "train_validation_and_grouped_test",
+      "crops": ["wheat"],
+      "dataset": "Wheat Nitrogen Deficiency & Leaf Rust Image",
+      "source_url": "https://www.kaggle.com/datasets/jocelyndumlao/wheat-nitrogen-deficiency-and-leaf-rust-image",
+      "license": "CC0 1.0",
+      "archive_url": "https://www.kaggle.com/api/v1/datasets/download/jocelyndumlao/wheat-nitrogen-deficiency-and-leaf-rust-image?datasetVersionNumber=1",
+      "archive_name": "wheat_iari_cc0.zip",
+      "archive_sha256": "d09de0fbb42b82dfa5ca44975181fc25f5631201119fb7934e95b271a9bc20fb",
+      "expected_bytes": 254197767,
+      "commercial_use": true
+    },
+    {
+      "id": "maize_mld_ccby",
+      "role": "frozen_field_test",
+      "crops": ["maize"],
+      "dataset": "MLD: A Multi-Class Maize Leaf Disease Image Dataset from Bangladesh (2025)",
+      "source_url": "https://data.mendeley.com/datasets/3myfctrgk3/1",
+      "doi": "10.17632/3myfctrgk3.1",
+      "license": "CC BY 4.0",
+      "archive_url": "https://data.mendeley.com/public-files/datasets/3myfctrgk3/files/691a1e78-dd69-43ee-a624-77df3e2f6a84/file_downloaded",
+      "archive_name": "maize_mld_ccby.zip",
+      "archive_sha256": "f15846ec615e6239ea9e282beb0b5506edfec1fb19975dad01df4a5942d1633f",
+      "expected_bytes": 27340926,
+      "commercial_use": true
+    },
+    {
+      "id": "potato_field_ccby",
+      "role": "frozen_field_test",
+      "crops": ["potato"],
+      "dataset": "Potato Leaf Disease Dataset",
+      "source_url": "https://data.mendeley.com/datasets/d5b3fzpw3g/1",
+      "doi": "10.17632/d5b3fzpw3g.1",
+      "license": "CC BY 4.0",
+      "archive_url": "https://data.mendeley.com/public-files/datasets/d5b3fzpw3g/files/3696ddd4-6e96-4682-b778-5187d088f624/file_downloaded",
+      "archive_name": "potato_field_ccby.zip",
+      "archive_sha256": "549c7f3343422fa2b77b6fb2c5009a52215aa00626b2646435ba19f4826f8192",
+      "expected_bytes": 38393565,
+      "commercial_use": true
+    },
+    {
+      "id": "rice_field_ccby",
+      "role": "frozen_field_test",
+      "crops": ["paddy"],
+      "dataset": "Rice Leaf Disease Image Samples",
+      "source_url": "https://data.mendeley.com/datasets/fwcj7stb8r/1",
+      "doi": "10.17632/fwcj7stb8r.1",
+      "license": "CC BY 4.0",
+      "archive_url": "https://data.mendeley.com/public-files/datasets/fwcj7stb8r/files/fd8717c4-0d65-4c80-a76c-3b61cb68e80d/file_downloaded",
+      "archive_name": "rice_field_ccby.7z",
+      "archive_sha256": "b2d5fbef5a8ef6adefa04a83be7ee5150091f412d40162ecdf9fd2b1b5e24aaf",
+      "expected_bytes": 179355409,
+      "commercial_use": true
+    },
+    {
+      "id": "plantdoc_ccby",
+      "role": "frozen_source_held_out_and_ood",
+      "crops": ["maize", "potato", "unsupported"],
+      "dataset": "Cropped PlantDoc",
+      "source_url": "https://github.com/pratikkayal/PlantDoc-Dataset",
+      "license": "CC BY 4.0",
+      "pinned_revision": "5467f6012d78d1c446145d5f582da6096f852ae8",
+      "archive_url": "https://github.com/pratikkayal/PlantDoc-Dataset/archive/5467f6012d78d1c446145d5f582da6096f852ae8.zip",
+      "archive_name": "plantdoc_ccby.zip",
+      "commercial_use": true
+    },
+    {
+      "id": "plantvillage_isolated",
+      "role": "baseline_reference_only_not_in_selected_weights",
+      "crops": ["maize", "potato"],
+      "dataset": "PlantVillage",
+      "source_url": "https://huggingface.co/datasets/mohanty/PlantVillage",
+      "license": "CC BY-SA 3.0",
+      "commercial_use": true,
+      "download": false,
+      "isolation_reason": "Share-alike implications for redistributed derived weights require separate legal approval. Existing synthetic baseline remains reproducible without adding this source to selected training."
+    }
+  ]
+}

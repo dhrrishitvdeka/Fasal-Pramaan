@@ -1,0 +1,44 @@
+name: Bug report
+description: Report a reproducible defect without including sensitive data.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include API keys, tokens, farmer evidence, or personal data.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      placeholder: "1. Start...\n2. Open...\n3. Select..."
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Revision or version
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      options:
+        - Farmer mobile/web app
+        - Reviewer dashboard
+        - API or worker
+        - Model service
+        - Docker or deployment
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      render: shell

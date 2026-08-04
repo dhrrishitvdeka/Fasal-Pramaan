@@ -1,0 +1,20 @@
+{
+  "name": "fasalpramaan-crop-health-vit-v3-experimental",
+  "version": "3.0.0-experimental",
+  "architecture": "vit_tiny_patch16_224",
+  "artifact": "model.onnx",
+  "artifact_sha256": "0cdefe58fb8007dc4d9d275db963e25b2fd3bfc46eed4bcd6b95d289bcb573fa",
+  "artifact_size_bytes": 22240720,
+  "opset": 17,
+  "temperature": 0.8218026900399514,
+  "crop_mismatch_threshold": 0.9,
+  "manual_review_grade_b_threshold": 0.7,
+  "supported_crop_codes": ["maize", "paddy", "potato", "wheat"],
+  "labels_file": "labels.json",
+  "preprocessing_file": "preprocessing.json",
+  "promotion_status": "not_promoted_experimental_demo_only",
+  "failed_promotion_gates": ["source_held_out_macro_f1_min", "maximum_ece_after_calibration"],
+  "rollback_adapter": "crop_vit",
+  "human_review_required": true,
+  "is_production_validated": false
+}

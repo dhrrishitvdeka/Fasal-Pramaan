@@ -1,0 +1,44 @@
+{
+  "lock_version": "field-expansion-download-lock-v3",
+  "sources": [
+    {
+      "id": "potato_pldd_up_ccby",
+      "lock_version": "potato-pldd-up-download-lock-v1",
+      "dataset": "PLDD-UP: Potato Leaf Disease Dataset from Uttar Pradesh, India",
+      "doi": "10.17632/3j4nfkvp2n.1",
+      "dataset_version": 1,
+      "license": "CC BY 4.0",
+      "source_url": "https://data.mendeley.com/datasets/3j4nfkvp2n/1",
+      "files": [
+        {
+          "filename": "EB.zip",
+          "url": "https://data.mendeley.com/public-files/datasets/3j4nfkvp2n/files/5717ac85-cf61-461d-bf70-e1e5af2f2c53/file_downloaded",
+          "bytes": 2766326616,
+          "sha256": "cffd37bbb79e75c0e23c1486f88f0a7c873b3fe67f643c41db3abd794bdc01e5"
+        },
+        {
+          "filename": "Healthy.zip",
+          "url": "https://data.mendeley.com/public-files/datasets/3j4nfkvp2n/files/d4ce2acf-3af8-416e-90bc-bb834ba9da66/file_downloaded",
+          "bytes": 3683027938,
+          "sha256": "2b7e4107d7ba03c0ef9636831aa4de7d333435df238f667f562e27b1e46e59e2"
+        },
+        {
+          "filename": "LB.zip",
+          "url": "https://data.mendeley.com/public-files/datasets/3j4nfkvp2n/files/35ff7712-865c-41bf-96b1-d25d84af7b95/file_downloaded",
+          "bytes": 2323338293,
+          "sha256": "f4d31182b5d2f147c256e1c73838eac9b17592b89ed2b1ae394f58863e74a447"
+        }
+      ],
+      "archive_set_sha256": "aa45fc6e55f73edf71e8d77c13587d59c5cb2f7afdcedab86e1a800f4da703af",
+      "rows": 15519,
+      "unique_image_sha256": 15265,
+      "labels": ["Early Blight", "Healthy", "Late Blight"],
+      "metadata_sha256": "378fe0aab3d434b62754dd1750785b5be598814eea33c256be116166f3559f89",
+      "resized_cache_policy": "longest edge <=512px, RGB JPEG quality 92, LANCZOS",
+      "only_original_images": true,
+      "synthetic_or_augmented_images_included": false
+    }
+  ],
+  "redistribute_raw_images": false,
+  "is_production_validated": false
+}

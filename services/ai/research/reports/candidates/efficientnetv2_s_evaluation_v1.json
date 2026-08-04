@@ -1,0 +1,1181 @@
+{
+  "version": "candidate-evaluation-v1",
+  "model_id": "efficientnetv2_s",
+  "model_config": {
+    "id": "efficientnetv2_s",
+    "provider": "torchvision",
+    "architecture": "efficientnet_v2_s",
+    "initialization": "random_local",
+    "initialization_reason": "No separately downloadable weights are required for offline reproduction."
+  },
+  "initialization": {
+    "initialization": "random_local"
+  },
+  "seed": 26007,
+  "training_rows": 4803,
+  "validation_rows": 910,
+  "training_ids_sha256": "7fb2c4ebe7c8791ca9c9733e56f4f3691a756ccb51dfa1361738dacf125e0815",
+  "validation_ids_sha256": "d56fb31b50130cf4001057a18479b5e93b6c9f2b37f54869efd7981cdc98de8b",
+  "experiment_config_sha256": "0dd8c7ca1d1ccd2aa5cfa8f3f1a07440f777763e351a811019c7d2fcb59daafc",
+  "manifest_sha256": "99f930cc5266780e8ebc1ca18f61045d46c593c7697085af1f91f43242a83f2e",
+  "epochs_completed": 8,
+  "training_seconds": 553.398926599999,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 2.1310298107029273,
+      "train_accuracy": 0.23131376223193836,
+      "validation_macro_f1": 0.11029583487466908,
+      "validation_balanced_accuracy": 0.1972321784149741,
+      "learning_rates": [
+        0.0002,
+        0.001
+      ]
+    },
+    {
+      "epoch": 2,
+      "train_loss": 1.6926681259734269,
+      "train_accuracy": 0.3437434936498022,
+      "validation_macro_f1": 0.3229944855201619,
+      "validation_balanced_accuracy": 0.36315846638427285,
+      "learning_rates": [
+        0.0001923879532511287,
+        0.0009619397662556434
+      ]
+    },
+    {
+      "epoch": 3,
+      "train_loss": 1.468417931541214,
+      "train_accuracy": 0.4436810326879034,
+      "validation_macro_f1": 0.36476827425735003,
+      "validation_balanced_accuracy": 0.5160149885956338,
+      "learning_rates": [
+        0.00017071067811865476,
+        0.0008535533905932738
+      ]
+    },
+    {
+      "epoch": 4,
+      "train_loss": 1.3163337242645496,
+      "train_accuracy": 0.5171767645221736,
+      "validation_macro_f1": 0.6094897537049481,
+      "validation_balanced_accuracy": 0.6554722855798124,
+      "learning_rates": [
+        0.000138268343236509,
+        0.0006913417161825451
+      ]
+    },
+    {
+      "epoch": 5,
+      "train_loss": 1.2122661202693021,
+      "train_accuracy": 0.5838017905475744,
+      "validation_macro_f1": 0.6293919960098111,
+      "validation_balanced_accuracy": 0.6579667644183773,
+      "learning_rates": [
+        0.0001,
+        0.0005000000000000001
+      ]
+    },
+    {
+      "epoch": 6,
+      "train_loss": 1.1076219056190215,
+      "train_accuracy": 0.6231521965438268,
+      "validation_macro_f1": 0.6502348142699568,
+      "validation_balanced_accuracy": 0.7024057782122299,
+      "learning_rates": [
+        6.173165676349103e-05,
+        0.0003086582838174552
+      ]
+    },
+    {
+      "epoch": 7,
+      "train_loss": 1.0511910642853832,
+      "train_accuracy": 0.6533416614615865,
+      "validation_macro_f1": 0.6912187813506858,
+      "validation_balanced_accuracy": 0.7330618008037363,
+      "learning_rates": [
+        2.9289321881345254e-05,
+        0.0001464466094067263
+      ]
+    },
+    {
+      "epoch": 8,
+      "train_loss": 1.0130125785057629,
+      "train_accuracy": 0.6710389339995836,
+      "validation_macro_f1": 0.7167335247931811,
+      "validation_balanced_accuracy": 0.74651171210311,
+      "learning_rates": [
+        7.612046748871327e-06,
+        3.8060233744356646e-05
+      ]
+    }
+  ],
+  "temperature": 0.8757628707158226,
+  "abstention": {
+    "threshold": 0.62,
+    "invalid_ood_recall": 0.7388888888888889,
+    "id_coverage": 0.7082191780821918,
+    "macro_f1": 0.6560758061510837,
+    "constraint_shortfall": 0.061111111111111116,
+    "selection_status": "constraints_infeasible_minimum_shortfall"
+  },
+  "metrics": {
+    "rows": 12167,
+    "accuracy": 0.26423933590860527,
+    "macro_f1": 0.36751100042210666,
+    "balanced_accuracy": 0.4655478209732973,
+    "per_class": {
+      "maize__healthy": {
+        "precision": 0.07018867924528302,
+        "recall": 0.21779859484777517,
+        "f1": 0.10616438356164383,
+        "support": 427
+      },
+      "maize__disease": {
+        "precision": 0.23531626506024098,
+        "recall": 0.442008486562942,
+        "f1": 0.3071253071253071,
+        "support": 1414
+      },
+      "paddy__healthy": {
+        "precision": 0.36293436293436293,
+        "recall": 0.7430830039525692,
+        "f1": 0.4876783398184176,
+        "support": 253
+      },
+      "paddy__disease": {
+        "precision": 0.5572139303482587,
+        "recall": 0.033185185185185186,
+        "f1": 0.06263982102908278,
+        "support": 6750
+      },
+      "potato__healthy": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "support": 16
+      },
+      "potato__disease": {
+        "precision": 0.0401819560272934,
+        "recall": 0.1840277777777778,
+        "f1": 0.06596141879278158,
+        "support": 288
+      },
+      "wheat__healthy": {
+        "precision": 0.8548387096774194,
+        "recall": 1.0,
+        "f1": 0.9217391304347826,
+        "support": 53
+      },
+      "wheat__disease": {
+        "precision": 0.9204545454545454,
+        "recall": 0.9101123595505618,
+        "f1": 0.9152542372881356,
+        "support": 89
+      },
+      "invalid__ood": {
+        "precision": 0.331239092495637,
+        "recall": 0.6597149808828641,
+        "f1": 0.4410363657488091,
+        "support": 2877
+      }
+    },
+    "per_crop": {
+      "maize": {
+        "precision": 0.22255714644561667,
+        "recall": 0.4812601846822379,
+        "support": 1841,
+        "healthy_recall": 0.21779859484777517,
+        "disease_recall": 0.442008486562942
+      },
+      "paddy": {
+        "precision": 0.6184782608695653,
+        "recall": 0.08125089247465372,
+        "support": 7003,
+        "healthy_recall": 0.7430830039525692,
+        "disease_recall": 0.033185185185185186
+      },
+      "potato": {
+        "precision": 0.03968253968253968,
+        "recall": 0.18092105263157895,
+        "support": 304,
+        "healthy_recall": 0.0,
+        "disease_recall": 0.1840277777777778
+      },
+      "wheat": {
+        "precision": 0.9466666666666667,
+        "recall": 1.0,
+        "support": 142,
+        "healthy_recall": 1.0,
+        "disease_recall": 0.9101123595505618
+      }
+    },
+    "per_source": {
+      "maize_mld_ccby": {
+        "rows": 1996,
+        "accuracy": 0.45490981963927857,
+        "macro_f1_present_classes": 0.212627260380696
+      },
+      "paddy_doctor_cc0": {
+        "rows": 1498,
+        "accuracy": 0.45193591455273696,
+        "macro_f1_present_classes": 0.4630585393062637
+      },
+      "plantdoc_ccby": {
+        "rows": 2515,
+        "accuracy": 0.5876739562624255,
+        "macro_f1_present_classes": 0.13857642563857794
+      },
+      "potato_field_ccby": {
+        "rows": 84,
+        "accuracy": 0.05952380952380952,
+        "macro_f1_present_classes": 0.03424657534246575
+      },
+      "rice_field_ccby": {
+        "rows": 5932,
+        "accuracy": 0.002191503708698584,
+        "macro_f1_present_classes": 0.0006247747206536105
+      },
+      "wheat_iari_cc0": {
+        "rows": 142,
+        "accuracy": 0.9436619718309859,
+        "macro_f1_present_classes": 0.9413828689370485
+      }
+    },
+    "confusion_matrix": [
+      [
+        93,
+        142,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        191
+      ],
+      [
+        26,
+        625,
+        18,
+        12,
+        4,
+        37,
+        0,
+        0,
+        692
+      ],
+      [
+        0,
+        0,
+        188,
+        4,
+        0,
+        0,
+        0,
+        0,
+        61
+      ],
+      [
+        1194,
+        1582,
+        153,
+        224,
+        22,
+        879,
+        0,
+        0,
+        2696
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        16
+      ],
+      [
+        0,
+        14,
+        0,
+        43,
+        2,
+        53,
+        0,
+        0,
+        176
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        53,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8,
+        81,
+        0
+      ],
+      [
+        12,
+        293,
+        159,
+        119,
+        38,
+        350,
+        1,
+        7,
+        1898
+      ]
+    ],
+    "expected_calibration_error_15_bins": 0.6315714781037625,
+    "reliability_bins": [
+      {
+        "lower": 0.0,
+        "upper": 0.06666666666666667,
+        "count": 0,
+        "accuracy": 0.0,
+        "confidence": 0.0
+      },
+      {
+        "lower": 0.06666666666666667,
+        "upper": 0.13333333333333333,
+        "count": 0,
+        "accuracy": 0.0,
+        "confidence": 0.0
+      },
+      {
+        "lower": 0.13333333333333333,
+        "upper": 0.2,
+        "count": 0,
+        "accuracy": 0.0,
+        "confidence": 0.0
+      },
+      {
+        "lower": 0.2,
+        "upper": 0.26666666666666666,
+        "count": 0,
+        "accuracy": 0.0,
+        "confidence": 0.0
+      },
+      {
+        "lower": 0.26666666666666666,
+        "upper": 0.3333333333333333,
+        "count": 0,
+        "accuracy": 0.0,
+        "confidence": 0.0
+      },
+      {
+        "lower": 0.3333333333333333,
+        "upper": 0.4,
+        "count": 0,
+        "accuracy": 0.0,
+        "confidence": 0.0
+      },
+      {
+        "lower": 0.4,
+        "upper": 0.4666666666666667,
+        "count": 0,
+        "accuracy": 0.0,
+        "confidence": 0.0
+      },
+      {
+        "lower": 0.4666666666666667,
+        "upper": 0.5333333333333333,
+        "count": 0,
+        "accuracy": 0.0,
+        "confidence": 0.0
+      },
+      {
+        "lower": 0.5333333333333333,
+        "upper": 0.6,
+        "count": 0,
+        "accuracy": 0.0,
+        "confidence": 0.0
+      },
+      {
+        "lower": 0.6,
+        "upper": 0.6666666666666666,
+        "count": 874,
+        "accuracy": 0.20022883295194507,
+        "confidence": 0.6438259482383728
+      },
+      {
+        "lower": 0.6666666666666666,
+        "upper": 0.7333333333333333,
+        "count": 1319,
+        "accuracy": 0.18119787717968158,
+        "confidence": 0.6992117166519165
+      },
+      {
+        "lower": 0.7333333333333333,
+        "upper": 0.8,
+        "count": 1193,
+        "accuracy": 0.20033528918692373,
+        "confidence": 0.7654503583908081
+      },
+      {
+        "lower": 0.8,
+        "upper": 0.8666666666666667,
+        "count": 844,
+        "accuracy": 0.2677725118483412,
+        "confidence": 0.8318420648574829
+      },
+      {
+        "lower": 0.8666666666666667,
+        "upper": 0.9333333333333333,
+        "count": 852,
+        "accuracy": 0.2312206572769953,
+        "confidence": 0.9004363417625427
+      },
+      {
+        "lower": 0.9333333333333333,
+        "upper": 1.0,
+        "count": 7085,
+        "accuracy": 0.3019054340155258,
+        "confidence": 0.9925105571746826
+      }
+    ],
+    "invalid_ood_rejection_recall": 0.6597149808828641,
+    "id_coverage": 0.58751345532831,
+    "prediction_counts": {
+      "invalid__ood": 5730,
+      "maize__disease": 2656,
+      "maize__healthy": 1325,
+      "paddy__disease": 402,
+      "paddy__healthy": 518,
+      "potato__disease": 1319,
+      "potato__healthy": 67,
+      "wheat__disease": 88,
+      "wheat__healthy": 62
+    },
+    "high_confidence_failures": [
+      {
+        "id": "0018643bdf5f102250087b72",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0029def414dd68af4b731e5f",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "003df570793620e0536a0a06",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "007511aecb457468d5a5f96b",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0089c887fea056e94e73d095",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "00ab0cc766cd34c8d0a3c25d",
+        "source": "plantdoc_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "00ad0e1f5018460e73084387",
+        "source": "plantdoc_ccby",
+        "true": "potato__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "00be89ad17db200913b76e1c",
+        "source": "plantdoc_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "00c0fb744753a2ea6a31e7fe",
+        "source": "maize_mld_ccby",
+        "true": "maize__healthy",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "00c29a06643c6a3d94261baf",
+        "source": "maize_mld_ccby",
+        "true": "maize__healthy",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "00c496d2ab2388996ea45b71",
+        "source": "maize_mld_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "00c5054b0d5c0ec5ecd1f12d",
+        "source": "maize_mld_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "00d32c48b87dbaf58fa155a3",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "00d52d0b33295f27c5265359",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "00df7ed7d22c193ffaf40583",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "00f2389a49b69694fed1d011",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0104fdf26309a36ec86443db",
+        "source": "maize_mld_ccby",
+        "true": "maize__healthy",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "01291cb47ba9afda92b33f4a",
+        "source": "plantdoc_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "012ffb89c84d2d44c6c8d595",
+        "source": "maize_mld_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0135e36caf19f67bb70ebaad",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0149443267cad05136141ce6",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "014ab0943e90d7abc410fe27",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0163f3a38a92414af68024ff",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "018a39ca02f6f6c49f0c8544",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "01906baad7b74e4b4f41ab16",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "01987b35ae2e494b54ae9b44",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "019fc951b6ceef33c1966ad8",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "01aa81d07a7ef18712791ebf",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "01b43c8cb9c7a98beb19c1bb",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "01ea777ff93ce57005a0d970",
+        "source": "maize_mld_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "01f53e0c3d666e523176798c",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "01f7617abef85bae8a23a2c6",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "01f7d594232becb83556e00a",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "02275a90d521934b9449f9cc",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "02376094180c8d7ff0cd36a0",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "02489dd1652d6635bcf8b9fd",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "02598a05ba9a9296fd8c62db",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "026fadb33ce90002bac3cc03",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "027017e0872cf03d5c1cdc62",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "027a676611ba82ab2708c83e",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "02826c8e20c56aa7059393d1",
+        "source": "plantdoc_ccby",
+        "true": "potato__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0290a9540f86b0c43036a8a0",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "02a259d229cb7f7781b49dc2",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "02a722e04e54958fc2d3e052",
+        "source": "maize_mld_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "02c0d0e5883d3ca6e3e4d2b9",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "02ef532c163b30cd19134a48",
+        "source": "plantdoc_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "02f240d0d92564e786d1e878",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "02f443b23a2c15486eeaa6dd",
+        "source": "potato_field_ccby",
+        "true": "potato__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "030802273d653749affbd09a",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03119e8db9491e0ad10adbd4",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "032f8a014e6a787ad5347af9",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0332410050620a0abe85a053",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "033986364e8b739af133598b",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0344e6dd3e1e73ff065432fe",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "035a6b0ed1ca2d20b3205227",
+        "source": "maize_mld_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03739a6158484777bf3e3410",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03919802fdca1f8c4b8b3830",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "039a2dc0e6a016e8a9cb56b3",
+        "source": "plantdoc_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03a14e7637fb2a2e13e856de",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03ac467391b0af4858bf225d",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03acdf92ecc87d980b9e40c1",
+        "source": "maize_mld_ccby",
+        "true": "maize__healthy",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03b249a71cb37e73db731d99",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03c66320c24a1e5be3036d19",
+        "source": "maize_mld_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03c6865ff9478a9f3b094a64",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03dc2103db1b864929c2cd81",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03e5be2beb11594858f9c9d8",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "03f9b0c4355d259f919152ee",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "044e21f08e4c32c675ea892d",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "04568b2f36f6a763bffc757e",
+        "source": "plantdoc_ccby",
+        "true": "potato__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "04715307195502e585eaf8e2",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "047aa0358020023bd28288df",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "04831909c5642857375c0db3",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0495a4a88d2ecd5d64ffba81",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "04a5108f89dc3de0ee03a133",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "04a85e7ab8090a3182ce05b2",
+        "source": "maize_mld_ccby",
+        "true": "maize__healthy",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "04ab2af322f3e49756190d3f",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "04b8f912d56f1b57ec631b26",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "04cf12c6f30c2f678c7cb02c",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "04e48991186e0af042d7f7df",
+        "source": "maize_mld_ccby",
+        "true": "maize__healthy",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "04f8dc136889687026dfaacf",
+        "source": "maize_mld_ccby",
+        "true": "maize__healthy",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "04ff38bc179e0df453f3d475",
+        "source": "maize_mld_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0501d79b646dbfbd98a55a2f",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "05074da2f21135723aba6f34",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "05227b6185dd305277902bb2",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0527e0ff254919d01e329562",
+        "source": "plantdoc_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "053021e7cc71ce71eb011207",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0537b4abe7a6d799eb8602ce",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "053a9e38fbe19bd0b3c8dd7f",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0552125392c326127fb2fd8a",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "056070a667a982f543d7743a",
+        "source": "maize_mld_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "0568c2cfb97d855fe50d6e8b",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "057c8e5fcbcea907685a5f44",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "058566dcc110554f5e6e8ad4",
+        "source": "maize_mld_ccby",
+        "true": "maize__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "059563bbb988756d10c599d8",
+        "source": "plantdoc_ccby",
+        "true": "potato__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "05b7db9544bce2f5207eaaa0",
+        "source": "maize_mld_ccby",
+        "true": "maize__healthy",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "05b9d7a0b4df6b2d3168d3e3",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "05c77b27aab45fa2b939c3a2",
+        "source": "paddy_doctor_cc0",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "05c863adf77d6176e0c0350b",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "05d6f8a49d115ac8d5543023",
+        "source": "maize_mld_ccby",
+        "true": "maize__healthy",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      },
+      {
+        "id": "05de60e9ba27c8cc9fa55e26",
+        "source": "rice_field_ccby",
+        "true": "paddy__disease",
+        "predicted": "invalid__ood",
+        "confidence": 1.0
+      }
+    ],
+    "external_field_macro_f1_present_classes": 0.10249977436862928,
+    "pre_abstention_calibration": {
+      "expected_calibration_error_15_bins": 0.462218488558234,
+      "macro_f1": 0.3375230164057756
+    },
+    "cpu_latency_p50_ms": 67.67985000260524,
+    "cpu_latency_p95_ms": 88.55899999980466,
+    "model_size_bytes": 81614311,
+    "checkpoint_sha256": "3f46b66e5b7437a29de8a18a2a937f289c3d9ae7ea9147caa3606bcfb6425109"
+  },
+  "checkpoint": "C:\\Users\\dhrri\\Desktop\\Fasal-Pramaan\\services\\ai\\research\\runs\\efficientnetv2_s\\best.pt",
+  "is_production_validated": false
+}
