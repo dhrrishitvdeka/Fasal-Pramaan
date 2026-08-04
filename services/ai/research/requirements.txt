@@ -6,7 +6,7 @@ scikit-learn==1.7.0
 scipy==1.16.0
 matplotlib==3.10.3
 onnx==1.18.0
-onnxruntime==1.27.0
+onnxruntime==1.28.0
 onnxscript==0.3.2
 Pillow==12.3.0
 ImageHash==4.3.2

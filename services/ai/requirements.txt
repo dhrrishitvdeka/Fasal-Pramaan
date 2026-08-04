@@ -10,6 +10,6 @@ ruff==0.8.4
 python-multipart==0.0.32
 # Small local ViT inference path. Training dependencies intentionally stay out
 # of the presentation image so clone-to-Docker startup remains lightweight.
-onnxruntime==1.27.0
+onnxruntime==1.28.0
 # OpenCV/imagehash and Torch/Transformers are optional research dependencies,
 # not required by the offline ViT presentation runtime.
