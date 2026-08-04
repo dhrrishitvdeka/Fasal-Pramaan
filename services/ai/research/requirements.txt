@@ -11,6 +11,6 @@ onnxscript==0.3.2
 Pillow==12.3.0
 ImageHash==4.3.2
 py7zr==1.0.0
-jsonschema==4.24.0
+jsonschema==4.26.0
 tqdm==4.67.1
 numpy==2.1.3
