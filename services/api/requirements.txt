@@ -11,7 +11,7 @@ PyJWT[crypto]==2.13.0
 passlib[argon2]==1.7.4
 argon2-cffi==23.1.0
 python-multipart==0.0.32
-redis==5.2.1
+redis==8.1.0
 celery==5.4.0
 httpx==0.28.1
 boto3==1.35.76
