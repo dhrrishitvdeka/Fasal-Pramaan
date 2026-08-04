@@ -23,4 +23,4 @@ shapely==2.0.6
 pytest==9.0.3
 pytest-asyncio==1.4.0
 ruff==0.16.1
-anyio==4.7.0
+anyio==4.14.2
