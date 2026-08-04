@@ -1,0 +1,204 @@
+{
+  "version": "dataset-audit-v5",
+  "manifest_rows": 52414,
+  "new_rows": 15260,
+  "frozen_test_rows": 12167,
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "checks": {
+    "manifest_required_fields": {
+      "passed": true,
+      "detail": {}
+    },
+    "unique_manifest_ids": {
+      "passed": true,
+      "detail": 52414
+    },
+    "no_synthetic_images": {
+      "passed": true,
+      "detail": true
+    },
+    "known_splits": {
+      "passed": true,
+      "detail": [
+        "test",
+        "train",
+        "validation"
+      ]
+    },
+    "taxonomy_exact": {
+      "passed": true,
+      "detail": [
+        "invalid__ood",
+        "maize__disease",
+        "maize__healthy",
+        "paddy__disease",
+        "paddy__healthy",
+        "potato__disease",
+        "potato__healthy",
+        "wheat__disease",
+        "wheat__healthy"
+      ]
+    },
+    "all_v4_rows_unchanged": {
+      "passed": true,
+      "detail": []
+    },
+    "v5_is_strict_append_of_v4": {
+      "passed": true,
+      "detail": {
+        "v4_rows": 37154,
+        "v5_rows": 52414,
+        "new_rows": 15260
+      }
+    },
+    "new_row_count_matches_summary": {
+      "passed": true,
+      "detail": 15260
+    },
+    "frozen_test_ids_exact": {
+      "passed": true,
+      "detail": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083"
+    },
+    "frozen_test_rows_byte_equivalent": {
+      "passed": true,
+      "detail": 12167
+    },
+    "no_new_rows_in_frozen_test": {
+      "passed": true,
+      "detail": true
+    },
+    "no_image_sha256_overlap": {
+      "passed": true,
+      "detail": []
+    },
+    "no_cached_image_sha256_overlap": {
+      "passed": true,
+      "detail": []
+    },
+    "no_near_duplicate_cluster_overlap": {
+      "passed": true,
+      "detail": []
+    },
+    "no_capture_group_overlap": {
+      "passed": true,
+      "detail": []
+    },
+    "no_split_group_overlap": {
+      "passed": true,
+      "detail": []
+    },
+    "only_declared_source_added": {
+      "passed": true,
+      "detail": [
+        "potato_pldd_up_ccby"
+      ]
+    },
+    "new_source_provenance_matches_config": {
+      "passed": true,
+      "detail": []
+    },
+    "aggregate_and_local_download_locks_match": {
+      "passed": true,
+      "detail": "potato_pldd_up_ccby"
+    },
+    "archive_set_sha256_exact": {
+      "passed": true,
+      "detail": "aa45fc6e55f73edf71e8d77c13587d59c5cb2f7afdcedab86e1a800f4da703af"
+    },
+    "source_archives_match_download_lock": {
+      "passed": true,
+      "detail": []
+    },
+    "metadata_matches_download_lock": {
+      "passed": true,
+      "detail": {
+        "rows": 15519,
+        "unique_hashes": 15265
+      }
+    },
+    "conflicting_exact_label_groups_excluded": {
+      "passed": true,
+      "detail": 5
+    },
+    "new_original_images_exist": {
+      "passed": true,
+      "detail": []
+    },
+    "new_original_hashes_match": {
+      "passed": true,
+      "detail": []
+    },
+    "new_cached_images_exist": {
+      "passed": true,
+      "detail": []
+    },
+    "new_cached_hashes_match": {
+      "passed": true,
+      "detail": []
+    },
+    "cached_dimension_policy_declared": {
+      "passed": true,
+      "detail": []
+    },
+    "qa_sample_ids_valid_unique_and_new": {
+      "passed": true,
+      "detail": 36
+    },
+    "manual_label_qa_complete": {
+      "passed": true,
+      "detail": {
+        "accepted": 36
+      }
+    },
+    "approved_commercial_license": {
+      "passed": true,
+      "detail": "CC BY 4.0"
+    }
+  },
+  "passed": true,
+  "counts_by_source": {
+    "digigreen_ccby": 1053,
+    "maize_mld_ccby": 1996,
+    "maize_seasonal_ccby": 2337,
+    "multicrop_ccby": 6870,
+    "paddy_doctor_cc0": 10407,
+    "plantdoc_ccby": 2515,
+    "potato_ethiopia_ccby": 429,
+    "potato_field_ccby": 84,
+    "potato_pldd_up_ccby": 15260,
+    "potato_uncontrolled_ccby": 3020,
+    "rice_field_ccby": 5932,
+    "ricey_field_ccby": 1652,
+    "wheat_iari_cc0": 859
+  },
+  "counts_by_class_split": {
+    "invalid__ood:test": 2877,
+    "invalid__ood:train": 5688,
+    "invalid__ood:validation": 1260,
+    "maize__disease:test": 1414,
+    "maize__disease:train": 1779,
+    "maize__disease:validation": 487,
+    "maize__healthy:test": 427,
+    "maize__healthy:train": 1200,
+    "maize__healthy:validation": 52,
+    "paddy__disease:test": 6750,
+    "paddy__disease:train": 6051,
+    "paddy__disease:validation": 1357,
+    "paddy__healthy:test": 253,
+    "paddy__healthy:train": 1782,
+    "paddy__healthy:validation": 364,
+    "potato__disease:test": 288,
+    "potato__disease:train": 11484,
+    "potato__disease:validation": 2751,
+    "potato__healthy:test": 16,
+    "potato__healthy:train": 4792,
+    "potato__healthy:validation": 445,
+    "wheat__disease:test": 89,
+    "wheat__disease:train": 254,
+    "wheat__disease:validation": 30,
+    "wheat__healthy:test": 53,
+    "wheat__healthy:train": 390,
+    "wheat__healthy:validation": 81
+  },
+  "is_production_validated": false
+}

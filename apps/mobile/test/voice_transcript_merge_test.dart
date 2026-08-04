@@ -1,0 +1,43 @@
+import 'package:fasalpramaan/features/voice/voice_assistant_controller.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('mergeStreamingTranscript', () {
+    test('keeps cumulative full text', () {
+      expect(
+        VoiceAssistantController.mergeStreamingTranscript('नमस्ते', 'नमस्ते किसान'),
+        'नमस्ते किसान',
+      );
+    });
+
+    test('appends pure delta fragments (last-word bug)', () {
+      // Model streams one token at a time; UI used to show only the last piece.
+      var text = '';
+      for (final piece in ['ऐप', ' की', ' भाषा', ' हिन्दी', ' कर', ' दी', ' गई', ' है', '?']) {
+        text = VoiceAssistantController.mergeStreamingTranscript(text, piece);
+      }
+      expect(text, 'ऐप की भाषा हिन्दी कर दी गई है?');
+    });
+
+    test('repairs overlapping deltas', () {
+      expect(
+        VoiceAssistantController.mergeStreamingTranscript('नमस्ते कि', 'किसान'),
+        'नमस्ते किसान',
+      );
+    });
+
+    test('ignores exact trailing duplicates', () {
+      expect(
+        VoiceAssistantController.mergeStreamingTranscript('hello world', 'world'),
+        'hello world',
+      );
+    });
+
+    test('adds space between latin word deltas', () {
+      expect(
+        VoiceAssistantController.mergeStreamingTranscript('Found', '0'),
+        'Found 0',
+      );
+    });
+  });
+}

@@ -1,0 +1,62 @@
+{
+  "version": "field-adaptation-v2",
+  "frozen_before_training": true,
+  "config_filename": "field_adaptation_v2.json",
+  "seed": 26007,
+  "manifest_filename": "manifest_v2.jsonl",
+  "manifest_sha256": "2915cf91380b58ec7dcad8e99454a91208cb7029a00197b460d71609224ec762",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "rationale": "Conservatively adapt the selected crop-aware ViT to expert-annotated, real smallholder field images. The new source is split by duplicate group, the v1 test rows are byte-equivalent and immutable, and calibration gives each validation source equal total weight so near-clean lab sources cannot dominate field confidence.",
+  "test_disclosure": "The frozen test was observed for prior candidates and exposed domain shift. This run was specified from the prior gate failures plus new disjoint training/validation data. No frozen-test image, label, logit, threshold, or duplicate is used for training, checkpoint selection, temperature fitting, or hierarchy fitting.",
+  "models": [
+    {
+      "id": "vit_tiny_field_adapted_v5",
+      "provider": "timm",
+      "architecture": "vit_tiny_patch16_224",
+      "initialization": "local_vit_tiny_crop_aware_v3_best_checkpoint",
+      "base_run": "research/runs/vit_tiny_crop_aware_v3/best.pt"
+    }
+  ],
+  "training": {
+    "epochs": 4,
+    "warmup_head_epochs": 0,
+    "batch_size": 32,
+    "dataloader_workers": 4,
+    "optimizer": "adamw",
+    "learning_rate": 0.000008,
+    "head_learning_rate": 0.00003,
+    "weight_decay": 0.01,
+    "label_smoothing": 0.04,
+    "early_stopping_patience": 2,
+    "mixed_precision": true,
+    "gradient_clip_norm": 1.0,
+    "class_weighting": "inverse_sqrt_frequency",
+    "invalid_class_weight_multiplier": 1.5,
+    "source_balanced_sampling": true,
+    "calibration_source_balanced": true,
+    "skip_frozen_test_during_training": true,
+    "crop_aware_loss": {
+      "crop_loss_weight": 0.2,
+      "invalid_margin_weight": 0.15,
+      "invalid_margin": 0.8
+    },
+    "max_train_per_class": null,
+    "max_validation_per_class": null
+  },
+  "augmentation": {
+    "random_resized_crop_scale": [0.7, 1.0],
+    "horizontal_flip_probability": 0.5,
+    "rotation_degrees": 18,
+    "color_jitter": [0.2, 0.2, 0.14, 0.03],
+    "random_grayscale_probability": 0.02,
+    "gaussian_blur_probability": 0.08,
+    "perspective_probability": 0.05,
+    "perspective_distortion_scale": 0.15,
+    "jpeg_quality_range": [50, 100],
+    "random_erasing_probability": 0.12,
+    "synthetic_images_in_validation_or_test": false
+  },
+  "selection_metric": "unweighted_validation_macro_f1",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

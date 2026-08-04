@@ -1,0 +1,20 @@
+{
+  "version": "licensed-sources-v2",
+  "extends": "sources_v1.json",
+  "redistribute_raw_images": false,
+  "added_sources": [
+    {
+      "id": "digigreen_ccby",
+      "role": "train_validation_field_domain_and_ood",
+      "crops": ["maize", "paddy", "potato", "wheat", "unsupported"],
+      "dataset": "Digital Green Crop Disease Images",
+      "source_url": "https://huggingface.co/datasets/DigiGreen/Crop_Disease_Images",
+      "license": "CC BY 4.0",
+      "pinned_revision": "d47d7eb88b1865062f821edcf58c28d8a7013718",
+      "annotations_sha256": "c628b93090847189b432f1a884c1bffdf054be4de5f1b1913028b0548138d3b3",
+      "commercial_use": true,
+      "redistribute_raw_images": false,
+      "annotation_origin": "Expert crop-disease annotations published by Digital Green/Farmer.Chat"
+    }
+  ]
+}

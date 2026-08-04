@@ -1,0 +1,9 @@
+research/
+.research-venv/
+.pytest_cache/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.ruff_cache/
+.mypy_cache/
+*.log

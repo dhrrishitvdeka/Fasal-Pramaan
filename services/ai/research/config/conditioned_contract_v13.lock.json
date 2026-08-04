@@ -1,0 +1,15 @@
+{
+  "lock_version": "conditioned-contract-lock-v1",
+  "frozen_at": "2026-07-23T21:55:20+05:30",
+  "contract_filename": "conditioned_contract_v13.json",
+  "contract_sha256": "4f1e1afd3a7d1c4aa8059b528d7fc26c7c18688444725585795e2c1f2101c38c",
+  "checkpoint_sha256": "9be92da54ac3ff619ef691d2f58f104211547b0d7700981914d6c8b288b9bdc0",
+  "training_config_sha256": "ad4c7f9c1ca6af300187f32372c8b9870e08925c1b3aceb7d51e4e0d1908f8c7",
+  "manifest_sha256": "fa9b7d2e691feb7feb04d17b80c94d3e1ec72a7cd928c574894c2b1da82a8eff",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "temperature": 1.0000034972115646,
+  "abstention_threshold": 0.51,
+  "frozen_test_evaluated": false,
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

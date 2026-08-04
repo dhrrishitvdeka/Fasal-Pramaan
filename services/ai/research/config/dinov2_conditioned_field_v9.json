@@ -1,0 +1,67 @@
+{
+  "version": "dinov2-crop-conditioned-field-continuation-v9",
+  "frozen_before_training": true,
+  "config_filename": "dinov2_conditioned_field_v9.json",
+  "seed": 26019,
+  "manifest_filename": "manifest_v6.jsonl",
+  "manifest_sha256": "fa9b7d2e691feb7feb04d17b80c94d3e1ec72a7cd928c574894c2b1da82a8eff",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "rationale": "Continue the validation-selected v12 crop-conditioned heads on source-disjoint CC BY 4.0 paddy smartphone-field, potato multi-location field, and rice-field weed OOD originals. The added domains directly address the sole remaining source-held-out field gate without changing the frozen DINOv2 encoder, taxonomy, grade policy, or promotion thresholds. Epoch zero preserves v12 behavior so continuation is selected only when manifest-v6 validation macro F1 improves.",
+  "test_disclosure": "No frozen-test image, label, logit, per-example failure, threshold, or calibration parameter enters this run. Source selection responds only to the previously disclosed aggregate field-domain gap and validation evidence. Checkpoint selection, temperature, and abstention use manifest-v6 validation only. Promotion gates remain unchanged.",
+  "model": {
+    "id": "dinov2_vits14_conditioned_field_v13",
+    "base_model_id": "dinov2_vits14_pldd_linear_v11",
+    "base_checkpoint": "runs/dinov2_vits14_conditioned_v12/best.pt",
+    "base_checkpoint_sha256": "0fa86d75e8c4db26e1b748ed2d8445ece359dba4bf1b475a85864612b1be8973",
+    "architecture": "vit_small_patch14_dinov2.lvd142m_with_four_3way_heads",
+    "conditioned_crops": ["maize", "paddy", "potato", "wheat"],
+    "conditioned_classes": ["healthy", "disease", "invalid"]
+  },
+  "training": {
+    "epochs": 3,
+    "batch_size": 64,
+    "evaluation_batch_size": 96,
+    "dataloader_workers": 4,
+    "optimizer": "adamw",
+    "head_learning_rate": 0.00005,
+    "weight_decay": 0.01,
+    "label_smoothing": 0.02,
+    "mixed_precision": true,
+    "gradient_clip_norm": 1.0,
+    "invalid_target_weight_multiplier": 1.25,
+    "calibration_sources": [
+      "digigreen_ccby",
+      "potato_uncontrolled_ccby",
+      "ricey_field_ccby",
+      "potato_ethiopia_ccby",
+      "maize_seasonal_ccby",
+      "potato_pldd_up_ccby",
+      "riceleafbd_ccby",
+      "rice_field_weeds_ccby",
+      "potato_blight_sample_ccby"
+    ],
+    "minimum_temperature": 1.0,
+    "skip_frozen_test_during_training": true
+  },
+  "preprocessing": {
+    "image_size": 224,
+    "normalize_mean": [0.485, 0.456, 0.406],
+    "normalize_std": [0.229, 0.224, 0.225]
+  },
+  "augmentation": {
+    "random_resized_crop_scale": [0.75, 1.0],
+    "horizontal_flip_probability": 0.5,
+    "rotation_degrees": 12,
+    "color_jitter": [0.15, 0.15, 0.1, 0.02],
+    "random_grayscale_probability": 0.0,
+    "gaussian_blur_probability": 0.03,
+    "perspective_probability": 0.02,
+    "perspective_distortion_scale": 0.1,
+    "jpeg_quality_range": [65, 100],
+    "random_erasing_probability": 0.05,
+    "synthetic_images_in_validation_or_test": false
+  },
+  "selection_metric": "unweighted_validation_macro_f1",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

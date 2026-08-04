@@ -1,0 +1,89 @@
+{
+  "version": "conditioned-dinov2-onnx-export-v14",
+  "model_id": "dinov2_vits14_conditioned_finetune_v14",
+  "contract_sha256": "30e5df8173712ba6af26bea6c53536ee2aab4900935b3e42ac49aa39b4588348",
+  "checkpoint_sha256": "29e36588d6d33200f774fb3c298a27ba412ecc221b9a7d8f08d594fd616e35e8",
+  "initialization": {
+    "initialization": "locally_trained_dinov2_vits14_field_linear_v10_checkpoint",
+    "source": "https://huggingface.co/timm/vit_small_patch14_dinov2.lvd142m",
+    "pinned_revision": "bdc84086a163e3e7e6745d534c5f44c97dd493ef",
+    "weights_sha256": "04d27f3400d059fc0cfd7d17dd1909a75bf3ea8fb3eeb48b97cb99e57ee20081",
+    "license": "Apache-2.0",
+    "positional_embedding_resampled": "37x37_to_16x16_for_224px_input",
+    "randomly_initialized_head_classes": 9,
+    "base_checkpoint": "C:\\Users\\dhrri\\Desktop\\Fasal-Pramaan\\services\\ai\\research\\runs\\dinov2_vits14_conditioned_field_v13\\best.pt",
+    "base_checkpoint_sha256": "9be92da54ac3ff619ef691d2f58f104211547b0d7700981914d6c8b288b9bdc0",
+    "conditioned_head_initialization": "continued from the validation-selected conditioned checkpoint",
+    "conditioned_outputs": {
+      "maize": [
+        "healthy",
+        "disease",
+        "invalid"
+      ],
+      "paddy": [
+        "healthy",
+        "disease",
+        "invalid"
+      ],
+      "potato": [
+        "healthy",
+        "disease",
+        "invalid"
+      ],
+      "wheat": [
+        "healthy",
+        "disease",
+        "invalid"
+      ]
+    }
+  },
+  "onnx_sha256": "f53536a738078c6d355ecb4633393c31e2b3fc8ef2ea77a9b29f86aa67b0fe7f",
+  "onnx_size_bytes": 86698536,
+  "opset": 17,
+  "input": {
+    "name": "pixel_values",
+    "shape": [
+      "batch",
+      3,
+      224,
+      224
+    ]
+  },
+  "output": {
+    "name": "conditioned_logits",
+    "shape": [
+      "batch",
+      4,
+      3
+    ],
+    "crop_order": [
+      "maize",
+      "paddy",
+      "potato",
+      "wheat"
+    ],
+    "class_order": [
+      "healthy",
+      "disease",
+      "invalid"
+    ]
+  },
+  "parity_rows": 144,
+  "parity_cells": 576,
+  "onnx_top1_parity": 1.0,
+  "maximum_logit_absolute_error": 3.0517578125e-05,
+  "maximum_probability_absolute_error": 5.930662155151367e-06,
+  "cpu_latency_samples": 100,
+  "cpu_latency_p50_ms": 154.39065000100527,
+  "cpu_latency_p95_ms": 156.97639999780222,
+  "quantized": false,
+  "quantization_reason": "FP32 ONNX is below the frozen 100 MiB size gate.",
+  "checks": {
+    "onnx_size": true,
+    "onnx_top1_parity": true,
+    "onnx_probability_error": true,
+    "cpu_latency_p95": true
+  },
+  "passed": true,
+  "is_production_validated": false
+}

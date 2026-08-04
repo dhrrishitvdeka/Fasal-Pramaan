@@ -1,0 +1,72 @@
+{
+  "version": "field-preservation-v3",
+  "frozen_before_training": true,
+  "config_filename": "field_preservation_v3.json",
+  "seed": 26007,
+  "manifest_filename": "manifest_v2.jsonl",
+  "manifest_sha256": "2915cf91380b58ec7dcad8e99454a91208cb7029a00197b460d71609224ec762",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "rationale": "V5 improved the new field validation source but catastrophically forgot potato and rice behavior from the selected v3 model. Preserve the natural original-data distribution, bound the new source to a 3x sampling multiplier, and distill v3 predictions on every original-source sample while learning expert labels normally. Calibration cannot sharpen below temperature 1.0 because both earlier selected and v5 candidates were overconfident on held-out field data.",
+  "test_disclosure": "The immutable test has been observed for earlier candidates, including v5. Only aggregate gate and source-level failure patterns informed this preservation recipe. No test image, label, logit, duplicate, or per-example failure enters training, checkpoint selection, calibration, or threshold selection. Independent field validation remains required.",
+  "models": [
+    {
+      "id": "vit_tiny_field_preserved_v6",
+      "provider": "timm",
+      "architecture": "vit_tiny_patch16_224",
+      "initialization": "local_vit_tiny_crop_aware_v3_best_checkpoint",
+      "base_run": "research/runs/vit_tiny_crop_aware_v3/best.pt"
+    }
+  ],
+  "training": {
+    "epochs": 3,
+    "warmup_head_epochs": 0,
+    "batch_size": 32,
+    "dataloader_workers": 4,
+    "optimizer": "adamw",
+    "learning_rate": 0.000004,
+    "head_learning_rate": 0.000015,
+    "weight_decay": 0.01,
+    "label_smoothing": 0.03,
+    "early_stopping_patience": 2,
+    "mixed_precision": true,
+    "gradient_clip_norm": 1.0,
+    "class_weighting": "inverse_sqrt_frequency",
+    "invalid_class_weight_multiplier": 1.5,
+    "source_balanced_sampling": false,
+    "source_sampling_multipliers": {
+      "digigreen_ccby": 3.0
+    },
+    "calibration_source_balanced": true,
+    "minimum_temperature": 1.0,
+    "skip_frozen_test_during_training": true,
+    "distillation": {
+      "teacher_run": "vit_tiny_crop_aware_v3",
+      "weight": 0.4,
+      "temperature": 2.0,
+      "exclude_sources": ["digigreen_ccby"]
+    },
+    "crop_aware_loss": {
+      "crop_loss_weight": 0.25,
+      "invalid_margin_weight": 0.2,
+      "invalid_margin": 0.9
+    },
+    "max_train_per_class": null,
+    "max_validation_per_class": null
+  },
+  "augmentation": {
+    "random_resized_crop_scale": [0.72, 1.0],
+    "horizontal_flip_probability": 0.5,
+    "rotation_degrees": 18,
+    "color_jitter": [0.18, 0.18, 0.12, 0.03],
+    "random_grayscale_probability": 0.0,
+    "gaussian_blur_probability": 0.04,
+    "perspective_probability": 0.03,
+    "perspective_distortion_scale": 0.12,
+    "jpeg_quality_range": [55, 100],
+    "random_erasing_probability": 0.12,
+    "synthetic_images_in_validation_or_test": false
+  },
+  "selection_metric": "unweighted_validation_macro_f1",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

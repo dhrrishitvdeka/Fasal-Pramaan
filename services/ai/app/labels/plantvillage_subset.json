@@ -1,0 +1,45 @@
+{
+  "version": "1.0",
+  "description": "PlantVillage-style leaf disease subset used for FasalPramaan fine-tuning",
+  "source": "Synthetic training images following PlantVillage class naming conventions (legally safe). Not field photographs.",
+  "classes": [
+    "Apple___Apple_scab",
+    "Apple___Black_rot",
+    "Apple___healthy",
+    "Corn_(maize)___Common_rust_",
+    "Corn_(maize)___Northern_Leaf_Blight",
+    "Corn_(maize)___healthy",
+    "Potato___Early_blight",
+    "Potato___Late_blight",
+    "Potato___healthy",
+    "Tomato___Bacterial_spot",
+    "Tomato___Early_blight",
+    "Tomato___Late_blight",
+    "Tomato___Leaf_Mold",
+    "Tomato___Septoria_leaf_spot",
+    "Tomato___healthy"
+  ],
+  "fasalpramaan_damage_map": {
+    "Apple___Apple_scab": "disease",
+    "Apple___Black_rot": "disease",
+    "Apple___healthy": "healthy",
+    "Corn_(maize)___Common_rust_": "disease",
+    "Corn_(maize)___Northern_Leaf_Blight": "disease",
+    "Corn_(maize)___healthy": "healthy",
+    "Potato___Early_blight": "disease",
+    "Potato___Late_blight": "disease",
+    "Potato___healthy": "healthy",
+    "Tomato___Bacterial_spot": "disease",
+    "Tomato___Early_blight": "disease",
+    "Tomato___Late_blight": "disease",
+    "Tomato___Leaf_Mold": "disease",
+    "Tomato___Septoria_leaf_spot": "disease",
+    "Tomato___healthy": "healthy"
+  },
+  "crop_map": {
+    "Apple": "unknown",
+    "Corn_(maize)": "maize",
+    "Potato": "unknown",
+    "Tomato": "unknown"
+  }
+}

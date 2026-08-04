@@ -1,0 +1,29 @@
+{
+  "version": "trusted-crop-health-contract-v1",
+  "frozen_before_this_contracts_test_evaluation": true,
+  "base_checkpoint": "research/runs/vit_tiny_field_preserved_v6/best.pt",
+  "base_checkpoint_sha256": "9516748eb10fad948c47325f96caf869e2564ee43fcd2cf9cce41ef1ec7eef7a",
+  "base_checkpoint_selection": "highest unweighted manifest-v2 validation macro_f1 across the frozen three-epoch schedule",
+  "manifest": "manifest_v2.jsonl",
+  "manifest_sha256": "2915cf91380b58ec7dcad8e99454a91208cb7029a00197b460d71609224ec762",
+  "frozen_test_ids_sha256": "f00eadb9c0c82ce90cf368441007e4a2364d81a82180a9a011728558b1e1d083",
+  "calibration": "equal-source validation temperature with minimum 1.0",
+  "fixed_thresholds": {
+    "mismatch_threshold": 1.0,
+    "confidence_threshold": 0.0,
+    "validation_invalid_ood_recall": 0.984920634920635,
+    "validation_id_coverage": 0.967623701893708,
+    "validation_macro_f1": 0.9495899226504937,
+    "selection_source": "hierarchical_validation_only_v6.json"
+  },
+  "expected_crop_source_in_product": "trusted crop-cycle metadata supplied by the API request",
+  "decision": [
+    "temperature-scale logits using validation only without sharpening below temperature 1.0",
+    "treat trusted crop-cycle metadata as authoritative for the supported crop",
+    "restrict the health decision to expected-crop healthy/disease plus the explicit invalid logit",
+    "use no visual crop-mismatch or additional confidence rejection"
+  ],
+  "test_disclosure": "The immutable test was observed for v6 under the older 0.9 crop-mismatch contract. This trusted-metadata contract was selected from v2 validation behavior and product semantics without inspecting v6 per-example test logits. Independent fresh field validation is still required.",
+  "promotion_thresholds_unchanged": true,
+  "is_production_validated": false
+}

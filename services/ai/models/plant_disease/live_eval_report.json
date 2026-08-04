@@ -1,0 +1,94 @@
+{
+  "disclaimer": "Measured on public/in-repo PlantVillage-named subset via shipped adapter path. NOT production-validated for insurance or PMFBY. Lab leaf photos \u2260 Indian field multi-peril.",
+  "is_production_validated": false,
+  "adapter_requested": "plant_disease",
+  "adapter_type_observed": [
+    "plant_disease"
+  ],
+  "plant_disease_checkpoint_available": true,
+  "data_root": "datasets/plantvillage_subset/val",
+  "split": "val",
+  "num_images": 60,
+  "top1_class_accuracy": 0.4167,
+  "correct": 25,
+  "damage_map_proxy_hits": 0,
+  "per_class": {
+    "Apple___Apple_scab": {
+      "correct": 1,
+      "total": 4,
+      "accuracy": 0.25
+    },
+    "Apple___Black_rot": {
+      "correct": 0,
+      "total": 4,
+      "accuracy": 0.0
+    },
+    "Apple___healthy": {
+      "correct": 4,
+      "total": 4,
+      "accuracy": 1.0
+    },
+    "Corn_(maize)___Common_rust_": {
+      "correct": 2,
+      "total": 4,
+      "accuracy": 0.5
+    },
+    "Corn_(maize)___Northern_Leaf_Blight": {
+      "correct": 0,
+      "total": 4,
+      "accuracy": 0.0
+    },
+    "Corn_(maize)___healthy": {
+      "correct": 4,
+      "total": 4,
+      "accuracy": 1.0
+    },
+    "Potato___Early_blight": {
+      "correct": 0,
+      "total": 4,
+      "accuracy": 0.0
+    },
+    "Potato___Late_blight": {
+      "correct": 4,
+      "total": 4,
+      "accuracy": 1.0
+    },
+    "Potato___healthy": {
+      "correct": 4,
+      "total": 4,
+      "accuracy": 1.0
+    },
+    "Tomato___Bacterial_spot": {
+      "correct": 1,
+      "total": 4,
+      "accuracy": 0.25
+    },
+    "Tomato___Early_blight": {
+      "correct": 0,
+      "total": 4,
+      "accuracy": 0.0
+    },
+    "Tomato___Late_blight": {
+      "correct": 1,
+      "total": 4,
+      "accuracy": 0.25
+    },
+    "Tomato___Leaf_Mold": {
+      "correct": 0,
+      "total": 4,
+      "accuracy": 0.0
+    },
+    "Tomato___Septoria_leaf_spot": {
+      "correct": 0,
+      "total": 4,
+      "accuracy": 0.0
+    },
+    "Tomato___healthy": {
+      "correct": 4,
+      "total": 4,
+      "accuracy": 1.0
+    }
+  },
+  "elapsed_seconds": 2.74,
+  "vit_note": "HF ViT (wambugu71/crop_leaf_diseases_vit) is optional via AI_ENABLE_HF_CROP_VIT; default hierarchical crop stage is heuristic when transformers/weights absent."
+}
