@@ -48,22 +48,27 @@ def ensure_roles(db) -> dict[str, Role]:
 
 def ensure_user(db, email: str, full_name: str, role: Role) -> User:
     user = db.query(User).filter(User.email == email).first()
-    created = False
     if not user:
-        user = User(email=email)
+        # password_hash is NOT NULL — set it before the first flush/insert.
+        user = User(
+            email=email,
+            full_name=full_name,
+            password_hash=hash_password(DEMO_PASSWORD),
+            preferred_language="hi" if role.code == "farmer" else "en",
+            is_active=True,
+            is_verified=True,
+        )
         db.add(user)
         db.flush()
-        created = True
-
-    user.full_name = full_name
-    user.phone = None
-    # Only set password on create, or when DEMO_PASSWORD rotates — avoid
-    # rewriting the hash on every seed (does not invalidate JWTs, but is noisy).
-    if created or not user.password_hash:
-        user.password_hash = hash_password(DEMO_PASSWORD)
-    user.preferred_language = "hi" if role.code == "farmer" else "en"
-    user.is_active = True
-    user.is_verified = True
+    else:
+        user.full_name = full_name
+        user.phone = None
+        # Backfill only if missing; avoid re-hashing every seed run.
+        if not user.password_hash:
+            user.password_hash = hash_password(DEMO_PASSWORD)
+        user.preferred_language = "hi" if role.code == "farmer" else "en"
+        user.is_active = True
+        user.is_verified = True
 
     user_role = (
         db.query(UserRole)
