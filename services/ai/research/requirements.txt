@@ -1,6 +1,6 @@
 # Separate from the lightweight presentation runtime image.
 torch==2.13.0
-torchvision==0.22.1
+torchvision==0.28.0
 timm==1.0.15
 scikit-learn==1.7.0
 scipy==1.18.0
