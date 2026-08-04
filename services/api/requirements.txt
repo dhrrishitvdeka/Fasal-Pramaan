@@ -22,5 +22,5 @@ orjson==3.11.9
 shapely==2.0.6
 pytest==9.0.3
 pytest-asyncio==1.4.0
-ruff==0.8.4
+ruff==0.16.1
 anyio==4.7.0
