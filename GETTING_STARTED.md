@@ -1,18 +1,37 @@
 # Getting started
 
-This guide prepares a clean local FasalPramaan environment. It includes four
-demo login accounts but starts with no farms, plots, crop cycles, submissions,
-images, reviews, alerts, or notifications.
+This guide prepares a clean local FasalPramaan environment from a **fresh
+GitHub clone**. You can delete any previous local copy; cloning the public repo
+and starting Docker is enough. The ONNX model, Compose stack, seed data, and
+app sources are all versioned.
+
+It includes four demo login accounts but starts with no farms, plots, crop
+cycles, submissions, images, reviews, alerts, or notifications.
 
 ## Prerequisites
 
 - Windows, macOS, or Linux
 - Docker Desktop or Docker Engine
 - Docker Compose v2
+- Git (only to clone; not required at runtime)
 - At least 8 GB RAM and 12 GB free disk space recommended for the first build
 
 Flutter, Python, Node.js, PostgreSQL, Redis, and MinIO do not need to be
 installed on the host.
+
+## Clone
+
+```bash
+git clone https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
+cd Fasal-Pramaan
+```
+
+Optional: pin a release tag (for example `V1.1`):
+
+```bash
+git clone --branch V1.1 https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
+cd Fasal-Pramaan
+```
 
 ## Start on Windows
 

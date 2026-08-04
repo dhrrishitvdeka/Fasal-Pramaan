@@ -11,9 +11,34 @@ weights at runtime.
 > severity, produce quality, claim eligibility, or insurance settlement.
 > Human review is mandatory.
 
-## One-command start
+## Fully packed and reusable
 
-Prerequisite: Docker Desktop or Docker Engine with Compose v2.
+You can delete this folder from your machine and still get the **same** local
+product from GitHub alone. Everything needed for a Dockerized demo is versioned
+in the repository:
+
+| Included on clone | Notes |
+|---|---|
+| Flutter field app + Next.js dashboard | Built inside Docker images |
+| FastAPI, Celery worker, migrations, seed | Single API image reused by worker/migrate/seed |
+| PostgreSQL/PostGIS, Redis, MinIO | Compose services; no host installs |
+| DINOv2 ONNX model (`crop_health_v4`) | `services/ai/models/.../model.onnx` (~87 MB), no runtime download |
+| Demo accounts + crop catalogs | Created by the `seed` job |
+| `.env.example` + start scripts | Copy once; launcher fills local URLs |
+
+**Not required on the host:** Flutter SDK, Node.js, Python, PostgreSQL, Redis,
+or MinIO. Only Docker Desktop/Engine with Compose v2 is required.
+
+Recommended free disk for the first build: **~12 GB** (base images + Flutter
+build stage + named volumes). After the first successful `docker compose up`,
+subsequent starts reuse local image layers.
+
+### Fresh clone on any machine
+
+```bash
+git clone https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
+cd Fasal-Pramaan
+```
 
 Windows:
 
@@ -36,8 +61,13 @@ docker compose up -d --build
 ```
 
 The first build downloads base images and the Flutter SDK used only while
-building the field-app image. The selected 86.7 MB ONNX model is already in
-the repository.
+building the field-app image. The selected ONNX model is already in the clone.
+
+Release tags with the same pack: [`V1.1`](https://github.com/dhrrishitvdeka/Fasal-Pramaan/releases/tag/V1.1)
+(Fasal Saathi voice assistant) and [`V1`](https://github.com/dhrrishitvdeka/Fasal-Pramaan/releases/tag/V1).
+
+If the tree is already checked out locally, skip `git clone` and run the
+Windows / macOS / Linux start commands from the repo root.
 
 ## Open the apps
 
@@ -205,6 +235,44 @@ docker-compose.yml  Complete local/LAN stack
 Start with [GETTING_STARTED.md](GETTING_STARTED.md), then use
 [RUN_GUIDE.md](RUN_GUIDE.md) for day-to-day operations and
 [docs/README.md](docs/README.md) for the full documentation index.
+
+## Contributors
+
+Thanks to everyone who has shipped code on this project.
+
+<!-- Contributor cards with GitHub profile photos (PFPs). -->
+<table>
+  <tr>
+    <td align="center" width="160">
+      <a href="https://github.com/dhrrishitvdeka">
+        <img src="https://avatars.githubusercontent.com/u/260863532?v=4&s=120" width="100" height="100" alt="Dhrrishit V Deka" style="border-radius:50%;" />
+        <br />
+        <sub><b>Dhrrishit V Deka</b></sub>
+      </a>
+      <br />
+      <sub><a href="https://github.com/dhrrishitvdeka">@dhrrishitvdeka</a></sub>
+    </td>
+    <td align="center" width="160">
+      <a href="https://github.com/parasdwivedi26">
+        <img src="https://avatars.githubusercontent.com/u/226138841?v=4&s=120" width="100" height="100" alt="Paras Dwivedi" style="border-radius:50%;" />
+        <br />
+        <sub><b>Paras Dwivedi</b></sub>
+      </a>
+      <br />
+      <sub><a href="https://github.com/parasdwivedi26">@parasdwivedi26</a></sub>
+    </td>
+  </tr>
+</table>
+
+Auto-updating contribution graph (from GitHub history):
+
+<p align="left">
+  <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan/graphs/contributors">
+    <img src="https://contrib.rocks/image?repo=dhrrishitvdeka/Fasal-Pramaan" alt="Contributors to Fasal-Pramaan" />
+  </a>
+</p>
+
+Want to join the list? See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
