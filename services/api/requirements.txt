@@ -16,7 +16,7 @@ celery==5.6.3
 httpx==0.28.1
 boto3==1.35.76
 Pillow==12.3.0
-imagehash==4.3.1
+imagehash==4.3.2
 slowapi==0.1.9
 orjson==3.11.9
 shapely==2.0.6
