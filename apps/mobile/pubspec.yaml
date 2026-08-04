@@ -16,7 +16,7 @@ dependencies:
   go_router: ^17.3.0
   dio: ^5.10.0
   flutter_secure_storage: ^10.3.1
-  connectivity_plus: ^7.3.0
+  connectivity_plus: ^7.3.1
   geolocator: ^14.0.3
   camera: ^0.12.0+2
   image: ^4.9.1
