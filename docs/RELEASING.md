@@ -9,8 +9,10 @@
    the four demo accounts and reference catalogs.
 4. Confirm `.env` is ignored and scan the staged tree for secrets, personal
    data, captured evidence, generated builds, and dependency folders.
-5. Update [CHANGELOG.md](../CHANGELOG.md) and version identifiers.
-6. Create an annotated tag such as `v0.1.0` only after the release commit is
+5. Update [CHANGELOG.md](../CHANGELOG.md) and version identifiers
+   (`services/*/app/__init__.py`, `apps/mobile/pubspec.yaml`,
+   `apps/dashboard/package.json`).
+6. Create an annotated tag such as `v1.1.0` only after the release commit is
    reviewed.
 
 ## GitHub repository settings

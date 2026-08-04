@@ -70,14 +70,26 @@ void main() {
           'outputTranscription': {'text': ' तीन खेत हैं '},
         },
       });
+      // Preserve leading spaces on stream deltas so Hindi words stay separated.
       expect(
         parsed.events.whereType<GeminiInputTranscription>().single.text,
-        'मेरे खेत',
+        '  मेरे खेत  ',
       );
       expect(
         parsed.events.whereType<GeminiOutputTranscription>().single.text,
-        'तीन खेत हैं',
+        ' तीन खेत हैं ',
       );
+    });
+
+    test('drops pure-whitespace transcription fragments', () {
+      final parsed = parseGeminiLiveMessage({
+        'serverContent': {
+          'inputTranscription': {'text': '   '},
+          'outputTranscription': {'text': '\n\t'},
+        },
+      });
+      expect(parsed.events.whereType<GeminiInputTranscription>(), isEmpty);
+      expect(parsed.events.whereType<GeminiOutputTranscription>(), isEmpty);
     });
   });
 

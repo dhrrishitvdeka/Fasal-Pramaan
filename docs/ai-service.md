@@ -7,7 +7,7 @@ The AI service is an **assistive** component in the evidence workflow. It is nev
 
 ## Adapters
 
-| Adapter | Use | Presentation status |
+| Adapter | Use | Status |
 |---|---|---|
 | `crop_health_v4` | Local DINOv2 ViT-S/14 four-crop health screening | **Default**; internal gates passed; non-production |
 | `crop_health_v3` | Previous locally trained ViT-Tiny screening model | First rollback; non-production |
@@ -40,7 +40,7 @@ metadata. The model file, label order, preprocessing contract, source licences,
 SHA-256, frozen evaluation, model card, and rollback instructions are stored
 under `services/ai/models/crop_health_dinov2_v14/`.
 
-Its presentation screening grades are:
+Its screening grades are:
 
 | Grade | Meaning |
 |---|---|
@@ -68,9 +68,11 @@ capture-protocol-matched field validation.
 
 The synthetic evaluation has no exact train/validation hash overlap, but it is still not an independent field evaluation. The model is therefore unsuitable for insurance accuracy claims.
 
-## Presentation-safe explanation
+## Product boundary
 
-“The AI helps triage image quality and provides an experimental disease signal. When it cannot provide a trustworthy assessment, the workflow asks for recapture or a human physical inspection. A reviewer owns the final decision.”
+The model helps triage image quality and provides an experimental disease
+signal. When it cannot provide a trustworthy assessment, the workflow asks for
+recapture or a human physical inspection. A reviewer owns the final decision.
 
 ## Configuration
 

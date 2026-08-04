@@ -39,5 +39,46 @@ void main() {
         'Found 0',
       );
     });
+
+    test('preserves leading spaces on hindi deltas (trim regression)', () {
+      var text = '';
+      for (final piece in [
+        'खेत',
+        ' की',
+        ' जानकारी',
+        ' देख',
+        ' सकता',
+        ' हूँ',
+      ]) {
+        text = VoiceAssistantController.mergeStreamingTranscript(text, piece);
+      }
+      expect(text, 'खेत की जानकारी देख सकता हूँ');
+    });
+
+    test('adds space between bare hindi word deltas', () {
+      var text = '';
+      for (final piece in ['खेत', 'की', 'जानकारी', 'देख', 'सकता', 'हूँ']) {
+        text = VoiceAssistantController.mergeStreamingTranscript(text, piece);
+      }
+      expect(text, 'खेत की जानकारी देख सकता हूँ');
+    });
+
+    test('does not split devanagari matra or virama clusters', () {
+      // Matra attaches to previous consonant (U+0940 ी).
+      expect(
+        VoiceAssistantController.mergeStreamingTranscript('क', 'ी'),
+        'की',
+      );
+      // Halant + consonant continues the same cluster.
+      expect(
+        VoiceAssistantController.mergeStreamingTranscript('क्', 'ष'),
+        'क्ष',
+      );
+      // Word-level deltas without spaces still get a separator.
+      expect(
+        VoiceAssistantController.mergeStreamingTranscript('मदद', 'कर'),
+        'मदद कर',
+      );
+    });
   });
 }

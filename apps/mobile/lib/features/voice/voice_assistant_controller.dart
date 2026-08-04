@@ -463,7 +463,8 @@ class VoiceAssistantController extends ChangeNotifier {
   static String mergeStreamingTranscript(String previous, String incoming) {
     final next = incoming;
     if (next.isEmpty) return previous;
-    if (previous.isEmpty) return next;
+    // First fragment may carry padding spaces from the stream.
+    if (previous.isEmpty) return next.trimLeft();
 
     // Cumulative stream: full text so far.
     if (next.startsWith(previous)) return next;
@@ -476,10 +477,11 @@ class VoiceAssistantController extends ChangeNotifier {
         return previous + next.substring(n);
       }
     }
-    // Pure delta fragment.
+    // Pure delta fragment — insert a word separator when the model omits one.
     final needsSpace = !_endsWithSpaceOrJoin(previous) &&
         !_startsWithSpaceOrPunct(next) &&
-        _isLatinBoundary(previous, next);
+        (_isLatinBoundary(previous, next) ||
+            _isDevanagariWordBoundary(previous, next));
     return needsSpace ? '$previous $next' : previous + next;
   }
 
@@ -499,11 +501,13 @@ class VoiceAssistantController extends ChangeNotifier {
         c == ',' ||
         c == '.' ||
         c == '।' ||
-        c == '؟';
+        c == '؟' ||
+        c == '،' ||
+        c == ';' ||
+        c == ':';
   }
 
-  /// Insert a space between Latin words; Devanagari usually joins without spaces
-  /// when the model streams syllable fragments.
+  /// Insert a space between Latin word / digit deltas without a separator.
   static bool _isLatinBoundary(String previous, String next) {
     if (previous.isEmpty || next.isEmpty) return false;
     final a = previous.codeUnitAt(previous.length - 1);
@@ -513,6 +517,28 @@ class VoiceAssistantController extends ChangeNotifier {
         (u >= 0x61 && u <= 0x7A) ||
         (u >= 0x30 && u <= 0x39);
     return latin(a) && latin(b);
+  }
+
+  /// Insert a space between Devanagari word-level deltas.
+  ///
+  /// Does not split clusters: no space before matras/combining marks, and no
+  /// space after virama (halant) when the next consonant continues the cluster.
+  static bool _isDevanagariWordBoundary(String previous, String next) {
+    if (previous.isEmpty || next.isEmpty) return false;
+    final a = previous.runes.last;
+    final b = next.runes.first;
+    bool isDevanagari(int u) => u >= 0x0900 && u <= 0x097F;
+    if (!isDevanagari(a) || !isDevanagari(b)) return false;
+    // Combining signs attach to the previous consonant — never a word break.
+    bool isCombining(int u) =>
+        (u >= 0x0900 && u <= 0x0903) ||
+        (u >= 0x093A && u <= 0x094F) ||
+        (u >= 0x0951 && u <= 0x0957) ||
+        (u >= 0x0962 && u <= 0x0963);
+    if (isCombining(b)) return false;
+    // Virama + consonant continues the same akshara cluster.
+    if (a == 0x094D) return false;
+    return true;
   }
 
   /// Downsample or upsample mono PCM16 for Gemini Live (expects ~16 kHz).

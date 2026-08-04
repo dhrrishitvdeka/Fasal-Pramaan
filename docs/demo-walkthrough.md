@@ -1,8 +1,8 @@
-# Demonstration walkthrough
+# End-to-end walkthrough
 
-This walkthrough demonstrates the real local workflow. The demo accounts are
-pre-created, but all farms, crop cycles, evidence, classifications, and review
-records are produced during the session.
+This walkthrough covers the local farmer → classification → reviewer flow.
+Demo accounts are pre-created; farms, crop cycles, evidence, classifications,
+and review records are created during use.
 
 ## Farmer workflow
 
@@ -30,7 +30,7 @@ records are produced during the session.
 
 ## Farmer/API workflow
 
-Use this only if you need a second perspective in the presentation:
+Optional API checks (same farmer account):
 
 ```powershell
 $login = Invoke-RestMethod -Method POST http://localhost:8000/api/v1/auth/login `

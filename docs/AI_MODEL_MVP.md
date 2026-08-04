@@ -1,9 +1,9 @@
 # Local crop-health ViT reference
 
-The local presentation adapter is `crop_health_v4` (**DINOv2 ViT-S/14**). It
+The default local adapter is `crop_health_v4` (**DINOv2 ViT-S/14**). It
 supports maize, paddy, potato, and wheat leaf images, needs trusted
-`expected_crop` metadata, and returns A/B/C/U health-screening workflow
-buckets. The ONNX model and sidecars are versioned under
+`expected_crop` metadata, and returns A/B/C/U health-screening buckets. The
+ONNX model and sidecars are versioned under
 `services/ai/models/crop_health_dinov2_v14/` (including `model.onnx`), so Docker
 bakes weights into the AI image at build time and never downloads them at
 startup.
