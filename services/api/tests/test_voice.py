@@ -101,18 +101,19 @@ def test_ephemeral_token_is_one_use_and_configuration_locked(monkeypatch):
 
 def test_session_token_response_advertises_proxy(client, monkeypatch, farmer_token):
     """Browser clients should prefer the same-origin /voice/live proxy."""
-    from app.services import gemini_live
-    from app.services.gemini_live import GeminiEphemeralSession
+    from app.api.v1 import voice as voice_routes
+    from app.services.gemini_live import GEMINI_LIVE_WEBSOCKET_URL, GeminiEphemeralSession
     from datetime import datetime, timedelta, timezone
     from uuid import uuid4
 
+    # voice.py binds create_ephemeral_session at import time — patch the route module.
     monkeypatch.setattr(
-        gemini_live,
+        voice_routes,
         "create_ephemeral_session",
         lambda settings: GeminiEphemeralSession(
             token="auth_tokens/proxy-demo",
             model="gemini-3.1-flash-live-preview",
-            websocket_url=gemini_live.GEMINI_LIVE_WEBSOCKET_URL,
+            websocket_url=GEMINI_LIVE_WEBSOCKET_URL,
             expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
             new_session_expires_at=datetime.now(timezone.utc) + timedelta(minutes=1),
             session_id=uuid4(),
