@@ -5,6 +5,8 @@ import { api, Submission } from "@/lib/api";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { AiConfidenceBreakdown } from "@/components/AiConfidenceBreakdown";
+
 export default function ReviewDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -115,52 +117,29 @@ export default function ReviewDetailPage() {
           </div>
         </section>
 
-        <section className="fp-panel space-y-2 p-4">
+        <section className="fp-panel space-y-3 p-4">
           <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            AI findings
+            AI findings & breakdown
           </h3>
           {pred ? (
             <>
-              <p className="border border-slate-300 bg-slate-50 px-2 py-1.5 text-xs text-slate-700">
-                Model {pred.model_version} ({pred.adapter_type}) · production validated:{" "}
-                <strong>{pred.is_production_validated ? "yes" : "no"}</strong>
-                {pred.promotion_status && <> · {pred.promotion_status.replaceAll("_", " ")}</>}
-                {pred.adapter_type === "crop_health_v3" && !pred.promotion_status && (
-                  <> · promotion gates not passed</>
-                )}
-                {!pred.is_production_validated && " — non-production; human decision required"}
-              </p>
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
+              <AiConfidenceBreakdown prediction={pred} images={data.images} />
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm pt-2 border-t border-slate-100">
                 <dt className="text-slate-500">Crop</dt>
                 <dd>
                   {pred.predicted_crop || "—"} ({((pred.crop_confidence || 0) * 100).toFixed(0)}%)
                 </dd>
                 <dt className="text-slate-500">Stage</dt>
                 <dd>{pred.predicted_growth_stage || "—"}</dd>
-                <dt className="text-slate-500">Health screening grade</dt>
-                <dd>
-                  <span className="fp-badge-neutral">{pred.predicted_grade || "—"}</span>{" "}
-                  {pred.grade_label?.replaceAll("_", " ") || ""}
-                  {pred.grade_confidence != null
-                    ? ` (${(pred.grade_confidence * 100).toFixed(0)}%)`
-                    : ""}
-                </dd>
                 <dt className="text-slate-500">Primary damage</dt>
                 <dd>{pred.primary_damage}</dd>
                 <dt className="text-slate-500">Severity</dt>
                 <dd>{pred.severity || "—"}</dd>
                 <dt className="text-slate-500">Affected area</dt>
                 <dd>{pred.affected_area_pct == null ? "—" : `${pred.affected_area_pct}%`}</dd>
-                <dt className="text-slate-500">Confidence</dt>
-                <dd className="tabular-nums">{((pred.overall_confidence || 0) * 100).toFixed(0)}%</dd>
                 <dt className="text-slate-500">Recommendation</dt>
                 <dd>{pred.human_review_recommendation}</dd>
               </dl>
-              {(pred.quality_warnings || []).length > 0 && (
-                <p className="text-xs text-slate-700">
-                  Warnings: {(pred.quality_warnings || []).join(", ")}
-                </p>
-              )}
             </>
           ) : (
             <p className="text-sm text-slate-500">No AI prediction yet</p>
