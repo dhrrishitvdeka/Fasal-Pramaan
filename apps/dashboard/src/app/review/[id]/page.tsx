@@ -5,6 +5,9 @@ import { api, Submission } from "@/lib/api";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { AiConfidenceBreakdown } from "@/components/AiConfidenceBreakdown";
+import { ReviewKeyboardShortcuts } from "@/components/ReviewKeyboardShortcuts";
+
 export default function ReviewDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -51,15 +54,61 @@ export default function ReviewDetailPage() {
   }
   const pred = data.latest_prediction;
 
+  const handleAccept = () => {
+    if (pred && pred.primary_damage && pred.severity && pred.affected_area_pct != null) {
+      action.mutate({ action: "accept", notes });
+    }
+  };
+
+  const handleCorrect = () => {
+    action.mutate({
+      action: "correct",
+      override_reason: reason,
+      corrected_severity: severity || undefined,
+      corrected_damage_codes: damage ? [damage] : undefined,
+      corrected_affected_area_pct: affectedArea === "" ? undefined : Number(affectedArea),
+      corrected_crop: crop || undefined,
+      corrected_growth_stage: growthStage || undefined,
+      corrected_grade: grade || undefined,
+      notes,
+    });
+  };
+
+  const handleRecapture = () => {
+    action.mutate({
+      action: "request_recapture",
+      override_reason: reason || notes || "Image quality insufficient",
+      notes,
+    });
+  };
+
+  const handleInspection = () => {
+    action.mutate({
+      action: "physical_inspection",
+      override_reason: reason || notes || "Requires field verification",
+      notes,
+    });
+  };
+
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <button
-        type="button"
-        className="text-sm text-slate-600 underline underline-offset-2 hover:text-slate-900"
-        onClick={() => router.push("/review")}
-      >
-        ← Return to queue
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          className="text-sm text-slate-600 underline underline-offset-2 hover:text-slate-900"
+          onClick={() => router.push("/review")}
+        >
+          ← Return to queue
+        </button>
+        <ReviewKeyboardShortcuts
+          disabled={action.isPending}
+          onAccept={handleAccept}
+          onCorrect={handleCorrect}
+          onRequestRecapture={handleRecapture}
+          onPhysicalInspection={handleInspection}
+          onReturnToQueue={() => router.push("/review")}
+        />
+      </div>
 
       <div className="border-b border-slate-200 pb-3">
         <h2 className="fp-page-title">Case review</h2>
@@ -115,52 +164,29 @@ export default function ReviewDetailPage() {
           </div>
         </section>
 
-        <section className="fp-panel space-y-2 p-4">
+        <section className="fp-panel space-y-3 p-4">
           <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            AI findings
+            AI findings & breakdown
           </h3>
           {pred ? (
             <>
-              <p className="border border-slate-300 bg-slate-50 px-2 py-1.5 text-xs text-slate-700">
-                Model {pred.model_version} ({pred.adapter_type}) · production validated:{" "}
-                <strong>{pred.is_production_validated ? "yes" : "no"}</strong>
-                {pred.promotion_status && <> · {pred.promotion_status.replaceAll("_", " ")}</>}
-                {pred.adapter_type === "crop_health_v3" && !pred.promotion_status && (
-                  <> · promotion gates not passed</>
-                )}
-                {!pred.is_production_validated && " — non-production; human decision required"}
-              </p>
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
+              <AiConfidenceBreakdown prediction={pred} images={data.images} />
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm pt-2 border-t border-slate-100">
                 <dt className="text-slate-500">Crop</dt>
                 <dd>
                   {pred.predicted_crop || "—"} ({((pred.crop_confidence || 0) * 100).toFixed(0)}%)
                 </dd>
                 <dt className="text-slate-500">Stage</dt>
                 <dd>{pred.predicted_growth_stage || "—"}</dd>
-                <dt className="text-slate-500">Health screening grade</dt>
-                <dd>
-                  <span className="fp-badge-neutral">{pred.predicted_grade || "—"}</span>{" "}
-                  {pred.grade_label?.replaceAll("_", " ") || ""}
-                  {pred.grade_confidence != null
-                    ? ` (${(pred.grade_confidence * 100).toFixed(0)}%)`
-                    : ""}
-                </dd>
                 <dt className="text-slate-500">Primary damage</dt>
                 <dd>{pred.primary_damage}</dd>
                 <dt className="text-slate-500">Severity</dt>
                 <dd>{pred.severity || "—"}</dd>
                 <dt className="text-slate-500">Affected area</dt>
                 <dd>{pred.affected_area_pct == null ? "—" : `${pred.affected_area_pct}%`}</dd>
-                <dt className="text-slate-500">Confidence</dt>
-                <dd className="tabular-nums">{((pred.overall_confidence || 0) * 100).toFixed(0)}%</dd>
                 <dt className="text-slate-500">Recommendation</dt>
                 <dd>{pred.human_review_recommendation}</dd>
               </dl>
-              {(pred.quality_warnings || []).length > 0 && (
-                <p className="text-xs text-slate-700">
-                  Warnings: {(pred.quality_warnings || []).join(", ")}
-                </p>
-              )}
             </>
           ) : (
             <p className="text-sm text-slate-500">No AI prediction yet</p>
@@ -244,59 +270,39 @@ export default function ReviewDetailPage() {
         <div className="flex flex-wrap gap-2 pt-1">
           <button
             type="button"
-            className="fp-btn-primary"
+            className="fp-btn-primary flex items-center gap-1.5"
             disabled={action.isPending || !pred || !pred.primary_damage || !pred.severity || pred.affected_area_pct == null}
-            onClick={() => action.mutate({ action: "accept", notes })}
+            onClick={handleAccept}
           >
-            Accept AI result
+            <span>Accept AI result</span>
+            <kbd className="rounded bg-emerald-700 px-1 font-mono text-[10px] text-white">A</kbd>
           </button>
           <button
             type="button"
-            className="fp-btn-secondary"
+            className="fp-btn-secondary flex items-center gap-1.5"
             disabled={action.isPending}
-            onClick={() =>
-              action.mutate({
-                action: "correct",
-                override_reason: reason,
-                corrected_severity: severity || undefined,
-                corrected_damage_codes: damage ? [damage] : undefined,
-                corrected_affected_area_pct: affectedArea === "" ? undefined : Number(affectedArea),
-                corrected_crop: crop || undefined,
-                corrected_growth_stage: growthStage || undefined,
-                corrected_grade: grade || undefined,
-                notes,
-              })
-            }
+            onClick={handleCorrect}
           >
-            Correct & verify
+            <span>Correct & verify</span>
+            <kbd className="rounded border border-slate-300 bg-slate-100 px-1 font-mono text-[10px] text-slate-600">C</kbd>
           </button>
           <button
             type="button"
-            className="fp-btn-secondary"
+            className="fp-btn-secondary flex items-center gap-1.5"
             disabled={action.isPending}
-            onClick={() =>
-              action.mutate({
-                action: "request_recapture",
-                override_reason: reason || notes || "Image quality insufficient",
-                notes,
-              })
-            }
+            onClick={handleRecapture}
           >
-            Request recapture
+            <span>Request recapture</span>
+            <kbd className="rounded border border-slate-300 bg-slate-100 px-1 font-mono text-[10px] text-slate-600">R</kbd>
           </button>
           <button
             type="button"
-            className="fp-btn-danger"
+            className="fp-btn-danger flex items-center gap-1.5"
             disabled={action.isPending}
-            onClick={() =>
-              action.mutate({
-                action: "physical_inspection",
-                override_reason: reason || notes || "Requires field verification",
-                notes,
-              })
-            }
+            onClick={handleInspection}
           >
-            Physical inspection
+            <span>Physical inspection</span>
+            <kbd className="rounded bg-rose-700 px-1 font-mono text-[10px] text-white">P</kbd>
           </button>
         </div>
       </section>
