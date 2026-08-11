@@ -1,4 +1,4 @@
-fastapi==0.139.0
+fastapi==0.141.1
 uvicorn[standard]==0.34.0
 sqlalchemy[asyncio]==2.0.51
 geoalchemy2==0.15.2
