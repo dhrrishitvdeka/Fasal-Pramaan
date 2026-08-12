@@ -1,245 +1,220 @@
-# FasalPramaan AI
+# FasalPramaan
 
-Local-first crop evidence capture, assistive ViT screening, and human review.
+**फसल प्रमाण** — *Capture. Verify. Protect.*
 
-FasalPramaan connects a Flutter farmer/field app, FastAPI, MinIO, Celery,
-PostgreSQL/PostGIS, the local DINOv2 model, and a Next.js reviewer dashboard.
-The complete local stack runs with Docker and does not download model
-weights at runtime.
+A local crop-evidence system for farmers and reviewers. A farmer records
+five guided field photos with location. A local leaf-health model gives a
+screening grade. A human reviewer makes the decision.
 
-> AI results are assistive screening signals. They do not determine crop-loss
-> severity, produce quality, claim eligibility, or insurance settlement.
-> Human review is mandatory.
+> The model is a helper, not an authority. It does **not** approve insurance,
+> estimate payout, or replace a field officer. Every case still needs a person.
 
-## What a clone includes
+Latest release: [`V1.1.1`](https://github.com/dhrrishitvdeka/Fasal-Pramaan/releases/tag/V1.1.1)
 
-Everything needed for the local Docker stack is versioned in the repository:
+## Who it is for
 
-| Included on clone | Notes |
-|---|---|
-| Flutter field app + Next.js dashboard | Built inside Docker images |
-| FastAPI, Celery worker/beat, migrations, seed | Single API image reused by worker, beat, migrate, and seed |
-| PostgreSQL/PostGIS, Redis, MinIO | Compose services; no host installs |
-| DINOv2 ONNX model (`crop_health_v4`) | `services/ai/models/.../model.onnx` (~87 MB), no runtime download |
-| Demo accounts + crop catalogs | Created by the `seed` job (no farms or submissions) |
-| `.env.example` + start scripts | Copy once; launcher sets local URLs |
+| You are… | You use… | You can… |
+|---|---|---|
+| A farmer or field officer | The field app at `http://localhost:8085` | Register a farm, take five evidence photos, upload, and see results |
+| A reviewer or administrator | The Command Centre at `http://localhost:3000` | Open the queue, inspect photos and model output, accept or correct the case |
+| A developer or researcher | This repository + Docker | Run the full stack on one machine, inspect the API, and try the local model |
 
-**Host requirements:** Docker Desktop or Docker Engine with Compose v2. Flutter,
-Node.js, Python, PostgreSQL, Redis, and MinIO are not required on the host for
-the containerized stack.
+No Flutter, Python, or Node install is required to try the demo. Docker is enough.
 
-Recommended free disk for the first build: **~12 GB** (base images + Flutter
-build stage + named volumes). Later starts reuse local image layers.
+## What you get in a clone
 
-### Fresh clone on any machine
+The repository is a complete local pack:
 
-```bash
-git clone https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
-cd Fasal-Pramaan
-```
+- Farmer / field-officer app (Flutter, served as a web app in Docker)
+- Reviewer Command Centre (Next.js)
+- API, background worker, PostgreSQL/PostGIS, Redis, and MinIO evidence storage
+- A local DINOv2 leaf-health model (~87 MB ONNX file, already in the tree)
+- Four demo logins and crop catalogs (no sample farms until you create them)
 
-Windows:
+The model does **not** download weights when the stack starts.
+
+## Start in two commands
+
+**Windows**
 
 ```powershell
+git clone https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
+cd Fasal-Pramaan
 Copy-Item .env.example .env
 powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1
 ```
 
-macOS/Linux:
+**macOS / Linux**
 
 ```bash
+git clone https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
+cd Fasal-Pramaan
 cp .env.example .env
 sh scripts/start-portable.sh
 ```
 
-Or use Docker Compose directly:
+Or: `docker compose up -d --build`
 
-```bash
-docker compose up -d --build
-```
+The first build needs about **12 GB** free disk (base images + Flutter SDK used
+only while building). Later starts reuse cached layers.
 
-The first build downloads base images and the Flutter SDK used only while
-building the field-app image. The selected ONNX model is already in the clone.
-
-Release tags with the same pack: [`V1.1`](https://github.com/dhrrishitvdeka/Fasal-Pramaan/releases/tag/V1.1)
-(Fasal Saathi voice assistant) and [`V1`](https://github.com/dhrrishitvdeka/Fasal-Pramaan/releases/tag/V1).
-
-If the tree is already checked out locally, skip `git clone` and run the
-Windows / macOS / Linux start commands from the repo root.
+Optional: clone a release with `git clone --branch V1.1.1 …`
 
 ## Open the apps
 
-| Surface | URL | Demo account |
+| App | Address | Demo login |
 |---|---|---|
-| Farmer/field app | `http://localhost:8085` | `farmer@fasalpramaan.local` / `Demo@12345` |
-| Reviewer Command Centre | `http://localhost:3000` | `reviewer@fasalpramaan.local` / `Demo@12345` |
-| API health/docs | `http://localhost:8000/health`, `/docs` | — |
-| AI health | `http://localhost:8001/health` | — |
-| MinIO console | `http://localhost:9001` | `minioadmin` / `minioadmin_dev_only` |
+| Farmer / field app | http://localhost:8085 | `farmer@fasalpramaan.local` / `Demo@12345` |
+| Reviewer Command Centre | http://localhost:3000 | `reviewer@fasalpramaan.local` / `Demo@12345` |
+| API health / docs | http://localhost:8000/health , `/docs` | — |
+| AI health | http://localhost:8001/health | — |
+| MinIO console (local only) | http://localhost:9001 | `minioadmin` / `minioadmin_dev_only` |
 
-## Farmer voice assistant (Fasal Saathi)
+Staff accounts (`officer@`, `reviewer@`, `admin@`) use the same demo password.
 
-The farmer app includes **Fasal Saathi**, a Hindi/English Gemini Live voice
-assistant that can read farmer data, navigate allowlisted screens, and operate
-the guided capture flow verbally. Sync and submission finalization require a
-new, explicit spoken confirmation and cannot be replayed.
+This is a **local / trusted-LAN demo**, not a public internet service. Change
+every default password and secret before sharing the stack on a network.
 
-Enable it only after adding a server-side Gemini key to `.env`:
+## Try a complete case (about 10 minutes)
+
+1. Open the field app and sign in as the farmer.
+2. Create a **farm**, then a **plot**, then a **crop cycle** (choose a crop such as paddy).
+3. Open **Capture Crop Evidence**. Take the five required angles (wide field,
+   left, mid-canopy, right, close-up).
+   - On a laptop browser, camera or GPS may be missing. The web app then uses
+     **sample frames and a demo location** so the local flow can still finish.
+4. Tap **Save & submit**. Photos upload and the local model runs in the background.
+5. Open the Command Centre as the reviewer. The case appears in the
+   **Review queue** with photos, location, and an A/B/C/U screening grade.
+6. Accept the screening, correct it, request recapture, or send it for
+   physical inspection.
+
+More detail: [GETTING_STARTED.md](GETTING_STARTED.md) and
+[demo walkthrough](docs/demo-walkthrough.md).
+
+## What the model actually says
+
+The default model (`crop_health_v4`) looks at leaf photos of **maize, paddy,
+potato, and wheat** and returns a **screening bucket**, not a loss estimate:
+
+| Grade | Meaning |
+|---|---|
+| **A** | Confident healthy-leaf signal |
+| **B** | Uncertain — a person should look |
+| **C** | Confident disease-pattern signal |
+| **U** | Unusable, unsupported crop, or out of domain |
+
+It does **not** output insurance severity or affected-area percentage. The
+reviewer can still close the case using that grade.
+
+Internal (not independently field-validated) metrics are in
+[docs/AI_MODEL_MVP.md](docs/AI_MODEL_MVP.md). Potato-healthy is the weakest
+disclosed class.
+
+One-off local image:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\demo-model.ps1 C:\path\to\leaf.jpg paddy
+```
+
+## How the pieces connect
+
+```mermaid
+flowchart LR
+  Field["Field app<br/>photos + offline queue"] --> API["API<br/>accounts + cases"]
+  Dashboard["Reviewer dashboard"] --> API
+  API --> DB[("PostgreSQL")]
+  API --> Store[("Photo store")]
+  API --> Worker["Background worker"]
+  Worker --> AI["Local DINOv2 model"]
+  AI --> Worker
+  Worker --> DB
+```
+
+Photos stay on your machine. Inference is local ONNX. Nothing is sent to a
+cloud model unless you turn on the optional voice assistant.
+
+## Optional: farmer voice assistant (Fasal Saathi)
+
+Fasal Saathi is a Hindi/English spoken helper for the farmer app. It is
+**off** until you add a server-side Gemini key:
 
 ```dotenv
 VOICE_ASSISTANT_ENABLED=true
 GEMINI_API_KEY=your_google_ai_studio_key
 ```
 
-The long-lived key never enters the Flutter client. The authenticated API mints
-a constrained, one-use ephemeral token. On the Docker web app, audio traffic
-uses the same-origin Live proxy (`/backend/api/v1/voice/live`). See
-[Fasal Saathi](docs/VOICE_ASSISTANT_DEMO.md) for configuration, spoken script,
-tool boundaries, and limitations.
+The long-lived key never enters the phone or browser. Sync and final submit
+still require a fresh spoken yes. Guide:
+[docs/VOICE_ASSISTANT_DEMO.md](docs/VOICE_ASSISTANT_DEMO.md).
 
-The field app and dashboard use same-origin `/backend` proxies, so no browser
-API base-URL configuration is required.
-
-## Use from another device
-
-Keep the second device and Docker host on the same trusted Wi-Fi/LAN. On
-Windows:
+## Another device on the same Wi-Fi
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1 `
-  -PublicHost 192.168.1.25
+powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1 -PublicHost 192.168.1.25
 ```
-
-On macOS/Linux:
 
 ```bash
 sh scripts/start-portable.sh 192.168.1.25
 ```
 
-Then open:
+Then open `http://192.168.1.25:8085` and `http://192.168.1.25:3000`. Only do
+this on a trusted private network.
 
-- `http://192.168.1.25:8085` for the field app
-- `http://192.168.1.25:3000` for the reviewer dashboard
+## Project layout
 
-Allow TCP ports `3000`, `8085`, and `9000` through the host firewall only on a
-trusted private network. This is a local/LAN reference deployment, not a public deployment.
-
-## System flow
-
-```mermaid
-flowchart LR
-  Field["Flutter field app<br/>capture + offline queue"] --> API["FastAPI<br/>auth + submissions"]
-  Dashboard["Next.js Command Centre<br/>review + audit"] --> API
-  API --> DB[("PostgreSQL + PostGIS")]
-  API --> Store[("MinIO evidence")]
-  API --> Queue[("Redis")]
-  Queue --> Worker["Celery worker"]
-  Worker --> Store
-  Worker --> AI["DINOv2 ViT-S/14<br/>ONNX crop_health_v4"]
-  AI --> Worker
-  Worker --> DB
+```text
+apps/mobile/        Farmer and field-officer app
+apps/dashboard/     Reviewer Command Centre
+services/api/       Accounts, cases, storage, background jobs
+services/ai/        Local ONNX model and evaluation notes
+scripts/            Start, health, model demo, e2e, packaging
+docs/               Architecture, security, model, and operations
+docker-compose.yml  Full local stack
 ```
 
-Capture lifecycle:
+| Guide | Use it when |
+|---|---|
+| [GETTING_STARTED.md](GETTING_STARTED.md) | First clone and first run |
+| [RUN_GUIDE.md](RUN_GUIDE.md) | Day-to-day start/stop |
+| [docs/README.md](docs/README.md) | Full documentation index |
+| [docs/known-limitations.md](docs/known-limitations.md) | What this software must not be claimed to do |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to send a change |
 
-```mermaid
-flowchart LR
-  Capture["5 guided angles + GPS"] --> Upload["Signed MinIO upload"]
-  Upload --> Checks["Hash, quality, location checks"]
-  Checks --> ViT["Local ViT screening"]
-  ViT --> Review["Mandatory human review"]
-  Review --> Audit["Decision + audit trail"]
-```
-
-## Included classification model
-
-- Adapter: `crop_health_v4`
-- Artifact: `services/ai/models/crop_health_dinov2_v14/model.onnx`
-- Version: `4.0.0-dinov2-v14`
-- Crops: maize, paddy/rice, potato, wheat
-- Output: A/B/C/U leaf-health screening bucket with abstention
-- Runtime: local ONNX; no cloud inference or startup download
-- Status: internally evaluated, not independently field validated
-
-Frozen internal evaluation: macro-F1 `0.8068`, balanced accuracy `0.8193`,
-source-held-out field macro-F1 `0.6393`, OOD rejection recall `0.9353`, and
-ECE `0.0162`. Potato-healthy is the weakest disclosed class (16 samples,
-recall `0.25`, F1 `0.32`). See [local model reference](docs/AI_MODEL_MVP.md).
-
-Analyze one local image:
+## Quality checks
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\demo-model.ps1 `
-  C:\path\to\leaf.jpg paddy
+cd apps\dashboard
+npm.cmd run lint
+npm.cmd run typecheck
+npm.cmd test
+
+cd ..\..
+docker compose exec api pytest
+docker compose exec ai pytest
+
+docker build --target tester -t fasalpramaan-mobile-test apps/mobile
 ```
 
-Verify the complete five-photo upload → worker → v4 → reviewer-dashboard data
-path with five distinct JPEGs:
+End-to-end upload → model → reviewer queue (five distinct JPEGs):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -Command `
   "& .\scripts\verify-e2e.ps1 -ImagePaths @('wide.jpg','left.jpg','mid.jpg','right.jpg','close.jpg')"
 ```
 
-## Quality checks
-
-```powershell
-# Dashboard
-cd apps\dashboard
-npm.cmd run lint
-npm.cmd run typecheck
-npm.cmd test
-
-# Containerized services
-cd ..\..
-docker compose exec api pytest
-docker compose exec ai pytest
-
-# Reproducible Flutter checks
-docker build --target tester -t fasalpramaan-mobile-test apps/mobile
-```
-
-## Portable archive
-
-Create a shareable source bundle that excludes Git metadata, secrets, caches,
-raw research data, training runs, and generated build output:
+## Share a copy without Git
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-portable-bundle.ps1
 ```
 
-The archive and its SHA-256 file are written to `dist/`. A recipient extracts
-it, installs Docker Desktop/Engine, and runs the one-command start above. No
-GitHub account or Git client is required.
-
-Clean generated local dependencies and build caches:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\clean-workspace.ps1 `
-  -IncludeResearchDownloads
-```
-
-## Repository layout
-
-```text
-apps/mobile/        Flutter farmer and field-officer app
-apps/dashboard/     Next.js reviewer Command Centre
-services/api/       FastAPI, database models, migrations, Celery worker
-services/ai/        ONNX inference service, selected model, evaluation evidence
-scripts/            Start, health, model-demo, e2e, and packaging helpers
-docs/               Architecture, operations, model, security, and demo docs
-docker-compose.yml  Complete local/LAN stack
-```
-
-Start with [GETTING_STARTED.md](GETTING_STARTED.md), then use
-[RUN_GUIDE.md](RUN_GUIDE.md) for day-to-day operations and
-[docs/README.md](docs/README.md) for the full documentation index.
+The archive lands in `dist/`. A recipient needs Docker only.
 
 ## Contributors
 
 Thanks to everyone who has shipped code on this project.
 
-<!-- Contributor cards with GitHub profile photos (PFPs). -->
 <table>
   <tr>
     <td align="center" width="160">
@@ -263,8 +238,6 @@ Thanks to everyone who has shipped code on this project.
   </tr>
 </table>
 
-Auto-updating contribution graph (from GitHub history):
-
 <p align="left">
   <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan/graphs/contributors">
     <img src="https://contrib.rocks/image?repo=dhrrishitvdeka/Fasal-Pramaan" alt="Contributors to Fasal-Pramaan" />
@@ -275,5 +248,5 @@ Want to join the list? See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE). Public dataset/model provenance and restrictions are recorded
-in [LICENSE_REPORT.md](services/ai/research/reports/LICENSE_REPORT.md).
+[MIT](LICENSE). Dataset and model provenance:
+[LICENSE_REPORT.md](services/ai/research/reports/LICENSE_REPORT.md).
