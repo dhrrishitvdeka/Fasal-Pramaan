@@ -40,14 +40,27 @@ class AppConfig {
   static const maxUploadMb = 15;
 
   static void assertSafeRuntime() {
-    final uri = Uri.parse(apiBaseUrl);
-    final sameOriginPath = !uri.hasScheme && apiBaseUrl.startsWith('/');
-    if (kReleaseMode && !sameOriginPath && uri.scheme != 'https') {
+    checkSafeRuntime(
+      releaseMode: kReleaseMode,
+      enableDemoMode: demoMode,
+      apiBase: apiBaseUrl,
+    );
+  }
+
+  /// Extracted so tests can drive the same release-boot rules main() uses.
+  static void checkSafeRuntime({
+    required bool releaseMode,
+    required bool enableDemoMode,
+    required String apiBase,
+  }) {
+    final uri = Uri.parse(apiBase);
+    final sameOriginPath = !uri.hasScheme && apiBase.startsWith('/');
+    if (releaseMode && !sameOriginPath && uri.scheme != 'https') {
       throw StateError(
         'Release builds require HTTPS or a same-origin API_BASE_URL path',
       );
     }
-    if (kReleaseMode && demoMode) {
+    if (releaseMode && enableDemoMode) {
       throw StateError('DEMO_MODE cannot be enabled in release builds');
     }
   }

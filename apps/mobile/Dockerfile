@@ -30,9 +30,10 @@ FROM flutter-base AS web-builder
 ARG API_BASE_URL=/backend
 # Gate the production image on analyze + unit tests.
 COPY --from=tester /app/pubspec.lock /tmp/.flutter-tests-passed
+# Do not set DEMO_MODE=true: release main() calls assertSafeRuntime()
+# which throws in that case. kIsWeb already enables local capture fallback.
 RUN flutter build web --release \
-    --dart-define=API_BASE_URL=${API_BASE_URL} \
-    --dart-define=DEMO_MODE=false
+    --dart-define=API_BASE_URL=${API_BASE_URL}
 
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf

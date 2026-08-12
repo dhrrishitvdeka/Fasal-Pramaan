@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     storage_backend: str = "s3"  # s3-compatible (MinIO/AWS/GCS interop)
 
     api_v1_prefix: str = "/api/v1"
+    # Local MVP: rate limits stay off so demo traffic is never 429'd.
+    rate_limit_enabled: bool = False
     rate_limit_per_minute: int = 120
     rate_limit_backend: Literal["memory", "redis"] = "memory"
     trusted_proxy_ips: str = ""

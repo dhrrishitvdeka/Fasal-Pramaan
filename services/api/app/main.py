@@ -100,6 +100,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """Apply per-IP sliding window limits (stricter on auth)."""
 
     async def dispatch(self, request: Request, call_next):
+        if not settings.rate_limit_enabled:
+            return await call_next(request)
         path = str(request.scope.get("path") or "")
         if path.startswith(settings.api_v1_prefix):
             client = _client_ip(request)

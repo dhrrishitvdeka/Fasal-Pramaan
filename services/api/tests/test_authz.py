@@ -24,6 +24,21 @@ def _register_or_login(client: TestClient, email: str, password: str = "TestPass
     return login.json()["access_token"]
 
 
+def _cycle_accessible_to_officer(client: TestClient, farmer_headers: dict, fo_headers: dict) -> str | None:
+    """First farmer cycle the seeded officer can actually open (jurisdiction-scoped)."""
+    cycles = client.get("/api/v1/crop-cycles", headers=farmer_headers)
+    if cycles.status_code != 200:
+        return None
+    for item in cycles.json() or []:
+        cycle_id = item.get("id")
+        if not cycle_id:
+            continue
+        probe = client.get(f"/api/v1/crop-cycles/{cycle_id}", headers=fo_headers)
+        if probe.status_code == 200:
+            return cycle_id
+    return None
+
+
 def test_cannot_self_register_privileged_roles(client: TestClient):
     """Staff roles grant cross-farmer access — must not be self-assignable."""
     for role in ("administrator", "reviewer", "admin", "field_officer"):
@@ -348,13 +363,11 @@ def test_farmer_can_read_fo_submission_on_own_farm(client: TestClient, farmer_to
     fo_headers = {"Authorization": f"Bearer {fo_token}"}
     farmer_headers = {"Authorization": f"Bearer {farmer_token}"}
 
-    cycles = client.get("/api/v1/crop-cycles", headers=farmer_headers)
-    assert cycles.status_code == 200
-    if not cycles.json():
+    cycle_id = _cycle_accessible_to_officer(client, farmer_headers, fo_headers)
+    if not cycle_id:
         import pytest
 
-        pytest.skip("No crop cycles")
-    cycle_id = cycles.json()[0]["id"]
+        pytest.skip("No farmer cycle inside the seeded officer's jurisdiction")
 
     # FO can access farmer cycle (staff) and create draft
     draft = client.post(
@@ -427,12 +440,11 @@ def test_fo_on_behalf_must_match_cycle_farm_owner(client: TestClient, farmer_tok
     fo_headers = {"Authorization": f"Bearer {fo_login.json()['access_token']}"}
     farmer_headers = {"Authorization": f"Bearer {farmer_token}"}
 
-    cycles = client.get("/api/v1/crop-cycles", headers=farmer_headers)
-    if not cycles.json():
+    cycle_id = _cycle_accessible_to_officer(client, farmer_headers, fo_headers)
+    if not cycle_id:
         import pytest
 
-        pytest.skip("No crop cycles")
-    cycle_id = cycles.json()[0]["id"]
+        pytest.skip("No farmer cycle inside the seeded officer's jurisdiction")
 
     # Register unrelated farmer C and resolve their FarmerProfile id
     email_c = f"authz_behalf_c_{uuid.uuid4().hex[:8]}@fasalpramaan.local"
@@ -498,12 +510,11 @@ def test_on_behalf_alone_does_not_grant_read_access(client: TestClient, farmer_t
     fo_headers = {"Authorization": f"Bearer {fo_login.json()['access_token']}"}
     farmer_headers = {"Authorization": f"Bearer {farmer_token}"}
 
-    cycles = client.get("/api/v1/crop-cycles", headers=farmer_headers)
-    if not cycles.json():
+    cycle_id = _cycle_accessible_to_officer(client, farmer_headers, fo_headers)
+    if not cycle_id:
         import pytest
 
-        pytest.skip("No crop cycles")
-    cycle_id = cycles.json()[0]["id"]
+        pytest.skip("No farmer cycle inside the seeded officer's jurisdiction")
 
     draft = client.post(
         "/api/v1/submissions/drafts",

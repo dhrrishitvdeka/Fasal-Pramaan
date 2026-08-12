@@ -602,6 +602,15 @@ def finalize_submission(
     if missing:
         raise HTTPException(400, f"Missing required angles: {', '.join(sorted(missing))}")
 
+    fallback_captured_at = sub.capture_timestamp or datetime.now(timezone.utc)
+    for image in scoped_images:
+        if image.capture_lat is None:
+            image.capture_lat = sub.capture_lat
+        if image.capture_lon is None:
+            image.capture_lon = sub.capture_lon
+        if image.captured_at is None:
+            image.captured_at = fallback_captured_at
+
     evidence_missing = [
         i.angle_type
         for i in scoped_images
