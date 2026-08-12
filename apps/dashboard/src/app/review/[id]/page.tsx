@@ -54,8 +54,17 @@ export default function ReviewDetailPage() {
   }
   const pred = data.latest_prediction;
 
+  const canAccept = Boolean(
+    pred &&
+      (pred.predicted_grade ||
+        (pred.primary_damage &&
+          pred.primary_damage !== "unknown" &&
+          pred.severity &&
+          pred.affected_area_pct != null))
+  );
+
   const handleAccept = () => {
-    if (pred && pred.primary_damage && pred.severity && pred.affected_area_pct != null) {
+    if (canAccept) {
       action.mutate({ action: "accept", notes });
     }
   };
@@ -63,7 +72,7 @@ export default function ReviewDetailPage() {
   const handleCorrect = () => {
     action.mutate({
       action: "correct",
-      override_reason: reason,
+      override_reason: reason || notes || "Human recorded screening decision",
       corrected_severity: severity || undefined,
       corrected_damage_codes: damage ? [damage] : undefined,
       corrected_affected_area_pct: affectedArea === "" ? undefined : Number(affectedArea),
@@ -271,7 +280,7 @@ export default function ReviewDetailPage() {
           <button
             type="button"
             className="fp-btn-primary flex items-center gap-1.5"
-            disabled={action.isPending || !pred || !pred.primary_damage || !pred.severity || pred.affected_area_pct == null}
+            disabled={action.isPending || !canAccept}
             onClick={handleAccept}
           >
             <span>Accept AI result</span>

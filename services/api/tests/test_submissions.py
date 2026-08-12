@@ -536,3 +536,176 @@ def test_draft_defaults_growth_stage_from_cycle(client: TestClient, farmer_token
     assert draft.json()["crop_cycle_id"] == cycle_id
     if expected_stage:
         assert draft.json().get("growth_stage_id") == expected_stage
+
+
+def _ensure_cycle_id(client: TestClient, headers: dict) -> str:
+    cycles = client.get("/api/v1/crop-cycles", headers=headers)
+    assert cycles.status_code == 200, cycles.text
+    if cycles.json():
+        return cycles.json()[0]["id"]
+    crops = client.get("/api/v1/crops", headers=headers)
+    assert crops.status_code == 200 and crops.json(), crops.text
+    crop = next((item for item in crops.json() if item.get("code") == "paddy"), crops.json()[0])
+    farm = client.post(
+        "/api/v1/farms",
+        json={"name": "MVP Test Farm", "total_area_hectares": 1.0},
+        headers=headers,
+    )
+    assert farm.status_code == 201, farm.text
+    plot = client.post(
+        f"/api/v1/farms/{farm.json()['id']}/plots",
+        json={"name": "MVP Test Plot", "area_hectares": 1.0, "centroid_lat": 23.2615, "centroid_lon": 77.4125},
+        headers=headers,
+    )
+    assert plot.status_code == 201, plot.text
+    cycle = client.post(
+        "/api/v1/crop-cycles",
+        json={
+            "plot_id": plot.json()["id"],
+            "crop_type_id": crop["id"],
+            "season_year": 2026,
+            "season": "kharif",
+        },
+        headers=headers,
+    )
+    assert cycle.status_code == 201, cycle.text
+    return cycle.json()["id"]
+
+
+def _upload_five_angles(client: TestClient, headers: dict, sid: str) -> None:
+    images = []
+    blobs: dict[str, bytes] = {}
+    for i, angle in enumerate(
+        ["wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"]
+    ):
+        payload = _tiny_jpeg(f"{sid}-{angle}".encode())
+        blobs[angle] = payload
+        images.append(
+            {
+                "angle_type": angle,
+                "sequence_order": i,
+                "content_type": "image/jpeg",
+                "byte_size": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+                "width": 96,
+                "height": 96,
+            }
+        )
+    urls = client.post(
+        f"/api/v1/submissions/{sid}/upload-urls",
+        json={"images": images},
+        headers=headers,
+    )
+    assert urls.status_code == 200, urls.text
+    for item in urls.json()["uploads"]:
+        put_bytes(item["object_key"], blobs[item["angle_type"]])
+    conf = client.post(
+        f"/api/v1/submissions/{sid}/images/confirm",
+        json=[{"image_id": item["image_id"]} for item in urls.json()["uploads"]],
+        headers=headers,
+    )
+    assert conf.status_code == 200, conf.text
+
+
+def test_finalize_defaults_missing_image_captured_at(client: TestClient, farmer_token: str):
+    """GPS on the draft is enough; per-image captured_at is filled from the submission."""
+    headers = {"Authorization": f"Bearer {farmer_token}"}
+    cycle_id = _ensure_cycle_id(client, headers)
+    draft = client.post(
+        "/api/v1/submissions/drafts",
+        json={
+            "crop_cycle_id": cycle_id,
+            "idempotency_key": f"no-captured-at-{uuid.uuid4()}",
+            "capture_lat": 23.2615,
+            "capture_lon": 77.4125,
+            "capture_accuracy_m": 8,
+        },
+        headers=headers,
+    )
+    assert draft.status_code == 201, draft.text
+    sid = draft.json()["id"]
+    _upload_five_angles(client, headers, sid)
+
+    from app.db.models import SubmissionImage
+    from app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        db.query(SubmissionImage).filter(SubmissionImage.submission_id == sid).update(
+            {SubmissionImage.captured_at: None},
+            synchronize_session=False,
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    fin = client.post(f"/api/v1/submissions/{sid}/finalize", json={}, headers=headers)
+    assert fin.status_code == 200, fin.text
+
+
+def test_review_accept_v4_grade_without_severity(client: TestClient, farmer_token: str, reviewer_token: str):
+    """crop_health_v4 leaves severity/area null; accept must still complete the case."""
+    farmer = {"Authorization": f"Bearer {farmer_token}"}
+    reviewer = {"Authorization": f"Bearer {reviewer_token}"}
+    cycle_id = _ensure_cycle_id(client, farmer)
+    draft = client.post(
+        "/api/v1/submissions/drafts",
+        json={
+            "crop_cycle_id": cycle_id,
+            "idempotency_key": f"v4-accept-{uuid.uuid4()}",
+            "capture_lat": 23.2615,
+            "capture_lon": 77.4125,
+        },
+        headers=farmer,
+    )
+    assert draft.status_code == 201, draft.text
+    sid = draft.json()["id"]
+
+    from app.db.models import AIJob, AIPrediction, Submission
+    from app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        sub = db.query(Submission).filter(Submission.id == sid).one()
+        job = AIJob(submission_id=sub.id, status="completed")
+        db.add(job)
+        db.flush()
+        db.add(
+            AIPrediction(
+                ai_job_id=job.id,
+                submission_id=sub.id,
+                model_version="4.0.0-dinov2-v14",
+                adapter_type="crop_health_v4",
+                predicted_grade="A",
+                grade_label="healthy_leaf_signal",
+                primary_damage="healthy",
+                severity=None,
+                affected_area_pct=None,
+                overall_confidence=0.81,
+            )
+        )
+        sub.status = "pending_review"
+        db.commit()
+    finally:
+        db.close()
+
+    queue = client.get("/api/v1/review/queue", headers=reviewer)
+    assert queue.status_code == 200, queue.text
+    ids = {item["id"] for item in (queue.json().get("items") or [])}
+    assert sid in ids
+
+    action = client.post(
+        f"/api/v1/review/{sid}/action",
+        json={"action": "accept", "notes": "Accept v4 screening grade"},
+        headers=reviewer,
+    )
+    assert action.status_code == 200, action.text
+    assert action.json()["status"] == "verified"
+
+
+def test_review_queue_includes_attention_statuses(client: TestClient, reviewer_token: str):
+    headers = {"Authorization": f"Bearer {reviewer_token}"}
+    unfiltered = client.get("/api/v1/review/queue", headers=headers)
+    assert unfiltered.status_code == 200, unfiltered.text
+    pending_only = client.get("/api/v1/review/queue?status=pending_review", headers=headers)
+    assert pending_only.status_code == 200, pending_only.text

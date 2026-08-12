@@ -25,6 +25,8 @@ class RateLimiter:
 
     def check(self, key: str, limit: int, window_seconds: int = 60) -> None:
         settings = get_settings()
+        if not settings.rate_limit_enabled:
+            return
         if settings.rate_limit_backend == "redis":
             self._check_redis(key, limit, window_seconds, settings.redis_url)
             return
@@ -63,6 +65,8 @@ async def rate_limit_dependency(request: Request) -> None:
     Uses RATE_LIMIT_PER_MINUTE as-is (floor 10). Auth routes use min(30, limit).
     """
     settings = get_settings()
+    if not settings.rate_limit_enabled:
+        return
     limit = max(int(settings.rate_limit_per_minute), 10)
     client = request.client.host if request.client else "unknown"
     path = request.url.path
