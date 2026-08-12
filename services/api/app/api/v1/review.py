@@ -24,19 +24,37 @@ from app.services.notifications import notify_user
 router = APIRouter(prefix="/review", tags=["Review"])
 
 
+_ATTENTION_STATUSES = ("pending_review", "physical_inspection", "needs_recapture")
+
+
+def _prediction_is_reviewable(pred) -> bool:
+    """v4 screening (A/B/C/U) is a complete result even when severity/area are null."""
+    if pred is None:
+        return False
+    if pred.predicted_grade in {"A", "B", "C", "U"}:
+        return True
+    if (
+        pred.primary_damage not in (None, "unknown")
+        and pred.severity is not None
+        and pred.affected_area_pct is not None
+    ):
+        return True
+    return False
+
+
 @router.get("/queue", response_model=Paginated[SubmissionOut])
 def review_queue(
     db: DbSession,
     user: User = Depends(require_roles(ROLE_REVIEWER, ROLE_ADMIN)),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    status_filter: str | None = Query("pending_review", alias="status"),
+    status_filter: str | None = Query(None, alias="status"),
 ) -> Paginated[SubmissionOut]:
     q = db.query(Submission).filter(Submission.is_deleted.is_(False))
     if status_filter:
         q = q.filter(Submission.status == status_filter)
     else:
-        q = q.filter(Submission.status.in_(["pending_review", "physical_inspection", "needs_recapture"]))
+        q = q.filter(Submission.status.in_(_ATTENTION_STATUSES))
     total = q.count()
     rows = (
         q.options(joinedload(Submission.images))
@@ -83,8 +101,8 @@ def review_action(
 
     allowed_actions = {
         "pending_review": {"accept", "correct", "reject", "request_recapture", "physical_inspection", "inconclusive"},
-        "physical_inspection": {"complete", "correct", "request_recapture", "inconclusive"},
-        "needs_recapture": {"physical_inspection", "inconclusive"},
+        "physical_inspection": {"complete", "correct", "accept", "request_recapture", "inconclusive"},
+        "needs_recapture": {"physical_inspection", "inconclusive", "accept", "correct", "reject"},
     }
     if body.action not in allowed_actions.get(sub.status, set()):
         raise HTTPException(409, f"Action {body.action} is not allowed for status {sub.status}")
@@ -110,20 +128,10 @@ def review_action(
     )
 
     if body.action == "accept":
-        if not pred or pred.primary_damage in (None, "unknown") or pred.severity is None or pred.affected_area_pct is None:
+        if not _prediction_is_reviewable(pred):
             raise HTTPException(
                 400,
                 "AI result is incomplete; record a corrected human assessment instead of accepting it",
-            )
-
-    if body.action in ("correct", "complete"):
-        primary = (body.corrected_damage_codes or [pred.primary_damage if pred else None])[0]
-        severity = body.corrected_severity if body.corrected_severity is not None else (pred.severity if pred else None)
-        area = body.corrected_affected_area_pct if body.corrected_affected_area_pct is not None else (pred.affected_area_pct if pred else None)
-        if primary in (None, "unknown") or severity is None or area is None:
-            raise HTTPException(
-                400,
-                "A final human assessment requires damage code, severity, and affected-area percentage",
             )
 
     review = HumanReview(

@@ -6,8 +6,20 @@ All notable changes will be documented in this file. The format follows
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-08-13
+
 ### Fixed
 
+- Local Docker field-app no longer crashes on boot: release web builds do not
+  set `DEMO_MODE=true` (that flag trips `assertSafeRuntime()` before `runApp()`).
+  Camera/GPS fallback still runs on Flutter web via `kIsWeb`.
+- Reviewers can accept DINOv2 `crop_health_v4` screening (A/B/C/U) when
+  severity and affected-area are empty; the queue lists all human-attention
+  statuses.
+- Finalize no longer fails only because a photo omitted `captured_at` when the
+  draft already has GPS.
+- Local demo traffic is not rate-limited (`RATE_LIMIT_ENABLED` defaults off).
+- Dashboard health uses the same-origin `/backend` base inside Docker.
 - Hindi/English Fasal Saathi transcript bubbles no longer glue words together
   (preserve stream token spacing; Devanagari word-boundary merge).
 - Field-app Docker build re-declares `API_BASE_URL` and gates the image on

@@ -9,9 +9,7 @@ export default function ReviewQueuePage() {
     queryKey: ["review-queue"],
     queryFn: async () =>
       (
-        await api.get<{ items: Submission[] }>("/review/queue", {
-          params: { status: "pending_review" },
-        })
+        await api.get<{ items: Submission[] }>("/review/queue")
       ).data,
   });
 
