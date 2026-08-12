@@ -6,6 +6,12 @@ All notable changes will be documented in this file. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- README rewritten for a general audience (who it is for, what the grades
+  mean, laptop capture fallback). Getting started, env reference, and
+  known-limitations updated to match V1.1.1 local behaviour.
+
 ## [1.1.1] — 2026-08-13
 
 ### Fixed

@@ -28,7 +28,9 @@ The application preserves this boundary by marking predictions non-production an
 - Seed creates demo accounts and reference catalogs only; farms, cycles, and
   submissions are created during use.
 - The local MinIO bucket is a development evidence store, not a governed retention system.
-- Docker field app is available at `http://localhost:8085`; native Android/iOS still need a local Flutter toolchain.
+- Docker field app is available at `http://localhost:8085`. On desktop browsers
+  without camera or GPS, capture uses sample frames and a demo location so the
+  local walkthrough can finish. Native Android/iOS still need a Flutter toolchain.
 - The local stack demonstrates workflow behavior; it does not prove field accuracy, farmer adoption, or programme integration.
 
 ## Platform limitations still open
@@ -43,6 +45,7 @@ The application preserves this boundary by marking predictions non-production an
 | Recapture AI inputs | Finalize scopes new angles; worker may still load all uploaded images | Scope worker payload to recapture window |
 | Admin settings UI | Writes allowlisted DB settings | Wire into runtime rules or remove dead controls |
 | Mobile verification | Docker web + unit tests; physical-device CI optional | Device-lab / CI Flutter jobs |
+| Screening vs severity | v4 returns A/B/C/U only; reviewers may accept that grade | Do not present grades as insurance severity |
 | Model readiness | Internal gates passed; non-production assist only | Independent, protocol-matched field validation |
 
 ## Accurate product claims

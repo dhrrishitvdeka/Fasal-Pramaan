@@ -13,7 +13,7 @@ defaults unless you intentionally change them. Do not share or commit `.env`.
 | AI | `AI_SERVICE_URL`, `AI_SERVICE_TOKEN`, `AI_MODEL_ADAPTER` (default **`crop_health_v4`**), `AI_ALLOW_MOCK_FALLBACK` | AI service boundary; rollbacks `crop_health_v3` / `crop_vit` / legacy `plant_disease` |
 | Voice (Fasal Saathi) | `VOICE_ASSISTANT_ENABLED`, `GEMINI_API_KEY`, `GEMINI_LIVE_MODEL`, `GEMINI_LIVE_VOICE`, `GEMINI_LIVE_SESSION_MINUTES` | Server-only Gemini Live config; key never leaves the API |
 | Native mobile development | `MOBILE_API_BASE_URL` | Host API URL used by helper scripts/native builds; Docker web uses same-origin `/backend` |
-| Rate limit | `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_BACKEND`, `TRUSTED_PROXY_IPS` | Client throttling and proxy handling |
+| Rate limit | `RATE_LIMIT_ENABLED` (default **off** for the local MVP), `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_BACKEND`, `TRUSTED_PROXY_IPS` | Optional client throttling; leave disabled for local demo traffic |
 | Operations | `SENTRY_DSN`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `SEED_ON_STARTUP` | Optional observability and local seed behavior |
 
 ## Important production behavior

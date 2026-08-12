@@ -25,10 +25,10 @@ git clone https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
 cd Fasal-Pramaan
 ```
 
-Optional: pin a release tag (for example `V1.1`):
+Optional: pin a release tag (for example `V1.1.1`):
 
 ```bash
-git clone --branch V1.1 https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
+git clone --branch V1.1.1 https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
 cd Fasal-Pramaan
 ```
 
@@ -56,14 +56,17 @@ the URLs.
 2. Sign in as `farmer@fasalpramaan.local` / `Demo@12345`.
 3. Create a farm, plot, and crop cycle with the app or the confirmed voice
    actions. These records are stored in the local PostgreSQL database.
-4. Open **Capture Crop Evidence**, grant camera and location permission, and
-   capture all five required angles.
-5. Select **Save & submit**. The app uploads the locally captured images,
-   finalizes the submission, and queues the local classifier automatically.
+4. Open **Capture Crop Evidence**. On a phone, grant camera and location
+   permission and take all five required angles. On a laptop browser the
+   camera or GPS is often missing — tap capture anyway; the web app uses
+   sample frames and a demo location so the local flow can finish.
+5. Select **Save & submit**. The app uploads the images, finalizes the
+   submission, and queues the local classifier automatically.
 6. Open `http://localhost:3000` and sign in as
    `reviewer@fasalpramaan.local` / `Demo@12345`.
-7. Open **Review queue** after classification completes. The new submission,
-   captured evidence, model output, and geo-tagged location appear there.
+7. Open **Review queue**. The case shows photos, location, and an A/B/C/U
+   screening grade (not an insurance severity). Accept, correct, request
+   recapture, or send it for physical inspection.
 
 ## Health verification
 
