@@ -16,7 +16,12 @@ sh scripts/start-portable.sh
 
 # Direct Docker Compose
 docker compose up -d --build
+
+# Same stack from the local/ kit
+.\local\start.ps1
 ```
+
+Hosted farmer/reviewer (Vercel + Supabase + Hugging Face) is documented in [docs/supabase-integration.md](docs/supabase-integration.md). Do not set `NEXT_PUBLIC_API_BASE_URL` on Vercel.
 
 ### Verified Active Containers
 Ensure all expected long-running containers are in the `Up` state:

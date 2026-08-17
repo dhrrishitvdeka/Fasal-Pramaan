@@ -52,3 +52,22 @@ Fasal-Pramaan adheres strictly to [Semantic Versioning 2.0.0](https://semver.org
 - **Major (`X.0.0`)**: Breaking database migrations or incompatible API contract revisions.
 - **Minor (`0.Y.0`)**: New feature additions, new AI model adapters, or scoring engine enhancements.
 - **Patch (`0.0.Z`)**: Security fixes, UI refinements, and performance optimizations.
+
+GitHub release tags on this repo use a `V` prefix and match existing history: `V1`, `V1.1`, `V1.1.1`, `V1.2.0`, `V1.3.0`.
+
+```bash
+# After CHANGELOG.md is updated and CI is green on main:
+git tag -a V1.x.y -m "V1.x.y — short title"
+git push origin V1.x.y
+gh api repos/dhrrishitvdeka/Fasal-Pramaan/releases --input notes.json
+```
+
+Published:
+
+| Tag | What it marks |
+|---|---|
+| [V1.3.0](https://github.com/dhrrishitvdeka/Fasal-Pramaan/releases/tag/V1.3.0) | Vercel farmer/reviewer + Hugging Face + env-only secrets |
+| [V1.2.0](https://github.com/dhrrishitvdeka/Fasal-Pramaan/releases/tag/V1.2.0) | 4-D Evidence Confidence Engine |
+| [V1.1.1](https://github.com/dhrrishitvdeka/Fasal-Pramaan/releases/tag/V1.1.1) | Local MVP runnability |
+
+Keep `CHANGELOG.md` and the GitHub release body in sync. Never put secrets in release notes.

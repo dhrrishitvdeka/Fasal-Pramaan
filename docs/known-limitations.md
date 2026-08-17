@@ -20,4 +20,13 @@ The default `crop_health_v4` DINOv2 ViT-S/14 model provides **assisted optical l
 - **Missing Signal Policy**: The system never converts missing signals (e.g., absent GPS or unverified checksums) into passed scores. Missing inputs result in explicit deductions and lower confidence bounds.
 - **Anti-Fraud Enforcement**: Suspected duplicate files, perceptual collisions, or mock GPS signals trigger mandatory human investigation and cannot be cleared by automated recaptures.
 
+---
+
+## 3. Hosted web (Vercel) boundaries
+
+- **Hugging Face is assistive only**: `wambugu71/crop_leaf_diseases_vit` returns a label + score. It is not a settlement decision. Human review is required.
+- **GPS is the device browser**: `navigator.geolocation`. There is no geocoding, plot-boundary, or weather API on this path. Missing GPS lowers the context score; it is not treated as a pass.
+- **No Gemini / Fasal Saathi** on Vercel. Voice dictation on `/farmer/capture` uses the browser Web Speech API when present.
+- **Reviewer login** needs a Supabase Auth user. Farmer routes are public; do not treat that as production access control.
+
 For full architectural governance and risk mitigation protocols, see [AI Governance & Safety Boundaries](./governance-and-safety.md).
