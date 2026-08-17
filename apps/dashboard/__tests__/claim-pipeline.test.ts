@@ -58,9 +58,10 @@ describe("claim persist + HF + reviewer queue", () => {
       { fetchImpl, modelId: "wambugu71/crop_leaf_diseases_vit" },
     );
 
-    expect(result.prediction.modelId).toBe("wambugu71/crop_leaf_diseases_vit");
-    expect(result.prediction.label).toBe("Tomato_Late_blight");
-    expect(result.prediction.score).toBe(0.91);
+    expect(result.prediction).not.toBeNull();
+    expect(result.prediction!.modelId).toBe("wambugu71/crop_leaf_diseases_vit");
+    expect(result.prediction!.label).toBe("Tomato_Late_blight");
+    expect(result.prediction!.score).toBe(0.91);
 
     const queue = await listReviewerQueue(store);
     expect(queue.map((item) => item.id)).toContain(result.claimId);
