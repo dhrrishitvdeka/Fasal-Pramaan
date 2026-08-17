@@ -109,6 +109,17 @@ When evidence is incomplete or blurry, the system **does not force farmers to re
 
 ---
 
+## Layout: Vercel webapp vs local Docker
+
+| Location | What it is |
+|---|---|
+| `apps/dashboard` | Farmer + reviewer Next.js app. This is what Vercel builds. |
+| `vercel.json` | Tells Vercel to install/build `apps/dashboard`. |
+| `local/` | Laptop Docker stack helpers (`local/start.ps1`). Secrets in `local/.env` (gitignored). |
+| `.env` | Gitignored root env for Compose. Same secrets as `local/.env`. |
+
+Vercel project: connect this GitHub repo. Framework Next.js. Env vars listed below. Root can stay the repository root — `vercel.json` points the build at `apps/dashboard`.
+
 ## Vercel farmer → Hugging Face → reviewer
 
 The laptop Docker stack is unchanged (`docker compose up`). The Next.js app in `apps/dashboard` can also be hosted on Vercel:
