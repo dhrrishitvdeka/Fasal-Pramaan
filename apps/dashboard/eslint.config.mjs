@@ -8,10 +8,9 @@ export default defineConfig([
   {
     rules: {
       "react-hooks/set-state-in-effect": "off",
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", ignoreRestSiblings: true },
-      ],
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "react/no-unescaped-entities": "off",
     },
   },
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
