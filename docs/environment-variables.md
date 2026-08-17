@@ -44,6 +44,7 @@ Set these five on the Vercel project (and in `apps/dashboard/.env.local` for `np
 | `SUPABASE_SERVICE_ROLE_KEY` | **no** | yes | Server-only. Never `NEXT_PUBLIC_*` |
 | `HF_TOKEN` | **no** | yes | Token that can invoke the private Space (`predict_api`) |
 | `HF_SPACE_URL` | **no** | no | Defaults to `https://dhrrishitvdeka-fasal-pramaan-api.hf.space` |
+| `SITE_LOCK_PASSWORD` | **no** | yes on Vercel | Master password for the public site gate (`/unlock`). Never `NEXT_PUBLIC_*`. |
 
 **Leave unset on Vercel**
 
