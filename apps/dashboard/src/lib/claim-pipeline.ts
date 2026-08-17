@@ -255,18 +255,26 @@ export async function persistAndInfer(
   input: PersistClaimInput,
   infer: typeof inferCropDisease = inferCropDisease,
   inferOptions?: { apiToken?: string; fetchImpl?: typeof fetch; modelId?: string },
-): Promise<{ claimId: string; prediction: HfPrediction }> {
+): Promise<{ claimId: string; prediction: HfPrediction | null; inferError?: string }> {
   const persisted = await persistFarmerSubmission(store, input);
   const closeup =
     input.images.find((img) => img.angleType === "closeup_damage") || input.images[0];
-  const prediction = await infer({
-    imageBytes: closeup.bytes,
-    modelId: inferOptions?.modelId,
-    apiToken: inferOptions?.apiToken,
-    fetchImpl: inferOptions?.fetchImpl,
-  });
-  await attachHfPrediction(store, persisted.claimId, prediction);
-  return { claimId: persisted.claimId, prediction };
+  try {
+    const prediction = await infer({
+      imageBytes: closeup.bytes,
+      modelId: inferOptions?.modelId,
+      apiToken: inferOptions?.apiToken,
+      fetchImpl: inferOptions?.fetchImpl,
+    });
+    await attachHfPrediction(store, persisted.claimId, prediction);
+    return { claimId: persisted.claimId, prediction };
+  } catch (error) {
+    return {
+      claimId: persisted.claimId,
+      prediction: null,
+      inferError: error instanceof Error ? error.message : "Inference failed",
+    };
+  }
 }
 
 export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Submission {
@@ -392,13 +400,18 @@ export async function applyReviewerAction(
   return updated;
 }
 
-export function createMemoryClaimStore(): ClaimStore & { claims: Map<string, WebClaimRow>; images: Map<string, WebImageRow[]> } {
+export function createMemoryClaimStore(): ClaimStore & {
+  claims: Map<string, WebClaimRow>;
+  images: Map<string, WebImageRow[]>;
+  blobs: Map<string, Uint8Array>;
+} {
   const claims = new Map<string, WebClaimRow>();
   const images = new Map<string, WebImageRow[]>();
   const blobs = new Map<string, Uint8Array>();
   return {
     claims,
     images,
+    blobs,
     async insertClaim(row) {
       claims.set(row.id, { ...row });
       return row;
