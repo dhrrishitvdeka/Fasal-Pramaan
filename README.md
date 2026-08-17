@@ -109,6 +109,17 @@ When evidence is incomplete or blurry, the system **does not force farmers to re
 
 ---
 
+## Vercel farmer → Hugging Face → reviewer
+
+The laptop Docker stack is unchanged (`docker compose up`). The Next.js app in `apps/dashboard` can also be hosted on Vercel:
+
+1. Apply `scripts/setup_supabase.sql` and `scripts/setup_web_schema.sql` on your Supabase project.
+2. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, and `NEXT_PUBLIC_HF_MODEL_ID` (default `wambugu71/crop_leaf_diseases_vit`) in Vercel. Never commit those values.
+3. Farmer captures or uploads photos at `/farmer/capture`. The server route `POST /api/claims` stores the image in the private `fasal-web-evidence` bucket, calls the Hugging Face model, and writes `web_claims`.
+4. The same claim id appears on `/review` with the stored photos and HF label/score.
+
+There is no showcase/pseudo fallback on these routes.
+
 ## Quickstart Guide
 
 ### Prerequisites

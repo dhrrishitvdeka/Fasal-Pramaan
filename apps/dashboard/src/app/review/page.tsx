@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { api, Submission } from "@/lib/api";
+import { listWebClaims, Submission } from "@/lib/api";
 import Link from "next/link";
 import { useState, useMemo } from "react";
 import { resolveEvidenceEvaluation } from "@/components/EvidenceConfidenceSection";
@@ -15,10 +15,7 @@ export default function ReviewQueuePage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["review-queue"],
-    queryFn: async () =>
-      (
-        await api.get<{ items: Submission[] }>("/review/queue")
-      ).data,
+    queryFn: async () => ({ items: await listWebClaims() }),
   });
 
   const rawItems = useMemo(() => data?.items || [], [data?.items]);

@@ -1,13 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { api, Overview } from "@/lib/api";
+import { overviewStats, Overview } from "@/lib/api";
 import MetricCard from "@/components/MetricCard";
 
 export default function OverviewPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["overview"],
-    queryFn: async () => (await api.get<Overview>("/dashboard/overview")).data,
+    queryFn: overviewStats,
     refetchInterval: 15_000,
   });
 
@@ -46,12 +46,12 @@ export default function OverviewPage() {
             value={
               data.average_evidence_confidence != null
                 ? `${data.average_evidence_confidence.toFixed(1)}%`
-                : "79.2%"
+                : "—"
             }
             tone={
-              (data.average_evidence_confidence ?? 79.2) >= 80
+              (data.average_evidence_confidence ?? 0) >= 80
                 ? "ok"
-                : (data.average_evidence_confidence ?? 79.2) >= 65
+                : (data.average_evidence_confidence ?? 0) >= 65
                 ? "warn"
                 : "danger"
             }

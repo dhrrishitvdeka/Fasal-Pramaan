@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, Submission } from "@/lib/api";
+import { applyWebReviewAction, getWebClaim, listReviewHistory, Submission } from "@/lib/api";
+import type { ReviewActionPayload } from "@/lib/web-db";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useMemo } from "react";
 
@@ -37,12 +38,12 @@ export default function ReviewDetailPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["submission", id],
-    queryFn: async () => (await api.get<Submission>(`/review/${id}`)).data,
+    queryFn: async () => getWebClaim(id),
   });
 
   const { data: history } = useQuery({
     queryKey: ["review-history", id],
-    queryFn: async () => (await api.get(`/review/${id}/history`)).data,
+    queryFn: async () => listReviewHistory(id),
   });
 
   // Resolve evidence evaluation & safety
@@ -78,8 +79,7 @@ export default function ReviewDetailPage() {
   }, [evaluation]);
 
   const action = useMutation({
-    mutationFn: async (payload: Record<string, unknown>) =>
-      (await api.post(`/review/${id}/action`, payload)).data,
+    mutationFn: async (payload: ReviewActionPayload) => applyWebReviewAction(id, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["submission", id] });
       qc.invalidateQueries({ queryKey: ["review-queue"] });

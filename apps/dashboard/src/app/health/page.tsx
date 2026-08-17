@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
+import { getHfModelId } from "@/lib/hf-model";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/backend";
 
@@ -21,6 +22,10 @@ export default function HealthPage() {
         {[
           { title: "API", data: apiHealth.data || apiHealth.error },
           { title: "Dependency checks", data: apiHealth.data?.checks || {} },
+          {
+            title: "Hugging Face model",
+            data: { model_id: getHfModelId(), path: "farmer upload → /api/claims → reviewer queue" },
+          },
         ].map((block) => (
           <div key={block.title} className="fp-panel">
             <div className="border-b border-slate-100 px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-500">

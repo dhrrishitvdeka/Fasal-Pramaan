@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api, logoutSession, setSessionTokens } from "@/lib/api";
 import { LoginForm, loginSchema } from "@/lib/schemas";
+import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -16,15 +17,30 @@ export default function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues:
-      process.env.NEXT_PUBLIC_DEMO_MODE === "true"
-        ? { email: "reviewer@fasalpramaan.local", password: "Demo@12345" }
-        : { email: "", password: "" },
+    defaultValues: { email: "", password: "" },
   });
 
   async function onSubmit(data: LoginForm) {
     setError(null);
     try {
+      if (isSupabaseConfigured()) {
+        const supabase = getSupabaseClient();
+        if (!supabase) {
+          setError("Supabase is not configured.");
+          return;
+        }
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
+        if (authError) {
+          setError(authError.message || "Sign-in failed.");
+          return;
+        }
+        router.push("/overview");
+        return;
+      }
+
       const res = await api.post("/auth/login", data);
       setSessionTokens(res.data.access_token, res.data.refresh_token);
       const me = await api.get<{ roles: string[] }>("/auth/me");

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
-import { api, MapMarker } from "@/lib/api";
+import { mapMarkers, MapMarker } from "@/lib/api";
 import { useState } from "react";
 
 const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
@@ -27,7 +27,7 @@ export default function MapPage() {
       if (district) params.district = district;
       if (dateFrom) params.date_from = new Date(`${dateFrom}T00:00:00`).toISOString();
       if (dateTo) params.date_to = new Date(`${dateTo}T23:59:59`).toISOString();
-      return (await api.get<MapMarker[]>("/dashboard/map/markers", { params })).data;
+      return mapMarkers(params);
     },
     refetchInterval: 15_000,
   });
