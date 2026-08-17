@@ -49,8 +49,8 @@ Copy `.env.example` to `.env.local` and set:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
-- `HF_TOKEN` (server-only)
-- `NEXT_PUBLIC_HF_MODEL_ID` (optional; default `wambugu71/crop_leaf_diseases_vit`)
+- `HF_TOKEN` (server-only; calls the private Fasal-Pramaan Space)
+- `HF_SPACE_URL` (optional; default `https://dhrrishitvdeka-fasal-pramaan-api.hf.space`)
 
 Leave `NEXT_PUBLIC_API_BASE_URL` empty so the app uses `POST /api/claims` (persist + HF) and `/review` reads `web_claims`. Farmer capture is `/farmer/capture`. Reviewer login needs a Supabase Auth user.
 

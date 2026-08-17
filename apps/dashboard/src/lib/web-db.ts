@@ -182,6 +182,7 @@ function asStatus(value: string | null | undefined): ClaimStatus {
 }
 
 function asSeverityGrade(value: string | null | undefined): ClaimAiPrediction["severityGrade"] {
+  if (value === "A" || value === "B" || value === "C" || value === "U") return value;
   if (value === "Medium" || value === "High" || value === "Severe") return value;
   return "Low";
 }

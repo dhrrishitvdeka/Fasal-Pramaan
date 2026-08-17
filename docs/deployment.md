@@ -80,8 +80,8 @@ The local Docker Compose topology above is unchanged (`local/start.ps1` or `scri
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
-   - `HF_TOKEN` (server-only Read token)
-   - `NEXT_PUBLIC_HF_MODEL_ID=wambugu71/crop_leaf_diseases_vit`
+   - `HF_TOKEN` (server-only token that can call the private Space)
+   - `HF_SPACE_URL=https://dhrrishitvdeka-fasal-pramaan-api.hf.space`
 4. Create a Supabase Auth user if you need reviewer `/login`. Farmer `/farmer/capture` is public.
 5. Farmer path: `/farmer/capture` → `POST /api/claims` → Hugging Face → `/review` lists the same claim id.
 

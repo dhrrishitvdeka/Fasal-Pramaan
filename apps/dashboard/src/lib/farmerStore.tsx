@@ -69,7 +69,7 @@ export interface ClaimAiPrediction {
   diseaseDetected: string;
   diseaseDetectedHi: string;
   severityPercentage: number;
-  severityGrade: "Low" | "Medium" | "High" | "Severe";
+  severityGrade: "Low" | "Medium" | "High" | "Severe" | "A" | "B" | "C" | "U";
   affectedAreaHectares: number;
   estimatedLossInr: number;
   modelConfidence: number;
@@ -167,6 +167,14 @@ const FarmerContext = createContext<FarmerContextType | null>(null);
 const STORAGE_KEY_LANG = "fp_farmer_lang_v1";
 const STORAGE_KEY_DRAFT = "fp_farmer_active_draft_v1";
 
+function workflowGradeFromPrediction(
+  prediction: Awaited<ReturnType<typeof listWebClaims>>[number]["latest_prediction"],
+): ClaimAiPrediction["severityGrade"] {
+  const grade = (prediction?.explanation as { predicted_grade?: string } | undefined)?.predicted_grade;
+  if (grade === "A" || grade === "B" || grade === "C" || grade === "U") return grade;
+  return "Low";
+}
+
 function emptyPrediction(): ClaimAiPrediction {
   return {
     cropIdentified: "",
@@ -221,6 +229,7 @@ function submissionToClaim(item: Awaited<ReturnType<typeof listWebClaims>>[numbe
       cropConfidence: Math.round((item.latest_prediction?.crop_confidence || 0) * 100),
       diseaseDetected: item.latest_prediction?.primary_damage || "",
       modelConfidence: Math.round((item.latest_prediction?.overall_confidence || 0) * 100),
+      severityGrade: workflowGradeFromPrediction(item.latest_prediction),
     },
     payoutStatus: "pending_review",
   };
