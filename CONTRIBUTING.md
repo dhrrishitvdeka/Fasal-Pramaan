@@ -1,46 +1,48 @@
-# Contributing to FasalPramaan
+# Contributing to Fasal-Pramaan
 
-Thank you for improving FasalPramaan. Keep changes focused, reproducible, and
-honest about the model and deployment boundaries.
+Thank you for contributing to Fasal-Pramaan. We welcome community contributions, architectural improvements, and bug fixes.
 
-## Before contributing
+---
 
-1. Read [Getting started](GETTING_STARTED.md) and the
-   [architecture](docs/architecture.md).
-2. Create a branch such as `feat/...`, `fix/...`, `docs/...`, or `chore/...`.
-3. Never commit `.env`, API keys, credentials, farmer evidence, personal data,
-   private datasets, or production service URLs.
-4. Keep model output assistive and preserve mandatory human review.
-5. Update documentation and tests whenever behavior or configuration changes.
+## 1. Development Workflow
 
-## Required checks
+1. **Review Technical Specs**: Read [System Architecture](docs/architecture.md), [Evidence Evaluation](docs/evidence-evaluation.md), and [API Reference](docs/api.md).
+2. **Branch Naming**: Use descriptive branch prefixes:
+   - `feat/feature-name` (New capability or enhancement)
+   - `fix/bug-description` (Bug or defect fix)
+   - `docs/doc-update` (Documentation improvements)
+   - `perf/optimization` (Performance enhancements)
+3. **Security Standards**: Never commit `.env`, private keys, secrets, or real personal data.
+
+---
+
+## 2. Automated Quality Assurance Checks
+
+All pull requests must pass the complete automated verification suite:
 
 ```powershell
-# API and model services
-docker compose exec api pytest -q
-docker compose exec ai pytest -q
+# 1. API & Evidence Engine Unit Tests
+docker compose exec api pytest -v
 
-# Flutter app, using the pinned Docker build environment
-docker build --target tester -t fasalpramaan-mobile-test apps/mobile
+# 2. AI Model Inference Tests
+docker compose exec ai pytest -v
 
-# Reviewer dashboard
-Set-Location apps/dashboard
-npm.cmd ci
+# 3. Next.js Dashboard Build, Lint & Typecheck
+cd apps/dashboard
 npm.cmd run lint
 npm.cmd run typecheck
 npm.cmd test
 npm.cmd run build
+cd ../..
+
+# 4. Flutter Mobile Static Analysis & Tests
+docker build --target tester -t fasalpramaan-mobile-test apps/mobile
 ```
 
-Use `scripts/verify-e2e.ps1` with five distinct JPEGs for changes to capture,
-storage, classification, worker processing, or the reviewer queue.
+---
 
-## Pull requests
+## 3. Pull Request Guidelines
 
-- Explain the user-facing outcome and verification performed.
-- Keep unrelated refactors separate.
-- Add no generated dependencies, build output, local databases, or evidence.
-- Disclose limitations; never describe internal evaluation as independent
-  field validation or production approval.
-
-By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+- **Clear Description**: Summarize the architectural motivation, changes made, and verification steps executed.
+- **Atomic Commits**: Keep unrelated refactors separate from functional feature commits.
+- **Code of Conduct**: All contributors are expected to uphold our [Code of Conduct](CODE_OF_CONDUCT.md).

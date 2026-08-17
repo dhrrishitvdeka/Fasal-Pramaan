@@ -3,10 +3,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, Submission } from "@/lib/api";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 import { AiConfidenceBreakdown } from "@/components/AiConfidenceBreakdown";
 import { ReviewKeyboardShortcuts } from "@/components/ReviewKeyboardShortcuts";
+import { EvidenceConfidenceSection, resolveEvidenceEvaluation } from "@/components/EvidenceConfidenceSection";
+
+const ALL_ANGLES = [
+  { key: "wide_field", label: "Wide Field" },
+  { key: "left_context", label: "Left Context" },
+  { key: "mid_canopy", label: "Mid Canopy" },
+  { key: "right_context", label: "Right Context" },
+  { key: "closeup_damage", label: "Closeup Damage" },
+];
 
 export default function ReviewDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +31,10 @@ export default function ReviewDetailPage() {
   const [grade, setGrade] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
+  // Specific adaptive recapture angle selection
+  const [selectedAngles, setSelectedAngles] = useState<string[]>([]);
+  const [recaptureModalOpen, setRecaptureModalOpen] = useState(false);
+
   const { data, isLoading } = useQuery({
     queryKey: ["submission", id],
     queryFn: async () => (await api.get<Submission>(`/review/${id}`)).data,
@@ -32,6 +45,38 @@ export default function ReviewDetailPage() {
     queryFn: async () => (await api.get(`/review/${id}/history`)).data,
   });
 
+  // Resolve evidence evaluation & safety
+  const evaluation = useMemo(() => {
+    return data ? resolveEvidenceEvaluation(data) : null;
+  }, [data]);
+
+  // Determine if integrity checks have failed
+  const integrityFailed = useMemo(() => {
+    if (!evaluation) return false;
+    const iScore = evaluation.integrity?.score ?? 100;
+    const iDetails = evaluation.integrity?.details;
+    return (
+      iScore < 50 ||
+      evaluation.uncertainty?.type === "integrity" ||
+      iDetails?.tamper_check_passed === false ||
+      iDetails?.duplicate_detected === true ||
+      iDetails?.is_mock_location === true
+    );
+  }, [evaluation]);
+
+  // Auto-fill suggested recapture angles from evaluation
+  const suggestedAngles = useMemo(() => {
+    if (!evaluation) return ["closeup_damage"];
+    if (evaluation.request?.required_angles && evaluation.request.required_angles.length > 0) {
+      return evaluation.request.required_angles;
+    }
+    const missing = evaluation.coverage?.details?.missing_views;
+    if (Array.isArray(missing) && missing.length > 0) {
+      return missing;
+    }
+    return ["closeup_damage"];
+  }, [evaluation]);
+
   const action = useMutation({
     mutationFn: async (payload: Record<string, unknown>) =>
       (await api.post(`/review/${id}/action`, payload)).data,
@@ -40,6 +85,7 @@ export default function ReviewDetailPage() {
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["review-history", id] });
       setMessage("Decision recorded. Audit trail updated.");
+      setRecaptureModalOpen(false);
     },
     onError: (err: unknown) => {
       const msg =
@@ -54,8 +100,10 @@ export default function ReviewDetailPage() {
   }
   const pred = data.latest_prediction;
 
+  // SAFETY: Disallow accepting AI result if mandatory integrity condition fails or prediction is missing
   const canAccept = Boolean(
     pred &&
+      !integrityFailed &&
       (pred.predicted_grade ||
         (pred.primary_damage &&
           pred.primary_damage !== "unknown" &&
@@ -83,11 +131,25 @@ export default function ReviewDetailPage() {
     });
   };
 
-  const handleRecapture = () => {
+  const handleOpenRecapture = () => {
+    if (selectedAngles.length === 0) {
+      setSelectedAngles(suggestedAngles);
+    }
+    setRecaptureModalOpen(true);
+  };
+
+  const handleConfirmRecapture = () => {
+    const anglesToRequest = selectedAngles.length > 0 ? selectedAngles : suggestedAngles;
     action.mutate({
       action: "request_recapture",
-      override_reason: reason || notes || "Image quality insufficient",
-      notes,
+      override_reason:
+        reason ||
+        notes ||
+        `Recapture requested for angles: ${anglesToRequest.join(", ")}. Reason: ${
+          evaluation?.uncertainty?.reasons?.[0] || "Evidence quality or coverage insufficient"
+        }`,
+      notes: notes || `Requested angles: ${anglesToRequest.join(", ")}`,
+      required_angles: anglesToRequest,
     });
   };
 
@@ -99,8 +161,14 @@ export default function ReviewDetailPage() {
     });
   };
 
+  const toggleAngle = (key: string) => {
+    setSelectedAngles((prev) =>
+      prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]
+    );
+  };
+
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -113,15 +181,15 @@ export default function ReviewDetailPage() {
           disabled={action.isPending}
           onAccept={handleAccept}
           onCorrect={handleCorrect}
-          onRequestRecapture={handleRecapture}
+          onRequestRecapture={handleOpenRecapture}
           onPhysicalInspection={handleInspection}
           onReturnToQueue={() => router.push("/review")}
         />
       </div>
 
       <div className="border-b border-slate-200 pb-3">
-        <h2 className="fp-page-title">Case review</h2>
-        <p className="mt-1 font-mono text-xs text-slate-500">{data.id}</p>
+        <h2 className="fp-page-title">Case Review & Evidence Assessment</h2>
+        <p className="mt-1 font-mono text-xs text-slate-500">Case ID: {data.id}</p>
       </div>
 
       {message && (
@@ -133,159 +201,240 @@ export default function ReviewDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-3 md:grid-cols-2">
-        <section className="fp-panel space-y-2 p-4">
-          <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Evidence & location
-          </h3>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-            <dt className="text-slate-500">Status</dt>
-            <dd>
-              <span className="fp-badge-neutral">{data.status}</span>
-            </dd>
-            <dt className="text-slate-500">GPS</dt>
-            <dd className="tabular-nums">
-              {data.capture_lat?.toFixed(5)}, {data.capture_lon?.toFixed(5)} (±
-              {data.capture_accuracy_m ?? "?"} m)
-            </dd>
-            <dt className="text-slate-500">Notes</dt>
-            <dd className="text-slate-700">{data.farmer_observations || "—"}</dd>
-          </dl>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {data.images.map((img) => (
-              <div key={img.id} className="border border-slate-200 p-2 text-xs">
-                <div className="font-medium text-slate-800">{img.angle_type}</div>
-                <div className="text-slate-500">{img.upload_status}</div>
-                {img.download_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={img.download_url}
-                    alt={img.angle_type}
-                    className="mt-1 max-h-24 w-full object-cover"
-                  />
-                ) : (
-                  <div className="mt-1 flex h-16 items-center justify-center bg-slate-100 text-slate-400">
-                    No preview
-                  </div>
-                )}
-              </div>
-            ))}
+      {/* Safety Alert if Integrity Failed */}
+      {integrityFailed && (
+        <div
+          className="rounded-md border border-rose-300 bg-rose-50 p-3.5 text-xs text-rose-900"
+          role="alert"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-bold uppercase tracking-wider text-rose-800">
+              ⚠️ Safety Block: Mandatory Integrity Checks Failed
+            </span>
           </div>
-        </section>
+          <p className="mt-1 text-rose-800">
+            Accepting AI results is disabled for this case because image tamper, duplicate evidence, or mock GPS was detected. A human correction or physical inspection is mandatory.
+          </p>
+        </div>
+      )}
 
-        <section className="fp-panel space-y-3 p-4">
-          <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            AI findings & breakdown
+      {/* SECTION 1: Authoritative Evidence Confidence & 4 Component Cards */}
+      <EvidenceConfidenceSection submission={data} />
+
+      {/* SECTION 2: Evidence Images & Location Context */}
+      <section className="fp-panel space-y-3 p-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-600">
+            Submitted Evidence Images & Geotag
           </h3>
-          {pred ? (
-            <>
-              <AiConfidenceBreakdown prediction={pred} images={data.images} />
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm pt-2 border-t border-slate-100">
-                <dt className="text-slate-500">Crop</dt>
-                <dd>
+          <span className="text-xs text-slate-500 font-mono">
+            {data.images?.length || 0} image(s) uploaded
+          </span>
+        </div>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+          <dt className="text-slate-500">Status</dt>
+          <dd>
+            <span className="fp-badge-neutral">{data.status}</span>
+          </dd>
+          <dt className="text-slate-500">GPS</dt>
+          <dd className="tabular-nums font-mono text-xs">
+            {data.capture_lat?.toFixed(5)}, {data.capture_lon?.toFixed(5)} (±
+            {data.capture_accuracy_m ?? "?"} m)
+          </dd>
+          <dt className="text-slate-500">Farmer Notes</dt>
+          <dd className="text-slate-700">{data.farmer_observations || "—"}</dd>
+        </dl>
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+          {data.images.map((img) => (
+            <div key={img.id} className="border border-slate-200 p-2 text-xs rounded bg-white">
+              <div className="font-semibold text-slate-800 truncate capitalize">{img.angle_type.replaceAll("_", " ")}</div>
+              <div className="text-[11px] text-slate-500">{img.upload_status}</div>
+              {img.download_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={img.download_url}
+                  alt={img.angle_type}
+                  className="mt-1.5 h-24 w-full object-cover rounded border border-slate-100"
+                />
+              ) : (
+                <div className="mt-1.5 flex h-24 items-center justify-center bg-slate-100 text-slate-400 rounded text-[11px]">
+                  No preview
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* SECTION 3: AI Model Prediction & Screening (Explicitly Distinct from Evidence Confidence) */}
+      <section className="fp-panel space-y-3 p-4 border-l-4 border-l-blue-500">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">
+              AI Model Prediction & Screening (Assistive Only)
+            </h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Model inference findings · Does not equal evidence confidence
+            </p>
+          </div>
+          {pred && (
+            <span className="font-mono text-[11px] text-slate-500">
+              Model: {pred.adapter_type} ({pred.model_version})
+            </span>
+          )}
+        </div>
+
+        {pred ? (
+          <>
+            <AiConfidenceBreakdown prediction={pred} images={data.images} />
+            <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2 text-xs pt-2 border-t border-slate-100">
+              <div>
+                <dt className="text-slate-500">Predicted Crop</dt>
+                <dd className="font-semibold text-slate-800">
                   {pred.predicted_crop || "—"} ({((pred.crop_confidence || 0) * 100).toFixed(0)}%)
                 </dd>
-                <dt className="text-slate-500">Stage</dt>
-                <dd>{pred.predicted_growth_stage || "—"}</dd>
-                <dt className="text-slate-500">Primary damage</dt>
-                <dd>{pred.primary_damage}</dd>
-                <dt className="text-slate-500">Severity</dt>
-                <dd>{pred.severity || "—"}</dd>
-                <dt className="text-slate-500">Affected area</dt>
-                <dd>{pred.affected_area_pct == null ? "—" : `${pred.affected_area_pct}%`}</dd>
-                <dt className="text-slate-500">Recommendation</dt>
-                <dd>{pred.human_review_recommendation}</dd>
-              </dl>
-            </>
-          ) : (
-            <p className="text-sm text-slate-500">No AI prediction yet</p>
-          )}
-        </section>
-      </div>
+              </div>
+              <div>
+                <dt className="text-slate-500">Growth Stage</dt>
+                <dd className="font-semibold text-slate-800">{pred.predicted_growth_stage || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Primary Damage</dt>
+                <dd className="font-semibold text-slate-800 capitalize">{pred.primary_damage?.replaceAll("_", " ") || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Damage Severity</dt>
+                <dd className="font-semibold text-slate-800 capitalize">{pred.severity || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Affected Area</dt>
+                <dd className="font-semibold text-slate-800">{pred.affected_area_pct == null ? "—" : `${pred.affected_area_pct}%`}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">Screening Grade</dt>
+                <dd className="font-semibold text-slate-800">{pred.predicted_grade || "—"} ({pred.grade_label || "Grade"})</dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-slate-500">AI Recommendation</dt>
+                <dd className="font-semibold text-slate-800">{pred.human_review_recommendation || "Manual review"}</dd>
+              </div>
+            </dl>
+          </>
+        ) : (
+          <p className="text-sm text-slate-500">No AI prediction available yet.</p>
+        )}
+      </section>
 
+      {/* SECTION 4: Reviewer Decision & Action Controls */}
       <section className="fp-panel space-y-3 p-4">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-slate-500">
-          Reviewer decision
+        <h3 className="text-xs font-bold uppercase tracking-wide text-slate-600">
+          Reviewer Decision & Verification
         </h3>
-        <label className="block text-xs font-medium text-slate-700">
-          Damage category
-          <select className="fp-input" value={damage} onChange={(e) => setDamage(e.target.value)}>
-            <option value="">Keep AI category</option>
-            {[
-              "healthy", "lodging", "flood", "waterlogging", "drought_stress", "pest",
-              "disease", "hail_storm", "fire", "nutrient_deficiency", "weed_pressure",
-            ].map((value) => <option key={value} value={value}>{value}</option>)}
-          </select>
-        </label>
-        <label className="block text-xs font-medium text-slate-700">
-          Corrected health screening grade
-          <select className="fp-input" value={grade} onChange={(e) => setGrade(e.target.value)}>
-            <option value="">Keep AI screening grade</option>
-            <option value="A">A — healthy leaf signal</option>
-            <option value="B">B — uncertain; manual review</option>
-            <option value="C">C — disease pattern signal</option>
-            <option value="U">U — unusable or unsupported</option>
-          </select>
-        </label>
-        <p className="text-xs text-slate-500">
-          Screening grade is not crop-loss severity, produce quality, or claim eligibility.
-        </p>
-        <label className="block text-xs font-medium text-slate-700">
-          Corrected severity
-          <select
-            className="fp-input"
-            value={severity}
-            onChange={(e) => setSeverity(e.target.value)}
-          >
-            <option value="">Keep AI severity</option>
-            <option value="none">None</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </label>
-        <label className="block text-xs font-medium text-slate-700">
-          Affected area (%)
-          <input className="fp-input" type="number" min="0" max="100" step="0.1" value={affectedArea} onChange={(e) => setAffectedArea(e.target.value)} />
-        </label>
-        <div className="grid gap-3 md:grid-cols-2">
+
+        <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-xs font-medium text-slate-700">
-            Corrected crop (optional)
-            <input className="fp-input" value={crop} onChange={(e) => setCrop(e.target.value)} />
+            Damage Category Override
+            <select className="fp-input mt-1" value={damage} onChange={(e) => setDamage(e.target.value)}>
+              <option value="">Keep AI category ({pred?.primary_damage || "None"})</option>
+              {[
+                "healthy", "lodging", "flood", "waterlogging", "drought_stress", "pest",
+                "disease", "hail_storm", "fire", "nutrient_deficiency", "weed_pressure",
+              ].map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
           </label>
+
           <label className="block text-xs font-medium text-slate-700">
-            Corrected growth stage (optional)
-            <input className="fp-input" value={growthStage} onChange={(e) => setGrowthStage(e.target.value)} />
+            Corrected Health Screening Grade
+            <select className="fp-input mt-1" value={grade} onChange={(e) => setGrade(e.target.value)}>
+              <option value="">Keep AI screening grade ({pred?.predicted_grade || "U"})</option>
+              <option value="A">A — healthy leaf signal</option>
+              <option value="B">B — uncertain; manual review</option>
+              <option value="C">C — disease pattern signal</option>
+              <option value="U">U — unusable or unsupported</option>
+            </select>
           </label>
         </div>
+
+        <p className="text-[11px] text-slate-500">
+          Screening grade is an assistive leaf health indicator, distinct from insurance crop-loss severity or claim eligibility.
+        </p>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs font-medium text-slate-700">
+            Corrected Loss Severity
+            <select
+              className="fp-input mt-1"
+              value={severity}
+              onChange={(e) => setSeverity(e.target.value)}
+            >
+              <option value="">Keep AI severity ({pred?.severity || "Unset"})</option>
+              <option value="none">None</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+
+          <label className="block text-xs font-medium text-slate-700">
+            Affected Area (%)
+            <input
+              className="fp-input mt-1"
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={affectedArea}
+              onChange={(e) => setAffectedArea(e.target.value)}
+              placeholder={pred?.affected_area_pct != null ? `${pred.affected_area_pct}%` : "0.0"}
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs font-medium text-slate-700">
+            Corrected Crop (Optional)
+            <input className="fp-input mt-1" value={crop} onChange={(e) => setCrop(e.target.value)} placeholder={pred?.predicted_crop || ""} />
+          </label>
+          <label className="block text-xs font-medium text-slate-700">
+            Corrected Growth Stage (Optional)
+            <input className="fp-input mt-1" value={growthStage} onChange={(e) => setGrowthStage(e.target.value)} placeholder={pred?.predicted_growth_stage || ""} />
+          </label>
+        </div>
+
         <label className="block text-xs font-medium text-slate-700">
-          Override reason (required when correcting)
+          Override Reason (Required when correcting or requesting recapture)
           <textarea
-            className="fp-input"
+            className="fp-input mt-1"
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            placeholder="Explain why the AI assessment or evidence was overridden or flagged..."
           />
         </label>
+
         <label className="block text-xs font-medium text-slate-700">
-          Notes
+          Reviewer Notes
           <textarea
-            className="fp-input"
+            className="fp-input mt-1"
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
+            placeholder="Additional notes for audit trail..."
           />
         </label>
-        <div className="flex flex-wrap gap-2 pt-1">
+
+        <div className="flex flex-wrap gap-2 pt-2">
           <button
             type="button"
             className="fp-btn-primary flex items-center gap-1.5"
             disabled={action.isPending || !canAccept}
             onClick={handleAccept}
+            title={integrityFailed ? "Acceptance disabled due to failed integrity checks" : "Accept AI result (A)"}
           >
             <span>Accept AI result</span>
             <kbd className="rounded bg-emerald-700 px-1 font-mono text-[10px] text-white">A</kbd>
           </button>
+
           <button
             type="button"
             className="fp-btn-secondary flex items-center gap-1.5"
@@ -295,15 +444,17 @@ export default function ReviewDetailPage() {
             <span>Correct & verify</span>
             <kbd className="rounded border border-slate-300 bg-slate-100 px-1 font-mono text-[10px] text-slate-600">C</kbd>
           </button>
+
           <button
             type="button"
             className="fp-btn-secondary flex items-center gap-1.5"
             disabled={action.isPending}
-            onClick={handleRecapture}
+            onClick={handleOpenRecapture}
           >
-            <span>Request recapture</span>
+            <span>Request specific recapture…</span>
             <kbd className="rounded border border-slate-300 bg-slate-100 px-1 font-mono text-[10px] text-slate-600">R</kbd>
           </button>
+
           <button
             type="button"
             className="fp-btn-danger flex items-center gap-1.5"
@@ -316,9 +467,100 @@ export default function ReviewDetailPage() {
         </div>
       </section>
 
+      {/* Adaptive Recapture Dialog / Modal */}
+      {recaptureModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="recapture-dialog-title"
+        >
+          <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-xl space-y-4 border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 id="recapture-dialog-title" className="text-sm font-bold text-slate-900">
+                Adaptive Evidence Recapture Request
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRecaptureModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Select only the specific angles needed to resolve evidence uncertainty. The farmer will be guided to capture only these selected frames instead of re-doing all 5.
+            </p>
+
+            <div className="space-y-2">
+              <span className="text-xs font-semibold text-slate-700 block">Required Angles to Request:</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {ALL_ANGLES.map((angle) => {
+                  const isChecked = selectedAngles.includes(angle.key);
+                  const isSuggested = suggestedAngles.includes(angle.key);
+                  return (
+                    <label
+                      key={angle.key}
+                      className={`flex items-center gap-2 rounded border p-2 text-xs cursor-pointer transition-colors ${
+                        isChecked
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-900 font-medium"
+                          : "border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleAngle(angle.key)}
+                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span>{angle.label}</span>
+                      {isSuggested && (
+                        <span className="ml-auto rounded bg-amber-100 px-1 py-0.5 text-[9px] font-bold text-amber-800">
+                          Recommended
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <label className="block text-xs font-medium text-slate-700">
+              Farmer Instruction / Reason:
+              <input
+                className="fp-input mt-1"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. Please capture a clear close-up damage photo with good lighting."
+              />
+            </label>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                className="fp-btn-secondary"
+                onClick={() => setRecaptureModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="fp-btn-primary"
+                disabled={action.isPending || selectedAngles.length === 0}
+                onClick={handleConfirmRecapture}
+              >
+                {action.isPending ? "Sending…" : `Request ${selectedAngles.length} Angle(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 5: Audit & Review History */}
       <section className="fp-panel p-4">
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-          Audit & review history
+          Audit & Review History
         </h3>
         <pre className="max-h-64 overflow-auto border border-slate-100 bg-slate-50 p-3 text-xs text-slate-700">
           {JSON.stringify(history || {}, null, 2)}
@@ -327,3 +569,4 @@ export default function ReviewDetailPage() {
     </div>
   );
 }
+

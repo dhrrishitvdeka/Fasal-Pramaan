@@ -1,164 +1,161 @@
-# FasalPramaan operations guide
+# Operations & Exhibition Running Guide
 
-## Start
+This guide provides day-to-day operational commands, exhibition setup instructions, health verification probes, and diagnostic workflows for Fasal-Pramaan.
 
-Windows:
+---
 
+## 1. Starting & Stopping the Platform
+
+### Start Commands
 ```powershell
+# Windows PowerShell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1
-```
 
-macOS/Linux:
-
-```bash
+# Linux / macOS Bash
 sh scripts/start-portable.sh
-```
 
-Direct Compose:
-
-```powershell
+# Direct Docker Compose
 docker compose up -d --build
+```
+
+### Verified Active Containers
+Ensure all expected long-running containers are in the `Up` state:
+```bash
 docker compose ps
 ```
+- `fp-api`: FastAPI REST Gateway (`:8000`)
+- `fp-ai`: DINOv2 ViT-S/14 Inference Service (`:8001`)
+- `fp-dashboard`: Next.js 14 Reviewer Command Centre (`:3000`)
+- `fp-mobile`: Flutter Field Web App (`:8085`)
+- `fp-worker`: Celery Asynchronous Worker Pool
+- `fp-beat`: Celery Beat Recurring Schedule Engine
+- `fp-db`: PostgreSQL 16 + PostGIS 3.4 (`:5432`)
+- `fp-redis`: Redis 7 Message Broker (`:6379`)
+- `fp-minio`: MinIO S3 Object Storage (`:9000`, `:9001`)
 
-Expected long-running containers: `fp-api`, `fp-ai`, `fp-dashboard`,
-`fp-mobile`, `fp-worker`, `fp-beat`, `fp-db`, `fp-redis`, and `fp-minio`.
-`fp-migrate` and `fp-seed` should exit successfully.
+### Stop Commands
+```bash
+# Gracefully stop containers (preserves database and evidence)
+docker compose down
 
-## URLs
-
-- Field app: `http://localhost:8085`
-- Reviewer dashboard: `http://localhost:3000`
-- API health: `http://localhost:8000/health`
-- AI health: `http://localhost:8001/health`
-- API docs: `http://localhost:8000/docs`
-
-## Health
-
-```powershell
-docker compose ps
-Invoke-RestMethod http://localhost:8000/health
-Invoke-RestMethod http://localhost:8001/health
-(Invoke-WebRequest http://localhost:3000 -UseBasicParsing).StatusCode
-(Invoke-WebRequest http://localhost:8085/healthz -UseBasicParsing).StatusCode
-(Invoke-WebRequest http://localhost:8085/backend/health -UseBasicParsing).StatusCode
+# Stop and wipe all local persistent volumes
+docker compose down -v
 ```
 
-The AI response must show `default_adapter: crop_health_v4`,
-`crop_health_v4_model: true`, and `inference_ready: true`.
+---
 
-## Demo accounts
+## 2. Multi-Device Exhibition Setup (LAN Demo)
 
-| Role | Email | Password |
-|---|---|---|
-| Farmer | `farmer@fasalpramaan.local` | `Demo@12345` |
-| Field officer | `officer@fasalpramaan.local` | `Demo@12345` |
-| Reviewer | `reviewer@fasalpramaan.local` | `Demo@12345` |
-| Administrator | `admin@fasalpramaan.local` | `Demo@12345` |
+To demonstrate the mobile field app and reviewer dashboard across multiple physical devices (e.g., iPhone/Android phone + Laptop) on the same Wi-Fi network:
 
-## Voice assistant demonstration
-
-Set `VOICE_ASSISTANT_ENABLED=true` and `GEMINI_API_KEY` in `.env`, rebuild the
-`api` and `mobile` services, then choose **Talk to Fasal Saathi** at startup
-and sign in as the farmer. Keep the Gemini key server-side; the app uses only one-use
-ephemeral session tokens.
-
-Use `http://localhost:8085` for a browser demonstration. Microphone capture on
-a different device via a plain `http://<LAN-IP>` URL may be blocked by the
-browser because it is not a secure context; use HTTPS for that setup.
-
-The complete script and tool boundary are in
-[`docs/VOICE_ASSISTANT_DEMO.md`](docs/VOICE_ASSISTANT_DEMO.md).
-
-## Model demonstration
-
-One image:
-
+### Step 1: Launch with Host LAN IP
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\demo-model.ps1 `
-  C:\path\to\leaf.jpg paddy
+# Windows
+powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1 -PublicHost 192.168.1.25
+
+# Linux / macOS
+sh scripts/start-portable.sh 192.168.1.25
 ```
 
-Complete evidence/worker/model verification:
+### Step 2: Open Applications on Client Devices
+- **Farmer Phone (Mobile Browser)**: Navigate to `http://192.168.1.25:8085`
+- **Reviewer Laptop**: Navigate to `http://192.168.1.25:3000`
 
+*Note: Ensure your operating system firewall permits inbound TCP traffic on ports 8085, 3000, 8000, and 9000 for private network profiles.*
+
+---
+
+## 3. Voice Assistant Demonstration (Fasal Saathi)
+
+Fasal Saathi provides full-duplex spoken assistance in Hindi and English using the Google Gemini Live API.
+
+### Step 1: Enable Server-Side Gemini Key
+Add your Gemini API key to `.env`:
+```dotenv
+VOICE_ASSISTANT_ENABLED=true
+GEMINI_API_KEY=your_google_ai_studio_api_key
+GEMINI_LIVE_MODEL=gemini-3.1-flash-live-preview
+GEMINI_LIVE_VOICE=Kore
+```
+
+### Step 2: Rebuild & Restart Services
+```powershell
+docker compose up -d --build api mobile
+```
+
+### Step 3: Run Spoken Demo
+1. Open `http://localhost:8085` and click **Talk to Fasal Saathi**.
+2. Sign in as `farmer@fasalpramaan.local` / `Demo@12345`.
+3. Try spoken commands in Hindi or English:
+   - *"मेरे खेत बताओ"* or *"List my farms."*
+   - *"इस फसल चक्र के लिए प्रमाण कैप्चर शुरू करो"*
+   - *"फोटो खींचो"* (Advances through the 5 canonical angles)
+   - *"ऑब्जर्वेशन लिखो: पत्तों पर भूरे धब्बे हैं"*
+   - *"क्यू सिंक करो"* (Assistant explains the upload and asks for spoken confirmation before proceeding)
+
+For the complete spoken script and safety boundaries, see [docs/VOICE_ASSISTANT_DEMO.md](docs/VOICE_ASSISTANT_DEMO.md).
+
+---
+
+## 4. Automated Testing & Quality Probes
+
+### 4.1 Single-Image Model Test CLI
+Test the local DINOv2 ONNX classifier on any arbitrary image file directly from the terminal:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\demo-model.ps1 C:\path\to\leaf_sample.jpg paddy
+```
+
+### 4.2 Full End-to-End Automated Pipeline Verification
+Execute an automated test simulating complete farmer capture, upload, checksum validation, worker processing, DINOv2 inference, Evidence Trust calculation, and reviewer queue verification:
 ```powershell
 powershell -ExecutionPolicy Bypass -Command `
   "& .\scripts\verify-e2e.ps1 -ImagePaths @('wide.jpg','left.jpg','mid.jpg','right.jpg','close.jpg')"
 ```
 
-The five JPEGs must be distinct because the API correctly rejects duplicate
-evidence checksums.
-
-This verifier authenticates both farmer and reviewer accounts and proves the
-submission, all five images, and local model classification reach the same
-reviewer queue/detail endpoints used by the dashboard.
-
-## Evidence reminders
-
-Each active crop cycle receives a 30-day plan for five guided photos. Farmers
-can change the interval to 14–90 days, select four or five reminder photos,
-snooze by up to seven days, or pause a plan. `fp-beat` checks due plans every
-six hours and `fp-worker` writes in-app notifications. Native builds also keep
-a local schedule for temporary offline periods. See
-[`docs/EVIDENCE_REMINDERS.md`](docs/EVIDENCE_REMINDERS.md).
-
-## Tests
-
+### 4.3 Running Unit & Integration Test Suites
 ```powershell
-# Flutter analyze + tests in pinned build environment
-docker build --target tester -t fasalpramaan-mobile-test apps/mobile
+# API Gateway & Evidence Engine Tests
+docker compose exec api pytest -v
 
-# Dashboard
+# AI Model Inference Tests
+docker compose exec ai pytest -v
+
+# Reviewer Dashboard Tests (TypeScript, Lint & Jest)
 cd apps\dashboard
 npm.cmd run lint
 npm.cmd run typecheck
 npm.cmd test
 cd ..\..
 
-# API and AI
-docker compose exec api pytest
-docker compose exec ai pytest
+# Mobile App Flutter Tests
+docker build --target tester -t fasalpramaan-mobile-test apps/mobile
 ```
 
-## LAN access
+---
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1 `
-  -PublicHost 192.168.1.25
+## 5. Log Inspection & Operational Diagnostics
+
+### Real-Time Log Streaming
+```bash
+# View combined logs
+docker compose logs -f --tail=100 api ai worker
+
+# View specific service logs
+docker compose logs -f api
+docker compose logs -f worker
 ```
 
-Open `http://192.168.1.25:8085` and `http://192.168.1.25:3000` from a device on
-the same trusted network. Do not expose this local stack through router port forwarding.
-
-## Logs and recovery
-
-```powershell
-docker compose logs --tail=100 api ai worker mobile dashboard
-docker compose restart api ai worker mobile dashboard
-```
-
-To remove locally captured records while retaining the demo accounts and catalogs:
-
+### Resetting Operational Data
+To wipe test submissions, images, and reviews while preserving seed user accounts and crop catalogs:
 ```powershell
 docker compose stop worker beat
 docker compose exec api python scripts/clear_operational_data.py --confirm-local-reset
 docker compose start worker beat
 ```
 
-## Stop
-
-```powershell
-docker compose down
-```
-
-This keeps the local database and MinIO volumes. Add `-v` only when you intend
-to delete every local volume, including captured records.
-
-## Portable archive
-
+### Creating a Portable Distribution Bundle
+Generate a self-contained ZIP archive for offline sharing without requiring Git:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-portable-bundle.ps1
 ```
-
-Share the ZIP and `.sha256` file from `dist/`. The recipient needs Docker but
-does not need Git, Flutter, Python, or Node.js.
+The output package lands in `dist/FasalPramaan-portable.zip`.

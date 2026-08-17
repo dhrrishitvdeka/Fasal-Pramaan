@@ -117,12 +117,27 @@ class S {
   String get syncNow => isHi ? 'अभी सिंक करें' : 'Sync Now';
   String get syncing => isHi ? 'सिंक हो रहा है...' : 'Syncing...';
 
-  // Results Screen
+  // Results & Specific Recapture
   String get screeningGrade => isHi ? 'स्क्रीनिंग ग्रेड' : 'Screening Grade';
   String get damageSeverity => isHi ? 'क्षति की गंभीरता' : 'Damage Severity';
   String get primaryPeril => isHi ? 'मुख्य संकट' : 'Primary Peril';
   String get captureReplacement =>
       isHi ? 'प्रतिस्थापन साक्ष्य कैप्चर करें' : 'Capture Replacement Evidence';
+  String get additionalEvidenceRequired =>
+      isHi ? 'अतिरिक्त साक्ष्य आवश्यक' : 'Additional Evidence Required';
+  String get recaptureReasonLabel => isHi ? 'कारण' : 'Reason';
+  String get captureRequestedEvidence =>
+      isHi ? 'अनुरोधित साक्ष्य कैप्चर करें' : 'Capture Requested Evidence';
+  String get evidenceConfidence =>
+      isHi ? 'साक्ष्य विश्वसनीयता' : 'Evidence Confidence';
+  String get defaultRecaptureReason => isHi
+      ? 'प्रभावित फसल का स्पष्ट विवरण आवश्यक है।'
+      : 'A clear photograph of the affected area is required.';
+  String get closeupDamageTitle => isHi
+      ? 'क्षतिग्रस्त हिस्सा (Close-Up Damage)'
+      : 'Close-Up Damage Photo';
+  String get wideFieldTitle =>
+      isHi ? 'खेत का समग्र दृश्य (Wide Field)' : 'Wide Field Photo';
   String get assistiveNotice => isHi
       ? 'सहायक AI जांच · अधिकारी समीक्षा के अधीन'
       : 'Assistive AI check · Subject to mandatory officer review';

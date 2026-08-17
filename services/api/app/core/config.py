@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     ai_high_severity_threshold: float = 0.7
     ai_require_human_review: bool = True
 
+    # Evidence evaluation layer
+    evidence_confidence_threshold: float = 85.0
+    evidence_quality_retake_threshold: float = 40.0
+    evidence_coverage_request_threshold: float = 50.0
+    evidence_evaluation_version: str = "evidence-confidence-v1"
+
     # Gemini Live voice-assistant demo. The long-lived key is server-side only;
     # authenticated farmers receive one-use, short-lived session tokens.
     voice_assistant_enabled: bool = False

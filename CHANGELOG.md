@@ -1,85 +1,56 @@
 # Changelog
 
-All notable changes will be documented in this file. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+---
 
-### Changed
+## [1.2.0] — 2026-08-17
 
-- README rewritten for a general audience (who it is for, what the grades
-  mean, laptop capture fallback). Getting started, env reference, and
-  known-limitations updated to match V1.1.1 local behaviour.
+### Added
+- **4-Dimensional Evidence Confidence & Trust Evaluation Engine**:
+  - Independent formulation: $\text{Final Confidence} = 0.4 \times \text{Quality} + 0.3 \times \text{Coverage} + 0.2 \times \text{Context} + 0.1 \times \text{Integrity}$.
+  - Canonical threshold ($\ge 85.0$) for evidence sufficiency.
+  - Deterministic 4-tier uncertainty classification with strict priority ordering ($\text{Integrity} \succ \text{Coverage} \succ \text{Visual} \succ \text{Context}$).
+  - Immutable historical snapshot persistence in `evidence_evaluations` table with component breakdowns.
+- **Adaptive Evidence Recapture Workflow**:
+  - Replaces blanket 5-photo retakes with targeted angle requests (e.g. `closeup_damage`, `wide_field`).
+  - Automated re-evaluation pipeline with exact confidence delta ($\Delta C$) calculation.
+  - Bilingual farmer guidance (Hindi and English).
+- **Comprehensive Documentation Architecture**:
+  - Dedicated technical specifications: `docs/evidence-evaluation.md` and `docs/adaptive-recapture.md`.
+  - Authoritative AI governance and safety boundary documentation (`docs/governance-and-safety.md`).
+  - Model card and frozen benchmark validation metrics (`docs/AI_MODEL_MVP.md`).
+  - Presentation-ready MUN exhibition showcase guide (`docs/demo-walkthrough.md`).
+
+---
 
 ## [1.1.1] — 2026-08-13
 
 ### Fixed
+- Web build runtime safety assertion: release web builds correctly bypass `DEMO_MODE=true` crash on startup.
+- Reviewer adjudication handling: reviewers can accept DINOv2 `crop_health_v4` screening ($A/B/C/U$) when severity is empty.
+- Finalization validation: finalization no longer fails on omitted photo timestamps when draft GPS is valid.
+- Hindi/English transcript merge: word boundary spacing preserved in streaming voice assistant bubbles.
 
-- Local Docker field-app no longer crashes on boot: release web builds do not
-  set `DEMO_MODE=true` (that flag trips `assertSafeRuntime()` before `runApp()`).
-  Camera/GPS fallback still runs on Flutter web via `kIsWeb`.
-- Reviewers can accept DINOv2 `crop_health_v4` screening (A/B/C/U) when
-  severity and affected-area are empty; the queue lists all human-attention
-  statuses.
-- Finalize no longer fails only because a photo omitted `captured_at` when the
-  draft already has GPS.
-- Local demo traffic is not rate-limited (`RATE_LIMIT_ENABLED` defaults off).
-- Dashboard health uses the same-origin `/backend` base inside Docker.
-- Hindi/English Fasal Saathi transcript bubbles no longer glue words together
-  (preserve stream token spacing; Devanagari word-boundary merge).
-- Field-app Docker build re-declares `API_BASE_URL` and gates the image on
-  `flutter analyze` + `flutter test`.
-- Web secure-storage fallback when browser crypto is unavailable over plain HTTP.
-- Makefile migrate/seed targets no longer reference a missing Compose profile;
-  `beat` is started with the full stack.
-
-### Changed
-
-- Service and app package versions aligned to **1.1.0**.
-- Documentation refreshed to match proxy-based voice Live path, evidence
-  reminder routes, empty operational seed, and removed broken doc links.
-
-### Added
-
-- Voice system instruction asks for short, clearly spaced Hindi/English replies.
+---
 
 ## [1.1.0] — 2026-08-04
 
 ### Added
+- **Fasal Saathi Gemini Live Voice Assistant**: Full-duplex Hindi/English conversational assistant for farmers.
+- Same-origin WebSocket proxy (`/api/v1/voice/live`) for secure ephemeral session token provisioning.
+- Allowlisted voice tools with spoken confirmation gates for state-mutating operations.
+- Recurring geo-tagged evidence reminders engine (`fp-beat` and `fp-worker`).
+- Automated local upload, classification, and reviewer-queue pipeline.
 
-- **Fasal Saathi** Gemini Live Hindi/English voice assistant for farmers.
-- Same-origin Live WebSocket proxy (`/api/v1/voice/live`) so the browser does
-  not open Google WSS directly.
-- Allowlisted voice tools (navigation, farms/plots/cycles, capture, reminders)
-  with explicit spoken confirmation for sensitive writes, sync, and finalize.
-- Streaming transcript merge so assistant replies show full sentences, not only
-  the last token fragment.
-- Mic PCM resample toward 16 kHz, session refresh before voice start, and
-  safer crop-cycle confirmation (UUID checks + API error handling).
-- Voice panel UI polish with open/close animation (no “demo” badge clutter).
-- Recurring geo-tagged evidence reminders.
-- Automatic local upload, classification, and reviewer-queue workflow.
-- Clean operational-data reset that preserves demo accounts and catalogs.
+---
 
-### Fixed
+## [1.0.0] — 2026-07-15
 
-- Seed bootstrap no longer inserts users with null `password_hash` (CI
-  `api-and-model` seed crash).
-- Voice connect timeouts from pre-accept Gemini token minting.
-- Expired JWT 401s when starting voice without a session check.
-- Uncaught Dio errors on voice-confirmed crop-cycle creation (422).
-
-### Changed
-
-- Local bootstrap contains no farms, submissions, images, predictions, or
-  reviewer records.
-- Gemini token provisioning retries transient upstream failures.
-- Field-app nginx no longer immutably caches Flutter entry JS for a week.
-- Repository licensing and contribution files are aligned for open-source use.
-
-### Notes
-
-- Model output remains assistive screening only; human review is mandatory.
-- Voice assistant is a local feature requiring `VOICE_ASSISTANT_ENABLED` and a
-  server-side `GEMINI_API_KEY`.
+### Added
+- Initial open-source release of Fasal-Pramaan.
+- Flutter multi-platform field application with 5-angle guided capture and encrypted offline storage.
+- Next.js 14 Reviewer Command Centre with PostGIS GIS mapping and audit trail.
+- FastAPI REST Gateway with spatial jurisdiction RBAC and Alembic migrations.
+- DINOv2 ViT-S/14 ONNX local inference microservice.
+- Docker Compose multi-service orchestration stack.

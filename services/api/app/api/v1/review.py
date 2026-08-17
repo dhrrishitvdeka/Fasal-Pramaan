@@ -6,17 +6,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import joinedload
 
 from app.core.deps import ROLE_ADMIN, ROLE_REVIEWER, DbSession, require_roles
+
 from app.db.models import (
     AIPrediction,
     AuditLog,
     DamageAssessment,
+    EvidenceEvaluation,
     HumanReview,
     RecaptureRequest,
     Submission,
     User,
 )
 from app.schemas.common import Paginated
-from app.schemas.submission import ReviewActionRequest, SubmissionOut
+from app.schemas.submission import EvidenceEvaluationOut, ReviewActionRequest, SubmissionOut
 from app.api.v1.submissions import _serialize_submission
 from app.services.audit import write_audit
 from app.services.notifications import notify_user
@@ -133,6 +135,17 @@ def review_action(
                 400,
                 "AI result is incomplete; record a corrected human assessment instead of accepting it",
             )
+        latest_eval = (
+            db.query(EvidenceEvaluation)
+            .filter(EvidenceEvaluation.submission_id == sub.id)
+            .order_by(EvidenceEvaluation.created_at.desc())
+            .first()
+        )
+        if latest_eval and (latest_eval.integrity_score < 70.0 or latest_eval.uncertainty_type == "integrity"):
+            raise HTTPException(
+                400,
+                "Cannot accept submission with integrity issues (integrity score < 70). Human correction or rejection is required.",
+            )
 
     review = HumanReview(
         submission_id=sub.id,
@@ -224,18 +237,30 @@ def review_action(
             DamageAssessment.is_final.is_(True),
         ).update({DamageAssessment.is_final: False}, synchronize_session=False)
     elif body.action == "request_recapture":
-        db.add(
-            RecaptureRequest(
-                submission_id=sub.id,
-                requested_by=user.id,
-                reason=body.override_reason or body.notes or "Recapture requested",
-                required_angles=[
+        req_angles = body.required_angles
+        if not req_angles:
+            latest_eval = (
+                db.query(EvidenceEvaluation)
+                .filter(EvidenceEvaluation.submission_id == sub.id)
+                .order_by(EvidenceEvaluation.created_at.desc())
+                .first()
+            )
+            if latest_eval and latest_eval.generated_request and latest_eval.generated_request.get("required_angles"):
+                req_angles = latest_eval.generated_request.get("required_angles")
+            else:
+                req_angles = [
                     "wide_field",
                     "left_context",
                     "mid_canopy",
                     "right_context",
                     "closeup_damage",
-                ],
+                ]
+        db.add(
+            RecaptureRequest(
+                submission_id=sub.id,
+                requested_by=user.id,
+                reason=body.override_reason or body.notes or "Recapture requested",
+                required_angles=req_angles,
                 status="open",
             )
         )
@@ -264,6 +289,28 @@ def review_action(
     return _serialize_submission(db, sub)
 
 
+@router.get("/{submission_id}/evaluations", response_model=list[EvidenceEvaluationOut])
+def review_submission_evaluations(
+    submission_id: str,
+    db: DbSession,
+    user: User = Depends(require_roles(ROLE_REVIEWER, ROLE_ADMIN)),
+) -> list[EvidenceEvaluationOut]:
+    sub = (
+        db.query(Submission.id)
+        .filter(Submission.id == submission_id, Submission.is_deleted.is_(False))
+        .first()
+    )
+    if not sub:
+        raise HTTPException(404, "Submission not found")
+    evals = (
+        db.query(EvidenceEvaluation)
+        .filter(EvidenceEvaluation.submission_id == submission_id)
+        .order_by(EvidenceEvaluation.created_at.desc())
+        .all()
+    )
+    return [EvidenceEvaluationOut.model_validate(e) for e in evals]
+
+
 @router.get("/{submission_id}/history")
 def review_history(
     submission_id: str,
@@ -288,6 +335,12 @@ def review_history(
         .order_by(AuditLog.created_at.asc())
         .all()
     )
+    evals = (
+        db.query(EvidenceEvaluation)
+        .filter(EvidenceEvaluation.submission_id == submission_id)
+        .order_by(EvidenceEvaluation.created_at.asc())
+        .all()
+    )
     return {
         "reviews": [
             {
@@ -305,6 +358,10 @@ def review_history(
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in reviews
+        ],
+        "evaluations": [
+            EvidenceEvaluationOut.model_validate(e).model_dump(mode="json")
+            for e in evals
         ],
         "audit": [
             {

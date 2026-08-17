@@ -1,27 +1,31 @@
-# Security policy
+# Security Policy & Vulnerability Reporting
 
-## Supported versions
+## 1. Supported Versions
 
-Security fixes are applied to the latest revision of the default branch. This
-local reference deployment is not a hosted production claims system.
+Security updates and vulnerability patches are actively maintained and applied to the default `main` branch.
 
-## Reporting a vulnerability
+---
 
-Use GitHub private vulnerability reporting when it is enabled for the
-repository. Do not disclose credentials, tokens, personal data, farmer
-evidence, or exploit details in a public issue.
+## 2. Reporting a Vulnerability
 
-If private reporting is unavailable, contact the repository maintainer through
-the private contact method listed on their GitHub profile. Include affected
-versions, reproduction steps, impact, and a suggested mitigation when known.
+If you discover a potential security vulnerability within Fasal-Pramaan, please report it responsibly:
 
-## Secrets
+1. **GitHub Private Vulnerability Reporting**: Use the **Security $\rightarrow$ Report a vulnerability** tab on GitHub.
+2. **Private Email Disclosure**: If private GitHub reporting is unavailable, contact the project maintainers via the contact details listed on their GitHub profile.
 
-- Never commit `.env` or API keys.
-- Gemini credentials stay server-side; clients receive constrained one-use
-  session tokens.
-- Rotate any credential immediately if it appears in a commit, log, screenshot,
-  issue, or pull request.
+Please include:
+- Affected component, endpoint, or module.
+- Step-by-step reproduction instructions or proof-of-concept.
+- Potential impact and suggested remediation if known.
 
-See [security architecture](docs/security.md) and
-[production-readiness boundaries](docs/production-readiness.md).
+*Please do not report security vulnerabilities via public GitHub issues.*
+
+---
+
+## 3. Security Guidelines & Best Practices
+
+- **Never Commit Secrets**: Ensure `.env` and sensitive API keys are excluded from version control.
+- **Server-Side Credentials**: High-privilege tokens (such as `GEMINI_API_KEY`) must reside exclusively on the server and never be distributed to client binaries.
+- **Immediate Credential Rotation**: If credentials or keys are inadvertently exposed, revoke and rotate them immediately across all environments.
+
+For complete architectural security specifications, see [Security Architecture](docs/security.md).

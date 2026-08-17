@@ -148,6 +148,76 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
                                 ],
                               ),
                               const SizedBox(height: 10),
+
+                              // Evidence Confidence Metric if available
+                              if (item['evidence_evaluation'] != null ||
+                                  item['latest_evaluation'] != null) ...[
+                                Builder(
+                                  builder: (_) {
+                                    final ev = item['evidence_evaluation'] ??
+                                        item['latest_evaluation'];
+                                    final conf = ev is Map &&
+                                            ev['confidence'] is Map
+                                        ? ev['confidence']['final']
+                                        : null;
+                                    if (conf == null) return const SizedBox.shrink();
+                                    final isHigh = (conf is num && conf >= 85);
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 10),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: isHigh
+                                            ? const Color(0xFFF0FDF4)
+                                            : const Color(0xFFFFFBEB),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: isHigh
+                                              ? const Color(0xFFBBF7D0)
+                                              : const Color(0xFFFDE68A),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isHigh
+                                                ? Icons.verified_outlined
+                                                : Icons.help_outline_rounded,
+                                            size: 16,
+                                            color: isHigh
+                                                ? const Color(0xFF16A34A)
+                                                : const Color(0xFFD97706),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${s.evidenceConfidence}:',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: isHigh
+                                                  ? const Color(0xFF166534)
+                                                  : const Color(0xFF92400E),
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          Text(
+                                            '$conf / 100',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              fontFamily: 'monospace',
+                                              color: isHigh
+                                                  ? const Color(0xFF166534)
+                                                  : const Color(0xFF92400E),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+
                               if (damage != null) ...[
                                 Container(
                                   padding: const EdgeInsets.all(12),
@@ -182,23 +252,131 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
                                     fontSize: 11, color: Color(0xFF94A3B8)),
                               ),
 
+                              // Structured Adaptive Recapture Card
                               if (statusStr == 'needs_recapture') ...[
                                 const SizedBox(height: 14),
-                                ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFD97706),
-                                    minimumSize: const Size.fromHeight(42),
-                                  ),
-                                  onPressed: () => context.push(
-                                    '/capture?submission_id=${Uri.encodeQueryComponent(item['id'].toString())}'
-                                    '&crop_cycle_id=${Uri.encodeQueryComponent(item['crop_cycle_id'].toString())}',
-                                  ),
-                                  icon: const Icon(Icons.refresh_rounded,
-                                      size: 20, color: Colors.white),
-                                  label: Text(
-                                    s.captureReplacement,
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
+                                Builder(
+                                  builder: (_) {
+                                    final reqAngles =
+                                        _extractRequestedAngles(item);
+                                    final reason =
+                                        _extractRecaptureReason(item, s);
+
+                                    return Container(
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFFBEB),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                            color: const Color(0xFFF59E0B),
+                                            width: 1.2),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                  Icons.warning_amber_rounded,
+                                                  color: Color(0xFFB45309),
+                                                  size: 20),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  s.additionalEvidenceRequired,
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF92400E),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Wrap(
+                                            spacing: 6,
+                                            runSpacing: 4,
+                                            children: reqAngles.map((angle) {
+                                              return Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      const Color(0xFFFEF3C7),
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                      color: const Color(
+                                                          0xFFFCD34D)),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                        Icons.camera_alt_outlined,
+                                                        size: 14,
+                                                        color:
+                                                            Color(0xFF92400E)),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      _getAngleDisplayName(
+                                                          angle, isHi),
+                                                      style: const TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color:
+                                                            Color(0xFF78350F),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            '${s.recaptureReasonLabel}: $reason',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF78350F),
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          ElevatedButton.icon(
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  const Color(0xFFD97706),
+                                              minimumSize:
+                                                  const Size.fromHeight(44),
+                                            ),
+                                            onPressed: () => context.push(
+                                              '/capture?submission_id=${Uri.encodeQueryComponent(item['id'].toString())}'
+                                              '&crop_cycle_id=${Uri.encodeQueryComponent(item['crop_cycle_id'].toString())}'
+                                              '&required_angles=${Uri.encodeQueryComponent(reqAngles.join(","))}'
+                                              '&reason=${Uri.encodeQueryComponent(reason)}',
+                                            ),
+                                            icon: const Icon(
+                                                Icons.camera_enhance_rounded,
+                                                size: 20,
+                                                color: Colors.white),
+                                            label: Text(
+                                              s.captureRequestedEvidence,
+                                              style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ],
@@ -209,6 +387,82 @@ class _ResultsScreenState extends ConsumerState<ResultsScreen> {
                   ),
                 ),
     );
+  }
+
+  List<String> _extractRequestedAngles(Map item) {
+    final ev = item['evidence_evaluation'] ?? item['latest_evaluation'];
+    if (ev is Map) {
+      final req = ev['request'];
+      if (req is Map && req['required_angles'] is List) {
+        final list = (req['required_angles'] as List)
+            .map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        if (list.isNotEmpty) return list;
+      }
+    }
+    if (item['required_angles'] is List) {
+      final list = (item['required_angles'] as List)
+          .map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (list.isNotEmpty) return list;
+    }
+    final rr = item['recapture_request'];
+    if (rr is Map && rr['required_angles'] is List) {
+      final list = (rr['required_angles'] as List)
+          .map((e) => e.toString())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (list.isNotEmpty) return list;
+    }
+    return const ['closeup_damage'];
+  }
+
+  String _extractRecaptureReason(Map item, S s) {
+    final ev = item['evidence_evaluation'] ?? item['latest_evaluation'];
+    if (ev is Map) {
+      final unc = ev['uncertainty'];
+      if (unc is Map &&
+          unc['reasons'] is List &&
+          (unc['reasons'] as List).isNotEmpty) {
+        return (unc['reasons'] as List).first.toString();
+      }
+      final req = ev['request'];
+      if (req is Map && req['instructions'] != null) {
+        return req['instructions'].toString();
+      }
+    }
+    final rr = item['recapture_request'];
+    if (rr is Map &&
+        rr['reason'] != null &&
+        rr['reason'].toString().isNotEmpty) {
+      return rr['reason'].toString();
+    }
+    if (item['farmer_observations'] != null &&
+        item['farmer_observations'].toString().isNotEmpty) {
+      return item['farmer_observations'].toString();
+    }
+    return s.defaultRecaptureReason;
+  }
+
+  String _getAngleDisplayName(String angleKey, bool isHi) {
+    switch (angleKey) {
+      case 'wide_field':
+        return isHi ? 'खेत का समग्र दृश्य (Wide Field)' : 'Wide Field View';
+      case 'left_context':
+        return isHi ? 'बायाँ संदर्भ दृश्य' : 'Left Context View';
+      case 'mid_canopy':
+        return isHi ? 'फसल कैनोपी दृश्य (Mid-Canopy)' : 'Mid-Canopy View';
+      case 'right_context':
+        return isHi ? 'दायाँ संदर्भ दृश्य' : 'Right Context View';
+      case 'closeup_damage':
+        return isHi
+            ? 'क्षतिग्रस्त हिस्सा (Close-Up Damage)'
+            : 'Close-Up Damage Photo';
+      default:
+        return angleKey.replaceAll('_', ' ');
+    }
   }
 
   Widget _buildMetricBox({
