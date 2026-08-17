@@ -114,20 +114,21 @@ When evidence is incomplete or blurry, the system **does not force farmers to re
 | Location | What it is |
 |---|---|
 | `apps/dashboard` | Farmer + reviewer Next.js app. This is what Vercel builds. |
-| `vercel.json` | Tells Vercel to install/build `apps/dashboard`. |
+| `apps/dashboard` | Next.js app. Set the Vercel **Root Directory** to this folder. |
 | `local/` | Laptop Docker stack helpers (`local/start.ps1`). Secrets in `local/.env` (gitignored). |
 | `.env` | Gitignored root env for Compose. Same secrets as `local/.env`. |
 
-Vercel project: connect this GitHub repo. Framework Next.js. Env vars listed below. Root can stay the repository root — `vercel.json` points the build at `apps/dashboard`.
+Vercel project: connect this GitHub repo. Framework **Next.js**. Set **Root Directory** to `apps/dashboard` (Settings → General). That is what makes Vercel find `next` in `apps/dashboard/package.json`. Do not leave Root Directory empty and do not point it at `local/`.
 
 ## Vercel farmer → Hugging Face → reviewer
 
 The laptop Docker stack is unchanged (`docker compose up`). The Next.js app in `apps/dashboard` can also be hosted on Vercel:
 
 1. Apply `scripts/setup_supabase.sql` and `scripts/setup_web_schema.sql` on your Supabase project.
-2. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, and `HF_SPACE_URL=https://dhrrishitvdeka-fasal-pramaan-api.hf.space` in Vercel. Never commit those values. Leave `NEXT_PUBLIC_API_BASE_URL` unset. The hosted model is `dhrrishitvdeka/fasal-pramaan-model` via that Space — not a public placeholder classifier.
-3. Farmer captures or uploads photos at `/farmer/capture`. The server route `POST /api/claims` stores the image in the private `fasal-web-evidence` bucket, calls the Hugging Face model, and writes `web_claims`.
-4. The same claim id appears on `/review` with the stored photos and HF label/score. Reviewer `/login` needs a Supabase Auth user.
+2. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `HF_SPACE_URL=https://dhrrishitvdeka-fasal-pramaan-api.hf.space`, `SITE_LOCK_PASSWORD`, and `REVIEWER_EMAILS` (comma-separated reviewer logins) in Vercel. Never commit those values. Leave `NEXT_PUBLIC_API_BASE_URL` unset.
+3. Create Supabase Auth users. Put reviewer emails in `REVIEWER_EMAILS`. Everyone else is a farmer. Both roles sign in at `/login`.
+4. Farmer captures at `/farmer/capture`. `POST /api/claims` checks the user JWT, stores the photo with the service role, calls Hugging Face, and writes `web_claims.created_by`.
+5. The same claim id appears on `/review` only for reviewer JWTs.
 
 There is no showcase/pseudo fallback on these routes. GPS is the device browser (no Maps API). Weather and Gemini are not used on Vercel.
 

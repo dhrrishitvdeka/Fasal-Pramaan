@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.web_plots (
   village text,
   district text,
   state text,
+  created_by text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -102,7 +103,8 @@ CREATE TABLE IF NOT EXISTS public.web_milestones (
   completed_date date,
   evidence_image_url text,
   notes text,
-  is_overdue boolean DEFAULT false
+  is_overdue boolean DEFAULT false,
+  created_by text
 );
 
 CREATE TABLE IF NOT EXISTS public.web_review_actions (
@@ -143,12 +145,8 @@ DROP POLICY IF EXISTS web_milestones_anon_all ON public.web_milestones;
 DROP POLICY IF EXISTS web_review_actions_anon_all ON public.web_review_actions;
 DROP POLICY IF EXISTS web_profiles_anon_all ON public.web_profiles;
 
-CREATE POLICY web_plots_anon_all ON public.web_plots FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY web_claims_anon_all ON public.web_claims FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY web_claim_images_anon_all ON public.web_claim_images FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY web_milestones_anon_all ON public.web_milestones FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY web_review_actions_anon_all ON public.web_review_actions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY web_profiles_anon_all ON public.web_profiles FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+-- No policies for anon or authenticated. Browser keys cannot read or write.
+-- Hosted Next.js routes use the service role after verifying a user JWT.
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
@@ -166,16 +164,4 @@ ON CONFLICT (id) DO UPDATE SET
 DROP POLICY IF EXISTS web_evidence_insert ON storage.objects;
 DROP POLICY IF EXISTS web_evidence_select ON storage.objects;
 DROP POLICY IF EXISTS web_evidence_update ON storage.objects;
-
-CREATE POLICY web_evidence_insert ON storage.objects
-  FOR INSERT TO anon, authenticated
-  WITH CHECK (bucket_id = 'fasal-web-evidence');
-
-CREATE POLICY web_evidence_select ON storage.objects
-  FOR SELECT TO anon, authenticated
-  USING (bucket_id = 'fasal-web-evidence');
-
-CREATE POLICY web_evidence_update ON storage.objects
-  FOR UPDATE TO anon, authenticated
-  USING (bucket_id = 'fasal-web-evidence')
-  WITH CHECK (bucket_id = 'fasal-web-evidence');
+DROP POLICY IF EXISTS web_evidence_delete ON storage.objects;

@@ -13,7 +13,7 @@ The **Vercel web app** (`apps/dashboard`) uses Supabase for `web_*` tables and a
 | Hugging Face Space | `POST /api/claims` → `dhrrishitvdeka/fasal-pramaan-api` → `dhrrishitvdeka/fasal-pramaan-model` |
 | Browser GPS | `navigator.geolocation` — no Maps / geocoding API |
 | OpenStreetMap tiles | Reviewer map — no Mapbox / Google Maps key |
-| Supabase Auth | Reviewer `/login` (`signInWithPassword`). Farmer `/farmer/*` is public |
+| Supabase Auth | Required JWT for farmer and reviewer. Browser key is auth-only; data goes through service-role API routes |
 
 You do **not** need weather APIs, Gemini, FastAPI, MinIO, or Redis on Vercel.
 
@@ -26,7 +26,7 @@ You do **not** need weather APIs, Gemini, FastAPI, MinIO, or Redis on Vercel.
 
 Do **not** run Alembic / `python -m app.db.seed` against Supabase for the Vercel farmer/reviewer path. Those commands are only for the FastAPI Docker schema.
 
-Create at least one Auth user (Authentication → Users) if you want reviewer login. Farmer capture works without a login.
+Create Auth users (Authentication → Users). Put reviewer emails in `REVIEWER_EMAILS`. Farmer and reviewer both sign in at `/login`. Anon RLS is closed — the publishable key cannot read or write `web_*` or `fasal-web-evidence`.
 
 ---
 
@@ -42,6 +42,8 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 HF_TOKEN=
 HF_SPACE_URL=https://dhrrishitvdeka-fasal-pramaan-api.hf.space
+SITE_LOCK_PASSWORD=
+REVIEWER_EMAILS=
 ```
 
 Leave **`NEXT_PUBLIC_API_BASE_URL` unset** on Vercel. If you set it to `http://api:8000` or a missing FastAPI host, the hosted site will try to talk to Docker and fail.
@@ -61,10 +63,10 @@ Same five keys as above. Template: [`apps/dashboard/.env.example`](../apps/dashb
 
 ## 4. Deploy the web app on Vercel
 
-1. Connect GitHub repo `dhrrishitvdeka/Fasal-Pramaan`. Keep the **repository root** as the project root — [`vercel.json`](../vercel.json) installs and builds `apps/dashboard`.
-2. Paste the five env vars above. Redeploy after saving them.
-3. Farmer: `/farmer/capture` → `POST /api/claims` writes the private bucket + `web_claims` + HF label.
-4. Reviewer: `/review` lists the same claim ids. `/login` needs a Supabase Auth user.
+1. Connect GitHub repo `dhrrishitvdeka/Fasal-Pramaan`. Set Vercel **Root Directory** to `apps/dashboard`.
+2. Paste the env vars above plus `SITE_LOCK_PASSWORD` and `REVIEWER_EMAILS`. Redeploy after saving them.
+3. Farmer: `/login` → `/farmer/capture` → `POST /api/claims` (user JWT, service-role write) → private bucket + `web_claims` + HF label.
+4. Reviewer: `/login` → `/review` lists claims. Review actions require a reviewer JWT.
 
 There is no showcase or localStorage-only fallback on these routes.
 

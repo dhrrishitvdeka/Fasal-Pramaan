@@ -60,8 +60,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     async function verifySession() {
-      // Landing page and Farmer portal are public showcase routes
-      if (isLandingRoute || isFarmerRoute || isLoginRoute || isUnlockRoute) {
+      if (isLoginRoute || isUnlockRoute) {
+        if (!cancelled) setReady(true);
+        return;
+      }
+      if (isLandingRoute) {
         if (!cancelled) setReady(true);
         return;
       }
@@ -73,17 +76,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           if (sessionRoles) {
             setRoles(sessionRoles);
             setAuthenticated(true);
+            const isReviewer = sessionRoles.includes("reviewer") || sessionRoles.includes("administrator");
+            if (isFarmerRoute && isReviewer) {
+              // reviewers may use the farmer portal
+            } else if (!isFarmerRoute && !isReviewer) {
+              router.replace("/farmer");
+            }
           } else {
             setRoles([]);
             setAuthenticated(false);
-            router.replace("/login");
+            router.replace(isFarmerRoute ? "/login?next=/farmer" : "/login");
           }
         }
       } catch {
         if (!cancelled) {
           setRoles([]);
           setAuthenticated(false);
-          router.replace("/login");
+          router.replace(isFarmerRoute ? "/login?next=/farmer" : "/login");
         }
       }
       if (!cancelled) setReady(true);
@@ -95,6 +104,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname, isLandingRoute, isFarmerRoute, isLoginRoute, isUnlockRoute]);
 
   if (isLoginRoute || isUnlockRoute) {
+    return <>{children}</>;
+  }
+
+  if (isFarmerRoute) {
+    if (!ready) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
+          Loading…
+        </div>
+      );
+    }
+    if (!authenticated) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
+          Redirecting to sign in…
+        </div>
+      );
+    }
     return <>{children}</>;
   }
 

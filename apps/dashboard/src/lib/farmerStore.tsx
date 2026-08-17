@@ -3,15 +3,10 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { FarmerLang } from "./farmerI18n";
 import { getWebClaim, listWebClaims, submitWebClaim } from "./api";
+import { apiFetch } from "./auth-headers";
 import { computeEvidencePreview } from "./claim-pipeline";
 import { isSupabaseConfigured } from "./supabase";
-import {
-  EMPTY_FARMER_PROFILE,
-  fetchWebMilestones,
-  fetchWebPlots,
-  fetchWebProfile,
-  updateWebMilestone,
-} from "./web-db";
+import { EMPTY_FARMER_PROFILE } from "./web-db";
 
 export interface FarmerPlot {
   id: string;
@@ -255,17 +250,24 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = async () => {
     try {
-      const items = await listWebClaims();
-      setClaims(items.map(submissionToClaim));
       if (isSupabaseConfigured()) {
-        const [nextPlots, nextMilestones, profile] = await Promise.all([
-          fetchWebPlots(),
-          fetchWebMilestones(),
-          fetchWebProfile(),
-        ]);
-        setPlots(nextPlots);
-        setMilestones(nextMilestones);
-        setFarmerProfile(profile);
+        const res = await apiFetch("/api/farmer/state");
+        if (!res.ok) {
+          throw new Error(res.status === 401 ? "Sign in required" : "Failed to load farmer data");
+        }
+        const body = (await res.json()) as {
+          plots?: FarmerPlot[];
+          claims?: FarmerClaim[];
+          milestones?: GrowthTimelineMilestone[];
+          profile?: typeof EMPTY_FARMER_PROFILE;
+        };
+        setPlots(body.plots || []);
+        setClaims(body.claims || []);
+        setMilestones(body.milestones || []);
+        setFarmerProfile(body.profile || { ...EMPTY_FARMER_PROFILE });
+      } else {
+        const items = await listWebClaims();
+        setClaims(items.map(submissionToClaim));
       }
       setError(null);
     } catch (err) {
@@ -380,7 +382,15 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     const next = updated.find((m) => m.id === id);
     if (next && isSupabaseConfigured()) {
       try {
-        await updateWebMilestone(next);
+        const res = await apiFetch(`/api/milestones/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            dueDate: next.dueDate,
+            completed: next.completed,
+            isOverdue: next.isOverdue,
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to update reminder");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to update reminder");
       }
@@ -403,7 +413,17 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     const next = updated.find((m) => m.id === id);
     if (next && isSupabaseConfigured()) {
       try {
-        await updateWebMilestone(next);
+        const res = await apiFetch(`/api/milestones/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            completed: next.completed,
+            completedDate: next.completedDate,
+            evidenceImageUrl: next.evidenceImageUrl,
+            notes: next.notes,
+            isOverdue: next.isOverdue,
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to complete reminder");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to complete reminder");
       }

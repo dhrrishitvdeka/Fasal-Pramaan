@@ -3,13 +3,21 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api, logoutSession, setSessionTokens } from "@/lib/api";
+import { apiFetch } from "@/lib/auth-headers";
 import { LoginForm, loginSchema } from "@/lib/schemas";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 
-export default function LoginPage() {
+function safeNext(value: string | null): string | null {
+  if (!value) return null;
+  if (!value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return null;
+  return value;
+}
+
+function LoginFormView() {
   const router = useRouter();
+  const search = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const {
     register,
@@ -37,7 +45,18 @@ export default function LoginPage() {
           setError(authError.message || "Sign-in failed.");
           return;
         }
-        router.push("/overview");
+        const meRes = await apiFetch("/api/me");
+        const me = (await meRes.json().catch(() => ({}))) as { role?: string };
+        if (!meRes.ok) {
+          setError("Signed in, but the server could not resolve your role.");
+          return;
+        }
+        const next = safeNext(search.get("next"));
+        if (me.role === "farmer") {
+          router.push(next?.startsWith("/farmer") ? next : "/farmer");
+          return;
+        }
+        router.push(next && !next.startsWith("/farmer") ? next : "/overview");
         return;
       }
 
@@ -71,7 +90,8 @@ export default function LoginPage() {
         <div className="w-full max-w-sm border border-slate-300 bg-white p-6">
           <h1 className="text-base font-semibold text-slate-900">Sign in</h1>
           <p className="mt-1 text-xs text-slate-500">
-            For authorised government and insurance reviewers only.
+            Use the Supabase Auth account created for you. Farmers land on the capture portal;
+            reviewers land on the command centre.
           </p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
@@ -131,5 +151,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-100 text-sm text-slate-600">
+          Loading…
+        </div>
+      }
+    >
+      <LoginFormView />
+    </Suspense>
   );
 }

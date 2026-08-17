@@ -82,6 +82,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
         plotName: "North basin",
         khasraNumber: "241/14",
         cropType: "Wheat",
+        createdBy: "user-farmer-1",
         farmerObservations: "Yellow pustules on flag leaf",
         captureLat: 27.89,
         captureLon: 76.28,
@@ -99,6 +100,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
       { fetchImpl: spaceFetchImpl() },
     );
 
+    expect(store.claims.get(result.claimId)?.created_by).toBe("user-farmer-1");
     expect(result.prediction).not.toBeNull();
     expect(result.prediction!.modelId).toBe("dhrrishitvdeka/fasal-pramaan-model");
     expect(result.prediction!.label).toBe("wheat__disease");
