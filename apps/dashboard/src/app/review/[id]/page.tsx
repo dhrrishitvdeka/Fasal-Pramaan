@@ -84,7 +84,10 @@ export default function ReviewDetailPage() {
       qc.invalidateQueries({ queryKey: ["submission", id] });
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["review-history", id] });
-      setMessage("Decision recorded. Audit trail updated.");
+      qc.invalidateQueries({ queryKey: ["overview"] });
+      qc.invalidateQueries({ queryKey: ["map-markers"] });
+      qc.invalidateQueries({ queryKey: ["audit-logs"] });
+      setMessage("Decision recorded. Audit trail and metrics updated.");
       setRecaptureModalOpen(false);
     },
     onError: (err: unknown) => {
@@ -178,7 +181,7 @@ export default function ReviewDetailPage() {
           ← Return to queue
         </button>
         <ReviewKeyboardShortcuts
-          disabled={action.isPending}
+          disabled={action.isPending || recaptureModalOpen}
           onAccept={handleAccept}
           onCorrect={handleCorrect}
           onRequestRecapture={handleOpenRecapture}
@@ -201,42 +204,19 @@ export default function ReviewDetailPage() {
         </div>
       )}
 
-      {/* Safety Alert if Integrity Failed */}
-      {integrityFailed && (
-        <div
-          className="rounded-md border border-rose-300 bg-rose-50 p-3.5 text-xs text-rose-900"
-          role="alert"
-        >
-          <div className="flex items-center gap-2">
-            <span className="font-bold uppercase tracking-wider text-rose-800">
-              ⚠️ Safety Block: Mandatory Integrity Checks Failed
-            </span>
-          </div>
-          <p className="mt-1 text-rose-800">
-            Accepting AI results is disabled for this case because image tamper, duplicate evidence, or mock GPS was detected. A human correction or physical inspection is mandatory.
-          </p>
-        </div>
-      )}
-
-      {/* SECTION 1: Authoritative Evidence Confidence & 4 Component Cards */}
+      {/* 1. Evidence Confidence & Trust Assessment Section */}
       <EvidenceConfidenceSection submission={data} />
 
-      {/* SECTION 2: Evidence Images & Location Context */}
-      <section className="fp-panel space-y-3 p-4">
+      {/* 2. Physical Evidence & Geolocation */}
+      <section className="fp-panel space-y-2 p-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-600">
-            Submitted Evidence Images & Geotag
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            Physical Evidence & Geotags
           </h3>
-          <span className="text-xs text-slate-500 font-mono">
-            {data.images?.length || 0} image(s) uploaded
-          </span>
+          <span className="fp-badge-neutral">{data.status}</span>
         </div>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-          <dt className="text-slate-500">Status</dt>
-          <dd>
-            <span className="fp-badge-neutral">{data.status}</span>
-          </dd>
-          <dt className="text-slate-500">GPS</dt>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm pt-1">
+          <dt className="text-slate-500">GPS Coordinates</dt>
           <dd className="tabular-nums font-mono text-xs">
             {data.capture_lat?.toFixed(5)}, {data.capture_lon?.toFixed(5)} (±
             {data.capture_accuracy_m ?? "?"} m)
@@ -245,7 +225,7 @@ export default function ReviewDetailPage() {
           <dd className="text-slate-700">{data.farmer_observations || "—"}</dd>
         </dl>
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-          {data.images.map((img) => (
+          {(data.images || []).map((img) => (
             <div key={img.id} className="border border-slate-200 p-2 text-xs rounded bg-white">
               <div className="font-semibold text-slate-800 truncate capitalize">{img.angle_type.replaceAll("_", " ")}</div>
               <div className="text-[11px] text-slate-500">{img.upload_status}</div>

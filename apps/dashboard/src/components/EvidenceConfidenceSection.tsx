@@ -23,14 +23,9 @@ const ALL_ANGLES = [
  * when the backend has not yet persisted or returned one (legacy submissions).
  */
 export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvaluation {
-  if (submission.latest_evaluation) {
-    return submission.latest_evaluation;
-  }
-  if (submission.evidence_evaluation) {
-    return submission.evidence_evaluation;
-  }
+  const raw = submission.latest_evaluation || submission.evidence_evaluation;
 
-  // Fallback calculation for legacy submissions
+  // Fallback calculation for legacy or partial submissions
   const images = submission.images || [];
   const uploaded = images.filter((img) => img.upload_status === "uploaded");
   const uploadedAngles = new Set(uploaded.map((img) => img.angle_type));
@@ -146,7 +141,7 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
     flags: anomalies.map(String),
   };
 
-  return {
+  const fallback: EvidenceEvaluation = {
     evaluation_version: "evidence-confidence-v1",
     quality: { score: qualityScore, available: true, details: qualityDetails },
     coverage: { score: coverageScore, available: true, details: coverageDetails },
@@ -173,6 +168,19 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
       title: `Capture missing ${missingAngles.join(", ")} evidence`,
       instructions: `Please provide clear photo(s) for the missing angle(s): ${missingAngles.join(", ")}.`,
     } : null,
+  };
+
+  if (!raw) return fallback;
+
+  return {
+    ...fallback,
+    ...raw,
+    quality: { ...fallback.quality, ...(raw.quality || {}), score: raw.quality?.score ?? fallback.quality.score },
+    coverage: { ...fallback.coverage, ...(raw.coverage || {}), score: raw.coverage?.score ?? fallback.coverage.score },
+    context: { ...fallback.context, ...(raw.context || {}), score: raw.context?.score ?? fallback.context.score },
+    integrity: { ...fallback.integrity, ...(raw.integrity || {}), score: raw.integrity?.score ?? fallback.integrity.score },
+    confidence: { ...fallback.confidence, ...(raw.confidence || {}), final: raw.confidence?.final ?? fallback.confidence.final },
+    uncertainty: { ...fallback.uncertainty, ...(raw.uncertainty || {}), type: raw.uncertainty?.type ?? fallback.uncertainty.type, reasons: raw.uncertainty?.reasons || fallback.uncertainty.reasons },
   };
 }
 

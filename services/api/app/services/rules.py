@@ -29,13 +29,20 @@ def decide_review_path(
     warnings = prediction.get("quality_warnings") or []
     anomalies = prediction.get("anomaly_flags") or []
 
+    def _has_flag(flags: Any, name: str) -> bool:
+        if isinstance(flags, dict):
+            return bool(flags.get(name))
+        if isinstance(flags, (list, set, tuple)):
+            return name in flags
+        return False
+
     # 1. Evidence Evaluation authority on evidence sufficiency & recapture
     if evaluation is not None:
         if evaluation.uncertainty_type == "integrity" or evaluation.integrity_score < 70.0:
             return "pending_review", "urgent_review"
         if evaluation.recommended_action in ("retake_image", "request_specific_evidence"):
             return "needs_recapture", "recapture"
-        if evaluation.recommended_action == "human_review":
+        if evaluation.recommended_action in ("human_review", "request_context"):
             return "pending_review", "urgent_review"
 
     # 2. Quality fallback if evaluation is not present
@@ -43,7 +50,7 @@ def decide_review_path(
         return "needs_recapture", "recapture"
 
     # 3. Integrity anomalies from prediction or submission
-    if "duplicate" in anomalies or "screenshot_suspected" in anomalies or "mock_location" in anomalies:
+    if _has_flag(anomalies, "duplicate") or _has_flag(anomalies, "screenshot_suspected") or _has_flag(anomalies, "mock_location"):
         return "pending_review", "urgent_review"
 
     # 4. Location or crop mismatch
