@@ -2,6 +2,7 @@
 
 import { webCaptureBridge } from "@/lib/voice/capture-bridge";
 import { parseGeminiLiveMessage } from "@/lib/voice/gemini-live-parse";
+import { connectSilentProcessor } from "@/lib/voice/mic-graph";
 import { WebVoiceBroker } from "@/lib/voice/web-voice-broker";
 import { useFarmerData } from "@/lib/farmerStore";
 import { usePathname, useRouter } from "next/navigation";
@@ -232,7 +233,7 @@ export default function FasalSaathiOverlay() {
         );
       };
       source.connect(processor);
-      processor.connect(ctx.destination);
+      connectSilentProcessor(processor, ctx);
       setStatus("live");
     } catch (err) {
       setStatus("error");

@@ -34,6 +34,7 @@ import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
 import { measureLightingScore, qualityPassedFromSignals, sha256FromDataUrl, sha256Hex } from "@/lib/evidence";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { runVoiceShutter, runVoiceSubmitDraft } from "@/lib/voice/capture-actions";
 import { webCaptureBridge } from "@/lib/voice/capture-bridge";
 import clsx from "clsx";
 
@@ -237,15 +238,14 @@ function CaptureStudioContent() {
     }
   };
 
-  // Capture photo from live video stream
-  const capturePhotoFromCamera = () => {
-    if (!videoRef.current) return;
+  const grabCameraFrame = async (): Promise<{ dataUrl: string; lightingScore?: number } | null> => {
+    if (!videoRef.current) return null;
     const video = videoRef.current;
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth || 1280;
     canvas.height = video.videoHeight || 720;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) return null;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     let lightingScore: number | undefined;
     try {
@@ -253,8 +253,18 @@ function CaptureStudioContent() {
     } catch {
       lightingScore = undefined;
     }
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-    void saveEvidenceImage(dataUrl, { lightingScore });
+    return { dataUrl: canvas.toDataURL("image/jpeg", 0.9), lightingScore };
+  };
+
+  const capturePhotoFromCamera = async () => {
+    const result = await runVoiceShutter({
+      cameraActive: isCameraActive,
+      grabFrame: grabCameraFrame,
+      saveFrame: (dataUrl, extras) => saveEvidenceImage(dataUrl, extras),
+      angleId: currentAngle?.id,
+    });
+    if (!result.ok) showToast(result.message);
+    return result;
   };
 
   // Handle file upload fallback
@@ -344,79 +354,66 @@ function CaptureStudioContent() {
     showToast(t.draftSavedMsg);
   };
 
-  // Handle Final Submission
   const handleSubmitClaim = async () => {
-    if (!isAllCaptured) {
-      showToast(t.captureAllRequired);
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const imagesList = Object.values(capturedImages);
-
-      const plot = selectedPlot;
-      if (isTargetedRecapture && recaptureClaimId) {
-        const updated = await updateClaimRecapture(recaptureClaimId, imagesList);
-        setIsSubmitting(false);
-        router.push(`/farmer/claims/${updated?.id || recaptureClaimId}?recaptured=true`);
-      } else {
-        const newClaim = await createClaim({
-          plotId: plot?.id || "",
-          plotName: plot?.name || "Unregistered plot",
-          plotNameHi: plot?.nameHi || "",
-          khasraNumber: plot?.khasraNumber || "",
-          cropType: plot?.cropType || "",
-          cropTypeHi: plot?.cropTypeHi || "",
-          cropVariety: plot?.cropVariety || "",
-          status: "submitted",
-          farmerObservations: observations,
-          images: imagesList,
-          evidenceTrust: {
-            qualityScore: 0,
-            coverageScore: 0,
-            contextScore: 0,
-            integrityScore: 0,
-            overallConfidence: 0,
-          },
-          aiPrediction: {
-            cropIdentified: "",
-            cropConfidence: 0,
-            diseaseDetected: "",
-            diseaseDetectedHi: "",
-            severityPercentage: 0,
-            severityGrade: "Low",
-            affectedAreaHectares: 0,
-            estimatedLossInr: 0,
-            modelConfidence: 0,
-          },
-          payoutStatus: "pending_review",
-        });
-        setIsSubmitting(false);
-        router.push(`/farmer/claims/${newClaim.id}?submitted=true`);
-      }
-    } catch (err) {
-      console.error("Submission failed:", err);
-      setIsSubmitting(false);
-      showToast("Submission failed. Please try again.");
-      throw err;
-    }
+    const result = await runVoiceSubmitDraft({
+      allCaptured: isAllCaptured,
+      incompleteMessage: t.captureAllRequired,
+      persist: async () => {
+        setIsSubmitting(true);
+        try {
+          const imagesList = Object.values(capturedImages);
+          const plot = selectedPlot;
+          if (isTargetedRecapture && recaptureClaimId) {
+            const updated = await updateClaimRecapture(recaptureClaimId, imagesList);
+            const id = updated?.id || recaptureClaimId;
+            router.push(`/farmer/claims/${id}?recaptured=true`);
+            return { id };
+          }
+          const newClaim = await createClaim({
+            plotId: plot?.id || "",
+            plotName: plot?.name || "Unregistered plot",
+            plotNameHi: plot?.nameHi || "",
+            khasraNumber: plot?.khasraNumber || "",
+            cropType: plot?.cropType || "",
+            cropTypeHi: plot?.cropTypeHi || "",
+            cropVariety: plot?.cropVariety || "",
+            status: "submitted",
+            farmerObservations: observations,
+            images: imagesList,
+            evidenceTrust: {
+              qualityScore: 0,
+              coverageScore: 0,
+              contextScore: 0,
+              integrityScore: 0,
+              overallConfidence: 0,
+            },
+            aiPrediction: {
+              cropIdentified: "",
+              cropConfidence: 0,
+              diseaseDetected: "",
+              diseaseDetectedHi: "",
+              severityPercentage: 0,
+              severityGrade: "Low",
+              affectedAreaHectares: 0,
+              estimatedLossInr: 0,
+              modelConfidence: 0,
+            },
+            payoutStatus: "pending_review",
+          });
+          router.push(`/farmer/claims/${newClaim.id}?submitted=true`);
+          return { id: newClaim.id };
+        } finally {
+          setIsSubmitting(false);
+        }
+      },
+    });
+    if (!result.ok) showToast(result.message);
+    return result;
   };
 
   useEffect(() => {
     return webCaptureBridge.register({
-      captureCurrentAngle: async () => {
-        if (!isCameraActive) {
-          return { ok: false, message: "Camera is not active. Open capture first." };
-        }
-        capturePhotoFromCamera();
-        return {
-          ok: true,
-          message: `Captured ${currentAngle?.id || "angle"}.`,
-          angle: currentAngle?.id,
-        };
-      },
+      captureCurrentAngle: () => capturePhotoFromCamera(),
       readGuidance: async () => ({
         ok: true,
         message: currentAngle
@@ -428,12 +425,9 @@ function CaptureStudioContent() {
         setObservations(observation);
         return { ok: true, message: "Observation stored on the capture draft." };
       },
-      submitDraft: async () => {
-        await handleSubmitClaim();
-        return { ok: true, message: "Claim submitted for review." };
-      },
+      submitDraft: () => handleSubmitClaim(),
     });
-  }, [isCameraActive, currentAngle, handleSubmitClaim]);
+  }, [isCameraActive, currentAngle, isAllCaptured, handleSubmitClaim]);
 
   const getAngleIcon = (iconName: string) => {
     switch (iconName) {
