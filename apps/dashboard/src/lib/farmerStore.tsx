@@ -227,7 +227,16 @@ function submissionToClaim(item: Awaited<ReturnType<typeof listWebClaims>>[numbe
 }
 
 export function FarmerProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<FarmerLang>("hi");
+  const [lang, setLangState] = useState<FarmerLang>(() => {
+    if (typeof window === "undefined") return "hi";
+    try {
+      const storedLang = localStorage.getItem(STORAGE_KEY_LANG) as FarmerLang | null;
+      if (storedLang === "en" || storedLang === "hi") return storedLang;
+    } catch {
+      // ignore
+    }
+    return "hi";
+  });
   const [plots, setPlots] = useState<FarmerPlot[]>([]);
   const [claims, setClaims] = useState<FarmerClaim[]>([]);
   const [milestones, setMilestones] = useState<GrowthTimelineMilestone[]>([]);
@@ -258,12 +267,6 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    try {
-      const storedLang = localStorage.getItem(STORAGE_KEY_LANG) as FarmerLang | null;
-      if (storedLang === "en" || storedLang === "hi") setLangState(storedLang);
-    } catch {
-      // ignore
-    }
     void refresh();
   }, []);
 
