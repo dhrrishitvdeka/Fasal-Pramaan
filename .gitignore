@@ -171,11 +171,12 @@ desktop.ini
 desktop.ini.lnk
 $RECYCLE.BIN/
 
-# ------------------------------------------
 # Temp & Scratch Folders
 # ------------------------------------------
 tmp/
 temp/
+*.tmp
+*.temp
 .scratch/
 .scratch_*
 reports/
@@ -186,9 +187,18 @@ artifacts/
 *.sqlite
 *.sqlite3
 *.db
-# Local scratch dumps (do not publish)
+*.db3
+*.db-shm
+*.db-wal
+# Local scratch dumps and instruction/prompt artifacts (do not publish)
 all_code_dump.txt
 GETTING_STARTED_LOCAL.md
+readmeforgemini.pdf
+evidence_eval_spec.txt
+pdf_extracted.txt
+pdf_text.txt
+*.spec.txt
+AGENT_HANDOVER_STATE.md
 
 # Local ML research inputs and transient checkpoints. Provenance manifests,
 # evaluation reports, configs, and the selected ONNX model remain versioned.
@@ -196,3 +206,4 @@ services/ai/research/data/
 services/ai/research/runs/
 services/ai/research/.venv/
 services/ai/.research-venv/
+

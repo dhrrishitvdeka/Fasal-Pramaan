@@ -1,148 +1,181 @@
-# Architecture and solution structure
+# System Architecture & Technical Specifications
 
-FasalPramaan is a local, Dockerized implementation of an evidence-first crop
-assessment workflow. It separates capture, evidence storage, asynchronous model
-assistance, and human review so no model response becomes a final outcome.
+Fasal-Pramaan is architected as a distributed, decoupled, offline-resilient microservice platform designed for high-concurrency agricultural evidence verification and claims adjudication.
 
-## System boundaries
+---
+
+## 1. High-Level System Topology
 
 ```mermaid
-flowchart LR
-  subgraph Experience["Experience layer"]
-    Mobile["Flutter mobile\nFarmer / Field Officer"]
-    Dashboard["Next.js dashboard\nReviewer / Admin"]
-  end
-  subgraph Application["Application layer"]
-    API["FastAPI\nREST API + authorization"]
-    Worker["Celery worker\nasync evidence processing"]
-    AI["AI service\nassistive inference"]
-  end
-  subgraph Data["Data layer"]
-    Postgres[("PostgreSQL + PostGIS\noperational and audit data")]
-    Redis[("Redis\nrate limit, broker, results")]
-    ObjectStore[("MinIO / S3\nevidence objects")]
+flowchart TB
+  subgraph ExperienceLayer["Experience Layer"]
+    direction TB
+    Mobile["Farmer / Field Officer App\n(Flutter Mobile & Nginx Web :8085)\n• Guided 5-Angle Capture\n• Offline Encrypted Queue\n• Voice Bridge (Fasal Saathi)"]
+    Dashboard["Reviewer Command Centre\n(Next.js 14 TypeScript :3000)\n• GIS Plot Boundary Map\n• Evidence Trust Breakdown\n• Review Queue & Audit Log"]
   end
 
-  Mobile -->|"same-origin /backend (Docker web)"| API
-  Dashboard -->|"same-origin /backend rewrite"| API
+  subgraph GatewayLayer["Gateway & Routing Layer"]
+    API["FastAPI Core REST Gateway (:8000)\n• JWT Auth & RBAC\n• Spatial Jurisdiction Engine\n• Presigned S3 URL Issuance\n• SSE Notification Stream"]
+  end
+
+  subgraph AsyncProcessing["Asynchronous Processing Tier"]
+    Redis[("Redis 7\n• Celery Broker\n• Result Cache\n• Rate Limits")]
+    Worker["Celery Worker Pool\n• Byte & Checksum Verifier\n• Evidence Trust Engine v1\n• Case Router & State Machine"]
+    Beat["Celery Beat Scheduler\n• Evidence Reminders\n• Plan Recurrence Engine"]
+  end
+
+  subgraph AIServiceTier["Assistive AI Inference Tier"]
+    AI["Local AI Service (:8001)\n• DINOv2 ViT-S/14 ONNX Engine\n• Crop-Conditioned Heads\n• A/B/C/U Screening Classifier"]
+  end
+
+  subgraph StorageTier["Persistence & Evidence Storage Tier"]
+    Postgres[("PostgreSQL 16 + PostGIS\n• Spatial Plots & Boundaries\n• Immutable Audit Logs\n• Evidence Evaluation Snapshots")]
+    MinIO[("MinIO S3 Object Store (:9000)\n• Immutable Evidence Blobs\n• Presigned Upload/Download")]
+  end
+
+  Mobile -->|"HTTPS / REST API (/backend)"| API
+  Dashboard -->|"HTTPS / REST API (/backend)"| API
+  Mobile -->|"Direct Signed PUT Upload"| MinIO
+  Dashboard -->|"Presigned GET Media Previews"| MinIO
+
   API --> Postgres
-  API --> ObjectStore
+  API --> MinIO
   API --> Redis
+
   Redis --> Worker
+  Redis --> Beat
   Worker --> Postgres
-  Worker --> ObjectStore
-  Worker -->|"X-Service-Token"| AI
+  Worker --> MinIO
+  Worker -->|"X-Service-Token /v1/analyze"| AI
 ```
 
-## Responsibility by component
+---
 
-| Layer | Component | Responsibility |
-|---|---|---|
-| Capture | Flutter mobile app | Guided evidence capture, device location, encrypted offline queue, resumable sync |
-| Review | Command Centre dashboard | Case queue, map, evidence inspection, human correction, audit visibility |
-| Rules | FastAPI API | Authentication, role/jurisdiction checks, farms/cycles, upload issuance, review state machine |
-| Processing | Celery worker | Verifies queued evidence, calls AI with service authentication, persists outcome, sends cases to review/inspection |
-| AI | FastAPI AI service | Default `crop_health_v4` DINOv2 ViT-S/14 leaf-health screening (A/B/C/U); non-production |
-| Data | PostgreSQL/PostGIS | Users, roles, farms, geometry, submissions, predictions, reviews, audits |
-| Evidence | MinIO/S3 | Private immutable-by-key evidence objects; server verification after upload |
-| Coordination | Redis | Auth rate-limit counters, Celery broker and result backend |
+## 2. Layer & Component Responsibilities
 
-## Evidence processing sequence
+### 2.1 Experience Layer
 
-```mermaid
-sequenceDiagram
-  participant M as Mobile app
-  participant A as API
-  participant O as MinIO/S3
-  participant Q as Redis/Celery
-  participant W as Worker
-  participant I as AI service
-  participant R as Reviewer
+#### A. Farmer & Field Officer Mobile Application (`apps/mobile`)
+- **Technology**: Flutter 3.x (compiled to native Android, iOS, and containerized Web).
+- **Key Subsystems**:
+  - **Guided 5-Angle Capture Engine**: Overlays visual framing guides enforcing the capture of `wide_field`, `left_context`, `mid_canopy`, `right_context`, and `closeup_damage`.
+  - **Client Quality & Integrity Probes**: Real-time Laplacian edge detection for blur, exposure boundary validation, resolution checks, and Android mock-location detection.
+  - **Offline Storage & Encryption**: Local SQLite database encrypted using field-level AES-GCM envelopes, securing evidence when disconnected from cellular networks.
+  - **Resumable Synchronization**: Idempotent background sync engine with exponential backoff and jitter.
+  - **Fasal Saathi Voice Interface**: Dual-channel 16 kHz PCM audio streaming bridge connected to Gemini Live via the API gateway proxy.
 
-  M->>A: Create idempotent draft with GPS/capture metadata
-  A-->>M: Submission ID and signed upload URLs
-  M->>O: Upload required evidence images
-  M->>A: Confirm images and finalize
-  A->>O: Verify observed size, type, hash and image bytes
-  A->>Q: Enqueue processing task
-  Q->>W: Deliver task
-  W->>O: Load verified evidence
-  W->>I: Analyze with X-Service-Token
-  I-->>W: Assistive prediction or inconclusive result
-  W->>A: Persist prediction and route status
-  R->>A: Accept, correct, request recapture, or inspection
-  A-->>M: Persisted status/notification available to sync
-```
+#### B. Reviewer Command Centre (`apps/dashboard`)
+- **Technology**: Next.js 14, React 18, TypeScript, TailwindCSS, React Query, Lucide Icons, Leaflet GIS.
+- **Key Subsystems**:
+  - **Review Queue & Triage**: Real-time filtering and sorting by Evidence Confidence, Uncertainty Type, Integrity Status, and Severity.
+  - **Evidence Trust Inspector**: 4-component visual score cards (Quality, Coverage, Context, Integrity) with detailed deduction explanations.
+  - **Multi-Angle Visual Grid**: Synchronized multi-angle photo viewer with high-resolution pan/zoom and original vs. recapture comparison.
+  - **Spatial GIS Mapping**: Interactive PostGIS plot polygon boundary overlays with GPS capture pin accuracy circles.
+  - **Immutable Audit History**: Chronological timeline of AI predictions, reviewer overrides, and state transitions.
 
-## Case-state flow
+---
+
+### 2.2 Application Layer
+
+#### A. Core API Gateway (`services/api`)
+- **Technology**: FastAPI (Python 3.11), Pydantic v2, SQLAlchemy 2.0 async/sync ORM, GeoAlchemy2.
+- **Key Subsystems**:
+  - **Authentication & Security**: Argon2id password hashing, JWT access token versioning, opaque refresh token family rotation, and rate-limiting.
+  - **Spatial Jurisdiction RBAC**: Hierarchical boundary enforcement ($State \rightarrow District \rightarrow Block \rightarrow Village$), ensuring field officers only access plots within their assigned territory.
+  - **Presigned Upload Pipeline**: Issuance of cryptographically signed S3 PUT URLs with strict content-length and content-type enforcement.
+  - **Real-Time Notification SSE**: Server-Sent Events (SSE) broadcasting real-time queue updates to connected reviewers.
+
+#### B. Asynchronous Worker Pool (`services/api/app/workers`)
+- **Technology**: Celery 5.x on Redis 7.
+- **Key Subsystems**:
+  - **Server-Side Evidence Verification**: Inspects uploaded S3 objects, validates SHA-256 and perceptual hash ($pHash$) signatures, decodes image headers, and checks byte integrity.
+  - **Evidence Trust & Confidence Engine**: Calculates the 4-component scores ($0.4Q + 0.3C + 0.2X + 0.1I$) and classifies deterministic uncertainty.
+  - **AI Dispatcher**: Dispatches verified image streams to the AI service with mutual service token authentication (`X-Service-Token`).
+  - **Evidence Reminders (`fp-beat`)**: Scans active crop cycles and enqueues scheduled geo-tagged evidence prompts.
+
+---
+
+### 2.3 Assistive AI Inference Tier (`services/ai`)
+
+- **Technology**: FastAPI, ONNX Runtime (CPU/GPU-optimized), NumPy, Pillow.
+- **Default Model**: `crop_health_v4` — **DINOv2 ViT-S/14** (Vision Transformer, Small, 14×14 patch size, ~87 MB ONNX artifact).
+- **Supported Crops**: Maize (*Zea mays*), Paddy / Rice (*Oryza sativa*), Potato (*Solanum tuberosum*), Wheat (*Triticum aestivum*).
+- **Classification Output**: Crop-conditioned $A/B/C/U$ screening signal:
+  - `A`: Confident healthy leaf signal.
+  - `B`: Borderline / uncertain signal requiring human inspection.
+  - `C`: Confident disease/damage pattern.
+  - `U`: Unusable image, unsupported crop, or out-of-domain input.
+- **Architectural Isolation**: The AI model is strictly assistive; model probabilities are isolated from the Evidence Trust calculation and cannot approve financial payouts.
+
+---
+
+### 2.4 Persistence & Storage Tier
+
+- **PostgreSQL 16 + PostGIS 3.4**: Relational schema with spatial geometry types (`POLYGON`, `POINT`, SRID 4326), JSONB component details, optimistic locking (`VersionMixin`), and soft-delete support.
+- **Redis 7 Cluster**: In-memory message broker for Celery queues, task result backend, and distributed rate-limiting counters.
+- **MinIO / AWS S3**: S3-compliant object storage storing original, immutable evidence JPEGs using private server-generated object keys (`submissions/{sub_id}/{img_id}.jpg`).
+
+---
+
+## 3. Submission State Machine
+
+The lifecycle of a crop evidence submission follows a strict, deterministic state machine:
 
 ```mermaid
 stateDiagram-v2
-  [*] --> draft
-  draft --> uploaded: verified uploads + finalize
-  uploaded --> processing: worker starts
-  processing --> pending_review: usable assistive result
-  processing --> needs_recapture: insufficient/poor evidence
-  processing --> physical_inspection: inconclusive or failed safely
-  pending_review --> verified: human accept/correct
-  pending_review --> rejected: human reject
-  pending_review --> needs_recapture: human request
-  needs_recapture --> uploaded: replacement evidence
-  needs_recapture --> physical_inspection
-  physical_inspection --> verified: human completion
+  [*] --> draft: Farmer creates draft with GPS & timestamp
+  draft --> uploaded: Client uploads images & calls /finalize
+  uploaded --> processing: Worker picks up task from queue
+
+  state processing {
+    [*] --> VerifyBytes
+    VerifyBytes --> RunAIInference
+    RunAIInference --> EvaluateEvidenceTrust
+    EvaluateEvidenceTrust --> [*]
+  }
+
+  processing --> pending_review: Confidence >= 85 & No Integrity Failures
+  processing --> needs_recapture: Confidence < 85 (Visual / Coverage / Context)
+  processing --> physical_inspection: Inconclusive / Integrity Failure / Extreme Anomaly
+
+  needs_recapture --> uploaded: Farmer uploads targeted missing/replacement angles
+  
+  pending_review --> verified: Reviewer Accepts or Corrects
+  pending_review --> rejected: Reviewer Rejects (Fraud / Ineligible)
+  pending_review --> needs_recapture: Reviewer Requests Additional Evidence
+  pending_review --> physical_inspection: Reviewer Escalates for Field Audit
+
+  physical_inspection --> verified: Field Officer Completes Ground Inspection
+  physical_inspection --> rejected: Field Officer Confirms Invalid Claim
+
+  verified --> [*]
+  rejected --> [*]
 ```
 
-## Trust and authorization model
+---
+
+## 4. Spatial Jurisdiction & Security Hierarchy
+
+Access to farmer data, plot boundaries, and review queues is strictly governed by a hierarchical jurisdiction model:
 
 ```mermaid
 flowchart TD
-  Request["Authenticated request"] --> Identity["Load current user + DB roles"]
-  Identity --> Role{"Required role?"}
-  Role -->|"No"| Deny["403 deny"]
-  Role -->|"Yes"| Object{"Own object or\nassigned jurisdiction?"}
-  Object -->|"No"| Deny
-  Object -->|"Yes"| Action["Perform action + audit relevant change"]
+  National["National Administration\n(Global Visibility & System Settings)"]
+  State["State Level\n(e.g., Punjab, Uttar Pradesh)"]
+  District["District Level\n(e.g., Ludhiana, Varanasi)"]
+  Block["Block / Tehsil Level\n(e.g., Jagraon, Pindra)"]
+  Village["Village Level\n(e.g., Kaonke, Karkhiyaon)"]
+  
+  FarmPlot["Insured Farm Plots\n(Registered PostGIS Polygons)"]
+
+  National --> State
+  State --> District
+  District --> Block
+  Block --> Village
+  Village --> FarmPlot
 ```
 
-- Farmers can access their own data.
-- Field officers are restricted to their assigned jurisdiction and descendants.
-- Reviewers perform review actions; administrators manage administrative functions.
-- AI is reachable through the backend/worker service boundary, not as an unauthenticated public decision engine.
-
-## Repository structure
-
-```text
-apps/
-  mobile/                 Flutter capture + offline web (nginx :8085, /backend proxy)
-  dashboard/              Next.js Command Centre (:3000, /backend rewrite)
-services/
-  api/                    FastAPI routes, auth, models, Alembic, Celery tasks
-  ai/                     Adapters + DINOv2/ONNX artifacts (default crop_health_v4)
-docs/                     Architecture, operations, model, and security docs
-scripts/                  start-portable, fp.ps1, demo-model, verify-e2e helpers
-docker-compose.yml        Full local stack: db, redis, minio, api, worker, beat, ai, migrate, seed, dashboard, mobile
-```
-
-Optional voice path (Fasal Saathi): farmer app → same-origin `/backend/api/v1/voice/live`
-→ API Live proxy → Gemini ephemeral session. Tool calls execute only through the
-client allowlist. See [VOICE_ASSISTANT_DEMO.md](./VOICE_ASSISTANT_DEMO.md).
-
-## Client → API linking
-
-| Client | Public URL | API path used by browser |
-|---|---|---|
-| Field app (Docker) | `http://localhost:8085` | `/backend/*` → nginx → `api:8000` |
-| Dashboard (Docker) | `http://localhost:3000` | `/backend/*` → Next rewrite → `api:8000` |
-| Native Flutter / host API | host:8000 | Absolute `API_BASE_URL` (e.g. emulator `http://10.0.2.2:8000`) |
-
-Default AI adapter is `crop_health_v4` in Compose, API settings, and the AI service. Rollbacks: `crop_health_v3`, `crop_vit`, legacy `plant_disease`.
-
-## Design principles
-
-1. **Human-in-the-loop:** the model cannot make a final claim outcome.
-2. **Evidence before inference:** the server verifies uploaded bytes before processing.
-3. **Offline first:** a local queue lets capture proceed during connectivity loss, then resumes idempotently.
-4. **Replaceable AI:** adapters isolate experimental model choices from the evidence/review workflow.
-5. **Auditable decisions:** reviewer changes and overrides include reasons and audit history.
-
-See [README.md](../README.md) for product overview and [ai-service.md](./ai-service.md) for the current model.
+- **Farmers**: Can only create, view, and modify farms, plots, crop cycles, and submissions belonging to their authenticated `farmer_profile`.
+- **Field Officers**: Can only access and assist submissions belonging to villages within their assigned `jurisdiction_id` (and all sub-jurisdictions).
+- **Reviewers**: Authorized across designated administrative regions to perform claim adjudication.
+- **System Administrators**: Retain platform-wide observability, audit log inspection, and configuration governance.

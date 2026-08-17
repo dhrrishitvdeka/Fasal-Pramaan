@@ -1,105 +1,190 @@
-# API reference for the local deployment
+# API Reference & Data Contracts
 
-Base URL (host-mapped API): `http://localhost:8000`
+Base URL (Direct API Gateway): `http://localhost:8000`  
+Version Prefix: `/api/v1`  
+Interactive OpenAPI Documentation (Swagger UI): `http://localhost:8000/docs`  
+Alternative ReDoc Specification: `http://localhost:8000/redoc`
 
-Version prefix: `/api/v1`
+*Note: In Docker environments, browser clients use the same-origin `/backend` proxy (Next.js rewrite on port `3000` and Nginx reverse proxy on port `8085`), which seamlessly forwards requests to `http://api:8000`.*
 
-Browser clients in Docker call same-origin **`/backend`** (dashboard rewrite / mobile nginx), which proxies to the API container.
+---
 
-Local interactive docs (development environments only): `http://localhost:8000/docs`
+## 1. Authentication & Session Management
 
-This page summarizes the API surfaces used by the local stack. OpenAPI at
-`/docs` remains the route-level contract.
-
-## Authentication and sessions
-
-| Route | Purpose | Notes |
-|---|---|---|
-| `POST /auth/register` | Create a farmer account | Public registration is farmer-only; new account is not falsely marked verified |
-| `POST /auth/login` | Receive access and refresh tokens | Demo accounts are seeded locally |
-| `POST /auth/refresh` | Rotate refresh token | Reuse detection revokes the token family |
-| `POST /auth/logout` | End session | Invalidates refresh family and current access-token version |
-| `GET /auth/me` | Current user profile/roles | Requires Bearer access token |
-
+### Headers
+All protected routes require standard Bearer Token authorization:
 ```http
 Authorization: Bearer <access_token>
 ```
 
-Access tokens are short-lived. The dashboard/mobile clients refresh them during a running session; the dashboard intentionally keeps them in memory rather than browser storage.
+### Endpoints
 
-## Role and data scope
+| Method | Endpoint | Access Level | Description |
+|---|---|---|---|
+| `POST` | `/auth/register` | Public | Register a new farmer account (`full_name`, `email`, `password`, `phone`). |
+| `POST` | `/auth/login` | Public | Authenticate with email/password; returns short-lived access token and refresh token. |
+| `POST` | `/auth/refresh` | Public | Rotate refresh token with token-family reuse detection. |
+| `POST` | `/auth/logout` | Authenticated | Revoke refresh token family and increment user `token_version`. |
+| `GET` | `/auth/me` | Authenticated | Retrieve current user profile, roles, and assigned jurisdiction scopes. |
 
-| Actor | Data scope | Key actions |
+#### Login Request & Response Example
+```http
+POST /api/v1/auth/login HTTP/1.1
+Content-Type: application/json
+
+{
+  "email": "farmer@fasalpramaan.local",
+  "password": "Demo@12345"
+}
+```
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "8f3b2a19-4c12-4f81-9b24-7e912384a101",
+  "token_type": "bearer",
+  "expires_in": 1800,
+  "user": {
+    "id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+    "email": "farmer@fasalpramaan.local",
+    "full_name": "Ramesh Kumar",
+    "roles": ["farmer"],
+    "preferred_language": "hi"
+  }
+}
+```
+
+---
+
+## 2. Farm, Plot & Crop Cycle Management
+
+| Method | Endpoint | Description |
 |---|---|---|
-| Farmer | Own farms, cycles and submissions | Capture/sync evidence; view status |
-| Field officer | Assigned jurisdiction and descendants | Assist capture only within jurisdiction |
-| Reviewer | Review/dashboard scope | Review, correct, request recapture, inspect |
-| Admin | Administrative scope | User/settings/audit administration |
+| `GET` | `/farms` | List all farms owned by the farmer or within the field officer's jurisdiction. |
+| `POST` | `/farms` | Create a new farm record with village jurisdiction binding. |
+| `GET` | `/farms/{id}/plots` | List all spatial plots associated with a farm. |
+| `POST` | `/farms/{id}/plots` | Register a new plot with GeoJSON boundary geometry and centroid. |
+| `GET` | `/crop-cycles` | List active and historical crop cycles. |
+| `POST` | `/crop-cycles` | Initialize a new crop cycle on a plot (e.g., Kharif Paddy 2026). |
+| `GET` | `/crop-types` | Retrieve the reference crop catalog (Maize, Paddy, Potato, Wheat). |
 
-Every protected object route validates ownership or jurisdiction. The API does not grant a field officer global farmer access.
+---
 
-## Evidence lifecycle routes
+## 3. Evidence Capture & Submission Lifecycle
 
-| Route | Purpose | Important validation |
-|---|---|---|
-| `POST /submissions/drafts` | Create/resume idempotent draft | Cycle access, GPS/capture metadata, unique client key |
-| `POST /submissions/{id}/upload-urls` | Request signed evidence uploads | Required media type, declared size/hash, duplicate handling |
-| `POST /submissions/{id}/images/confirm` | Confirm uploaded images | Server observes object existence and metadata |
-| `POST /submissions/{id}/finalize` | Submit a complete case | Required angles, observed size/type/SHA/image bytes; queues processing |
-| `GET /submissions` / `GET /submissions/{id}` | Read status/evidence metadata | Ownership or authorized scope |
-| `POST /submissions/{id}/retry-processing` | Retry safe processing | Authorized case access |
+### 3.1 Draft Creation (`POST /submissions/drafts`)
+Initializes an idempotent submission container with GPS coordinates and client metadata.
 
-The signed PUT request includes the expected content type and content length. Confirmation/re-finalization still verifies the actual stored object; client metadata alone is never trusted.
+```json
+// Request Body
+{
+  "crop_cycle_id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+  "growth_stage_id": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+  "farmer_observations": "Severe yellowing and leaf lesions observed across the lower canopy.",
+  "capture_lat": 28.6139,
+  "capture_lon": 77.2090,
+  "capture_accuracy_m": 8.5,
+  "capture_timestamp": "2026-08-17T10:30:00Z",
+  "device_id": "android-pixel7-98412",
+  "offline_created": true,
+  "idempotency_key": "draft-ramesh-cycle-2026-08-17-001"
+}
+```
 
-## Review routes
+### 3.2 Request Upload URLs (`POST /submissions/{id}/upload-urls`)
+Requests presigned S3 PUT URLs for the 5 canonical angles.
 
-| Route | Purpose |
-|---|---|
-| `GET /review/queue` | Reviewable cases |
-| `GET /review/{id}` | Case detail |
-| `POST /review/{id}/action` | `accept`, `correct`, `reject`, `request_recapture`, `physical_inspection`, or `complete` as state allows |
-| `GET /review/{id}/history` | Review and audit history |
+```json
+// Request Body
+{
+  "images": [
+    {
+      "angle_type": "wide_field",
+      "sequence_order": 1,
+      "content_type": "image/jpeg",
+      "byte_size": 2451920,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "width": 4032,
+      "height": 3024
+    },
+    {
+      "angle_type": "left_context",
+      "sequence_order": 2,
+      "content_type": "image/jpeg",
+      "byte_size": 2189400,
+      "sha256": "ca978112ca1bbdcafac231b39a23dc4da78607f9c2f960000000000000000001",
+      "width": 4032,
+      "height": 3024
+    }
+  ]
+}
+```
 
-Overrides require an `override_reason`. A rejection clears any misleading final severity rather than leaving stale AI/human assessment values visible as final.
+```json
+// Response Body
+{
+  "submission_id": "f8a1e230-b741-4cf0-9852-192a8310c952",
+  "uploads": [
+    {
+      "image_id": "c1e0a293-1284-482a-a921-99884120ab11",
+      "angle_type": "wide_field",
+      "object_key": "submissions/f8a1e230-b741-4cf0-9852-192a8310c952/c1e0a293.jpg",
+      "upload_url": "http://localhost:9000/evidence-vault/submissions/f8a1e230...?...signed-params",
+      "method": "PUT",
+      "headers": {
+        "Content-Type": "image/jpeg",
+        "Content-Length": "2451920"
+      }
+    }
+  ]
+}
+```
 
-## Dashboard and system routes
+### 3.3 Confirm Uploads (`POST /submissions/{id}/images/confirm`)
+Confirms that files have been successfully transferred to object storage.
 
-| Route | Intended role |
-|---|---|
-| `GET /dashboard/overview` | Reviewer/admin |
-| `GET /dashboard/map/markers` | Reviewer/admin |
-| `GET /dashboard/analytics/*` | Reviewer/admin |
-| `GET /dashboard/notifications` | Authorized user |
-| `GET /health` | Local stack health |
+```json
+{
+  "image_id": "c1e0a293-1284-482a-a921-99884120ab11",
+  "etag": "\"9b10e43f0ba980c855e5c80eecd383d4\""
+}
+```
 
-## Evidence reminders
+### 3.4 Finalize Submission (`POST /submissions/{id}/finalize`)
+Locks the submission draft, performs server-side byte verification, enqueues the Celery background processing task, and returns the active submission status.
 
-| Route | Purpose |
-|---|---|
-| `GET /evidence-reminders` | List plans for the authenticated farmer |
-| `PUT /evidence-reminders/{cycle_id}` | Update cadence, photo count, pause/resume for a crop cycle |
-| `POST /evidence-reminders/{cycle_id}/snooze` | Snooze a plan (1–7 days) |
+---
 
-Plans are created when a crop cycle is created. Local seed creates accounts and
-catalogs only — no farms or crop cycles.
+## 4. Review & Adjudication Endpoints
 
-## Voice assistant (farmer only)
+| Method | Endpoint | Role | Description |
+|---|---|---|---|
+| `GET` | `/review/queue` | Reviewer / Admin | List cases pending human review with filters for evidence confidence, uncertainty, and crop. |
+| `GET` | `/review/{id}` | Reviewer / Admin | Retrieve full case dossier including images, 4-component trust scores, and AI prediction. |
+| `POST` | `/review/{id}/action` | Reviewer / Admin | Execute an adjudication action (`accept`, `correct`, `reject`, `request_recapture`, `physical_inspection`). |
+| `GET` | `/review/{id}/history` | Reviewer / Admin | Inspect the complete chronological audit log of human overrides and state changes. |
 
-| Route | Purpose |
-|---|---|
-| `POST /voice/session-token` | Mint a short-lived Gemini Live session payload |
-| `WS /voice/live` | Same-origin Live proxy (browser → API → Gemini) |
-| `POST /voice/actions/audit` | Record allowlisted tool outcomes |
+### Adjudication Action Payload (`POST /review/{id}/action`)
 
-Requires `VOICE_ASSISTANT_ENABLED=true` and a server-side `GEMINI_API_KEY`. See
-[VOICE_ASSISTANT_DEMO.md](./VOICE_ASSISTANT_DEMO.md).
+```json
+{
+  "action": "request_recapture",
+  "override_reason": "Close-up leaf shot is blurry and lacks sufficient detail to diagnose fungal blast.",
+  "required_angles": ["closeup_damage"],
+  "notes": "Please instruct the farmer to hold the camera steady in daylight."
+}
+```
 
-## Error behavior
+---
 
-- Authentication and authorization failures return `401` or `403` without revealing protected-object details.
-- Validation failures return structured `422` or domain `400/409` responses.
-- Unexpected failures are sanitized and include a correlation ID for local diagnostics.
-- Outside development/test/local environments, OpenAPI/docs routes are disabled.
+## 5. Evidence Reminders & Voice Bridge
 
-For exact endpoint schemas, start the local stack and open `/docs`. For an
-end-to-end walkthrough, see [demo-walkthrough.md](./demo-walkthrough.md).
+### Evidence Reminders
+- `GET /evidence-reminders`: Returns the farmer's recurring evidence capture schedules.
+- `PUT /evidence-reminders/{cycle_id}`: Configures cadence (14–90 days) and target photo preferences.
+- `POST /evidence-reminders/{cycle_id}/snooze`: Postpones an active reminder by 1–7 days.
+
+### Voice Bridge (Fasal Saathi on Gemini Live)
+- `POST /voice/session-token`: Mints a short-lived ephemeral session token for the authenticated farmer.
+- `WS /voice/live`: Full-duplex WebSocket proxy streaming 16 kHz audio between client and Gemini Live.
+- `POST /voice/actions/audit`: Logs verified tool executions (draft creation, sync trigger, language toggle).

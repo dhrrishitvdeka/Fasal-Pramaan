@@ -8,8 +8,11 @@ $root = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
 $targets = @(
     ".ruff_cache",
     ".pytest_cache",
+    ".mypy_cache",
+    ".turbo",
     "apps\dashboard\node_modules",
     "apps\dashboard\.next",
+    "apps\dashboard\.turbo",
     "apps\mobile\.dart_tool",
     "apps\mobile\build",
     "apps\mobile\.idea",
@@ -47,7 +50,7 @@ $generatedDirectories = Get-ChildItem `
     -Recurse `
     -Force `
     -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -in @("__pycache__", ".pytest_cache", ".ruff_cache") }
+    Where-Object { $_.Name -in @("__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".turbo") }
 
 foreach ($directory in $generatedDirectories) {
     Remove-WorkspacePath $directory.FullName
@@ -55,7 +58,11 @@ foreach ($directory in $generatedDirectories) {
 
 foreach ($relative in @(
     "apps\mobile\.flutter-plugins-dependencies",
-    "apps\mobile\fasalpramaan.iml"
+    "apps\mobile\fasalpramaan.iml",
+    "readmeforgemini.pdf",
+    "evidence_eval_spec.txt",
+    "pdf_extracted.txt",
+    "pdf_text.txt"
 )) {
     $path = Join-Path $root $relative
     if (Test-Path -LiteralPath $path) {
@@ -72,4 +79,17 @@ foreach ($relative in @(
     }
 }
 
+$tempFiles = Get-ChildItem `
+    -LiteralPath $root `
+    -File `
+    -Recurse `
+    -Force `
+    -ErrorAction SilentlyContinue |
+    Where-Object { $_.Extension -in @(".pyc", ".pyo") -or $_.Name -like ".coverage*" }
+
+foreach ($file in $tempFiles) {
+    Remove-Item -LiteralPath $file.FullName -Force
+}
+
 Write-Host "Workspace cleanup complete."
+

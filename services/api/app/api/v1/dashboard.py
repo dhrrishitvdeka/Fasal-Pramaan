@@ -6,11 +6,24 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, func, text
+from sqlalchemy import and_, func, or_, text
 from sqlalchemy.orm import aliased
 
 from app.core.deps import ROLE_ADMIN, ROLE_REVIEWER, CurrentUser, DbSession, require_roles
-from app.db.models import AIPrediction, Alert, CropCycle, CropType, Farm, Jurisdiction, Notification, Plot, Submission, User
+from app.db.models import (
+    AIPrediction,
+    Alert,
+    CropCycle,
+    CropType,
+    EvidenceEvaluation,
+    Farm,
+    Jurisdiction,
+    Notification,
+    Plot,
+    RecaptureRequest,
+    Submission,
+    User,
+)
 from app.schemas.submission import MapMarkerOut
 import csv
 import io
@@ -25,6 +38,17 @@ def _latest_prediction_subquery(db: DbSession):
             func.max(AIPrediction.created_at).label("created_at"),
         )
         .group_by(AIPrediction.submission_id)
+        .subquery()
+    )
+
+
+def _latest_evaluation_subquery(db: DbSession):
+    return (
+        db.query(
+            EvidenceEvaluation.submission_id.label("submission_id"),
+            func.max(EvidenceEvaluation.created_at).label("created_at"),
+        )
+        .group_by(EvidenceEvaluation.submission_id)
         .subquery()
     )
 
@@ -104,6 +128,86 @@ def overview(
         )
     ).first()
 
+    latest_eval_sub = _latest_evaluation_subquery(db)
+    latest_evaluations = (
+        db.query(EvidenceEvaluation)
+        .join(
+            latest_eval_sub,
+            and_(
+                EvidenceEvaluation.submission_id == latest_eval_sub.c.submission_id,
+                EvidenceEvaluation.created_at == latest_eval_sub.c.created_at,
+            ),
+        )
+        .join(Submission, Submission.id == EvidenceEvaluation.submission_id)
+        .filter(Submission.is_deleted.is_(False))
+    )
+
+    avg_ev_conf = (
+        db.query(func.avg(EvidenceEvaluation.final_confidence))
+        .join(
+            latest_eval_sub,
+            and_(
+                EvidenceEvaluation.submission_id == latest_eval_sub.c.submission_id,
+                EvidenceEvaluation.created_at == latest_eval_sub.c.created_at,
+            ),
+        )
+        .join(Submission, Submission.id == EvidenceEvaluation.submission_id)
+        .filter(Submission.is_deleted.is_(False))
+        .scalar()
+    )
+    average_evidence_confidence = round(float(avg_ev_conf), 2) if avg_ev_conf is not None else None
+    low_evidence_confidence_cases = latest_evaluations.filter(EvidenceEvaluation.final_confidence < 85.0).count()
+    visual_uncertainty_cases = latest_evaluations.filter(EvidenceEvaluation.uncertainty_type == "visual").count()
+    coverage_uncertainty_cases = latest_evaluations.filter(EvidenceEvaluation.uncertainty_type == "coverage").count()
+    context_uncertainty_cases = latest_evaluations.filter(EvidenceEvaluation.uncertainty_type == "context").count()
+    integrity_flags = latest_evaluations.filter(
+        or_(
+            EvidenceEvaluation.uncertainty_type == "integrity",
+            EvidenceEvaluation.integrity_score < 70.0,
+        )
+    ).count()
+
+    total_recaptures = db.query(RecaptureRequest).count()
+    resolved_recaptures = db.query(RecaptureRequest).filter(RecaptureRequest.status != "open").count()
+    subs_with_recapture = db.query(func.count(func.distinct(RecaptureRequest.submission_id))).scalar() or 0
+    recapture_rate = round(float(subs_with_recapture) / max(total, 1), 3)
+    evidence_resolution_rate = round(float(resolved_recaptures) / max(total_recaptures, 1), 3) if total_recaptures > 0 else 0.0
+
+    earliest_eval_sub = (
+        db.query(
+            EvidenceEvaluation.submission_id.label("submission_id"),
+            func.min(EvidenceEvaluation.created_at).label("created_at"),
+        )
+        .group_by(EvidenceEvaluation.submission_id)
+        .subquery()
+    )
+    earliest_eval = aliased(EvidenceEvaluation)
+    latest_eval = aliased(EvidenceEvaluation)
+    avg_imp = (
+        db.query(func.avg(latest_eval.final_confidence - earliest_eval.final_confidence))
+        .join(
+            latest_eval_sub,
+            and_(
+                latest_eval.submission_id == latest_eval_sub.c.submission_id,
+                latest_eval.created_at == latest_eval_sub.c.created_at,
+            ),
+        )
+        .join(
+            earliest_eval_sub,
+            and_(
+                earliest_eval.submission_id == earliest_eval_sub.c.submission_id,
+                earliest_eval.created_at == earliest_eval_sub.c.created_at,
+            ),
+        )
+        .join(Submission, Submission.id == latest_eval.submission_id)
+        .filter(
+            Submission.is_deleted.is_(False),
+            latest_eval.created_at > earliest_eval.created_at,
+        )
+        .scalar()
+    )
+    avg_confidence_improvement = round(float(avg_imp), 2) if avg_imp is not None else 0.0
+
     return {
         "total_submissions": total,
         "submissions_today": today,
@@ -117,6 +221,15 @@ def overview(
         "most_affected_district": top_district.name if top_district else None,
         "low_confidence_rate": round(low_conf / pred_total, 3),
         "submission_failure_rate": round(failed / max(total, 1), 3),
+        "average_evidence_confidence": average_evidence_confidence,
+        "low_evidence_confidence_cases": low_evidence_confidence_cases,
+        "visual_uncertainty_cases": visual_uncertainty_cases,
+        "coverage_uncertainty_cases": coverage_uncertainty_cases,
+        "context_uncertainty_cases": context_uncertainty_cases,
+        "integrity_flags": integrity_flags,
+        "recapture_rate": recapture_rate,
+        "evidence_resolution_rate": evidence_resolution_rate,
+        "avg_confidence_improvement": avg_confidence_improvement,
     }
 
 

@@ -1,21 +1,30 @@
-# Environment variables
+# Environment Variables Reference
 
-For local Docker use, copy `.env.example` to `.env` and keep the development
-defaults unless you intentionally change them. Do not share or commit `.env`.
+Fasal-Pramaan is configured via environment variables defined in `.env` (derived from `.env.example`).
 
-| Group | Variables | Purpose |
-|---|---|---|
-| Runtime | `ENVIRONMENT`, `LOG_LEVEL`, `CORS_ORIGINS`, `PUBLIC_HOST` | Application behavior, local origins, and LAN host used in browser URLs |
-| Database | `DATABASE_URL`, `POSTGRES_*` | PostgreSQL/PostGIS connection |
-| Redis/Celery | `REDIS_PASSWORD`, `REDIS_URL`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND` | Authenticated rate-limit and task infrastructure |
-| Auth | `JWT_SECRET_KEY`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_DAYS`, `DEMO_PASSWORD` | Local demo authentication |
-| Storage | `MINIO_*`, `S3_REGION`, `S3_BUCKET_VERSIONING`, `S3_ADDRESSING_STYLE` | Evidence object storage |
-| AI | `AI_SERVICE_URL`, `AI_SERVICE_TOKEN`, `AI_MODEL_ADAPTER` (default **`crop_health_v4`**), `AI_ALLOW_MOCK_FALLBACK` | AI service boundary; rollbacks `crop_health_v3` / `crop_vit` / legacy `plant_disease` |
-| Voice (Fasal Saathi) | `VOICE_ASSISTANT_ENABLED`, `GEMINI_API_KEY`, `GEMINI_LIVE_MODEL`, `GEMINI_LIVE_VOICE`, `GEMINI_LIVE_SESSION_MINUTES` | Server-only Gemini Live config; key never leaves the API |
-| Native mobile development | `MOBILE_API_BASE_URL` | Host API URL used by helper scripts/native builds; Docker web uses same-origin `/backend` |
-| Rate limit | `RATE_LIMIT_ENABLED` (default **off** for the local MVP), `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_BACKEND`, `TRUSTED_PROXY_IPS` | Optional client throttling; leave disabled for local demo traffic |
-| Operations | `SENTRY_DSN`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `SEED_ON_STARTUP` | Optional observability and local seed behavior |
+---
 
-## Important production behavior
+## Configuration Parameter Groups
 
-When `ENVIRONMENT` is not development/test/local, application validation rejects weak/demo JWT configuration, passwordless Redis URLs, memory-only production rate limiting, missing/weak AI service credentials, and AI mock fallback. Production values must be injected by a managed secret system—not copied from `.env.example`.
+| Group | Variables | Default Value | Description |
+|---|---|---|---|
+| **Runtime & Network** | `ENVIRONMENT`<br/>`LOG_LEVEL`<br/>`CORS_ORIGINS`<br/>`PUBLIC_HOST` | `development`<br/>`INFO`<br/>`http://localhost:3000,...`<br/>`localhost` | Environment mode (`development`, `production`, `test`), logging granularity, allowed CORS origins, and LAN host identifier. |
+| **Database & GIS** | `DATABASE_URL`<br/>`POSTGRES_DB`<br/>`POSTGRES_USER`<br/>`POSTGRES_PASSWORD` | `postgresql+psycopg2://...`<br/>`fasalpramaan`<br/>`fp_user`<br/>`fp_password` | PostgreSQL 16 + PostGIS connection string and credential parameters. |
+| **Redis & Queue** | `REDIS_URL`<br/>`REDIS_PASSWORD`<br/>`CELERY_BROKER_URL`<br/>`CELERY_RESULT_BACKEND` | `redis://:fp_redis_pass@redis:6379/0` | Redis 7 broker and Celery asynchronous task infrastructure. |
+| **Authentication** | `JWT_SECRET_KEY`<br/>`ACCESS_TOKEN_EXPIRE_MINUTES`<br/>`REFRESH_TOKEN_EXPIRE_DAYS`<br/>`DEMO_PASSWORD` | `32-byte-hex`<br/>`30`<br/>`30`<br/>`Demo@12345` | JWT secret key, token expiration timeframes, and pre-seeded demo user account password. |
+| **Evidence Storage** | `MINIO_ENDPOINT`<br/>`MINIO_ROOT_USER`<br/>`MINIO_ROOT_PASSWORD`<br/>`S3_BUCKET_NAME` | `minio:9000`<br/>`minioadmin`<br/>`minioadmin_dev_only`<br/>`evidence-vault` | S3/MinIO endpoint, credentials, and evidence bucket configuration. |
+| **Evidence Trust Engine** | `EVIDENCE_CONFIDENCE_THRESHOLD`<br/>`EVIDENCE_QUALITY_RETAKE_THRESHOLD`<br/>`EVIDENCE_COVERAGE_REQUEST_THRESHOLD`<br/>`EVIDENCE_EVALUATION_VERSION` | `85.0`<br/>`40.0`<br/>`50.0`<br/>`evidence-confidence-v1` | Deterministic threshold for evidence sufficiency, visual quality retake boundary, coverage request threshold, and scoring version. |
+| **AI Inference** | `AI_SERVICE_URL`<br/>`AI_SERVICE_TOKEN`<br/>`AI_MODEL_ADAPTER`<br/>`AI_ALLOW_MOCK_FALLBACK` | `http://ai:8001`<br/>`fp_ai_service_token_dev`<br/>`crop_health_v4`<br/>`false` | AI microservice endpoint, service authentication token, active model adapter, and fallback policy. |
+| **Voice (Fasal Saathi)** | `VOICE_ASSISTANT_ENABLED`<br/>`GEMINI_API_KEY`<br/>`GEMINI_LIVE_MODEL`<br/>`GEMINI_LIVE_VOICE`<br/>`GEMINI_LIVE_SESSION_MINUTES` | `false`<br/>`""`<br/>`gemini-3.1-flash-live-preview`<br/>`Kore`<br/>`15` | Google Gemini Live full-duplex spoken assistant configuration (server-side only). |
+| **Rate Limiting** | `RATE_LIMIT_ENABLED`<br/>`RATE_LIMIT_PER_MINUTE`<br/>`RATE_LIMIT_BACKEND`<br/>`TRUSTED_PROXY_IPS` | `false`<br/>`120`<br/>`redis`<br/>`127.0.0.1` | API gateway client throttling controls. |
+| **Observability** | `SENTRY_DSN`<br/>`OTEL_EXPORTER_OTLP_ENDPOINT`<br/>`SEED_ON_STARTUP` | `""`<br/>`""`<br/>`true` | Sentry error monitoring, OpenTelemetry distributed tracing, and automated startup data seeding. |
+
+---
+
+## Production Security Assertions
+
+When `ENVIRONMENT=production`, the application strictly enforces:
+- `JWT_SECRET_KEY` must be $\ge 32$ cryptographically random bytes.
+- `AI_ALLOW_MOCK_FALLBACK` must be `false`.
+- `REDIS_PASSWORD` and database credentials must be non-default.
+- `RATE_LIMIT_ENABLED` must be `true` with Redis backend.

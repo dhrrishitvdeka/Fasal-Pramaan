@@ -23,6 +23,7 @@ from app.db.models import (
     AIJob,
     AIPrediction,
     CropCycle,
+    EvidenceEvaluation,
     Farm,
     FarmerProfile,
     GrowthStage,
@@ -35,6 +36,7 @@ from app.db.models import (
 from app.schemas.common import MessageOut, Paginated
 from app.schemas.submission import (
     AIPredictionOut,
+    EvidenceEvaluationOut,
     FinalizeSubmissionRequest,
     ImageUploadedConfirm,
     SubmissionDraftCreate,
@@ -157,6 +159,13 @@ def _serialize_submission(db: DbSession, sub: Submission, include_urls: bool = T
         .first()
     )
     latest = AIPredictionOut.model_validate(pred) if pred else None
+    eval_row = (
+        db.query(EvidenceEvaluation)
+        .filter(EvidenceEvaluation.submission_id == sub.id)
+        .order_by(EvidenceEvaluation.created_at.desc())
+        .first()
+    )
+    latest_eval = EvidenceEvaluationOut.model_validate(eval_row) if eval_row else None
     return SubmissionOut(
         id=sub.id,
         crop_cycle_id=sub.crop_cycle_id,
@@ -178,6 +187,7 @@ def _serialize_submission(db: DbSession, sub: Submission, include_urls: bool = T
         anomaly_flags=sub.anomaly_flags,
         images=images,
         latest_prediction=latest,
+        latest_evaluation=latest_eval,
     )
 
 
@@ -793,3 +803,19 @@ def cancel_draft(submission_id: str, db: DbSession, user: CurrentUser) -> Messag
     sub.status = "cancelled"
     db.commit()
     return MessageOut(message="Draft cancelled")
+
+
+@router.get("/{submission_id}/evaluations", response_model=list[EvidenceEvaluationOut])
+def get_submission_evaluations(
+    submission_id: str,
+    db: DbSession,
+    user: CurrentUser,
+) -> list[EvidenceEvaluationOut]:
+    sub = _check_submission_access(db, user, submission_id)
+    evals = (
+        db.query(EvidenceEvaluation)
+        .filter(EvidenceEvaluation.submission_id == sub.id)
+        .order_by(EvidenceEvaluation.created_at.desc())
+        .all()
+    )
+    return [EvidenceEvaluationOut.model_validate(e) for e in evals]

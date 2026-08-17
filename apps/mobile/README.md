@@ -1,52 +1,50 @@
-# FasalPramaan field app
+# Fasal-Pramaan Field Application
 
-Flutter app for farmer and field-officer evidence capture. It provides guided
-five-angle capture, GPS policy, encrypted offline persistence, resumable
-upload, and submission status.
+The **Fasal-Pramaan Field Application** is a multi-platform Flutter application (supporting Native Android, iOS, and containerized Web) built for farmers and agricultural field officers. It facilitates guided 5-angle evidence capture, real-time visual quality checks, encrypted offline vault storage, and idempotent background synchronization.
 
-## Docker web build
+---
 
-The app is part of the root Docker Compose stack:
+## 1. Core Capabilities
 
-```powershell
-docker compose up -d --build
+- **Guided 5-Angle Capture Engine**: Step-by-step spatial photo guidance for `wide_field`, `left_context`, `mid_canopy`, `right_context`, and `closeup_damage`.
+- **Pre-Capture Quality Probes**: On-device detection of motion blur, underexposure/overexposure, sub-standard resolution, and mock/simulated GPS providers.
+- **Cryptographic Offline Vault**: Field-level AES-GCM-256 encryption ensuring offline evidence captured in remote areas is protected against tampering.
+- **Adaptive Recapture Mode**: Seamlessly switches between full 5-angle capture and targeted single-angle retake based on backend evaluation requests.
+- **Fasal Saathi Spoken Assistant**: Dual-channel 16 kHz PCM audio streaming bridge enabling hands-free field capture in Hindi and English via Gemini Live.
+
+---
+
+## 2. Running in Docker (Web Build)
+
+The application is compiled and served automatically as part of the root Docker stack:
+
+```bash
+docker compose up -d --build mobile
 ```
 
-Open `http://localhost:8085`. The web build uses `/backend`, proxied by Nginx
-to the API container, so it works unchanged on localhost or another LAN
-device.
+Access the field application at `http://localhost:8085`.
 
-Demo accounts:
+---
 
-- `farmer@fasalpramaan.local` / `Demo@12345`
-- `officer@fasalpramaan.local` / `Demo@12345`
+## 3. Native Mobile Development
 
-## Reproducible checks
-
-```powershell
-docker build --target tester -t fasalpramaan-mobile-test apps/mobile
-docker compose build mobile
-```
-
-The production image compiles Flutter in a pinned SDK builder, runs
-`flutter analyze` and `flutter test`, and serves only the release web output
-from Nginx.
-
-On the Docker web app over plain HTTP, secure storage falls back to
-SharedPreferences / memory when browser crypto APIs are unavailable. Native
-builds continue to use platform secure storage.
-
-## Native development
-
-Android emulator:
-
-```powershell
+### Android Emulator Setup
+```bash
+cd apps/mobile
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
 ```
 
-Physical device: use the Docker host's LAN IP and allow the API port on a
-trusted network. A release native build must use HTTPS; the same-origin
-`/backend` exception is only for the containerized web app.
+### Physical Device Setup
+To run on a physical phone connected over the same local Wi-Fi:
+```bash
+flutter run --dart-define=API_BASE_URL=http://<HOST_LAN_IP>:8000
+```
 
-Use synthetic data only. A mobile client can detect common mock-location
-signals but cannot independently prove physical location authenticity.
+---
+
+## 4. Verification & Testing
+
+```bash
+# Execute static analysis and unit test suite
+docker build --target tester -t fasalpramaan-mobile-test apps/mobile
+```
