@@ -9,7 +9,7 @@ All notable changes to **Fasal-Pramaan** will be documented in this file. The fo
 ### Added
 - **Vercel-hosted farmer and reviewer web portal** (`apps/dashboard`):
   - Farmer capture at `/farmer/capture` persists real photos (no showcase or localStorage-only path).
-  - Hugging Face inference on `POST /api/claims` using `wambugu71/crop_leaf_diseases_vit`.
+  - Hugging Face inference on `POST /api/claims` via Space `dhrrishitvdeka/fasal-pramaan-api` running `dhrrishitvdeka/fasal-pramaan-model`.
   - Reviewer queue at `/review` lists the same claim IDs from Supabase `web_*` tables.
 - **Supabase persistence** for the hosted web path: private bucket `fasal-web-evidence`, RLS on `web_*` tables, env-only credentials.
 - **Root `vercel.json`** so Vercel builds `apps/dashboard` from the repository root.

@@ -10,7 +10,7 @@ The **Vercel web app** (`apps/dashboard`) uses Supabase for `web_*` tables and a
 |---|---|
 | Supabase Postgres (`web_*` tables) | Claims, images metadata, reviewer actions |
 | Private bucket `fasal-web-evidence` | Real farmer photos (not public, no showcase data) |
-| Hugging Face Inference | `POST /api/claims` → `wambugu71/crop_leaf_diseases_vit` |
+| Hugging Face Space | `POST /api/claims` → `dhrrishitvdeka/fasal-pramaan-api` → `dhrrishitvdeka/fasal-pramaan-model` |
 | Browser GPS | `navigator.geolocation` — no Maps / geocoding API |
 | OpenStreetMap tiles | Reviewer map — no Mapbox / Google Maps key |
 | Supabase Auth | Reviewer `/login` (`signInWithPassword`). Farmer `/farmer/*` is public |
@@ -41,13 +41,13 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 HF_TOKEN=
-NEXT_PUBLIC_HF_MODEL_ID=wambugu71/crop_leaf_diseases_vit
+HF_SPACE_URL=https://dhrrishitvdeka-fasal-pramaan-api.hf.space
 ```
 
 Leave **`NEXT_PUBLIC_API_BASE_URL` unset** on Vercel. If you set it to `http://api:8000` or a missing FastAPI host, the hosted site will try to talk to Docker and fail.
 
 - `SUPABASE_SERVICE_ROLE_KEY` is **server-only**. Never prefix it with `NEXT_PUBLIC_`.
-- `HF_TOKEN` is **server-only**. Create a Read token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
+- `HF_TOKEN` is **server-only**. It must be allowed to call the private Space `dhrrishitvdeka/fasal-pramaan-api`. Never name it `NEXT_PUBLIC_*`.
 
 ### Local Next.js (`apps/dashboard/.env.local`, gitignored)
 

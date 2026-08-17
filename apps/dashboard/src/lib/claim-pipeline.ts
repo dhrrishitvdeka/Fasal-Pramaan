@@ -240,12 +240,17 @@ export async function attachHfPrediction(
 ): Promise<void> {
   await store.updateClaim(claimId, {
     model_id: prediction.modelId,
-    hf_label: prediction.label,
+    hf_label: prediction.plantDiseaseClass || prediction.label,
     hf_score: prediction.score,
-    disease_detected: prediction.label,
+    disease_detected: prediction.plantDiseaseClass || prediction.primaryDamage || prediction.label,
     model_confidence: Math.round(prediction.score * 1000) / 10,
-    crop_identified: prediction.label,
-    crop_confidence: Math.round(prediction.score * 1000) / 10,
+    crop_identified: prediction.predictedCrop || null,
+    crop_confidence:
+      prediction.cropConfidence == null ? null : Math.round(prediction.cropConfidence * 1000) / 10,
+    severity_grade: prediction.predictedGrade || null,
+    severity_percentage: null,
+    affected_area_hectares: null,
+    estimated_loss_inr: null,
     updated_at: new Date().toISOString(),
   });
 }
@@ -254,7 +259,7 @@ export async function persistAndInfer(
   store: ClaimStore,
   input: PersistClaimInput,
   infer: typeof inferCropDisease = inferCropDisease,
-  inferOptions?: { apiToken?: string; fetchImpl?: typeof fetch; modelId?: string },
+  inferOptions?: { apiToken?: string; fetchImpl?: typeof fetch; spaceUrl?: string },
 ): Promise<{ claimId: string; prediction: HfPrediction | null; inferError?: string }> {
   const persisted = await persistFarmerSubmission(store, input);
   const closeup =
@@ -262,9 +267,15 @@ export async function persistAndInfer(
   try {
     const prediction = await infer({
       imageBytes: closeup.bytes,
-      modelId: inferOptions?.modelId,
+      expectedCrop: input.cropType,
+      angleType: closeup.angleType,
+      extraImages: input.images.map((image) => ({
+        angleType: image.angleType,
+        bytes: image.bytes,
+      })),
       apiToken: inferOptions?.apiToken,
       fetchImpl: inferOptions?.fetchImpl,
+      spaceUrl: inferOptions?.spaceUrl,
     });
     await attachHfPrediction(store, persisted.claimId, prediction);
     return { claimId: persisted.claimId, prediction };
@@ -298,14 +309,14 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
     latest_prediction: claim.hf_label
       ? {
           model_version: claim.model_id || "",
-          adapter_type: "huggingface",
+          adapter_type: "crop_health_v4",
           is_production_validated: false,
           predicted_crop: claim.crop_identified,
           crop_confidence: (claim.crop_confidence ?? 0) / 100,
-          primary_damage: claim.hf_label,
-          severity: claim.severity_grade,
+          primary_damage: claim.disease_detected || claim.hf_label,
+          severity: null,
           overall_confidence: claim.hf_score ?? 0,
-          affected_area_pct: claim.severity_percentage,
+          affected_area_pct: null,
           quality_warnings: [],
           anomaly_flags: [],
           human_review_recommendation: "Review recommended",
@@ -313,6 +324,8 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
             hf_label: claim.hf_label,
             hf_score: claim.hf_score,
             model_id: claim.model_id,
+            predicted_grade: claim.severity_grade,
+            grade_is_workflow_bucket: true,
           },
         }
       : null,

@@ -11,7 +11,7 @@ Fasal-Pramaan is configured via environment variables defined in `.env` (derived
 | **Runtime & Network** | `ENVIRONMENT`<br/>`LOG_LEVEL`<br/>`CORS_ORIGINS`<br/>`PUBLIC_HOST` | `development`<br/>`INFO`<br/>`http://localhost:3000,...`<br/>`localhost` | Environment mode (`development`, `production`, `test`), logging granularity, allowed CORS origins, and LAN host identifier. |
 | **Database & GIS** | `DATABASE_URL`<br/>`POSTGRES_DB`<br/>`POSTGRES_USER`<br/>`POSTGRES_PASSWORD` | `postgresql+psycopg2://...`<br/>`fasalpramaan`<br/>`fp_user`<br/>`fp_password` | PostgreSQL 16 + PostGIS connection string and credential parameters. |
 | **Supabase (cloud)** | `NEXT_PUBLIC_SUPABASE_URL`<br/>`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`<br/>`SUPABASE_SERVICE_ROLE_KEY`<br/>`SUPABASE_DB_PASSWORD`<br/>`SUPABASE_PROJECT_REF`<br/>`SUPABASE_DB_REGION` | _(empty — set locally, never commit)_ | Browser publishable key, server-only service role, and DB vars for `scripts/test_supabase_conn.py`. |
-| **Hugging Face (Vercel path)** | `NEXT_PUBLIC_HF_MODEL_ID`<br/>`HF_TOKEN` | `wambugu71/crop_leaf_diseases_vit`<br/>_(empty)_ | Hosted inference model id and server-only API token used by `POST /api/claims`. |
+| **Hugging Face Space (Vercel path)** | `HF_SPACE_URL`<br/>`HF_TOKEN` | `https://dhrrishitvdeka-fasal-pramaan-api.hf.space`<br/>_(empty)_ | Private Space that runs `dhrrishitvdeka/fasal-pramaan-model`. Server-only. |
 | **Redis & Queue** | `REDIS_URL`<br/>`REDIS_PASSWORD`<br/>`CELERY_BROKER_URL`<br/>`CELERY_RESULT_BACKEND` | `redis://:fp_redis_pass@redis:6379/0` | Redis 7 broker and Celery asynchronous task infrastructure. |
 | **Authentication** | `JWT_SECRET_KEY`<br/>`ACCESS_TOKEN_EXPIRE_MINUTES`<br/>`REFRESH_TOKEN_EXPIRE_DAYS`<br/>`DEMO_PASSWORD` | `32-byte-hex`<br/>`30`<br/>`30`<br/>`Demo@12345` | JWT secret key, token expiration timeframes, and pre-seeded demo user account password. |
 | **Evidence Storage** | `MINIO_ENDPOINT`<br/>`MINIO_ROOT_USER`<br/>`MINIO_ROOT_PASSWORD`<br/>`S3_BUCKET_NAME` | `minio:9000`<br/>`minioadmin`<br/>`minioadmin_dev_only`<br/>`evidence-vault` | S3/MinIO endpoint, credentials, and evidence bucket configuration. |
@@ -42,8 +42,8 @@ Set these five on the Vercel project (and in `apps/dashboard/.env.local` for `np
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | yes | Project URL, e.g. `https://<ref>.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes | yes | Publishable / anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | **no** | yes | Server-only. Never `NEXT_PUBLIC_*` |
-| `HF_TOKEN` | **no** | yes | Hugging Face Read token for `POST /api/claims` |
-| `NEXT_PUBLIC_HF_MODEL_ID` | yes | no | Defaults to `wambugu71/crop_leaf_diseases_vit` |
+| `HF_TOKEN` | **no** | yes | Token that can invoke the private Space (`predict_api`) |
+| `HF_SPACE_URL` | **no** | no | Defaults to `https://dhrrishitvdeka-fasal-pramaan-api.hf.space` |
 
 **Leave unset on Vercel**
 
