@@ -47,7 +47,7 @@ const contentSecurityPolicy = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  ...(!process.env.VERCEL ? { output: "standalone" } : {}),
   reactStrictMode: true,
   turbopack: {
     root: process.cwd(),
