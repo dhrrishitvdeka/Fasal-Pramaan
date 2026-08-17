@@ -73,12 +73,17 @@ def process_submission_ai_sync(
 
 
 
-        image_payloads = []
-        for img in sub.images:
+        # Keep only the newest uploaded image per angle_type to correctly handle recaptures
+        active_images_by_angle: dict[str, Any] = {}
+        for img in sorted(sub.images, key=lambda x: x.created_at or datetime.min.replace(tzinfo=timezone.utc)):
             if getattr(img, "is_deleted", False):
                 continue
             if img.upload_status != "uploaded":
                 continue
+            active_images_by_angle[img.angle_type] = img
+
+        image_payloads = []
+        for img in active_images_by_angle.values():
             data = get_bytes(img.object_key) if img.object_key else None
             inference_data = _prepare_inference_image(data)
             image_b64 = base64.b64encode(inference_data).decode("ascii") if inference_data else None
@@ -308,6 +313,7 @@ def process_submission_ai_sync(
             raise
         logger.exception("AI job failed")
         try:
+            db.rollback()
             job = db.query(AIJob).filter(AIJob.id == job_id).first()
             sub = db.query(Submission).filter(Submission.id == submission_id).first()
             if job:

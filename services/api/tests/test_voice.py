@@ -99,12 +99,15 @@ def test_ephemeral_token_is_one_use_and_configuration_locked(monkeypatch):
     }
 
 
-def test_session_token_response_advertises_proxy(client, monkeypatch, farmer_token):
+def test_session_token_response_advertises_proxy(client, monkeypatch):
     """Browser clients should prefer the same-origin /voice/live proxy."""
-    from app.api.v1 import voice as voice_routes
-    from app.services.gemini_live import GEMINI_LIVE_WEBSOCKET_URL, GeminiEphemeralSession
+    from unittest.mock import MagicMock
     from datetime import datetime, timedelta, timezone
     from uuid import uuid4
+    from app.api.v1 import voice as voice_routes
+    from app.core.deps import get_current_user, get_db
+    from app.main import app
+    from app.services.gemini_live import GEMINI_LIVE_WEBSOCKET_URL, GeminiEphemeralSession
 
     # voice.py binds create_ephemeral_session at import time — patch the route module.
     monkeypatch.setattr(
@@ -119,16 +122,33 @@ def test_session_token_response_advertises_proxy(client, monkeypatch, farmer_tok
             session_id=uuid4(),
         ),
     )
-    response = client.post(
-        "/api/v1/voice/session-token",
-        headers={"Authorization": f"Bearer {farmer_token}"},
-        json={},
-    )
-    assert response.status_code == 200, response.text
-    body = response.json()
-    assert body["use_proxy"] is True
-    assert body["proxy_path"] == "/api/v1/voice/live"
-    assert body["model"] == "gemini-3.1-flash-live-preview"
+    monkeypatch.setattr(voice_routes, "write_audit", lambda *args, **kwargs: None)
+
+    mock_role = MagicMock()
+    mock_role.role.code = "farmer"
+    mock_user = MagicMock()
+    mock_user.id = uuid4()
+    mock_user.roles = [mock_role]
+
+    mock_db = MagicMock()
+
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    try:
+        response = client.post(
+            "/api/v1/voice/session-token",
+            headers={"Authorization": "Bearer mock-farmer-token"},
+            json={},
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["use_proxy"] is True
+        assert body["proxy_path"] == "/api/v1/voice/live"
+        assert body["model"] == "gemini-3.1-flash-live-preview"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
 
 
 def test_production_voice_feature_requires_server_api_key():
@@ -156,3 +176,106 @@ def test_transient_token_failures_are_retried_without_exposing_key(monkeypatch):
 
     assert session.token == "auth_tokens/one-use-demo-token"
     assert _RetryClient.attempts == 3
+
+
+def test_audit_voice_action_endpoint(client, monkeypatch):
+    """Voice action audit logs should be accepted and recorded for authenticated farmers."""
+    from unittest.mock import MagicMock
+    from uuid import uuid4
+    from app.api.v1 import voice as voice_routes
+    from app.core.deps import get_current_user, get_db
+    from app.main import app
+
+    audited = []
+    monkeypatch.setattr(voice_routes, "write_audit", lambda *args, **kwargs: audited.append(kwargs))
+
+    mock_role = MagicMock()
+    mock_role.role.code = "farmer"
+    mock_user = MagicMock()
+    mock_user.id = uuid4()
+    mock_user.roles = [mock_role]
+
+    mock_db = MagicMock()
+
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_db] = lambda: mock_db
+
+    session_id = str(uuid4())
+    try:
+        response = client.post(
+            "/api/v1/voice/actions/audit",
+            headers={"Authorization": "Bearer mock-farmer-token"},
+            json={
+                "session_id": session_id,
+                "action": "capture_current_angle",
+                "outcome": "succeeded",
+                "entity_id": "angle_wide_field",
+            },
+        )
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["recorded"] is True
+        assert len(audited) == 1
+        assert audited[0]["action"] == "voice_capture_current_angle"
+        assert str(audited[0]["entity_id"]) == session_id
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_function_declarations_have_valid_schemas():
+    """Verify all tool declarations match valid OpenAPI/JSON Object schema shapes."""
+    from app.services.gemini_live import FUNCTION_DECLARATIONS
+
+    expected_tools = {
+        "navigate_to_screen",
+        "change_language",
+        "list_my_farms",
+        "list_plots",
+        "list_crop_types",
+        "list_growth_stages",
+        "list_crop_cycles",
+        "list_my_submissions",
+        "list_notifications",
+        "list_evidence_reminders",
+        "read_offline_queue",
+        "begin_guided_capture",
+        "read_capture_guidance",
+        "capture_current_angle",
+        "set_capture_observation",
+        "save_guided_capture_offline",
+        "prepare_create_farm",
+        "prepare_create_plot",
+        "prepare_create_crop_cycle",
+        "prepare_update_evidence_reminder",
+        "prepare_snooze_evidence_reminder",
+        "prepare_mark_notification_read",
+        "prepare_logout",
+        "prepare_sync_offline_queue",
+        "prepare_finalize_submission",
+        "confirm_pending_action",
+        "cancel_pending_action",
+    }
+
+    declared_names = {tool["name"] for tool in FUNCTION_DECLARATIONS}
+    missing = expected_tools - declared_names
+    assert not missing, f"Missing tool declarations: {missing}"
+
+    for tool in FUNCTION_DECLARATIONS:
+        assert "name" in tool and isinstance(tool["name"], str)
+        assert "description" in tool and isinstance(tool["description"], str)
+        assert "parameters" in tool and isinstance(tool["parameters"], dict)
+        params = tool["parameters"]
+        assert params.get("type") == "OBJECT"
+        assert "properties" in params and isinstance(params["properties"], dict)
+
+
+def test_authenticate_farmer_ws_rejects_invalid_tokens():
+    """_authenticate_farmer_ws should raise HTTP 401 on invalid JWT tokens."""
+    from fastapi import HTTPException
+    from app.api.v1.voice import _authenticate_farmer_ws
+
+    with pytest.raises(HTTPException) as exc_info:
+        _authenticate_farmer_ws("invalid.jwt.token")
+    assert exc_info.value.status_code == 401
+

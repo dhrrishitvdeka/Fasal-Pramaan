@@ -10,7 +10,10 @@ from PIL import Image
 from app.adapters.plant_disease import PlantDiseaseAdapter, DEFAULT_CKPT
 from app.adapters import get_adapter
 
-_TORCH_AVAILABLE = importlib.util.find_spec("torch") is not None
+_TORCH_AVAILABLE = (
+    importlib.util.find_spec("torch") is not None
+    and importlib.util.find_spec("torchvision") is not None
+)
 
 
 def _leaf_jpeg_bytes(disease: bool = True) -> bytes:
