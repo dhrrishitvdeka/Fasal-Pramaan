@@ -25,6 +25,17 @@ jobs:
         run: docker compose build api ai
       - name: Start dependencies
         run: docker compose up -d db redis minio ai
+      - name: Wait for Postgres to accept connections
+        run: |
+          for i in $(seq 1 40); do
+            if docker compose exec -T db pg_isready -U fasalpramaan -d fasalpramaan; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Postgres never became ready"
+          docker compose logs db --tail=80
+          exit 1
       - name: Migrate and bootstrap catalogs
         run: |
           docker compose run --rm migrate
