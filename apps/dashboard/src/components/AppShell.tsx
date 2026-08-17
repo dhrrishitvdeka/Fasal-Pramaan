@@ -55,12 +55,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isFarmerRoute = pathname.startsWith("/farmer");
   const isLandingRoute = pathname === "/";
   const isLoginRoute = pathname === "/login";
+  const isUnlockRoute = pathname === "/unlock";
 
   useEffect(() => {
     let cancelled = false;
     async function verifySession() {
       // Landing page and Farmer portal are public showcase routes
-      if (isLandingRoute || isFarmerRoute || isLoginRoute) {
+      if (isLandingRoute || isFarmerRoute || isLoginRoute || isUnlockRoute) {
         if (!cancelled) setReady(true);
         return;
       }
@@ -91,9 +92,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [pathname, isLandingRoute, isFarmerRoute, isLoginRoute]);
+  }, [pathname, isLandingRoute, isFarmerRoute, isLoginRoute, isUnlockRoute]);
 
-  if (isLoginRoute) {
+  if (isLoginRoute || isUnlockRoute) {
     return <>{children}</>;
   }
 
