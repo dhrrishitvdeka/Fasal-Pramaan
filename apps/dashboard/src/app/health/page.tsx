@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { getHfModelId } from "@/lib/hf-model";
+import { getHfModelId, getHfSpaceId } from "@/lib/hf-model";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/backend";
 
@@ -23,8 +23,12 @@ export default function HealthPage() {
           { title: "API", data: apiHealth.data || apiHealth.error },
           { title: "Dependency checks", data: apiHealth.data?.checks || {} },
           {
-            title: "Hugging Face model",
-            data: { model_id: getHfModelId(), path: "farmer upload → /api/claims → reviewer queue" },
+            title: "Hugging Face Space",
+            data: {
+              model_id: getHfModelId(),
+              space_id: getHfSpaceId(),
+              path: "farmer upload → /api/claims → Fasal-Pramaan Space → reviewer queue",
+            },
           },
         ].map((block) => (
           <div key={block.title} className="fp-panel">
