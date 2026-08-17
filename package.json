@@ -1,11 +1,10 @@
 {
   "name": "fasal-pramaan",
   "private": true,
-  "description": "Root marker so a misconfigured Vercel project can see Next.js. Set Root Directory to apps/dashboard.",
+  "description": "Monorepo. The Next.js app is apps/dashboard. Set the Vercel Root Directory to apps/dashboard.",
   "scripts": {
-    "build": "npm run build --prefix apps/dashboard"
-  },
-  "dependencies": {
-    "next": "16.3.0"
+    "dev": "npm run dev --prefix apps/dashboard",
+    "build": "npm run build --prefix apps/dashboard",
+    "start": "npm run start --prefix apps/dashboard"
   }
 }
