@@ -1,51 +1,95 @@
 import { NextResponse } from "next/server";
-import { persistAndInfer, listReviewerQueue, type PersistClaimInput } from "@/lib/claim-pipeline";
+import {
+  persistAndInfer,
+  claimToSubmission,
+  type PersistClaimInput,
+} from "@/lib/claim-pipeline";
 import { inferCropDisease } from "@/lib/hf-infer";
 import { createServerSupabase } from "@/lib/supabase";
 import { createSupabaseClaimStore } from "@/lib/supabase-store";
+import { isReviewerRole, requireWebActor } from "@/lib/web-auth";
+
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const MAX_BYTES = 15 * 1024 * 1024;
+const MAX_IMAGES = 6;
 
 function decodeDataUrl(value: string): { bytes: Uint8Array; contentType: string } {
   const match = value.match(/^data:([^;]+);base64,(.+)$/);
   if (!match) {
     throw new Error("Image must be a data URL");
   }
-  return {
-    contentType: match[1],
-    bytes: Uint8Array.from(Buffer.from(match[2], "base64")),
-  };
+  const contentType = match[1].toLowerCase();
+  if (!ALLOWED_TYPES.has(contentType)) {
+    throw new Error("Only JPEG, PNG, and WebP images are allowed");
+  }
+  const bytes = Uint8Array.from(Buffer.from(match[2], "base64"));
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_BYTES) {
+    throw new Error("Each image must be between 1 byte and 15 MB");
+  }
+  return { contentType, bytes };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await requireWebActor(request);
+  if (!auth.ok) return auth.response;
   const supabase = createServerSupabase();
   if (!supabase) {
     return NextResponse.json({ items: [] });
   }
-  const items = await listReviewerQueue(createSupabaseClaimStore(supabase));
+  const store = createSupabaseClaimStore(supabase);
+  const claims = await store.listClaims();
+  const visible = isReviewerRole(auth.actor.role)
+    ? claims
+    : claims.filter((claim) => claim.created_by === auth.actor.userId);
+  const items = [];
+  for (const claim of visible) {
+    items.push(claimToSubmission(claim, await store.listImages(claim.id)));
+  }
   return NextResponse.json({ items });
 }
 
 export async function POST(request: Request) {
+  const auth = await requireWebActor(request);
+  if (!auth.ok) return auth.response;
   const supabase = createServerSupabase();
   if (!supabase) {
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
   }
-  const body = await request.json();
-  const images = (body.images || []).map(
-    (img: { imageDataUrl: string; angleType: string; sha256?: string; lat?: number; lon?: number; accuracyM?: number }) => {
-      const decoded = decodeDataUrl(img.imageDataUrl);
-      return {
-        angleType: img.angleType,
-        bytes: decoded.bytes,
-        contentType: decoded.contentType,
-        sha256: img.sha256,
-        lat: img.lat,
-        lon: img.lon,
-        accuracyM: img.accuracyM,
-      };
-    },
-  );
+  const body = await request.json().catch(() => ({}));
+  const rawImages = Array.isArray(body.images) ? body.images : [];
+  if (!rawImages.length || rawImages.length > MAX_IMAGES) {
+    return NextResponse.json({ error: `Send between 1 and ${MAX_IMAGES} images` }, { status: 400 });
+  }
+  let images: PersistClaimInput["images"];
+  try {
+    images = rawImages.map(
+      (img: {
+        imageDataUrl: string;
+        angleType: string;
+        sha256?: string;
+        lat?: number;
+        lon?: number;
+        accuracyM?: number;
+      }) => {
+        const decoded = decodeDataUrl(String(img.imageDataUrl || ""));
+        return {
+          angleType: String(img.angleType || "closeup_damage"),
+          bytes: decoded.bytes,
+          contentType: decoded.contentType,
+          sha256: img.sha256,
+          lat: img.lat,
+          lon: img.lon,
+          accuracyM: img.accuracyM,
+        };
+      },
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid image" },
+      { status: 400 },
+    );
+  }
   const input: PersistClaimInput = {
-    id: body.id,
     plotId: body.plotId,
     plotName: body.plotName,
     plotNameHi: body.plotNameHi,
@@ -58,6 +102,7 @@ export async function POST(request: Request) {
     captureLon: body.captureLon,
     captureAccuracyM: body.captureAccuracyM,
     gpsStatus: body.gpsStatus,
+    createdBy: auth.actor.userId,
     images,
   };
   try {
@@ -69,9 +114,6 @@ export async function POST(request: Request) {
     );
     return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Persist failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Persist failed" }, { status: 500 });
   }
 }

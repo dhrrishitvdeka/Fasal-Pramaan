@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/auth-headers";
 import { webCaptureBridge } from "@/lib/voice/capture-bridge";
 import { parseGeminiLiveMessage } from "@/lib/voice/gemini-live-parse";
 import { connectSilentProcessor } from "@/lib/voice/mic-graph";
@@ -142,7 +143,7 @@ export default function FasalSaathiOverlay() {
     setStatus("connecting");
     setLines([{ role: "system", text: lang === "hi" ? "फसल साथी शुरू हो रहा है…" : "Starting Fasal Saathi…" }]);
     try {
-      const minted = await fetch("/api/voice/session", { method: "POST" });
+      const minted = await apiFetch("/api/voice/session", { method: "POST" });
       const body = (await minted.json()) as {
         error?: string;
         token?: string;

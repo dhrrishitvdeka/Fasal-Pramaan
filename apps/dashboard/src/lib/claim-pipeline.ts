@@ -38,6 +38,7 @@ export type PersistClaimInput = {
   captureLon?: number | null;
   captureAccuracyM?: number | null;
   gpsStatus?: string | null;
+  createdBy?: string | null;
   images: PersistedImageInput[];
 };
 
@@ -83,6 +84,7 @@ export type WebClaimRow = {
   capture_lon?: number | null;
   capture_accuracy_m?: number | null;
   gps_status?: string | null;
+  created_by?: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -202,6 +204,7 @@ export async function persistFarmerSubmission(
     capture_accuracy_m: input.captureAccuracyM ?? null,
     gps_status: input.gpsStatus ?? null,
     payout_status: "pending_review",
+    created_by: input.createdBy ?? null,
     created_at: now,
     updated_at: now,
   };
@@ -380,7 +383,7 @@ export async function getReviewerClaim(store: ClaimStore, id: string): Promise<S
 export async function applyReviewerAction(
   store: ClaimStore,
   id: string,
-  payload: { action: string; notes?: string; reason?: string; required_angles?: string[] },
+  payload: { action: string; notes?: string; reason?: string; required_angles?: string[]; actor?: string },
 ): Promise<Submission> {
   const existing = await store.getClaim(id);
   if (!existing) {
@@ -406,7 +409,7 @@ export async function applyReviewerAction(
     notes: payload.notes,
     reason: payload.reason,
     required_angles: payload.required_angles,
-    actor: "reviewer",
+    actor: payload.actor || "reviewer",
   });
   const updated = await getReviewerClaim(store, id);
   if (!updated) throw new Error("Claim missing after update");

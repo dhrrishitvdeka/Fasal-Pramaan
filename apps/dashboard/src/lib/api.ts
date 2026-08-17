@@ -1,19 +1,7 @@
 import axios from "axios";
+import { apiFetch } from "./auth-headers";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
-import {
-  alertsFromClaims,
-  analyticsFromClaims,
-  emptyOverview,
-  fetchAllReviewActions,
-  fetchReviewActions,
-  fetchWebClaimById,
-  fetchWebClaims,
-  markersFromClaims,
-  overviewFromClaims,
-  persistReviewAction,
-  submissionFromClaim,
-  type ReviewActionPayload,
-} from "./web-db";
+import { emptyOverview, type ReviewActionPayload } from "./web-db";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/backend";
 
@@ -354,17 +342,10 @@ export type AlertItem = {
 
 export async function listClaims(): Promise<Submission[]> {
   if (isSupabaseConfigured()) {
-    try {
-      const res = await fetch("/api/claims");
-      if (res.ok) {
-        const body = (await res.json()) as { items?: Submission[] };
-        if (Array.isArray(body.items)) return body.items;
-      }
-    } catch {
-      // fall through to browser client
-    }
-    const claims = await fetchWebClaims();
-    return claims.map(submissionFromClaim);
+    const res = await apiFetch("/api/claims");
+    if (!res.ok) throw new Error("Could not load claims");
+    const body = (await res.json()) as { items?: Submission[] };
+    return Array.isArray(body.items) ? body.items : [];
   }
   if (hasRealApiSession()) {
     const res = await api.get<{ items: Submission[] }>("/review/queue");
@@ -375,15 +356,9 @@ export async function listClaims(): Promise<Submission[]> {
 
 export async function getClaim(id: string): Promise<Submission> {
   if (isSupabaseConfigured()) {
-    try {
-      const res = await fetch(`/api/claims/${id}`);
-      if (res.ok) return (await res.json()) as Submission;
-    } catch {
-      // fall through
-    }
-    const claim = await fetchWebClaimById(id);
-    if (!claim) throw new Error("Claim not found");
-    return submissionFromClaim(claim);
+    const res = await apiFetch(`/api/claims/${id}`);
+    if (!res.ok) throw new Error("Claim not found");
+    return (await res.json()) as Submission;
   }
   if (hasRealApiSession()) {
     return (await api.get<Submission>(`/review/${id}`)).data;
@@ -393,17 +368,15 @@ export async function getClaim(id: string): Promise<Submission> {
 
 export async function applyReviewAction(id: string, payload: ReviewActionPayload) {
   if (isSupabaseConfigured()) {
-    try {
-      const res = await fetch(`/api/claims/${id}/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) return res.json();
-    } catch {
-      // fall through
+    const res = await apiFetch(`/api/claims/${id}/action`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error || "Review action failed");
     }
-    return persistReviewAction(id, payload);
+    return res.json();
   }
   if (hasRealApiSession()) {
     return (await api.post(`/review/${id}/action`, payload)).data;
@@ -441,9 +414,8 @@ export async function submitWebClaim(input: {
   if (!isSupabaseConfigured()) {
     throw new Error("Supabase is not configured");
   }
-  const res = await fetch("/api/claims", {
+  const res = await apiFetch("/api/claims", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
   const body = await res.json().catch(() => ({}));
@@ -455,7 +427,9 @@ export async function submitWebClaim(input: {
 
 export async function listReviewHistory(id: string) {
   if (isSupabaseConfigured()) {
-    return fetchReviewActions(id);
+    const res = await apiFetch(`/api/claims/${id}/actions`);
+    if (!res.ok) return [];
+    return res.json();
   }
   if (hasRealApiSession()) {
     return (await api.get(`/review/${id}/history`)).data;
@@ -463,10 +437,34 @@ export async function listReviewHistory(id: string) {
   return [];
 }
 
+async function reviewerStats(): Promise<{
+  overview: Overview;
+  markers: MapMarker[];
+  alerts: AlertItem[];
+  analytics: {
+    byCategory: Array<{ category: string; count: number }>;
+    bySeverity: Array<{ severity: string; count: number }>;
+    byCrop: Array<{ crop_name: string; count: number }>;
+  };
+  actions: Array<{
+    id: string;
+    action: string | null;
+    claim_id: string;
+    actor: string | null;
+    created_at: string | null;
+    notes: string | null;
+    reason: string | null;
+  }>;
+} | null> {
+  const res = await apiFetch("/api/reviewer/stats");
+  if (!res.ok) return null;
+  return res.json();
+}
+
 export async function overviewStats(): Promise<Overview> {
   if (isSupabaseConfigured()) {
-    const claims = await fetchWebClaims();
-    return overviewFromClaims(claims);
+    const stats = await reviewerStats();
+    return stats?.overview || emptyOverview();
   }
   if (hasRealApiSession()) {
     return (await api.get<Overview>("/dashboard/overview")).data;
@@ -476,8 +474,8 @@ export async function overviewStats(): Promise<Overview> {
 
 export async function mapMarkers(params?: Record<string, string>): Promise<MapMarker[]> {
   if (isSupabaseConfigured()) {
-    const claims = await fetchWebClaims();
-    let markers = markersFromClaims(claims);
+    const stats = await reviewerStats();
+    let markers = stats?.markers || [];
     if (params?.status) markers = markers.filter((m) => m.status === params.status);
     if (params?.severity) markers = markers.filter((m) => m.severity === params.severity);
     if (params?.crop) markers = markers.filter((m) => (m.crop_code || "").toLowerCase().includes(params.crop.toLowerCase()));
@@ -496,7 +494,8 @@ export async function mapMarkers(params?: Record<string, string>): Promise<MapMa
 
 export async function auditLogs() {
   if (isSupabaseConfigured()) {
-    const rows = await fetchAllReviewActions();
+    const stats = await reviewerStats();
+    const rows = stats?.actions || [];
     return rows.map((row) => ({
       id: row.id,
       action: row.action || "review_action",
@@ -527,8 +526,8 @@ export async function auditLogs() {
 
 export async function listAlerts(): Promise<AlertItem[]> {
   if (isSupabaseConfigured()) {
-    const claims = await fetchWebClaims();
-    return alertsFromClaims(claims);
+    const stats = await reviewerStats();
+    return stats?.alerts || [];
   }
   if (hasRealApiSession()) {
     return (await api.get<AlertItem[]>("/dashboard/alerts")).data;
@@ -538,7 +537,8 @@ export async function listAlerts(): Promise<AlertItem[]> {
 
 export async function analyticsByCategory() {
   if (isSupabaseConfigured()) {
-    return analyticsFromClaims(await fetchWebClaims()).byCategory;
+    const stats = await reviewerStats();
+    return stats?.analytics.byCategory || [];
   }
   if (hasRealApiSession()) {
     return (await api.get("/dashboard/analytics/damage-by-category")).data;
@@ -548,7 +548,8 @@ export async function analyticsByCategory() {
 
 export async function analyticsBySeverity() {
   if (isSupabaseConfigured()) {
-    return analyticsFromClaims(await fetchWebClaims()).bySeverity;
+    const stats = await reviewerStats();
+    return stats?.analytics.bySeverity || [];
   }
   if (hasRealApiSession()) {
     return (await api.get("/dashboard/analytics/severity-distribution")).data;
@@ -558,7 +559,8 @@ export async function analyticsBySeverity() {
 
 export async function analyticsByCrop() {
   if (isSupabaseConfigured()) {
-    return analyticsFromClaims(await fetchWebClaims()).byCrop;
+    const stats = await reviewerStats();
+    return stats?.analytics.byCrop || [];
   }
   if (hasRealApiSession()) {
     return (await api.get("/dashboard/analytics/by-crop")).data;
@@ -567,14 +569,11 @@ export async function analyticsByCrop() {
 }
 
 export async function currentSessionRoles(): Promise<string[] | null> {
-  const supabase = getSupabaseClient();
-  if (supabase) {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) {
-      const meta = data.session.user.app_metadata?.roles || data.session.user.user_metadata?.roles;
-      if (Array.isArray(meta) && meta.length) return meta.map(String);
-      return ["reviewer"];
-    }
+  if (isSupabaseConfigured()) {
+    const res = await apiFetch("/api/me");
+    if (!res.ok) return null;
+    const body = (await res.json()) as { roles?: string[] };
+    return Array.isArray(body.roles) ? body.roles : null;
   }
   if (hasRealApiSession()) {
     const response = await api.get<{ roles: string[] }>("/auth/me");

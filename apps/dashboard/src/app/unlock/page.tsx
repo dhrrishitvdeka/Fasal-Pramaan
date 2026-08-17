@@ -30,8 +30,12 @@ function UnlockForm() {
       } catch {
         // ignore
       }
-      const next = search.get("next") || "/";
-      router.replace(next.startsWith("/") ? next : "/");
+      const rawNext = search.get("next") || "/";
+      const next =
+        rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.startsWith("/\\")
+          ? rawNext
+          : "/";
+      router.replace(next);
       router.refresh();
     } catch {
       setError("Network error. Try again.");
