@@ -1,0 +1,6 @@
+{
+  "framework": "nextjs",
+  "installCommand": "npm ci --prefix apps/dashboard",
+  "buildCommand": "npm run build --prefix apps/dashboard",
+  "outputDirectory": "apps/dashboard/.next"
+}
