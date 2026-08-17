@@ -32,7 +32,7 @@ The system addresses the fundamental trust deficit in rural crop insurance by pa
  │                            APPLICATION LAYER                                │
  │  ┌───────────────────────────────────────────────────────────────────────┐  │
  │  │                       FastAPI Core API Gateway                        │  │
- │  │   (Auth, RBAC, Spatial Jurisdiction, Evidence Lifecycle & Routing)     │  │
+ │  │   (Auth, RBAC, Spatial Jurisdiction, Evidence Lifecycle & Routing)    │  │
  │  └──────────────────┬──────────────────────────────┬─────────────────────┘  │
  │                     │ Enqueue                      │ X-Service-Token        │
  │  ┌──────────────────▼──────────┐         ┌─────────▼─────────────────────┐  │
