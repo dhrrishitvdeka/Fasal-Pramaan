@@ -22,6 +22,7 @@ from typing import Any
 
 import gradio as gr
 import numpy as np
+import spaces
 from huggingface_hub import snapshot_download
 from PIL import Image
 
@@ -370,6 +371,7 @@ def _parse_images_json(images_json: str | None, fallback_image: Any, angle_type:
     return [{"image": fallback_image, "angle_type": angle_type or "closeup_damage"}]
 
 
+@spaces.GPU(duration=30)
 def predict_ui(image: Any, expected_crop: str, angle_type: str) -> tuple[dict[str, Any], str]:
     result = analyze(
         [{"image": image, "angle_type": angle_type or "closeup_damage"}],
@@ -386,6 +388,7 @@ def predict_ui(image: Any, expected_crop: str, angle_type: str) -> tuple[dict[st
     return result, summary
 
 
+@spaces.GPU(duration=30)
 def predict_api(
     image_b64: str,
     expected_crop: str = "",
