@@ -1,21 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { auditLogs } from "@/lib/api";
 
 export default function AuditPage() {
   const { data, error, isLoading } = useQuery({
     queryKey: ["audit"],
     queryFn: async () =>
-      (await api.get("/admin/audit-logs")).data as Array<{
-        id: string;
-        action: string;
-        entity_type: string;
-        entity_id?: string;
-        actor_id?: string;
-        created_at?: string;
-        notes?: string;
-      }>,
+      auditLogs(),
   });
 
   return (

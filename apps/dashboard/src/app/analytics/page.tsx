@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { analyticsByCategory, analyticsByCrop, analyticsBySeverity } from "@/lib/api";
 import {
   Bar,
   BarChart,
@@ -21,26 +21,26 @@ export default function AnalyticsPage() {
   const byCat = useQuery({
     queryKey: ["damage-cat"],
     queryFn: async () =>
-      (await api.get("/dashboard/analytics/damage-by-category")).data as Array<{
+      analyticsByCategory() as Promise<Array<{
         category: string;
         count: number;
-      }>,
+      }>>,
   });
   const bySev = useQuery({
     queryKey: ["severity"],
     queryFn: async () =>
-      (await api.get("/dashboard/analytics/severity-distribution")).data as Array<{
+      analyticsBySeverity() as Promise<Array<{
         severity: string;
         count: number;
-      }>,
+      }>>,
   });
   const byCrop = useQuery({
     queryKey: ["by-crop"],
     queryFn: async () =>
-      (await api.get("/dashboard/analytics/by-crop")).data as Array<{
+      analyticsByCrop() as Promise<Array<{
         crop_name: string;
         count: number;
-      }>,
+      }>>,
   });
 
   return (

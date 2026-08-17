@@ -67,3 +67,21 @@ For production enterprise deployment on Kubernetes (EKS / GKE / AKS):
 - S3 / GCS versioned object storage with immutability retention policies.
 
 For detailed enterprise hardening and SLA specifications, see [Production Readiness](./production-readiness.md).
+
+---
+
+## 5. Vercel dashboard + Supabase + Hugging Face
+
+The local Docker Compose topology above is unchanged. To host only the Next.js web app:
+
+1. Deploy `apps/dashboard` on Vercel (`npx vercel` from that folder, or connect the GitHub repo with Root Directory `apps/dashboard`).
+2. Set placeholder-named env vars (never commit values):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `HF_TOKEN`
+   - `NEXT_PUBLIC_HF_MODEL_ID=wambugu71/crop_leaf_diseases_vit`
+3. Apply `scripts/setup_supabase.sql` then `scripts/setup_web_schema.sql` on the Supabase project.
+4. Farmer path: `/farmer/capture` → `POST /api/claims` → Hugging Face inference → `/review` lists the same claim id.
+
+Do not point Vercel at the Docker-only rewrite host `http://api:8000`. Leave `NEXT_PUBLIC_API_BASE_URL` empty on Vercel unless you host FastAPI separately.
