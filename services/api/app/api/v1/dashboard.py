@@ -185,6 +185,7 @@ def overview(
     latest_eval = aliased(EvidenceEvaluation)
     avg_imp = (
         db.query(func.avg(latest_eval.final_confidence - earliest_eval.final_confidence))
+        .select_from(latest_eval)
         .join(
             latest_eval_sub,
             and_(
@@ -192,6 +193,7 @@ def overview(
                 latest_eval.created_at == latest_eval_sub.c.created_at,
             ),
         )
+        .join(earliest_eval, earliest_eval.submission_id == latest_eval.submission_id)
         .join(
             earliest_eval_sub,
             and_(

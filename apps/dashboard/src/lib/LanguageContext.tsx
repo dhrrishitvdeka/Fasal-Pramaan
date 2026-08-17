@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useState } from "react";
 import { Lang, DictKey, t as translate } from "./i18n";
 
 interface LanguageContextType {
@@ -17,17 +17,19 @@ const LanguageContext = createContext<LanguageContextType>({
   t: (key: DictKey) => translate("en", key),
 });
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
+function readStoredLang(): Lang {
+  if (typeof window === "undefined") return "en";
+  try {
+    const saved = localStorage.getItem("fasal_lang") as Lang;
+    if (saved === "en" || saved === "hi") return saved;
+  } catch {
+    // ignore
+  }
+  return "en";
+}
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("fasal_lang") as Lang;
-      if (saved === "en" || saved === "hi") {
-        setLangState(saved);
-      }
-    } catch {}
-  }, []);
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [lang, setLangState] = useState<Lang>(readStoredLang);
 
   const setLang = (newLang: Lang) => {
     setLangState(newLang);
