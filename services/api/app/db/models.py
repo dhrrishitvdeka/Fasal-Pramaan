@@ -313,6 +313,14 @@ class Submission(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Ver
     images: Mapped[list["SubmissionImage"]] = relationship(back_populates="submission")
     ai_jobs: Mapped[list["AIJob"]] = relationship(back_populates="submission")
     reviews: Mapped[list["HumanReview"]] = relationship(back_populates="submission")
+    evaluations: Mapped[list["EvidenceEvaluation"]] = relationship(
+        back_populates="submission",
+        order_by="EvidenceEvaluation.created_at.desc()",
+    )
+
+    @property
+    def latest_evaluation(self) -> Optional["EvidenceEvaluation"]:
+        return self.evaluations[0] if self.evaluations else None
 
 
 class SubmissionImage(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
@@ -517,6 +525,45 @@ class RecaptureRequest(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     required_angles: Mapped[Optional[list[Any]]] = mapped_column(JSONB, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="open", nullable=False)
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EvidenceEvaluation(Base, UUIDPrimaryKeyMixin):
+    __tablename__ = "evidence_evaluations"
+    __table_args__ = (
+        Index("ix_evidence_evaluations_submission_id", "submission_id"),
+        Index("ix_evidence_evaluations_created_at", "created_at"),
+    )
+
+    submission_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("submissions.id"), nullable=False, index=True
+    )
+    evaluation_version: Mapped[str] = mapped_column(
+        String(64), default="evidence-confidence-v1", nullable=False
+    )
+    quality_score: Mapped[float] = mapped_column(Float, nullable=False)
+    coverage_score: Mapped[float] = mapped_column(Float, nullable=False)
+    context_score: Mapped[float] = mapped_column(Float, nullable=False)
+    integrity_score: Mapped[float] = mapped_column(Float, nullable=False)
+    final_confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence_threshold: Mapped[float] = mapped_column(Float, default=85.0, nullable=False)
+    uncertainty_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    uncertainty_severity: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    uncertainty_reasons: Mapped[Optional[list[Any]]] = mapped_column(JSONB, nullable=True)
+    recommended_action: Mapped[str] = mapped_column(
+        String(64), default="normal_review", nullable=False
+    )
+    generated_request: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    component_details: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    evidence_ids: Mapped[Optional[list[Any]]] = mapped_column(JSONB, nullable=True)
+    model_version: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+
+    submission: Mapped["Submission"] = relationship(back_populates="evaluations")
 
 
 # ---------------------------------------------------------------------------

@@ -1,55 +1,39 @@
-# Recurring geo-tagged evidence
+# Recurring Geo-Tagged Evidence Schedules
 
-The application keeps a repeatable before-and-after crop record for every active
-crop cycle. A new cycle receives a baseline reminder when the cycle is created;
-the next due date advances only after a complete evidence submission is
-finalized.
+Fasal-Pramaan maintains an automated, verifiable time-series record of crop growth and health across the entire agricultural lifecycle. A recurring evidence reminder plan is automatically initialized whenever a new crop cycle is created, ensuring systematic before-and-after historical evidence for insurance underwriting and disaster baseline verification.
 
-## Default protocol
+---
 
-- Cadence: 30 days, configurable from 14 to 90 days
-- Reminder lead: 3 days, configurable from 0 to 7 days through the API
-- Target: 5 photos, with 4 or 5 available as a reminder preference
-- Guided capture contract: wide field, left context, mid canopy, right context,
-  and close-up damage
-- Every frame carries capture time, GPS coordinates, accuracy, checksum,
-  dimensions, and capture-order metadata
-- Server finalization requires the complete five-angle contract and sends the
-  submission to the local classification worker, followed by mandatory human
-  review
+## 1. Recurring Schedule Protocol
 
-## Delivery paths
+- **Default Cadence**: 30 days (configurable from 14 to 90 days per crop cycle).
+- **Advance Reminder Window**: 3 days prior to due date (configurable from 0 to 7 days).
+- **Target Evidence Contract**: Full 5-angle guided spatial capture (`wide_field`, `left_context`, `mid_canopy`, `right_context`, `closeup_damage`).
+- **Due Date Advancement**: The next scheduled due date advances **only** after a complete evidence submission has been successfully uploaded, verified, and finalized.
 
-`fp-beat` enqueues a due-plan scan every six hours. The reminders queue on
-`fp-worker` writes de-duplicated in-app notifications. An overdue plan can
-repeat at most weekly until the farmer uploads new evidence.
+---
 
-Native Android, iOS, and macOS builds mirror the server plan into an inexact
-local notification so the prompt survives a temporary network outage. Android
-reschedules after boot. Notification taps deep-link to guided capture for the
-correct crop cycle after session restoration. The Docker web app uses
-server-generated in-app notifications because background browser scheduling is
-not portable across browsers.
+## 2. Background Scheduling & Delivery Architecture
 
-## Farmer controls
+```mermaid
+flowchart LR
+  Beat["Celery Beat Engine\n(fp-beat)\nRuns Scan Every 6 Hours"] --> Scan["Query Due Reminder Plans\n(evidence_reminder_plans table)"]
+  Scan --> Enqueue["Enqueue Notification Task\n(Redis Queue)"]
+  Enqueue --> Worker["Celery Worker\n(fp-worker)"]
+  Worker --> InApp["Write In-App Notification\n(Deduplicated per Cycle)"]
+  Worker --> SSE["Broadcast Real-Time Event\n(FastAPI Gateway)"]
+  InApp --> App["Farmer Mobile App\n(Deep-Links to Guided Capture)"]
+```
 
-Open **Evidence reminders** from Home or Settings. A farmer can:
+---
 
-- start capture for the correct crop cycle
-- change cadence and the 4–5 photo preference
-- pause or resume the plan
-- snooze by two days in the UI, or one to seven days through the API or Fasal
-  Saathi voice assistant
+## 3. Farmer Controls & Voice Management
 
-All plan changes are scoped to crop cycles owned by the authenticated farmer
-and write audit-log records. Voice changes use the same endpoints and require a
-fresh, explicit spoken confirmation.
+Farmers can manage their reminder schedules directly via the mobile app interface or hands-free via the **Fasal Saathi** voice assistant:
 
-## Local check
+1. **Start Scheduled Capture**: Tapping a reminder notification opens guided capture pre-configured for the specific plot and crop cycle.
+2. **Adjust Cadence**: Modify the reminder interval (e.g., set to 14 days during critical monsoon flowering periods).
+3. **Snooze Reminders**: Postpone an active reminder by 1 to 7 days (e.g., *"धान का प्रमाण 3 दिन के लिए स्नूज़ करो"*).
+4. **Pause / Resume**: Temporarily suspend reminder notifications during post-harvest fallow periods.
 
-With the Docker stack running, confirm `fp-beat` and `fp-worker` are active.
-Local seed creates demo **accounts and catalogs only** — no farms or crop
-cycles. Create a farm, plot, and crop cycle in the field app (or via confirmed
-voice actions), then open **Evidence reminders**. Use **Capture now** for the
-baseline record. The next due date moves forward only after
-upload and finalization succeed.
+All plan modifications are cryptographically signed with the farmer's Bearer JWT and recorded in the system audit log.

@@ -137,6 +137,28 @@ class AIPredictionOut(ORMModel):
     processing_duration_ms: Optional[int] = None
 
 
+class EvidenceEvaluationOut(ORMModel):
+    id: UUID
+    submission_id: UUID
+    evaluation_version: str
+    quality_score: float
+    coverage_score: float
+    context_score: float
+    integrity_score: float
+    final_confidence: float
+    confidence_threshold: float
+    uncertainty_type: Optional[str] = None
+    uncertainty_severity: Optional[str] = None
+    uncertainty_reasons: Optional[list[Any]] = None
+    recommended_action: str
+    generated_request: Optional[dict[str, Any]] = None
+    component_details: Optional[dict[str, Any]] = None
+    evidence_ids: Optional[list[Any]] = None
+    model_version: Optional[str] = None
+    created_at: datetime
+    actor_id: Optional[UUID] = None
+
+
 class SubmissionOut(ORMModel):
     id: UUID
     crop_cycle_id: UUID
@@ -158,6 +180,7 @@ class SubmissionOut(ORMModel):
     anomaly_flags: Optional[dict[str, Any]] = None
     images: list[SubmissionImageOut] = Field(default_factory=list)
     latest_prediction: Optional[AIPredictionOut] = None
+    latest_evaluation: Optional[EvidenceEvaluationOut] = None
 
 
 class ReviewActionRequest(BaseModel):
@@ -171,12 +194,18 @@ class ReviewActionRequest(BaseModel):
     corrected_damage_codes: Optional[list[str]] = Field(default=None, min_length=1, max_length=12)
     corrected_severity: Optional[str] = Field(default=None, pattern="^(none|low|medium|high|severe|critical)$")
     corrected_affected_area_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    required_angles: Optional[list[str]] = None
     notes: Optional[str] = Field(default=None, max_length=5000)
 
     @model_validator(mode="after")
     def validate_correction(self):
         if self.corrected_damage_codes and len(self.corrected_damage_codes) != len(set(self.corrected_damage_codes)):
             raise ValueError("corrected_damage_codes must be unique")
+        if self.required_angles:
+            allowed_angles = {"wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"}
+            for angle in self.required_angles:
+                if angle not in allowed_angles:
+                    raise ValueError(f"Invalid required angle: {angle}")
         correction_values = (
             self.corrected_crop,
             self.corrected_growth_stage,

@@ -1,62 +1,50 @@
-# FasalPramaan Command Centre
+# Fasal-Pramaan Reviewer Command Centre
 
-Reviewer-facing Next.js dashboard for operational overview, map markers, review
-cases, alerts, health, and audit-oriented case detail.
+The **Fasal-Pramaan Reviewer Command Centre** is an enterprise-grade Next.js 14 web application engineered for insurance claim adjudicators, agricultural officers, and loss assessment reviewers.
 
-## Docker use
+---
 
-1. From the repository root, start the stack:
-   ```powershell
-   Copy-Item .env.example .env
-   powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1
-   ```
-   Or: `docker compose up -d --build`
-2. Open http://localhost:3000.
-3. Sign in as `reviewer@fasalpramaan.local` / `Demo@12345`.
-4. Work through Overview → Map → Review Queue → case detail → human correction
-   with a reason.
+## 1. Core Features
 
-In Docker, the browser calls **`/backend`** (same origin). Next.js rewrites that
-path to the API container (`INTERNAL_API_BASE_URL=http://api:8000`). Evidence
-image previews use MinIO presigned URLs; CSP allows `NEXT_PUBLIC_MEDIA_ORIGIN`
-(default `http://localhost:9000`).
+- **Triage Review Queue**: Dynamic triage queue with real-time sorting and filtering by Evidence Confidence, Uncertainty Type, Integrity Status, and Severity.
+- **Evidence Trust Inspector**: 4-component score cards (Quality, Coverage, Context, Integrity) displaying detailed deduction breakdowns.
+- **Synchronized Multi-Angle Viewer**: High-resolution viewer enabling side-by-side inspection of all 5 canonical angles and comparison against recapture submissions.
+- **PostGIS GIS Mapping**: Interactive spatial overlays showing registered plot boundary polygons, centroid markers, and capture GPS accuracy radii.
+- **Human-in-the-Loop Adjudication**: Full decision support workflow (`Accept`, `Correct & Verify`, `Request Targeted Recapture`, `Escalate to Physical Inspection`, `Reject`) with mandatory reason logging and immutable audit history.
 
-The dashboard holds access/refresh credentials in memory for the current browser
-session and clears them on failed refresh/401. This is a local SPA client, not a
-production BFF/session architecture.
+---
 
-## Local development
+## 2. Running in Docker
 
-```powershell
-cd apps\dashboard
+The Command Centre is packaged within the root Docker Compose stack:
+
+```bash
+docker compose up -d --build dashboard
+```
+
+Access the dashboard at `http://localhost:3000`.
+
+Pre-seeded login: `reviewer@fasalpramaan.local` / `Demo@12345`
+
+---
+
+## 3. Local Development
+
+```bash
+cd apps/dashboard
 npm ci
-# Point at a running API (host-mapped compose API):
-$env:NEXT_PUBLIC_API_BASE_URL="http://localhost:8000"
-$env:NEXT_PUBLIC_MEDIA_ORIGIN="http://localhost:9000"
+
+# Configure environment pointing to running API Gateway
+export NEXT_PUBLIC_API_BASE_URL="http://localhost:8000"
+export NEXT_PUBLIC_MEDIA_ORIGIN="http://localhost:9000"
+
 npm run dev
 ```
 
-Useful checks:
-
-```powershell
+### Static Analysis & Testing
+```bash
 npm run lint
 npm run typecheck
 npm test
 npm run build
 ```
-
-| Variable | Docker default | Local `npm run dev` typical value |
-|---|---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | `/backend` | `http://localhost:8000` |
-| `INTERNAL_API_BASE_URL` | `http://api:8000` | unused when the browser talks to the API directly |
-| `NEXT_PUBLIC_MEDIA_ORIGIN` | `http://localhost:9000` (or `PUBLIC_HOST`) | same |
-
-## Product boundaries
-
-- Reviewers make or correct final assessments; the model result is non-production assistance.
-- Default grades (A/B/C/U) do not include severity or affected area — use
-  **Correct & verify**, not blind Accept, when those fields are empty.
-- Seed creates accounts and catalogs only; farms and cases are created during use.
-
-See [GETTING_STARTED.md](../../GETTING_STARTED.md) and
-[architecture](../../docs/architecture.md).

@@ -62,10 +62,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/farms', builder: (_, __) => const FarmsScreen()),
       GoRoute(
         path: '/capture',
-        builder: (_, state) => GuidedCaptureScreen(
-          recaptureSubmissionId: state.uri.queryParameters['submission_id'],
-          initialCycleId: state.uri.queryParameters['crop_cycle_id'],
-        ),
+        builder: (_, state) {
+          final anglesParam = state.uri.queryParameters['required_angles'];
+          final requiredAngles = anglesParam != null && anglesParam.isNotEmpty
+              ? anglesParam
+                  .split(',')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList()
+              : null;
+          return GuidedCaptureScreen(
+            recaptureSubmissionId: state.uri.queryParameters['submission_id'],
+            initialCycleId: state.uri.queryParameters['crop_cycle_id'],
+            requiredAngles: requiredAngles,
+            recaptureReason: state.uri.queryParameters['reason'],
+          );
+        },
       ),
       GoRoute(path: '/queue', builder: (_, __) => const QueueScreen()),
       GoRoute(path: '/results', builder: (_, __) => const ResultsScreen()),

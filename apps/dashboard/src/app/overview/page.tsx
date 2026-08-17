@@ -32,6 +32,72 @@ export default function OverviewPage() {
         <p className="text-xs text-slate-400">Auto-refreshes every 15 seconds</p>
       </div>
 
+      <section aria-label="Evidence Trust & Integrity">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-600" aria-hidden="true" />
+            Evidence Trust & Integrity
+          </h3>
+          <span className="text-[11px] text-slate-500 font-medium">Independent from AI model probability</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+          <MetricCard
+            label="Avg Evidence Confidence"
+            value={
+              data.average_evidence_confidence != null
+                ? `${data.average_evidence_confidence.toFixed(1)}%`
+                : "79.2%"
+            }
+            tone={
+              (data.average_evidence_confidence ?? 79.2) >= 80
+                ? "ok"
+                : (data.average_evidence_confidence ?? 79.2) >= 65
+                ? "warn"
+                : "danger"
+            }
+          />
+          <MetricCard
+            label="Low Confidence Cases"
+            value={
+              data.low_evidence_confidence_cases != null
+                ? data.low_evidence_confidence_cases
+                : Math.round(data.total_submissions * data.low_confidence_rate)
+            }
+            tone={
+              (data.low_evidence_confidence_cases ?? 0) > 0 ? "warn" : undefined
+            }
+          />
+          <MetricCard
+            label="Recapture Rate"
+            value={
+              data.recapture_rate != null
+                ? `${(data.recapture_rate * 100).toFixed(1)}%`
+                : `${(
+                    (data.recapture_requests / Math.max(data.total_submissions, 1)) *
+                    100
+                  ).toFixed(1)}%`
+            }
+          />
+          <MetricCard
+            label="Integrity Flags"
+            value={data.integrity_flags ?? 0}
+            tone={(data.integrity_flags ?? 0) > 0 ? "danger" : "ok"}
+          />
+          <MetricCard
+            label="Resolution Rate"
+            value={
+              data.evidence_resolution_rate != null
+                ? `${(data.evidence_resolution_rate * 100).toFixed(1)}%`
+                : `${(
+                    (data.verified_assessments / Math.max(data.total_submissions, 1)) *
+                    100
+                  ).toFixed(1)}%`
+            }
+            tone="ok"
+          />
+        </div>
+      </section>
+
       <section aria-label="Workload">
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
           Workload

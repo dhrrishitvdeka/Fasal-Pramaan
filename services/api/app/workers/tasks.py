@@ -13,8 +13,18 @@ from PIL import Image
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
-from app.db.models import AIJob, AIPrediction, Alert, CropCycle, CropType, DamageAssessment, Submission
+from app.db.models import (
+    AIJob,
+    AIPrediction,
+    Alert,
+    CropCycle,
+    CropType,
+    DamageAssessment,
+    RecaptureRequest,
+    Submission,
+)
 from app.db.session import SessionLocal
+from app.services.evidence_eval import calculate_re_evaluation_delta, evaluate_submission_evidence
 from app.services.notifications import notify_user
 from app.services.rules import decide_review_path
 from app.services.storage import get_bytes
@@ -185,8 +195,12 @@ def process_submission_ai_sync(
         )
         quality_weak = bool(prediction.get("image_validation", {}).get("passed") is False)
 
+        evaluation = evaluate_submission_evidence(db, sub, prediction=prediction)
+        delta_info = calculate_re_evaluation_delta(db, sub.id, evaluation)
+
         status, rec = decide_review_path(
             prediction,
+            evaluation=evaluation,
             location_anomaly=location_anomaly,
             crop_mismatch=crop_mismatch,
             quality_weak=quality_weak,
@@ -194,6 +208,23 @@ def process_submission_ai_sync(
         pred_row.human_review_recommendation = rec
         sub.status = status
         sub.severity = prediction.get("severity")
+
+        if status == "needs_recapture" and evaluation.generated_request:
+            open_req = (
+                db.query(RecaptureRequest)
+                .filter(RecaptureRequest.submission_id == sub.id, RecaptureRequest.status == "open")
+                .first()
+            )
+            if not open_req:
+                db.add(
+                    RecaptureRequest(
+                        submission_id=sub.id,
+                        requested_by=sub.submitted_by,
+                        reason=evaluation.generated_request.get("title") or "Evidence recapture required",
+                        required_angles=evaluation.generated_request.get("required_angles"),
+                        status="open",
+                    )
+                )
 
         db.add(
             DamageAssessment(
@@ -264,7 +295,13 @@ def process_submission_ai_sync(
         job.status = "completed"
         job.completed_at = datetime.now(timezone.utc)
         db.commit()
-        return {"status": sub.status, "job_id": str(job.id)}
+        return {
+            "status": sub.status,
+            "job_id": str(job.id),
+            "evaluation_id": str(evaluation.id),
+            "evidence_confidence": evaluation.final_confidence,
+            "confidence_delta": delta_info.get("confidence_delta"),
+        }
     except Exception as exc:  # noqa: BLE001
         if isinstance(exc, RetryableAIServiceError):
             db.rollback()

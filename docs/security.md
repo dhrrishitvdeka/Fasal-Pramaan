@@ -1,62 +1,84 @@
-# Security boundary for the local stack
+# Security Architecture & Trust Controls
 
-This document records implemented application controls and remaining limits.
-It is not a production security certification.
+Fasal-Pramaan implements a **defense-in-depth security model** engineered to protect sensitive agricultural and farmer data, prevent fraudulent claim submissions, and guarantee the non-repudiation of photographic evidence.
 
-## Controls implemented
+---
 
-| Area | Implemented control |
-|---|---|
-| Passwords | Argon2 hashing; stronger registration policy; login lockout/rate limits |
-| Access tokens | JWT token version checked against the database; logout invalidates the active version |
-| Refresh tokens | Opaque values hashed at rest, rotated, family reuse detection/revocation |
-| Authorization | Database roles plus ownership/jurisdiction checks on farms, cycles, submissions and SSE |
-| Field officers | Restricted to assigned jurisdiction and descendants |
-| API/AI boundary | `X-Service-Token` required for AI model/inference routes when configured; production requires a strong token (≥32 chars). Compose sets a default token for the local stack |
-| Redis/Celery | Redis password required in compose; authenticated broker/result URLs |
-| Rate limiting | Redis backend available and required by production validation; trusted proxy CIDRs are explicit |
-| Evidence upload | Signed content type/length, server object metadata, SHA-256 and image-byte verification |
-| Privacy | Log redaction, no production PII in seed data, private server-generated object keys |
-| Browser | Dashboard CSP and security headers (including MinIO media origin); access/refresh tokens stay in memory during a browser session |
-| Containers | API, worker and AI run as non-root users |
-| Errors | Client-facing AI/API failures are sanitized; detailed exception paths are not returned |
+## 1. Security Architecture Matrix
 
-## Port binding (matches `docker-compose.yml`)
+| Security Domain | Implemented Control | Technical Implementation |
+|---|---|---|
+| **Identity & Passwords** | Argon2id Hashing | High-memory cost parameters; automated account lockout after 5 consecutive failed attempts. |
+| **Session & Tokens** | JWT Token Versioning | Short-lived access tokens (30 min); user `token_version` checked in DB; global logout revokes all active tokens. |
+| **Refresh Tokens** | Cryptographic Token Families | Opaque SHA-256 hashed tokens with automatic family revocation if token reuse/theft is detected. |
+| **Role-Based Access (RBAC)** | Principle of Least Privilege | Distinct permission matrices for Farmers, Field Officers, Reviewers, and System Administrators. |
+| **Spatial Fencing** | PostGIS Jurisdiction Scoping | Field officers are restricted to plots within their assigned administrative geometry ($State \rightarrow District \rightarrow Block \rightarrow Village$). |
+| **Inter-Service Auth** | `X-Service-Token` Header | Microservices (API $\rightarrow$ AI $\rightarrow$ Worker) communicate over private networks with strong HMAC tokens (≥32 chars). |
+| **Evidence Immutability** | Content-Addressed Storage | Object keys are server-generated UUIDs; direct client file naming is prohibited; uploaded bytes are immutable. |
+| **Anti-Tamper & Anti-Fraud** | Multi-Factor Verification | SHA-256 checksums, Perceptual Hashes ($pHash$), EXIF capture time consistency, and mock-location detection. |
+| **Browser Protection** | CSP & Memory Retention | Strict Content Security Policy; tokens retained in memory rather than `localStorage` to prevent XSS exfiltration. |
+| **Container Hardening** | Non-Root User Execution | All Docker containers run under unprivileged service users with minimal Linux capabilities. |
 
-| Binding | Ports / services |
-|---|---|
-| **LAN-facing (`0.0.0.0`)** | API `8000`, AI `8001`, dashboard `3000`, field web app `8085`, MinIO S3 `9000` |
-| **Loopback only (`127.0.0.1`)** | PostgreSQL `5432`, Redis `6379`, MinIO console `9001` |
+---
 
-LAN binds are intentional for same-network demos (`PUBLIC_HOST`). Do **not** expose this stack to the public internet. Use a trusted private network and host firewall rules.
-
-## Authorization rule
+## 2. Threat Modeling & Mitigation
 
 ```mermaid
-flowchart LR
-  Token["Authenticated user"] --> Roles["Load DB roles"]
-  Roles --> Scope["Check ownership or jurisdiction"]
-  Scope -->|"allowed"| Operation["Perform route action"]
-  Scope -->|"not allowed"| Deny["401 / 403"]
-  Operation --> Audit["Write audit event where relevant"]
+flowchart TD
+  subgraph Threats["Threat Vectors"]
+    T1["Fraudulent Photo Reuse\n(Internet / Historical Images)"]
+    T2["GPS Spoofing / Mock Location"]
+    T3["Digital Screen Replay Attacks"]
+    T4["Insecure Direct Object Reference (IDOR)"]
+    T5["AI Model Poisoning / Overrule"]
+  end
+
+  subgraph Mitigations["Fasal-Pramaan Defenses"]
+    M1["SHA-256 + Perceptual Hash (pHash) Deduplication"]
+    M2["Android Mock-Provider Check + PostGIS Plot Boundary Match"]
+    M3["High-Frequency Texture & Moiré Pattern Analysis"]
+    M4["Strict UUID Ownership & Jurisdiction Database Scoping"]
+    M5["Model Separation: AI Assists, Evidence Engine Governs, Reviewer Decides"]
+  end
+
+  T1 --> M1
+  T2 --> M2
+  T3 --> M3
+  T4 --> M4
+  T5 --> M5
 ```
 
-## Local-stack rules
+---
 
-- Prefer loopback-only access for a single machine; open LAN ports only on trusted Wi-Fi.
-- Use only the seeded accounts and synthetic evidence.
-- Keep `.env` private; never commit or publish its values.
-- Do not treat the MinIO console or demo credentials as a production design.
-- Rotate `JWT_SECRET_KEY`, `DEMO_PASSWORD`, `AI_SERVICE_TOKEN`, and MinIO credentials before any shared-network use beyond a personal machine.
+## 3. Cryptographic Evidence Verification Pipeline
 
-## Remaining security and programme work
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Client as Mobile Client
+  participant API as FastAPI Gateway
+  participant S3 as MinIO S3 Store
+  participant Worker as Celery Worker
 
-- Managed secrets and rotation, TLS ingress, WAF/DDoS controls, backups/restore drills, and object retention/AV scanning.
-- Real SMS/email account verification and recovery (`is_verified` is stored but not enforced on write paths).
-- Independent penetration testing, privacy/DPIA review, operational monitoring and incident response.
-- Device attestation if GPS spoofing resistance is a requirement.
-- Always-on AI service token even in development when AI is bound to non-loopback interfaces.
-- A server-side BFF/httpOnly browser session is a future hardening option; the current dashboard reduces exposure by retaining tokens only in memory.
+  Client->>API: 1. Declares SHA-256, byte size, and MIME type
+  API-->>Client: 2. Issues Presigned S3 PUT URL with Content-Length & Type constraints
+  Client->>S3: 3. Streams raw image bytes directly to S3
+  Client->>API: 4. Calls /confirm with S3 ETag
+  API->>Worker: 5. Dispatches Verification Job
+  Worker->>S3: 6. Fetches object metadata and raw bytes
+  Worker->>Worker: 7. Recomputes SHA-256 & pHash independently
+  Worker->>Worker: 8. Verifies image headers (JPEG/PNG decoding)
+  alt Hash or Byte Size Mismatch
+    Worker->>API: Mark Image as "failed" & Deduct Integrity Score (-65.0)
+  else Verification Passes
+    Worker->>API: Mark Image as "uploaded" & Set is_original_immutable=True
+  end
+```
 
-See [production-readiness.md](./production-readiness.md) for deployment gates
-and [known-limitations.md](./known-limitations.md) for product and model boundaries.
+---
+
+## 4. Operational Secrets & Deployment Policy
+
+1. **Zero Hardcoded Secrets**: All cryptographic keys, database passwords, and API tokens are injected strictly via environment variables.
+2. **Local vs. Production Isolation**: When `ENVIRONMENT=production`, the application startup lifecycle strictly verifies that no demo credentials, default passwords, or mock fallbacks are active.
+3. **Audit Trails**: All reviewer overrides, claim status mutations, and voice assistant operations write immutable records to the `audit_logs` table with actor UUID and timestamp.

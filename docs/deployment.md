@@ -1,62 +1,69 @@
-# Deployment boundary
+# Deployment Topology & Operational Orchestration
 
-## Local and LAN deployment
+This guide outlines deployment options for Fasal-Pramaan across local workstations, local area network (LAN) exhibition setups, and enterprise container clusters.
 
-The checked-in Compose stack is the supported local reference deployment:
+---
+
+## 1. Local Reference Deployment (Docker Compose)
+
+The repository provides an automated, multi-container Compose topology encompassing the entire microservice ecosystem:
 
 ```powershell
 Copy-Item .env.example .env
 powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1
 ```
 
-| Port | Service | Binding |
-|---|---|---|
-| `3000` | Reviewer dashboard | LAN-accessible |
-| `8085` | Farmer/field web app | LAN-accessible |
-| `8000` | API and OpenAPI docs | LAN-accessible for diagnostics/native clients |
-| `8001` | AI health/inference service | LAN-accessible for diagnostics |
-| `9000` | MinIO S3 evidence endpoint | LAN-accessible for browser signed uploads |
-| `5432`, `6379`, `9001` | DB, Redis, MinIO admin | loopback only |
+### Port Allocation & Binding Matrix
 
-For another device, pass the Docker host's trusted LAN IP:
+| Port | Service Component | Network Binding | Purpose |
+|---|---|---|---|
+| `3000` | Reviewer Command Centre (Next.js 14) | `0.0.0.0` (LAN) | Adjudication dashboard and GIS interface |
+| `8085` | Field Mobile Application (Flutter/Nginx) | `0.0.0.0` (LAN) | Evidence capture and offline sync portal |
+| `8000` | Core API Gateway (FastAPI) | `0.0.0.0` (LAN) | REST endpoints, Swagger docs, auth, and SSE |
+| `8001` | Assistive AI Inference Service | `0.0.0.0` (LAN) | DINOv2 ViT-S/14 ONNX model health and inference |
+| `9000` | MinIO S3 Evidence Object Store | `0.0.0.0` (LAN) | Direct presigned media upload and preview endpoint |
+| `5432` | PostgreSQL 16 + PostGIS 3.4 | `127.0.0.1` (Host) | Relational and spatial data persistence |
+| `6379` | Redis 7 Cluster | `127.0.0.1` (Host) | Message broker, task backend, and rate limits |
+| `9001` | MinIO Storage Console | `127.0.0.1` (Host) | Storage bucket administration |
+
+---
+
+## 2. Multi-Device LAN Exhibition Deployment
+
+To expose the field app and reviewer portal across mobile phones and laptops on a local Wi-Fi network:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1 `
-  -PublicHost 192.168.1.25
+powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1 -PublicHost 192.168.1.25
 ```
 
-Use a private firewall profile and permit only the ports needed for the demo.
-Do not port-forward this stack to the public internet.
+```bash
+sh scripts/start-portable.sh 192.168.1.25
+```
 
-## Portable, no-Git distribution
+- Mobile Field App: `http://192.168.1.25:8085`
+- Reviewer Command Centre: `http://192.168.1.25:3000`
+
+---
+
+## 3. Self-Contained Portable Packaging
+
+To distribute a complete offline-executable package without requiring Git:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-portable-bundle.ps1
 ```
 
-The recipient extracts `dist/FasalPramaan-portable.zip`, installs Docker,
-and runs the launcher. The bundle excludes Git history, `.env`, caches,
-generated builds, downloaded datasets, and transient training runs while
-retaining the selected model and model-evaluation evidence.
+The bundle packages application code, pre-baked model weights, and database migrations into `dist/FasalPramaan-portable.zip`. Recipients need only Docker to run the entire stack.
 
-## Production shape (not provisioned)
+---
 
-```mermaid
-flowchart LR
-  Users["Users"] --> Edge["TLS ingress + WAF"]
-  Edge --> Web["Dashboard/API tier"]
-  Web --> DB[("Managed Postgres/PostGIS")]
-  Web --> Cache[("Managed Redis")]
-  Web --> Store[("Private versioned object storage")]
-  Cache --> Workers["Managed worker pool"]
-  Workers --> AI["Authenticated AI service"]
-```
+## 4. Enterprise Cloud Architecture
 
-Required gates before public deployment include managed secrets and key
-rotation, TLS, private service networking, restrictive CORS, WAF/rate limits,
-backup/restore drills, retention policy, monitoring, incident response,
-privacy review, penetration testing, and independent field model validation.
+For production enterprise deployment on Kubernetes (EKS / GKE / AKS):
+- Ingress with TLS 1.3 termination and WAF.
+- Managed PostgreSQL (Amazon RDS / Cloud SQL) with PostGIS extension.
+- Distributed Redis cluster with Sentinel failover.
+- Scalable Celery worker deployment dynamically auto-scaled based on queue depth.
+- S3 / GCS versioned object storage with immutability retention policies.
 
-This repository does not provision public cloud infrastructure, live
-PMFBY/YESTECH integration, or production certification. See
-[production-readiness.md](./production-readiness.md).
+For detailed enterprise hardening and SLA specifications, see [Production Readiness](./production-readiness.md).

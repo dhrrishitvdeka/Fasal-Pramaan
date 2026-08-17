@@ -15,16 +15,20 @@ import 'package:uuid/uuid.dart';
 import 'package:image/image.dart' as img;
 import 'package:fasalpramaan/features/voice/voice_capture_bridge.dart';
 
-/// Guided multi-angle capture with on-device quality checks.
+/// Guided multi-angle capture with on-device quality checks and adaptive specific recapture support.
 class GuidedCaptureScreen extends ConsumerStatefulWidget {
   const GuidedCaptureScreen({
     super.key,
     this.recaptureSubmissionId,
     this.initialCycleId,
+    this.requiredAngles,
+    this.recaptureReason,
   });
 
   final String? recaptureSubmissionId;
   final String? initialCycleId;
+  final List<String>? requiredAngles;
+  final String? recaptureReason;
 
   @override
   ConsumerState<GuidedCaptureScreen> createState() =>
@@ -53,7 +57,17 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
   bool capturing = false;
   bool submitting = false;
 
-  String get angle => AppConfig.requiredAngles[step];
+  /// Active list of angles for capture: either the specific requested recapture angles or standard 5 angles.
+  List<String> get activeAngles =>
+      (widget.requiredAngles != null && widget.requiredAngles!.isNotEmpty)
+          ? widget.requiredAngles!
+          : AppConfig.requiredAngles;
+
+  bool get isSpecificRecapture =>
+      widget.requiredAngles != null && widget.requiredAngles!.isNotEmpty;
+
+  String get angle =>
+      step < activeAngles.length ? activeAngles[step] : activeAngles.last;
 
   bool get _localFallbackEnabled =>
       kIsWeb || AppConfig.demoMode || cameraError != null;
@@ -158,7 +172,7 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
       'angle': angle,
       'angle_title': getAngleTitle(isHi),
       'step': step + 1,
-      'total_steps': AppConfig.requiredAngles.length,
+      'total_steps': activeAngles.length,
       'completed_angles': captures.keys.toList(),
       'crop_cycle_id': selectedCycleId,
     };
@@ -183,7 +197,7 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
       'captured_angle': requestedAngle,
       'completed_angles': captures.keys.toList(),
       'next_angle':
-          captures.length < AppConfig.requiredAngles.length ? angle : null,
+          captures.length < activeAngles.length ? angle : null,
     };
   }
 
@@ -208,11 +222,11 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
         'message': 'Select a crop cycle before saving.',
       };
     }
-    if (captures.length < AppConfig.requiredAngles.length) {
+    if (captures.length < activeAngles.length) {
       return {
         'ok': false,
         'message':
-            'Complete all ${AppConfig.requiredAngles.length} required angles before saving.',
+            'Complete all ${activeAngles.length} required angles before saving.',
         'completed_angles': captures.keys.toList(),
       };
     }
@@ -378,7 +392,7 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
               ? '$angle (फोटो सफलतापूर्वक स्वीकार की गई)'
               : 'Accepted $angle (${bytes.length} bytes retained offline)');
       capturing = false;
-      if (step < AppConfig.requiredAngles.length - 1) {
+      if (step < activeAngles.length - 1) {
         step++;
       }
     });
@@ -393,9 +407,9 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
           : 'Select a crop cycle before saving.');
       return;
     }
-    if (captures.length < AppConfig.requiredAngles.length) {
+    if (captures.length < activeAngles.length) {
       setState(() => message = isHi
-          ? 'कृपया पहले तीनों कोणों की फोटो लें।'
+          ? 'कृपया पहले सभी आवश्यक कोणों की फोटो लें।'
           : 'Complete all required angles first.');
       return;
     }
@@ -405,7 +419,7 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
 
     final imageMeta = <Map<String, dynamic>>[];
     var seq = 0;
-    for (final a in AppConfig.requiredAngles) {
+    for (final a in activeAngles) {
       final meta = captures[a]!;
       final saved = await db.saveLocalImage(
         localSubmissionId: localId,
@@ -431,7 +445,7 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
       }
     }
     final growthStageId = selectedCycle?['current_growth_stage_id']?.toString();
-    final referenceCapture = captures[AppConfig.requiredAngles.first]!;
+    final referenceCapture = captures[activeAngles.first]!;
 
     await db.saveLocalSubmission(
       localId: localId,
@@ -449,6 +463,10 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
             (referenceCapture['captured_at'] as DateTime).toIso8601String(),
         'is_mock_location': isMockLocation,
         'farmer_observations': observations.text,
+        'is_specific_recapture': isSpecificRecapture,
+        'required_angles': activeAngles,
+        if (widget.recaptureReason != null)
+          'recapture_reason': widget.recaptureReason,
         'images': imageMeta,
       },
     );
@@ -616,17 +634,59 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
                 ),
               ),
             ),
+          if (isSpecificRecapture) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded,
+                          color: Color(0xFFB45309), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        isHi
+                          ? 'लक्षित साक्ष्य अनुरोध (${activeAngles.length} फोटो)'
+                          : 'Specific Evidence Request (${activeAngles.length} Photo${activeAngles.length > 1 ? "s" : ""})',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF92400E),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (widget.recaptureReason != null &&
+                      widget.recaptureReason!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '${isHi ? "कारण:" : "Reason:"} ${widget.recaptureReason}',
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF78350F), height: 1.3),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           LinearProgressIndicator(
-            value: (step + 1) / AppConfig.requiredAngles.length,
+            value: (step + 1) / activeAngles.length,
             color: const Color(0xFF059669),
             backgroundColor: const Color(0xFFE2E8F0),
           ),
           const SizedBox(height: 14),
           Text(
             isHi
-                ? 'चरण ${step + 1} / ${AppConfig.requiredAngles.length}: ${getAngleTitle(isHi)}'
-                : 'Step ${step + 1} of ${AppConfig.requiredAngles.length}: ${getAngleTitle(isHi)}',
+                ? 'चरण ${step + 1} / ${activeAngles.length}: ${getAngleTitle(isHi)}'
+                : 'Step ${step + 1} of ${activeAngles.length}: ${getAngleTitle(isHi)}',
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -755,7 +815,7 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
             ),
-            onPressed: done >= AppConfig.requiredAngles.length && !submitting
+            onPressed: done >= activeAngles.length && !submitting
                 ? _saveOffline
                 : null,
             icon: submitting
@@ -766,10 +826,10 @@ class _GuidedCaptureScreenState extends ConsumerState<GuidedCaptureScreen> {
                 : const Icon(Icons.cloud_upload_rounded),
             label: Text(
               isHi
-                  ? 'सहेजें और सिंक करें ($done/${AppConfig.requiredAngles.length})'
+                  ? 'सहेजें और सिंक करें ($done/${activeAngles.length})'
                   : (submitting
                       ? 'Uploading…'
-                      : 'Save & submit ($done/${AppConfig.requiredAngles.length})'),
+                      : 'Save & submit ($done/${activeAngles.length})'),
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
           ),
