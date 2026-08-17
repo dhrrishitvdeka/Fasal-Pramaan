@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
 import { computeEvidencePreview, isRealSha256 } from "./evidence";
 import { HF_MODEL_ID } from "./hf-model";
@@ -130,8 +131,11 @@ export interface WebReviewActionRow {
 
 export interface WebProfileRow {
   id: string;
-  name: string | null;
-  name_hi: string | null;
+  name?: string | null;
+  name_hi?: string | null;
+  full_name?: string | null;
+  full_name_hi?: string | null;
+  role?: string | null;
   kisan_id: string | null;
   phone: string | null;
   village: string | null;
@@ -321,15 +325,17 @@ function dataUrlToBlob(dataUrl: string): Blob | null {
   }
 }
 
-export async function resolveImageUrl(imageUrl: string | null, storagePath: string | null): Promise<string> {
-  if (storagePath && isSupabaseConfigured()) {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      const { data, error } = await supabase.storage
-        .from(EVIDENCE_BUCKET)
-        .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
-      if (!error && data?.signedUrl) return data.signedUrl;
-    }
+export async function resolveImageUrl(
+  imageUrl: string | null,
+  storagePath: string | null,
+  client?: SupabaseClient | null,
+): Promise<string> {
+  const supabase = client ?? getSupabaseClient();
+  if (storagePath && supabase) {
+    const { data, error } = await supabase.storage
+      .from(EVIDENCE_BUCKET)
+      .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+    if (!error && data?.signedUrl) return data.signedUrl;
   }
   return imageUrl || "";
 }

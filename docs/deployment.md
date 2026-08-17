@@ -74,16 +74,18 @@ For detailed enterprise hardening and SLA specifications, see [Production Readin
 
 The local Docker Compose topology above is unchanged (`local/start.ps1` or `scripts/start-portable.ps1`). To host only the Next.js web app:
 
-1. Connect this GitHub repo to Vercel. Keep the **repository root** as the project root — [`vercel.json`](../vercel.json) builds `apps/dashboard`. Do not set Root Directory to `local/`.
-2. Apply `scripts/setup_supabase.sql` then `scripts/setup_web_schema.sql` in the Supabase SQL editor.
+1. Connect this GitHub repo to Vercel. Set **Root Directory** to `apps/dashboard` (Settings → General). Framework Next.js. Do not leave Root Directory empty — that is why “No Next.js version detected” happens. Do not point it at `local/`.
+2. Apply `scripts/setup_supabase.sql` then `scripts/setup_web_schema.sql` in the Supabase SQL editor. If the old open anon policies are already applied, run `scripts/lock_web_rls.sql`.
 3. Set these env vars in Vercel (Production + Preview). Never commit values:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
    - `HF_TOKEN` (server-only token that can call the private Space)
    - `HF_SPACE_URL=https://dhrrishitvdeka-fasal-pramaan-api.hf.space`
-4. Create a Supabase Auth user if you need reviewer `/login`. Farmer `/farmer/capture` is public.
-5. Farmer path: `/farmer/capture` → `POST /api/claims` → Hugging Face → `/review` lists the same claim id.
+   - `SITE_LOCK_PASSWORD`
+   - `REVIEWER_EMAILS` (comma-separated reviewer emails)
+4. Create Supabase Auth users. Reviewers are those emails (or `app_metadata.roles`). Everyone else is a farmer. Both use `/login`.
+5. Farmer path: sign in → `/farmer/capture` → `POST /api/claims` (JWT + service role) → Hugging Face → reviewer `/review`.
 
 Leave **`NEXT_PUBLIC_API_BASE_URL` unset** on Vercel. Do not point it at `http://api:8000`.
 

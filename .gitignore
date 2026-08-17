@@ -26,8 +26,7 @@ private/
 .grok/
 apps/dashboard/AGENTS.md
 apps/dashboard/CLAUDE.md
-# Accidental root npm install (this repo has no root Node app)
-/package.json
+# Accidental root lockfile from a stray npm install
 /package-lock.json
 
 # ------------------------------------------
