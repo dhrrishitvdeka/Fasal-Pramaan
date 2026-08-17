@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node -e \"require.resolve('next')\" || npm ci",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --quiet",
