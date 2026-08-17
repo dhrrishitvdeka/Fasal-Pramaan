@@ -26,7 +26,7 @@ The default `crop_health_v4` DINOv2 ViT-S/14 model provides **assisted optical l
 
 - **Hosted model is assistive only**: the Fasal-Pramaan Space runs `dhrrishitvdeka/fasal-pramaan-model` (DINOv2 ViT-S/14 ONNX). It returns crop-conditioned A/B/C/U workflow buckets. It does not estimate disease identity, severity, affected area, or payout. Human review is required.
 - **GPS is the device browser**: `navigator.geolocation`. There is no geocoding, plot-boundary, or weather API on this path. Missing GPS lowers the context score; it is not treated as a pass.
-- **No Gemini / Fasal Saathi** on Vercel. Voice dictation on `/farmer/capture` uses the browser Web Speech API when present.
+- **Hosted Fasal Saathi** mints a short-lived Gemini Live token on the server (`GEMINI_API_KEY` never goes to the browser). Anyone who passes the site lock can start a session and spend Gemini quota. Browser Web Speech dictation on the observation box remains as a fallback.
 - **Reviewer login** needs a Supabase Auth user. Farmer routes are public; do not treat that as production access control.
 
 For full architectural governance and risk mitigation protocols, see [AI Governance & Safety Boundaries](./governance-and-safety.md).
