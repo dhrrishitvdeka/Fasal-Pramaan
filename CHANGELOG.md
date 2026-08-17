@@ -4,6 +4,33 @@ All notable changes to **Fasal-Pramaan** will be documented in this file. The fo
 
 ---
 
+## [1.3.0] — 2026-08-18
+
+### Added
+- **Vercel-hosted farmer and reviewer web portal** (`apps/dashboard`):
+  - Farmer capture at `/farmer/capture` persists real photos (no showcase or localStorage-only path).
+  - Hugging Face inference on `POST /api/claims` using `wambugu71/crop_leaf_diseases_vit`.
+  - Reviewer queue at `/review` lists the same claim IDs from Supabase `web_*` tables.
+- **Supabase persistence** for the hosted web path: private bucket `fasal-web-evidence`, RLS on `web_*` tables, env-only credentials.
+- **Root `vercel.json`** so Vercel builds `apps/dashboard` from the repository root.
+- **Local run kit** in `local/` (`start.ps1`, `start.sh`, README). The laptop Docker Compose stack (FastAPI, Celery, PostGIS, MinIO) is unchanged.
+- Documentation for the hosted path: `docs/deployment.md`, `docs/supabase-integration.md`, `docs/environment-variables.md`, `docs/security.md`.
+
+### Security
+- Removed a leaked database password from git history (rewritten `main`; rotate the Supabase DB password if you cloned before the rewrite).
+- Tracked files are env-only: `SUPABASE_*`, `HF_TOKEN`, and related keys are never committed.
+- Camera, microphone, and geolocation are allowed in the dashboard; CSP permits `*.supabase.co`.
+
+### Fixed
+- Empty `plot_id` from unregistered capture is stored as `null` so it does not violate `web_plots` foreign keys.
+- Reviewer overview SQL join order (`missing FROM-clause entry for table evidence_evaluations_2`).
+- Dashboard CI: Node 22, ESLint `--quiet`, unused-import rules for the farmer page.
+
+### Removed
+- Showcase interceptor, mock reviewer tokens, and `showcase-data.ts`. Farmer and reviewer tabs read live data only.
+
+---
+
 ## [1.2.0] — 2026-08-17
 
 ### Added
