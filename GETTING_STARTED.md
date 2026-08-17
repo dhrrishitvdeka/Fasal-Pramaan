@@ -54,6 +54,20 @@ docker compose up -d --build
 
 The launcher automatically builds all container images, runs Alembic database migrations, seeds reference crop catalogs and test accounts, waits for health checks to pass, and prints application URLs.
 
+From the `local/` folder you can also run `.\start.ps1` / `sh start.sh` (same Docker stack). Do not point Vercel at `local/`.
+
+---
+
+## Hosted web (Vercel) — not this Docker walkthrough
+
+To run **only** the Next.js farmer/reviewer app on Vercel (Supabase + Hugging Face, no FastAPI):
+
+1. SQL: `scripts/setup_supabase.sql` then `scripts/setup_web_schema.sql`.
+2. Vercel env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, optional `NEXT_PUBLIC_HF_MODEL_ID`.
+3. Leave `NEXT_PUBLIC_API_BASE_URL` unset. No Maps / weather / Gemini keys.
+
+Details: [docs/supabase-integration.md](docs/supabase-integration.md) and [docs/deployment.md](docs/deployment.md).
+
 ---
 
 ## 3. Accessing System Portals

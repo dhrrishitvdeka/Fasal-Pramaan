@@ -28,18 +28,33 @@ Pre-seeded login: `reviewer@fasalpramaan.local` / `Demo@12345`
 
 ---
 
-## 3. Local Development
+## 3. Local Development (Docker API)
+
+Use this when FastAPI is running on the laptop (`docker compose up` or `local/start.ps1`):
 
 ```bash
 cd apps/dashboard
 npm ci
-
-# Configure environment pointing to running API Gateway
-export NEXT_PUBLIC_API_BASE_URL="http://localhost:8000"
-export NEXT_PUBLIC_MEDIA_ORIGIN="http://localhost:9000"
-
+cp .env.example .env.local
+# For Docker API only:
+# NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+# NEXT_PUBLIC_MEDIA_ORIGIN=http://localhost:9000
 npm run dev
 ```
+
+### Hosted / Vercel path (Supabase + Hugging Face)
+
+Copy `.env.example` to `.env.local` and set:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only)
+- `HF_TOKEN` (server-only)
+- `NEXT_PUBLIC_HF_MODEL_ID` (optional; default `wambugu71/crop_leaf_diseases_vit`)
+
+Leave `NEXT_PUBLIC_API_BASE_URL` empty so the app uses `POST /api/claims` (persist + HF) and `/review` reads `web_claims`. Farmer capture is `/farmer/capture`. Reviewer login needs a Supabase Auth user.
+
+GitHub → Vercel builds this app from the repo root via `vercel.json`. Do not point Vercel at `local/`. See [docs/supabase-integration.md](../../docs/supabase-integration.md).
 
 ### Static Analysis & Testing
 ```bash

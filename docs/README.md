@@ -26,8 +26,9 @@ Welcome to the comprehensive technical documentation for **Fasal-Pramaan (*рдлрд
 | [**production-readiness.md**](production-readiness.md) | Enterprise multi-AZ deployment topology, infrastructure hardening, and high-availability SLAs. |
 | [**governance-and-safety.md**](governance-and-safety.md) | Ethical AI principles, human-in-the-loop safeguards, crop coverage matrix, and operational risk controls. |
 | [**known-limitations.md**](known-limitations.md) | Operational scope boundaries, screening vs. settlement definitions, and calibrated abstention policies. |
-| [**environment-variables.md**](environment-variables.md) | Complete configuration parameter reference for `.env` and Docker Compose. |
-| [**deployment.md**](deployment.md) | Deployment guides for local reference, trusted LAN exhibition, and cloud container orchestration. |
+| [**environment-variables.md**](environment-variables.md) | Compose `.env` reference plus the five Vercel-only keys. |
+| [**deployment.md**](deployment.md) | Local Compose, LAN exhibition, and Vercel + Supabase + Hugging Face. |
+| [**supabase-integration.md**](supabase-integration.md) | Hosted web path: `web_*` tables, private `fasal-web-evidence` bucket, HF inference, what **not** to set on Vercel. |
 
 ---
 
