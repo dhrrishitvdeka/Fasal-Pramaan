@@ -34,6 +34,7 @@ import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
 import { measureLightingScore, qualityPassedFromSignals, sha256FromDataUrl, sha256Hex } from "@/lib/evidence";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { webCaptureBridge } from "@/lib/voice/capture-bridge";
 import clsx from "clsx";
 
 function CaptureStudioContent() {
@@ -399,8 +400,40 @@ function CaptureStudioContent() {
       console.error("Submission failed:", err);
       setIsSubmitting(false);
       showToast("Submission failed. Please try again.");
+      throw err;
     }
   };
+
+  useEffect(() => {
+    return webCaptureBridge.register({
+      captureCurrentAngle: async () => {
+        if (!isCameraActive) {
+          return { ok: false, message: "Camera is not active. Open capture first." };
+        }
+        capturePhotoFromCamera();
+        return {
+          ok: true,
+          message: `Captured ${currentAngle?.id || "angle"}.`,
+          angle: currentAngle?.id,
+        };
+      },
+      readGuidance: async () => ({
+        ok: true,
+        message: currentAngle
+          ? `${currentAngle.name}: ${currentAngle.instructions}`
+          : "No capture angle is selected.",
+        angle: currentAngle?.id,
+      }),
+      setObservation: async (observation) => {
+        setObservations(observation);
+        return { ok: true, message: "Observation stored on the capture draft." };
+      },
+      submitDraft: async () => {
+        await handleSubmitClaim();
+        return { ok: true, message: "Claim submitted for review." };
+      },
+    });
+  }, [isCameraActive, currentAngle, handleSubmitClaim]);
 
   const getAngleIcon = (iconName: string) => {
     switch (iconName) {

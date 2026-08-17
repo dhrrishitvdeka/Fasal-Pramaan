@@ -25,6 +25,8 @@ const connectSrc = [
   "https://*.supabase.co",
   "wss://*.supabase.co",
   supabaseOrigin,
+  "https://generativelanguage.googleapis.com",
+  "wss://generativelanguage.googleapis.com",
 ]
   .filter(Boolean)
   .join(" ");

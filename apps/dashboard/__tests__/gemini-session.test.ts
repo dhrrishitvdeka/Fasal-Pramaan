@@ -1,0 +1,103 @@
+import { describe, expect, it } from "vitest";
+import {
+  assertNoSecretLeak,
+  buildAuthTokenRequest,
+  mintVoiceSession,
+} from "../src/lib/voice/gemini-session";
+import { parseGeminiLiveMessage } from "../src/lib/voice/gemini-live-parse";
+
+describe("voice session mint", () => {
+  it("fails closed when the site lock is on and the request is locked", async () => {
+    const result = await mintVoiceSession({
+      lockActive: true,
+      unlocked: false,
+      voiceEnabled: true,
+      apiKey: "test-key",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(401);
+      expect(result.error).toMatch(/locked/i);
+      expect(JSON.stringify(result)).not.toMatch(/GEMINI_API_KEY|SITE_LOCK_PASSWORD/i);
+    }
+  });
+
+  it("fails closed when voice is disabled or the key is missing", async () => {
+    const disabled = await mintVoiceSession({
+      lockActive: false,
+      unlocked: true,
+      voiceEnabled: false,
+      apiKey: "test-key",
+    });
+    const missing = await mintVoiceSession({
+      lockActive: true,
+      unlocked: true,
+      voiceEnabled: true,
+      apiKey: "",
+    });
+    expect(disabled.ok).toBe(false);
+    expect(missing.ok).toBe(false);
+    if (!disabled.ok) expect(disabled.status).toBe(503);
+    if (!missing.ok) expect(missing.status).toBe(503);
+    expect(JSON.stringify(disabled)).not.toMatch(/GEMINI_API_KEY|SITE_LOCK_PASSWORD/i);
+    expect(JSON.stringify(missing)).not.toMatch(/GEMINI_API_KEY|SITE_LOCK_PASSWORD/i);
+  });
+
+  it("returns only ephemeral session fields when mint succeeds", async () => {
+    const result = await mintVoiceSession({
+      lockActive: true,
+      unlocked: true,
+      voiceEnabled: true,
+      apiKey: "server-only-key",
+      fetchImpl: async () =>
+        new Response(JSON.stringify({ name: "auth_tokens/ephemeral-demo" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.token).toBe("auth_tokens/ephemeral-demo");
+      expect(result.websocketUrl).toMatch(/^wss:\/\//);
+      expect(result.model).toBeTruthy();
+      expect(result.sessionId).toBeTruthy();
+      expect(JSON.stringify(result)).not.toMatch(/server-only-key|GEMINI_API_KEY/i);
+      assertNoSecretLeak(result);
+    }
+    const request = buildAuthTokenRequest();
+    expect(JSON.stringify(request.body)).toContain("list_plots");
+    expect(JSON.stringify(request.body)).toContain("confirm_pending_action");
+  });
+
+  it("second locked call still rejects without leaking secrets", async () => {
+    const again = await mintVoiceSession({
+      lockActive: true,
+      unlocked: false,
+      voiceEnabled: true,
+      apiKey: "test-key",
+    });
+    expect(again.ok).toBe(false);
+    expect(JSON.stringify(again)).not.toMatch(/GEMINI_API_KEY|SITE_LOCK_PASSWORD|test-key/i);
+  });
+});
+
+describe("gemini live parser", () => {
+  it("parses setup, transcripts, audio, and tool calls", () => {
+    const parsed = parseGeminiLiveMessage({
+      setupComplete: {},
+      serverContent: {
+        inputTranscription: { text: " list plots" },
+        outputTranscription: { text: " तीन भूखंड" },
+        modelTurn: { parts: [{ inlineData: { data: "AAAA", mimeType: "audio/pcm" } }] },
+        turnComplete: true,
+      },
+      toolCall: {
+        functionCalls: [{ id: "c1", name: "list_plots", args: {} }],
+      },
+    });
+    expect(parsed.setupComplete).toBe(true);
+    expect(parsed.events.some((event) => event.type === "toolCalls")).toBe(true);
+    expect(parsed.events.some((event) => event.type === "audio")).toBe(true);
+    expect(parsed.events.some((event) => event.type === "inputTranscript")).toBe(true);
+  });
+});

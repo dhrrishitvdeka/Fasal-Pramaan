@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { FarmerProvider, useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
+import FasalSaathiOverlay from "@/components/FasalSaathiOverlay";
 import clsx from "clsx";
 
 function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
@@ -325,6 +326,8 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
           })}
         </nav>
       </div>
+
+      <FasalSaathiOverlay />
 
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white px-4 py-6 text-center text-xs text-slate-500 hidden md:block">
