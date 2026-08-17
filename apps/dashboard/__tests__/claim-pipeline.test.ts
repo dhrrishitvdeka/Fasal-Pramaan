@@ -72,6 +72,8 @@ describe("claim persist + HF + reviewer queue", () => {
     expect(detail!.latest_prediction?.overall_confidence).toBe(0.91);
     expect(detail!.images).toHaveLength(1);
     expect(detail!.images[0].download_url).toMatch(/^memory:\/\//);
+    const storedPath = detail!.images[0].download_url!.replace(/^memory:\/\//, "");
+    expect(store.blobs.get(storedPath)).toEqual(bytes);
 
     const acted = await applyReviewerAction(store, result.claimId, {
       action: "request_recapture",
@@ -91,6 +93,34 @@ describe("claim persist + HF + reviewer queue", () => {
     expect(persisted.claim.plot_id).toBeNull();
     const stored = await store.getClaim(persisted.claimId);
     expect(stored?.plot_id).toBeNull();
+  });
+
+  it("still lists the persisted claim when Hugging Face inference fails", async () => {
+    const store = createMemoryClaimStore();
+    const bytes = jpegLikeBytes();
+    const result = await persistAndInfer(
+      store,
+      {
+        plotName: "East terrace",
+        farmerObservations: "Leaf rust",
+        images: [{ angleType: "closeup_damage", bytes, sha256: "c".repeat(64) }],
+      },
+      inferCropDisease,
+      {
+        fetchImpl: async () =>
+          new Response(JSON.stringify({ error: "Model is currently loading" }), { status: 503 }),
+      },
+    );
+
+    expect(result.prediction).toBeNull();
+    expect(result.inferError).toMatch(/503|failed|loading/i);
+    const queue = await listReviewerQueue(store);
+    expect(queue.map((item) => item.id)).toContain(result.claimId);
+    const detail = await getReviewerClaim(store, result.claimId);
+    expect(detail!.images).toHaveLength(1);
+    const storedPath = detail!.images[0].download_url!.replace(/^memory:\/\//, "");
+    expect(store.blobs.get(storedPath)).toEqual(bytes);
+    expect(detail!.latest_prediction).toBeNull();
   });
 
   it("rejects Hugging Face payloads that have no label", async () => {

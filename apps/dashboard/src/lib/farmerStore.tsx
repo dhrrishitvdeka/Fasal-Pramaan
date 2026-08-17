@@ -287,50 +287,39 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
       aiPrediction?: ClaimAiPrediction;
     },
   ): Promise<FarmerClaim> => {
-    if (isSupabaseConfigured()) {
-      const result = await submitWebClaim({
-        plotId: claimData.plotId,
-        plotName: claimData.plotName,
-        plotNameHi: claimData.plotNameHi,
-        khasraNumber: claimData.khasraNumber,
-        cropType: claimData.cropType,
-        cropTypeHi: claimData.cropTypeHi,
-        cropVariety: claimData.cropVariety,
-        farmerObservations: claimData.farmerObservations,
-        captureLat: claimData.images[0]?.lat,
-        captureLon: claimData.images[0]?.lon,
-        captureAccuracyM: claimData.images[0]?.accuracyM,
-        images: claimData.images.map((img) => ({
-          angleType: img.angleType,
-          imageDataUrl: img.imageUrl,
-          sha256: img.sha256,
-          lat: img.lat,
-          lon: img.lon,
-          accuracyM: img.accuracyM,
-        })),
-      });
-      const persisted = await getWebClaim(result.claimId);
-      const claim = submissionToClaim(persisted);
-      setClaims((prev) => [claim, ...prev.filter((item) => item.id !== claim.id)]);
-      try {
-        sessionStorage.removeItem(STORAGE_KEY_DRAFT);
-      } catch {
-        // ignore
-      }
-      return claim;
+    if (!isSupabaseConfigured()) {
+      throw new Error("Supabase is not configured — claim was not stored");
     }
-
-    const now = new Date().toISOString();
-    const local: FarmerClaim = {
-      ...claimData,
-      id: globalThis.crypto?.randomUUID?.() || `claim-${Date.now()}`,
-      createdAt: now,
-      updatedAt: now,
-      evidenceTrust: previewFromImages(claimData.images),
-      aiPrediction: claimData.aiPrediction || emptyPrediction(),
-    };
-    setClaims((prev) => [local, ...prev]);
-    return local;
+    const result = await submitWebClaim({
+      plotId: claimData.plotId,
+      plotName: claimData.plotName,
+      plotNameHi: claimData.plotNameHi,
+      khasraNumber: claimData.khasraNumber,
+      cropType: claimData.cropType,
+      cropTypeHi: claimData.cropTypeHi,
+      cropVariety: claimData.cropVariety,
+      farmerObservations: claimData.farmerObservations,
+      captureLat: claimData.images[0]?.lat,
+      captureLon: claimData.images[0]?.lon,
+      captureAccuracyM: claimData.images[0]?.accuracyM,
+      images: claimData.images.map((img) => ({
+        angleType: img.angleType,
+        imageDataUrl: img.imageUrl,
+        sha256: img.sha256,
+        lat: img.lat,
+        lon: img.lon,
+        accuracyM: img.accuracyM,
+      })),
+    });
+    const persisted = await getWebClaim(result.claimId);
+    const claim = submissionToClaim(persisted);
+    setClaims((prev) => [claim, ...prev.filter((item) => item.id !== claim.id)]);
+    try {
+      sessionStorage.removeItem(STORAGE_KEY_DRAFT);
+    } catch {
+      // ignore
+    }
+    return claim;
   };
 
   const updateClaimRecapture = async (

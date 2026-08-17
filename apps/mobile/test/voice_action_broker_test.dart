@@ -1,4 +1,5 @@
 import 'package:fasalpramaan/features/voice/voice_action_broker.dart';
+import 'package:fasalpramaan/features/voice/voice_capture_bridge.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeGateway implements VoiceActionGateway {
@@ -267,5 +268,91 @@ void main() {
 
     expect(result.outcome, VoiceActionOutcome.failed);
     expect(result.message, contains('four or five'));
+  });
+
+  test('demo read/nav/shutter/observation tools execute on the shipped broker',
+      () async {
+    final routes = <String>[];
+    final gateway = _FakeGateway();
+    final bridge = VoiceCaptureBridge();
+    final owner = Object();
+    var shutterCalls = 0;
+    final observations = <String>[];
+    bridge.register(
+      owner: owner,
+      capture: () async {
+        shutterCalls++;
+        return {'ok': true, 'message': 'Captured closeup_damage'};
+      },
+      guidance: () async => {'ok': true, 'message': 'Aim at the leaf'},
+      save: () async => {'ok': true, 'message': 'Saved offline'},
+      setObservation: (text) async {
+        observations.add(text);
+        return {'ok': true, 'message': 'Observation stored', 'observation': text};
+      },
+    );
+    final broker = VoiceActionBroker(
+      gateway: gateway,
+      navigate: routes.add,
+      captureBridge: bridge,
+    );
+
+    final farms = await broker.execute('list_my_farms', const {}, userTurn: 1);
+    final cycles =
+        await broker.execute('list_crop_cycles', const {}, userTurn: 1);
+    final capture = await broker.execute(
+      'begin_guided_capture',
+      {'crop_cycle_id': 'cycle-42'},
+      userTurn: 1,
+    );
+    final shutter = await broker.execute(
+      'capture_current_angle',
+      const {},
+      userTurn: 1,
+    );
+    final note = await broker.execute(
+      'set_capture_observation',
+      {'observation': 'brown leaf spots visible'},
+      userTurn: 1,
+    );
+
+    expect(farms.outcome, VoiceActionOutcome.succeeded);
+    expect(farms.data['farms'], isNotEmpty);
+    expect((farms.data['farms'] as List).first['name'], 'North plot');
+    expect(cycles.outcome, VoiceActionOutcome.succeeded);
+    expect(cycles.data['count'], 0);
+    expect(capture.outcome, VoiceActionOutcome.succeeded);
+    expect(routes.single, contains('crop_cycle_id=cycle-42'));
+    expect(shutter.outcome, VoiceActionOutcome.succeeded);
+    expect(shutterCalls, 1);
+    expect(note.outcome, VoiceActionOutcome.succeeded);
+    expect(observations, ['brown leaf spots visible']);
+  });
+
+  test('cancel after prepare does not mutate the gateway', () async {
+    final gateway = _FakeGateway();
+    final broker = VoiceActionBroker(gateway: gateway, navigate: (_) {});
+
+    final prepared = await broker.execute(
+      'prepare_sync_offline_queue',
+      const {},
+      userTurn: 1,
+    );
+    final cancelled = await broker.execute(
+      'cancel_pending_action',
+      const {},
+      userTurn: 2,
+    );
+    final confirmAfterCancel = await broker.execute(
+      'confirm_pending_action',
+      const {},
+      userTurn: 3,
+    );
+
+    expect(prepared.outcome, VoiceActionOutcome.confirmationRequired);
+    expect(gateway.syncCalls, 0);
+    expect(cancelled.outcome, VoiceActionOutcome.cancelled);
+    expect(confirmAfterCancel.outcome, VoiceActionOutcome.failed);
+    expect(gateway.syncCalls, 0);
   });
 }
