@@ -22,6 +22,7 @@ def _first_val_image() -> Path | None:
 
 def test_plant_disease_real_inference_on_val_image():
     pytest.importorskip("torch")
+    pytest.importorskip("torchvision")
     if not CKPT.is_file():
         pytest.skip("checkpoint missing")
     img = _first_val_image()

@@ -129,12 +129,7 @@ def review_action(
         .first()
     )
 
-    if body.action == "accept":
-        if not _prediction_is_reviewable(pred):
-            raise HTTPException(
-                400,
-                "AI result is incomplete; record a corrected human assessment instead of accepting it",
-            )
+    if body.action in ("accept", "complete"):
         latest_eval = (
             db.query(EvidenceEvaluation)
             .filter(EvidenceEvaluation.submission_id == sub.id)
@@ -144,7 +139,12 @@ def review_action(
         if latest_eval and (latest_eval.integrity_score < 70.0 or latest_eval.uncertainty_type == "integrity"):
             raise HTTPException(
                 400,
-                "Cannot accept submission with integrity issues (integrity score < 70). Human correction or rejection is required.",
+                "Cannot accept or complete submission with integrity issues (integrity score < 70). Human correction or rejection is required.",
+            )
+        if body.action == "accept" and not _prediction_is_reviewable(pred):
+            raise HTTPException(
+                400,
+                "AI result is incomplete; record a corrected human assessment instead of accepting it",
             )
 
     review = HumanReview(
