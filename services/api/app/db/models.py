@@ -535,7 +535,7 @@ class EvidenceEvaluation(Base, UUIDPrimaryKeyMixin):
     )
 
     submission_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("submissions.id"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("submissions.id"), nullable=False
     )
     evaluation_version: Mapped[str] = mapped_column(
         String(64), default="evidence-confidence-v1", nullable=False

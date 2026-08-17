@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { listAlerts } from "@/lib/api";
 import Link from "next/link";
 
 type Alert = {
@@ -17,7 +17,7 @@ type Alert = {
 export default function AlertsPage() {
   const { data = [], isLoading } = useQuery({
     queryKey: ["alerts"],
-    queryFn: async () => (await api.get<Alert[]>("/dashboard/alerts")).data,
+    queryFn: listAlerts,
     refetchInterval: 15_000,
   });
 

@@ -22,6 +22,12 @@ private/
 # Local agent/IDE session caches (do not publish)
 .agents/
 .codex/
+.grok/
+apps/dashboard/AGENTS.md
+apps/dashboard/CLAUDE.md
+# Accidental root npm install (this repo has no root Node app)
+/package.json
+/package-lock.json
 
 # ------------------------------------------
 # Python
@@ -84,6 +90,9 @@ node_modules/
 out/
 .turbo/
 .cache/
+.vercel/
+apps/dashboard/.vercel/
+*.orig
 .npm
 *.tsbuildinfo
 npm-debug.log*
