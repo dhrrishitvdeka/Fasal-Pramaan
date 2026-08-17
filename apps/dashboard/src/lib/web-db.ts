@@ -3,7 +3,6 @@ import { computeEvidencePreview, isRealSha256 } from "./evidence";
 import { HF_MODEL_ID } from "./hf-model";
 import type {
   ClaimAiPrediction,
-  ClaimEvidenceTrust,
   ClaimImageEvidence,
   ClaimStatus,
   FarmerClaim,
