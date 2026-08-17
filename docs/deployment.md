@@ -72,16 +72,21 @@ For detailed enterprise hardening and SLA specifications, see [Production Readin
 
 ## 5. Vercel dashboard + Supabase + Hugging Face
 
-The local Docker Compose topology above is unchanged. To host only the Next.js web app:
+The local Docker Compose topology above is unchanged (`local/start.ps1` or `scripts/start-portable.ps1`). To host only the Next.js web app:
 
-1. Deploy `apps/dashboard` on Vercel (`npx vercel` from that folder, or connect the GitHub repo with Root Directory `apps/dashboard`).
-2. Set placeholder-named env vars (never commit values):
+1. Connect this GitHub repo to Vercel. Keep the **repository root** as the project root — [`vercel.json`](../vercel.json) builds `apps/dashboard`. Do not set Root Directory to `local/`.
+2. Apply `scripts/setup_supabase.sql` then `scripts/setup_web_schema.sql` in the Supabase SQL editor.
+3. Set these env vars in Vercel (Production + Preview). Never commit values:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `HF_TOKEN`
+   - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
+   - `HF_TOKEN` (server-only Read token)
    - `NEXT_PUBLIC_HF_MODEL_ID=wambugu71/crop_leaf_diseases_vit`
-3. Apply `scripts/setup_supabase.sql` then `scripts/setup_web_schema.sql` on the Supabase project.
-4. Farmer path: `/farmer/capture` → `POST /api/claims` → Hugging Face inference → `/review` lists the same claim id.
+4. Create a Supabase Auth user if you need reviewer `/login`. Farmer `/farmer/capture` is public.
+5. Farmer path: `/farmer/capture` → `POST /api/claims` → Hugging Face → `/review` lists the same claim id.
 
-Do not point Vercel at the Docker-only rewrite host `http://api:8000`. Leave `NEXT_PUBLIC_API_BASE_URL` empty on Vercel unless you host FastAPI separately.
+Leave **`NEXT_PUBLIC_API_BASE_URL` unset** on Vercel. Do not point it at `http://api:8000`.
+
+No extra location, maps, or weather API keys are required. GPS comes from the browser; the reviewer map uses OpenStreetMap tiles. Gemini (`GEMINI_API_KEY`) is Docker/FastAPI voice only.
+
+Full variable list and “do not mix backends” notes: [supabase-integration.md](./supabase-integration.md), [environment-variables.md](./environment-variables.md).

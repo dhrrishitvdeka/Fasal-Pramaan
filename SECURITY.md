@@ -25,7 +25,7 @@ Please include:
 ## 3. Security Guidelines & Best Practices
 
 - **Never Commit Secrets**: Ensure `.env` and sensitive API keys are excluded from version control.
-- **Server-Side Credentials**: High-privilege tokens (such as `GEMINI_API_KEY`) must reside exclusively on the server and never be distributed to client binaries.
+- **Server-Side Credentials**: High-privilege tokens (`SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `GEMINI_API_KEY`) must reside exclusively on the server and never be named `NEXT_PUBLIC_*`.
 - **Immediate Credential Rotation**: If credentials or keys are inadvertently exposed, revoke and rotate them immediately across all environments.
 
 For complete architectural security specifications, see [Security Architecture](docs/security.md).

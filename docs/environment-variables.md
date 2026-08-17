@@ -30,3 +30,26 @@ When `ENVIRONMENT=production`, the application strictly enforces:
 - `AI_ALLOW_MOCK_FALLBACK` must be `false`.
 - `REDIS_PASSWORD` and database credentials must be non-default.
 - `RATE_LIMIT_ENABLED` must be `true` with Redis backend.
+
+---
+
+## Vercel-only (hosted farmer / reviewer)
+
+Set these five on the Vercel project (and in `apps/dashboard/.env.local` for `npm run dev`). Never commit values.
+
+| Variable | Public? | Required | Notes |
+|---|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | yes | yes | Project URL, e.g. `https://<ref>.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes | yes | Publishable / anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | **no** | yes | Server-only. Never `NEXT_PUBLIC_*` |
+| `HF_TOKEN` | **no** | yes | Hugging Face Read token for `POST /api/claims` |
+| `NEXT_PUBLIC_HF_MODEL_ID` | yes | no | Defaults to `wambugu71/crop_leaf_diseases_vit` |
+
+**Leave unset on Vercel**
+
+| Variable | Why |
+|---|---|
+| `NEXT_PUBLIC_API_BASE_URL` | Must not point at Docker `http://api:8000`. Empty = use Next routes (`/api/claims`). |
+| `DATABASE_URL`, `REDIS_*`, `MINIO_*`, `JWT_SECRET_KEY` | Laptop Compose only |
+| `GEMINI_API_KEY` | Fasal Saathi voice on FastAPI only |
+| Maps / geocoding / weather keys | Not used. GPS is `navigator.geolocation`; map tiles are OSM. |
