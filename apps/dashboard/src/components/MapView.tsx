@@ -3,6 +3,7 @@
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import type { MapMarker } from "@/lib/api";
+import { OSM_TILE_ATTRIBUTION, OSM_TILE_URL } from "@/lib/map-tiles";
 import { useEffect } from "react";
 import Link from "next/link";
 
@@ -49,10 +50,7 @@ export default function MapView({ markers }: { markers: MapMarker[] }) {
   return (
     <div className="h-[520px] w-full overflow-hidden border border-slate-200 bg-white">
       <MapContainer center={center} zoom={12} className="h-full w-full" scrollWheelZoom>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <TileLayer attribution={OSM_TILE_ATTRIBUTION} url={OSM_TILE_URL} />
         <FitBounds markers={markers} />
         {markers.map((m) => (
           <CircleMarker
