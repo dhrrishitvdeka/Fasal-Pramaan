@@ -101,6 +101,30 @@ export function waitForVideoFrame(video: HTMLVideoElement, timeoutMs = 8000): Pr
   });
 }
 
+/** Mean luma 0–100 from the current video frame. Null if nothing can be sampled. */
+export function sampleVideoMeanLuma(video: HTMLVideoElement): number | null {
+  if (!videoHasFrame(video)) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.min(video.videoWidth, 64);
+  canvas.height = Math.min(video.videoHeight, 64);
+  const ctx = canvas.getContext("2d");
+  if (!ctx || !canvas.width || !canvas.height) return null;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  try {
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < pixels.length; i += 16) {
+      sum += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+      count += 1;
+    }
+    if (!count) return null;
+    return Math.round((sum / count / 255) * 100);
+  } catch {
+    return null;
+  }
+}
+
 /** Bind a live stream so preview can start. A missing first frame is not fatal. */
 export async function attachStreamToVideo(
   video: HTMLVideoElement,
