@@ -48,7 +48,7 @@ export default function MapView({ markers }: { markers: MapMarker[] }) {
     markers.length > 0 ? [markers[0].lat, markers[0].lon] : [23.26, 77.41];
 
   return (
-    <div className="h-[520px] w-full overflow-hidden border border-slate-200 bg-white">
+    <div className="h-[min(58vh,380px)] w-full overflow-hidden border border-slate-200 bg-white md:h-[520px]">
       <MapContainer center={center} zoom={12} className="h-full w-full" scrollWheelZoom>
         <TileLayer attribution={OSM_TILE_ATTRIBUTION} url={OSM_TILE_URL} />
         <FitBounds markers={markers} />

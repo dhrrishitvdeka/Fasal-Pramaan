@@ -30,8 +30,8 @@ export default function AlertsPage() {
       {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
       <ul className="divide-y divide-slate-200 border border-slate-200 bg-white">
         {data.map((a) => (
-          <li key={a.id} className="flex items-start justify-between gap-4 px-4 py-3">
-            <div>
+          <li key={a.id} className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-4">
+            <div className="min-w-0">
               <div className="text-[11px] uppercase tracking-wide text-slate-500">
                 {a.alert_type} · {a.severity}
               </div>

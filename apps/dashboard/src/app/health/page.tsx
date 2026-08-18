@@ -1,16 +1,33 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
 import { getHfModelId, getHfSpaceId } from "@/lib/hf-model";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/backend";
+type HealthPayload = {
+  ok?: boolean;
+  status?: string;
+  mode?: string;
+  checks?: Record<string, unknown>;
+};
 
 export default function HealthPage() {
-  const apiHealth = useQuery({
-    queryKey: ["api-health"],
-    queryFn: async () => (await axios.get(`${API_BASE}/health`)).data,
+  const hosted = useQuery({
+    queryKey: ["hosted-health"],
+    queryFn: async (): Promise<HealthPayload> => {
+      const response = await fetch("/api/health");
+      const body = (await response.json().catch(() => null)) as HealthPayload | null;
+      if (!response.ok || !body) {
+        throw new Error(`Hosted health failed (${response.status})`);
+      }
+      return body;
+    },
   });
+
+  const apiBlock = hosted.isLoading
+    ? { status: "loading" }
+    : hosted.error
+      ? { status: "error", error: hosted.error instanceof Error ? hosted.error.message : "probe failed" }
+      : hosted.data || { status: "empty" };
 
   return (
     <div className="space-y-4">
@@ -20,14 +37,15 @@ export default function HealthPage() {
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         {[
-          { title: "API", data: apiHealth.data || apiHealth.error },
-          { title: "Dependency checks", data: apiHealth.data?.checks || {} },
+          { title: "API", data: apiBlock },
+          { title: "Dependency checks", data: hosted.data?.checks || { status: hosted.status } },
           {
             title: "Hugging Face Space",
             data: {
               model_id: getHfModelId(),
               space_id: getHfSpaceId(),
               path: "farmer upload → /api/claims → Fasal-Pramaan Space → reviewer queue",
+              probe: hosted.data?.checks?.huggingface_space || null,
             },
           },
         ].map((block) => (

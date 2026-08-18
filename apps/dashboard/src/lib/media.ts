@@ -40,3 +40,37 @@ export function cameraConstraintLadder(facing: FacingMode): MediaStreamConstrain
     { audio: false, video: true },
   ];
 }
+
+export function videoHasFrame(video: Pick<HTMLVideoElement, "videoWidth" | "readyState">): boolean {
+  return video.videoWidth > 0 && video.readyState >= 2;
+}
+
+/** Wait until the live element has decoded at least one frame. */
+export function waitForVideoFrame(
+  video: HTMLVideoElement,
+  timeoutMs = 4000,
+): Promise<void> {
+  if (videoHasFrame(video)) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const onReady = () => {
+      if (!videoHasFrame(video)) return;
+      cleanup();
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("Camera started but produced no video frames"));
+    }, timeoutMs);
+    const cleanup = () => {
+      clearTimeout(timer);
+      video.removeEventListener("loadedmetadata", onReady);
+      video.removeEventListener("loadeddata", onReady);
+      video.removeEventListener("playing", onReady);
+      video.removeEventListener("canplay", onReady);
+    };
+    video.addEventListener("loadedmetadata", onReady);
+    video.addEventListener("loadeddata", onReady);
+    video.addEventListener("playing", onReady);
+    video.addEventListener("canplay", onReady);
+  });
+}

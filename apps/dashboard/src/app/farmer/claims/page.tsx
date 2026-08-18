@@ -83,12 +83,12 @@ export default function FarmerClaimsPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-6">
+    <div className="space-y-4">
       {/* Header & New Claim Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <FileText className="h-6 w-6 text-emerald-800" />
+      <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 sm:flex-row sm:items-center sm:justify-between sm:pb-4">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-lg font-bold text-slate-900 sm:text-2xl">
+            <FileText className="h-5 w-5 text-[var(--accent)] sm:h-6 sm:w-6" />
             <span>{t.claims}</span>
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-slate-600">
@@ -100,7 +100,7 @@ export default function FarmerClaimsPage() {
 
         <Link
           href="/farmer/capture"
-          className="fp-btn-primary gap-2 shrink-0"
+          className="fp-btn-primary w-full shrink-0 gap-2 sm:w-auto"
         >
           <Camera className="h-4 w-4" />
           <span>{t.quickActionNewClaim}</span>
@@ -108,9 +108,9 @@ export default function FarmerClaimsPage() {
       </div>
 
       {/* Search & Filter Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         {/* Filter Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-200/70 rounded-xl border border-slate-200">
+        <div className="fp-chip-row rounded-lg border border-slate-200 bg-slate-200/70 p-1">
           {filterTabs.map((tab) => {
             const isActive = activeFilter === tab.key;
             return (
@@ -158,7 +158,7 @@ export default function FarmerClaimsPage() {
 
       {/* Claims List Grid */}
       {filteredClaims.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center sm:p-12">
           <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
           <h3 className="text-sm font-bold text-slate-700">{t.noClaimsFound}</h3>
           <p className="mt-1 text-xs text-slate-500">
@@ -185,7 +185,7 @@ export default function FarmerClaimsPage() {
               <div
                 key={claim.id}
                 className={clsx(
-                  "rounded-xl border bg-white p-5 shadow-xs transition-all hover:shadow-md",
+                  "rounded-xl border bg-white p-3 shadow-xs transition-all hover:shadow-md sm:p-5",
                   isRecapture
                     ? "border-amber-300 bg-amber-50/20"
                     : isVerified
@@ -197,7 +197,7 @@ export default function FarmerClaimsPage() {
                   {/* Left info */}
                   <div className="space-y-2 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-sm font-bold text-slate-900">
+                      <span className="max-w-full truncate font-mono text-sm font-bold text-slate-900">
                         {claim.id}
                       </span>
                       {/* Status Badge */}
@@ -324,7 +324,7 @@ export default function FarmerClaimsPage() {
 
                       <Link
                         href={`/farmer/claims/${claim.id}`}
-                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-800 hover:bg-slate-50 transition-colors shadow-2xs"
+                        className="inline-flex min-h-11 flex-1 items-center justify-center gap-1 border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-800 hover:bg-slate-50 sm:flex-initial"
                       >
                         <Eye className="h-3.5 w-3.5 text-slate-500" />
                         <span>{t.viewDetails}</span>

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { cameraConstraintLadder, isSafeDisplayUrl, safeDisplayUrl } from "../src/lib/media";
+import {
+  cameraConstraintLadder,
+  isSafeDisplayUrl,
+  safeDisplayUrl,
+  videoHasFrame,
+  waitForVideoFrame,
+} from "../src/lib/media";
 
 describe("hosted media helpers", () => {
   it("rejects file:// and empty values so capture never links off-origin files", () => {
@@ -27,5 +33,21 @@ describe("hosted media helpers", () => {
       expect.objectContaining({ facingMode: { ideal: "environment" } }),
     );
     expect(ladder[ladder.length - 1]).toEqual({ audio: false, video: true });
+  });
+
+  it("treats a zero-size video as having no frame", () => {
+    expect(videoHasFrame({ videoWidth: 0, readyState: 0 })).toBe(false);
+    expect(videoHasFrame({ videoWidth: 1280, readyState: 2 })).toBe(true);
+  });
+
+  it("times out when the camera never produces a frame", async () => {
+    const listeners = new Map<string, () => void>();
+    const video = {
+      videoWidth: 0,
+      readyState: 0,
+      addEventListener: (name: string, fn: () => void) => listeners.set(name, fn),
+      removeEventListener: (name: string) => listeners.delete(name),
+    } as unknown as HTMLVideoElement;
+    await expect(waitForVideoFrame(video, 20)).rejects.toThrow(/no video frames/i);
   });
 });

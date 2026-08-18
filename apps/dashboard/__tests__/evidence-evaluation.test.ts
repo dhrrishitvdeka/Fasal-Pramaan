@@ -37,6 +37,25 @@ describe("Evidence Evaluation Layer Tests", () => {
     },
   };
 
+  it("does not invent sharpness or brightness when pixels were not measured", () => {
+    const ev = resolveEvidenceEvaluation(baseSubmission);
+    expect(ev.quality.details?.blur_score).toBeUndefined();
+    expect(ev.quality.details?.brightness_score).toBeUndefined();
+  });
+
+  it("uses measured lighting instead of a default 82% brightness", () => {
+    const dark: Submission = {
+      ...baseSubmission,
+      images: baseSubmission.images.map((img) => ({
+        ...img,
+        quality_flags: { lighting_score: 0, quality_passed: false },
+      })),
+    };
+    const ev = resolveEvidenceEvaluation(dark);
+    expect(ev.quality.score).toBe(0);
+    expect(ev.quality.details?.brightness_score).toBe(0);
+  });
+
   it("calculates high evidence confidence for complete, valid submissions", () => {
     const ev = resolveEvidenceEvaluation(baseSubmission);
     expect(ev.confidence.final).toBeGreaterThanOrEqual(85);

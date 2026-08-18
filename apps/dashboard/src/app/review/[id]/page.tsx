@@ -163,14 +163,14 @@ export default function ReviewDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-5xl space-y-4">
+      <div className="flex items-center justify-between gap-2">
         <button
           type="button"
           className="text-sm text-slate-600 underline underline-offset-2 hover:text-slate-900"
           onClick={() => router.push("/review")}
         >
-          ← Return to queue
+          ← Queue
         </button>
         <ReviewKeyboardShortcuts
           disabled={action.isPending || recaptureModalOpen}
@@ -207,14 +207,14 @@ export default function ReviewDetailPage() {
           </h3>
           <span className="fp-badge-neutral">{data.status}</span>
         </div>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm pt-1">
+        <dl className="grid grid-cols-1 gap-y-1.5 pt-1 text-sm sm:grid-cols-[auto_1fr] sm:gap-x-4">
           <dt className="text-slate-500">GPS Coordinates</dt>
-          <dd className="tabular-nums font-mono text-xs">
+          <dd className="break-all font-mono text-xs tabular-nums">
             {data.capture_lat?.toFixed(5)}, {data.capture_lon?.toFixed(5)} (±
             {data.capture_accuracy_m ?? "?"} m)
           </dd>
           <dt className="text-slate-500">Farmer Notes</dt>
-          <dd className="text-slate-700">{data.farmer_observations || "—"}</dd>
+          <dd className="break-words text-slate-700">{data.farmer_observations || "—"}</dd>
         </dl>
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
           {(data.images || []).map((img) => (
@@ -263,7 +263,9 @@ export default function ReviewDetailPage() {
               <div>
                 <dt className="text-slate-500">Predicted Crop</dt>
                 <dd className="font-semibold text-slate-800">
-                  {pred.predicted_crop || "—"} ({((pred.crop_confidence || 0) * 100).toFixed(0)}%)
+                  {pred.predicted_grade === "U"
+                    ? "Not determined (unusable evidence)"
+                    : `${pred.predicted_crop || "—"} (${((pred.crop_confidence || 0) * 100).toFixed(0)}%)`}
                 </dd>
               </div>
               <div>
@@ -395,46 +397,46 @@ export default function ReviewDetailPage() {
           />
         </label>
 
-        <div className="flex flex-wrap gap-2 pt-2">
+        <div className="grid grid-cols-1 gap-2 pt-2 sm:flex sm:flex-wrap">
           <button
             type="button"
-            className="fp-btn-primary flex items-center gap-1.5"
+            className="fp-btn-primary flex w-full items-center justify-center gap-1.5 sm:w-auto"
             disabled={action.isPending || !canAccept}
             onClick={handleAccept}
             title={integrityFailed ? "Acceptance disabled due to failed integrity checks" : "Accept AI result (A)"}
           >
             <span>Accept AI result</span>
-            <kbd className="rounded bg-[var(--ink)] px-1 font-mono text-[10px] text-[var(--surface)]">A</kbd>
+            <kbd className="hidden rounded bg-[var(--ink)] px-1 font-mono text-[10px] text-[var(--surface)] sm:inline">A</kbd>
           </button>
 
           <button
             type="button"
-            className="fp-btn-secondary flex items-center gap-1.5"
+            className="fp-btn-secondary flex w-full items-center justify-center gap-1.5 sm:w-auto"
             disabled={action.isPending}
             onClick={handleCorrect}
           >
             <span>Correct & verify</span>
-            <kbd className="rounded border border-slate-300 bg-slate-100 px-1 font-mono text-[10px] text-slate-600">C</kbd>
+            <kbd className="hidden rounded border border-slate-300 bg-slate-100 px-1 font-mono text-[10px] text-slate-600 sm:inline">C</kbd>
           </button>
 
           <button
             type="button"
-            className="fp-btn-secondary flex items-center gap-1.5"
+            className="fp-btn-secondary flex w-full items-center justify-center gap-1.5 sm:w-auto"
             disabled={action.isPending}
             onClick={handleOpenRecapture}
           >
-            <span>Request specific recapture…</span>
-            <kbd className="rounded border border-slate-300 bg-slate-100 px-1 font-mono text-[10px] text-slate-600">R</kbd>
+            <span>Request recapture</span>
+            <kbd className="hidden rounded border border-slate-300 bg-slate-100 px-1 font-mono text-[10px] text-slate-600 sm:inline">R</kbd>
           </button>
 
           <button
             type="button"
-            className="fp-btn-danger flex items-center gap-1.5"
+            className="fp-btn-danger flex w-full items-center justify-center gap-1.5 sm:w-auto"
             disabled={action.isPending}
             onClick={handleInspection}
           >
             <span>Physical inspection</span>
-            <kbd className="rounded bg-rose-700 px-1 font-mono text-[10px] text-white">P</kbd>
+            <kbd className="hidden rounded bg-rose-700 px-1 font-mono text-[10px] text-white sm:inline">P</kbd>
           </button>
         </div>
       </section>
@@ -442,12 +444,12 @@ export default function ReviewDetailPage() {
       {/* Adaptive Recapture Dialog / Modal */}
       {recaptureModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="recapture-dialog-title"
         >
-          <div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-xl space-y-4 border border-slate-200">
+          <div className="max-h-[92vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-t-lg border border-slate-200 bg-white p-4 shadow-xl sm:rounded-lg sm:p-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h3 id="recapture-dialog-title" className="text-sm font-bold text-slate-900">
                 Adaptive Evidence Recapture Request
@@ -508,17 +510,17 @@ export default function ReviewDetailPage() {
               />
             </label>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
-                className="fp-btn-secondary"
+                className="fp-btn-secondary w-full sm:w-auto"
                 onClick={() => setRecaptureModalOpen(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="fp-btn-primary"
+                className="fp-btn-primary w-full sm:w-auto"
                 disabled={action.isPending || selectedAngles.length === 0}
                 onClick={handleConfirmRecapture}
               >

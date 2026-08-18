@@ -49,20 +49,20 @@ export default function FarmerRemindersPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-6">
+    <div className="space-y-4">
       {/* Toast */}
       {toast && (
-        <div className="fp-panel fixed top-16 right-4 z-50 flex items-center gap-2 px-4 py-3 text-xs sm:text-sm">
+        <div className="fp-panel fixed left-3 right-3 top-20 z-50 flex items-center gap-2 px-3 py-2.5 text-xs sm:left-auto sm:right-4 sm:max-w-sm sm:text-sm">
           <CheckCircle2 className="h-5 w-5" />
           <span>{toast}</span>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Calendar className="h-6 w-6" />
+      <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 sm:flex-row sm:items-center sm:justify-between sm:pb-4">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-lg font-bold text-slate-900 sm:text-2xl">
+            <Calendar className="h-5 w-5 sm:h-6 sm:w-6" />
             <span>{t.remindersTitle}</span>
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-slate-600 max-w-3xl">
@@ -72,7 +72,7 @@ export default function FarmerRemindersPage() {
 
         <Link
           href="/farmer/capture"
-          className="fp-btn-primary gap-2 shrink-0"
+          className="fp-btn-primary w-full shrink-0 gap-2 sm:w-auto"
         >
           <Camera className="h-4 w-4" />
           <span>{t.captureMilestoneNow}</span>
@@ -80,7 +80,7 @@ export default function FarmerRemindersPage() {
       </div>
 
       {/* Crop Selector Tabs & Progress Card */}
-      <div className="fp-panel p-5">
+      <div className="fp-panel p-3 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           {/* Crop Selector Tabs */}
           <div className="flex items-center gap-2">
@@ -123,10 +123,10 @@ export default function FarmerRemindersPage() {
 
         {/* Timeline Visual Progress Bar */}
         <div className="mt-6 space-y-2">
-          <div className="flex justify-between text-[11px] text-slate-500 font-medium">
-            <span>{lang === "hi" ? "बुवाई (दिन 0)" : "Sowing (Day 0)"}</span>
-            <span>{lang === "hi" ? "मध्य अवस्था (दिन 60)" : "Mid Growth (Day 60)"}</span>
-            <span>{lang === "hi" ? "कटाई (दिन 120)" : "Harvest (Day 120)"}</span>
+          <div className="flex justify-between text-[10px] font-medium text-slate-500 sm:text-[11px]">
+            <span>{lang === "hi" ? "बुवाई" : "Sowing"}</span>
+            <span className="hidden sm:inline">{lang === "hi" ? "मध्य अवस्था (दिन 60)" : "Mid Growth (Day 60)"}</span>
+            <span>{lang === "hi" ? "कटाई" : "Harvest"}</span>
           </div>
           <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden border border-slate-200">
             <div
@@ -138,7 +138,7 @@ export default function FarmerRemindersPage() {
       </div>
 
       {/* Main 2-Column Grid: Timeline Milestones (Left) & Settings / Benefits (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         {/* Left Column (8 cols): 30-Day Step Timeline */}
         <div className="lg:col-span-8 space-y-4">
           {cropMilestones.length === 0 && (
@@ -153,7 +153,7 @@ export default function FarmerRemindersPage() {
               <div
                 key={m.id}
                 className={clsx(
-                  "fp-panel relative p-5",
+                  "fp-panel relative p-3 sm:p-5",
                   isNextDue && !m.completed ? "border-[var(--ink)]" : "",
                   !m.completed && !isNextDue ? "opacity-70" : ""
                 )}
@@ -241,7 +241,7 @@ export default function FarmerRemindersPage() {
         {/* Right Column (4 cols): Cadence & Alert Settings Card */}
         <div className="lg:col-span-4 space-y-5">
           {/* Notification Preferences */}
-          <div className="fp-panel space-y-4 p-5">
+          <div className="fp-panel space-y-4 p-3 sm:p-5">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
               <Bell className="h-5 w-5 text-emerald-800" />
               <h2 className="text-sm sm:text-base font-bold text-slate-900">
@@ -283,7 +283,7 @@ export default function FarmerRemindersPage() {
           </div>
 
           {/* PMFBY Digital Baseline Explainer */}
-          <div className="fp-panel space-y-3 p-5">
+          <div className="fp-panel space-y-3 p-3 sm:p-5">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
               <ShieldCheck className="h-4 w-4" />
               <span>{lang === "hi" ? "30-दिवसीय लाभ" : "Digital Baseline Benefits"}</span>

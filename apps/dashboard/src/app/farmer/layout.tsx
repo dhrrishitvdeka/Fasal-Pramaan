@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Camera, FileText, Calendar, Menu, X } from "lucide-react";
+import { Home, Camera, FileText, Calendar } from "lucide-react";
 import { FarmerProvider, useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
 import FasalSaathiOverlay from "@/components/FasalSaathiOverlay";
@@ -14,7 +14,6 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
   const { lang, setLang, farmerProfile, claims } = useFarmerData();
   const t = getFarmerT(lang);
   const [isOnline, setIsOnline] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -57,16 +56,17 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
-      <div className="border-b border-[var(--line)] bg-[var(--ink)] px-4 py-1.5 text-xs text-[var(--surface)]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <span>
-            {lang === "hi"
-              ? "प्रधानमंत्री फसल बीमा योजना · डिजिटल साक्ष्य"
-              : "Pradhan Mantri Fasal Bima Yojana · Digital evidence"}
+      <div className="border-b border-[var(--line)] bg-[var(--ink)] px-3 py-1 text-[11px] text-[var(--surface)] sm:px-4 sm:text-xs">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2">
+          <span className="min-w-0 truncate">
+            {lang === "hi" ? "प्रधानमंत्री फसल बीमा योजना" : "PMFBY · Digital evidence"}
           </span>
-          <div className="flex items-center gap-3 text-[11px] opacity-80">
+          <div className="flex shrink-0 items-center gap-2 opacity-80 sm:gap-3">
             <span>{isOnline ? t.onlineNotice : t.offlineNotice}</span>
-            <Link href="/login?next=/overview" className="underline-offset-2 hover:underline">
+            <Link
+              href="/login?next=/overview"
+              className="hidden underline-offset-2 hover:underline sm:inline"
+            >
               {lang === "hi" ? "समीक्षक प्रवेश" : "Reviewer sign in"}
             </Link>
           </div>
@@ -74,18 +74,17 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
       </div>
 
       <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--surface)]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-2 sm:px-4 sm:py-2.5 md:px-6">
           <Link href="/farmer" className="min-w-0">
-            <div className="text-sm tracking-tight text-[var(--ink)]">
+            <div className="truncate text-sm tracking-tight text-[var(--ink)]">
               Fasal-Pramaan
-              <span className="ml-2 text-[var(--ink-muted)]">
+              <span className="ml-1.5 hidden text-[var(--ink-muted)] sm:ml-2 sm:inline">
                 {lang === "hi" ? "किसान पोर्टल" : "Farmer portal"}
               </span>
             </div>
-            <p className="hidden text-xs text-[var(--ink-muted)] sm:block">{t.tagline}</p>
+            <p className="hidden text-xs text-[var(--ink-muted)] md:block">{t.tagline}</p>
           </Link>
 
-          {/* Desktop Navigation Links */}
           <nav className="fp-ui hidden items-center gap-1 md:flex">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -115,61 +114,30 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="fp-ui flex items-center gap-2">
+          <div className="fp-ui flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => setLang(lang === "en" ? "hi" : "en")}
-              className="fp-btn-secondary px-2.5 py-1.5 text-xs"
+              className="border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--ink)]"
               aria-label="Toggle language"
             >
-              {lang === "en" ? "हिन्दी" : "English"}
+              {lang === "en" ? "हिन्दी" : "EN"}
             </button>
-            <div className="hidden text-xs text-[var(--ink-muted)] lg:block">
+            <div className="hidden max-w-[10rem] truncate text-xs text-[var(--ink-muted)] lg:block">
               {lang === "hi" ? farmerProfile.nameHi : farmerProfile.name}
             </div>
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-[var(--ink)] md:hidden"
-              aria-label="Open menu"
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
           </div>
         </div>
-
-        {mobileMenuOpen && (
-          <div className="fp-ui space-y-1 border-t border-[var(--line)] bg-[var(--surface)] px-4 py-3 md:hidden">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = item.exact
-                ? pathname === item.href
-                : pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={clsx(
-                    "flex items-center justify-between px-2 py-2 text-sm",
-                    isActive ? "bg-[var(--accent-soft)]" : "",
-                  )}
-                >
-                  <span className="flex items-center gap-2">
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </span>
-                  {item.badge ? <span className="fp-badge-alert">{item.badge}</span> : null}
-                </Link>
-              );
-            })}
-          </div>
-        )}
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-20 pt-6 sm:px-6 md:pb-8">{children}</main>
+      <main className="mx-auto w-full max-w-5xl min-w-0 flex-1 px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-4 md:px-6 md:pb-8 md:pt-5">
+        {children}
+      </main>
 
-      <nav className="fp-ui fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 border-t border-[var(--line)] bg-[var(--surface)] md:hidden">
+      <nav
+        className="fp-ui fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 border-t border-[var(--line)] bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] md:hidden"
+        aria-label="Farmer navigation"
+      >
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.exact
@@ -180,14 +148,14 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
               key={item.href}
               href={item.href}
               className={clsx(
-                "relative flex flex-col items-center py-2 text-[11px]",
+                "relative flex min-h-12 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] leading-tight",
                 isActive ? "text-[var(--ink)]" : "text-[var(--ink-muted)]",
               )}
             >
-              <Icon className="mb-0.5 h-4 w-4" />
-              {item.label}
+              <Icon className="h-4 w-4" />
+              <span className="max-w-full truncate px-1">{item.label}</span>
               {item.badge ? (
-                <span className="absolute right-3 top-1 fp-badge-alert">{item.badge}</span>
+                <span className="absolute right-2 top-1 fp-badge-alert">{item.badge}</span>
               ) : null}
             </Link>
           );
