@@ -1,4 +1,5 @@
 import type { AppLang } from "./live-indian-languages";
+import { REVIEWER_LOCALES } from "./reviewer-locales";
 
 export type Lang = AppLang;
 
@@ -63,6 +64,37 @@ const dict = {
     captureStep5: "5. Close-up Macro Damage",
     uploadSimulate: "Simulate 5-Angle Capture",
     submitClaim: "Submit Claim with Cryptographic Seal",
+    executiveOverview: "Executive overview",
+    operationalSnapshot: "Crop evidence assessment · operational snapshot",
+    lowConfidenceCases: "Low Confidence Cases",
+    integrityFlags: "Integrity Flags",
+    recaptureRequests: "Recapture requests",
+    avgEvidenceConfidence: "Avg Evidence Confidence",
+    recaptureRate: "Recapture Rate",
+    resolutionRate: "Resolution Rate",
+    totalSubmissions: "Total submissions",
+    submissionsToday: "Submissions today",
+    pendingAi: "Pending AI",
+    workload: "Workload",
+    outcomes: "Outcomes",
+    contextSection: "Context",
+    farmerShort: "Farmer",
+    reviewerShort: "Reviewer",
+    portalKicker: "Portal",
+    evidenceTriage: "Evidence capture and reviewer triage",
+    autoRefresh: "Auto-refreshes every 15 seconds",
+    loadingMetrics: "Loading operational metrics…",
+    reviewQueueTitle: "Review Queue & Evidence Triage",
+    reviewQueueSub: "Cases requiring human decision · Evaluates both Evidence Trust and Model Prediction",
+    evidenceTrustHeading: "Evidence Trust & Integrity",
+    independentFromModel: "Independent from AI model probability",
+    avgProcessing: "Avg processing (s)",
+    mostAffectedCrop: "Most affected crop",
+    mostAffectedDistrict: "Most affected district",
+    lowConfidenceRate: "Low confidence rate",
+    failureRate: "Failure rate",
+    openCase: "Open this case",
+    openQueue: "Open matching cases",
   },
   hi: {
     appName: "फसल प्रमाण कमांड सेंटर",
@@ -124,12 +156,45 @@ const dict = {
     captureStep5: "5. क्लोज़-अप सूक्ष्म क्षति (Closeup)",
     uploadSimulate: "5-कोण फोटो कैप्चर सिमुलेशन",
     submitClaim: "क्रिप्टोग्राफिक मुहर के साथ दावा जमा करें",
+    executiveOverview: "कार्यकारी सारांश",
+    operationalSnapshot: "फसल साक्ष्य आकलन · संचालन झलक",
+    lowConfidenceCases: "कम विश्वास वाले मामले",
+    integrityFlags: "अखंडता चेतावनी",
+    recaptureRequests: "पुनः कैप्चर अनुरोध",
+    avgEvidenceConfidence: "औसत साक्ष्य विश्वास",
+    recaptureRate: "पुनः कैप्चर दर",
+    resolutionRate: "निपटान दर",
+    totalSubmissions: "कुल प्रस्तुतियाँ",
+    submissionsToday: "आज की प्रस्तुतियाँ",
+    pendingAi: "AI लंबित",
+    workload: "कार्यभार",
+    outcomes: "परिणाम",
+    contextSection: "संदर्भ",
+    farmerShort: "किसान",
+    reviewerShort: "समीक्षक",
+    portalKicker: "पोर्टल",
+    evidenceTriage: "साक्ष्य कैप्चर और समीक्षक जाँच",
+    autoRefresh: "हर 15 सेकंड में स्वतः ताज़ा",
+    loadingMetrics: "संचालन आँकड़े लोड हो रहे हैं…",
+    reviewQueueTitle: "समीक्षा कतार और साक्ष्य छँटाई",
+    reviewQueueSub: "मानवीय निर्णय वाले मामले · साक्ष्य विश्वास और मॉडल दोनों",
+    evidenceTrustHeading: "साक्ष्य विश्वास और अखंडता",
+    independentFromModel: "AI मॉडल संभावना से अलग",
+    avgProcessing: "औसत प्रसंस्करण (सेकंड)",
+    mostAffectedCrop: "सबसे प्रभावित फसल",
+    mostAffectedDistrict: "सबसे प्रभावित जिला",
+    lowConfidenceRate: "कम विश्वास दर",
+    failureRate: "असफलता दर",
+    openCase: "यह मामला खोलें",
+    openQueue: "मिलते मामले खोलें",
   },
 } as const;
 
 export type DictKey = keyof (typeof dict)["en"];
 
 export function t(lang: Lang, key: DictKey): string {
-  const table = lang === "hi" ? dict.hi : dict.en;
-  return table[key] || dict.en[key];
+  if (lang === "en") return dict.en[key];
+  if (lang === "hi") return dict.hi[key] || dict.en[key];
+  const table = REVIEWER_LOCALES[lang];
+  return table?.[key] || dict.en[key];
 }

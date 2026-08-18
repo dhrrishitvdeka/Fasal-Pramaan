@@ -60,7 +60,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
       <div className="border-b border-[var(--line)] bg-[var(--ink)] px-3 py-1 text-[11px] text-[var(--surface)] sm:px-4 sm:text-xs">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-2">
           <span className="min-w-0 truncate">
-            {lang === "hi" ? "प्रधानमंत्री फसल बीमा योजना" : "PMFBY · Digital evidence"}
+            {t.pmfbyBanner}
           </span>
           <div className="flex shrink-0 items-center gap-2 opacity-80 sm:gap-3">
             <span>{isOnline ? t.onlineNotice : t.offlineNotice}</span>
@@ -68,7 +68,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
               href="/login?next=/overview"
               className="hidden underline-offset-2 hover:underline sm:inline"
             >
-              {lang === "hi" ? "समीक्षक प्रवेश" : "Reviewer sign in"}
+              {t.reviewerSignIn}
             </Link>
           </div>
         </div>
@@ -80,7 +80,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
             <div className="truncate text-sm tracking-tight text-[var(--ink)]">
               Fasal-Pramaan
               <span className="ml-1.5 hidden text-[var(--ink-muted)] sm:ml-2 sm:inline">
-                {lang === "hi" ? "किसान पोर्टल" : "Farmer portal"}
+                {t.farmerPortalLabel}
               </span>
             </div>
             <p className="hidden text-xs text-[var(--ink-muted)] md:block">{t.tagline}</p>
@@ -116,10 +116,13 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="fp-ui flex shrink-0 items-center gap-2">
+            <Link href="/farmer/help" className="hidden text-xs text-[var(--ink-muted)] hover:text-[var(--ink)] sm:inline">
+              {t.help}
+            </Link>
+            <Link href="/farmer/profile" className="hidden max-w-[10rem] truncate text-xs text-[var(--ink-muted)] hover:text-[var(--ink)] lg:block">
+              {lang === "hi" ? farmerProfile.nameHi || farmerProfile.name : farmerProfile.name}
+            </Link>
             <LanguageSelect value={lang} onChange={setLang} />
-            <div className="hidden max-w-[10rem] truncate text-xs text-[var(--ink-muted)] lg:block">
-              {lang === "hi" ? farmerProfile.nameHi : farmerProfile.name}
-            </div>
           </div>
         </div>
       </header>

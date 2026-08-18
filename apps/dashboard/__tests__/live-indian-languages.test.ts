@@ -57,9 +57,9 @@ describe("Gemini Live Indian language allowlist", () => {
     expect(telugu?.nativeLabel).toBe("తెలుగు");
   });
 
-  it("does not crash UI lookups for allowlisted languages without a full dictionary", () => {
-    expect(getFarmerT("ta").home).toBe(getFarmerT("en").home);
-    expect(t("bn", "logout")).toBe(t("en", "logout"));
+  it("translates allowlisted UI lookups instead of leaving English leftovers", () => {
+    expect(getFarmerT("ta").home).not.toBe(getFarmerT("en").home);
+    expect(t("bn", "logout")).not.toBe(t("en", "logout"));
     expect(t("hi", "logout")).toBeTruthy();
     expect(t("hi", "logout")).not.toBe(t("en", "logout"));
   });
