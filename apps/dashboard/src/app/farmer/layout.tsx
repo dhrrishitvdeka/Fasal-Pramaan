@@ -7,6 +7,7 @@ import { Home, Camera, FileText, Calendar } from "lucide-react";
 import { FarmerProvider, useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
 import FasalSaathiOverlay from "@/components/FasalSaathiOverlay";
+import { LanguageSelect } from "@/components/LanguageSelect";
 import clsx from "clsx";
 
 function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
@@ -115,14 +116,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="fp-ui flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setLang(lang === "en" ? "hi" : "en")}
-              className="border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1.5 text-xs text-[var(--ink)]"
-              aria-label="Toggle language"
-            >
-              {lang === "en" ? "हिन्दी" : "EN"}
-            </button>
+            <LanguageSelect value={lang} onChange={setLang} />
             <div className="hidden max-w-[10rem] truncate text-xs text-[var(--ink-muted)] lg:block">
               {lang === "hi" ? farmerProfile.nameHi : farmerProfile.name}
             </div>

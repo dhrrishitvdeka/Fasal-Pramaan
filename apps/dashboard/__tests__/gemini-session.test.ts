@@ -80,8 +80,13 @@ describe("voice session mint", () => {
       assertNoSecretLeak(result);
     }
     const request = buildAuthTokenRequest();
-    expect(JSON.stringify(request.body)).toContain("list_plots");
-    expect(JSON.stringify(request.body)).toContain("confirm_pending_action");
+    const body = JSON.stringify(request.body);
+    expect(body).toContain("list_plots");
+    expect(body).toContain("confirm_pending_action");
+    expect(body).toContain("get_portal_snapshot");
+    expect(body).toContain("begin_recapture");
+    expect(body).toContain("get_claim_detail");
+    expect(body).toContain("needs_recapture");
   });
 
   it("second locked call still rejects without leaking secrets", async () => {

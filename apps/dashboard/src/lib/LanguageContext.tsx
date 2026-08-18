@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState } from "react";
+import { parseAppLang, persistAppLang } from "./live-indian-languages";
 import { Lang, DictKey, t as translate } from "./i18n";
 
 interface LanguageContextType {
@@ -20,8 +21,7 @@ const LanguageContext = createContext<LanguageContextType>({
 function readStoredLang(): Lang {
   if (typeof window === "undefined") return "en";
   try {
-    const saved = localStorage.getItem("fasal_lang") as Lang;
-    if (saved === "en" || saved === "hi") return saved;
+    return persistAppLang(localStorage.getItem("fasal_lang"), "en");
   } catch {
     // ignore
   }
@@ -32,9 +32,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>(readStoredLang);
 
   const setLang = (newLang: Lang) => {
-    setLangState(newLang);
+    const next = parseAppLang(newLang);
+    if (!next) return;
+    setLangState(next);
     try {
-      localStorage.setItem("fasal_lang", newLang);
+      localStorage.setItem("fasal_lang", next);
     } catch {}
   };
 

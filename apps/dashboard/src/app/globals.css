@@ -186,6 +186,29 @@ textarea,
   }
 }
 
+/* Sized box for the live <video> — Tailwind aspect-4/3 is not a real utility. */
+.fp-viewfinder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  min-height: 240px;
+  height: min(52vh, 420px);
+  overflow: hidden;
+  background: #000;
+}
+
+@media (min-width: 640px) {
+  .fp-viewfinder {
+    aspect-ratio: 16 / 10;
+    height: auto;
+    min-height: 280px;
+    max-height: min(60vh, 560px);
+  }
+}
+
 @media (max-width: 767px) {
   .fp-page-title {
     font-size: 1.05rem;

@@ -32,6 +32,20 @@ describe("voice shutter and submit outcomes", () => {
     expect(saved).toEqual([]);
   });
 
+  it("saves a dim but real field photo", async () => {
+    const saved: string[] = [];
+    const result = await runVoiceShutter({
+      cameraActive: true,
+      grabFrame: async () => ({ dataUrl: "data:image/jpeg;base64,xx", lightingScore: 18 }),
+      saveFrame: async (dataUrl) => {
+        saved.push(dataUrl);
+      },
+      angleId: "wide_field",
+    });
+    expect(result.ok).toBe(true);
+    expect(saved).toEqual(["data:image/jpeg;base64,xx"]);
+  });
+
   it("does not save a black frame", async () => {
     const saved: string[] = [];
     const result = await runVoiceShutter({
