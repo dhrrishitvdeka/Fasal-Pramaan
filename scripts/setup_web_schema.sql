@@ -138,6 +138,13 @@ ALTER TABLE public.web_milestones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.web_review_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.web_profiles ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_crop text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_grade text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_severity text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_damage_codes text[];
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_affected_area_pct double precision;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_growth_stage text;
+
 DROP POLICY IF EXISTS web_plots_anon_all ON public.web_plots;
 DROP POLICY IF EXISTS web_claims_anon_all ON public.web_claims;
 DROP POLICY IF EXISTS web_claim_images_anon_all ON public.web_claim_images;

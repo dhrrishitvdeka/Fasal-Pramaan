@@ -1,7 +1,10 @@
 import axios from "axios";
 import { apiFetch } from "./auth-headers";
+import { resolveClaimClientPath } from "./claim-routes";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
 import { emptyOverview, type ReviewActionPayload } from "./web-db";
+
+export { resolveClaimClientPath } from "./claim-routes";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/backend";
 
@@ -341,34 +344,37 @@ export type AlertItem = {
 };
 
 export async function listClaims(): Promise<Submission[]> {
-  if (isSupabaseConfigured()) {
-    const res = await apiFetch("/api/claims");
+  const route = resolveClaimClientPath(isSupabaseConfigured(), "list");
+  if (route.hosted) {
+    const res = await apiFetch(route.path);
     if (!res.ok) throw new Error("Could not load claims");
     const body = (await res.json()) as { items?: Submission[] };
     return Array.isArray(body.items) ? body.items : [];
   }
   if (hasRealApiSession()) {
-    const res = await api.get<{ items: Submission[] }>("/review/queue");
+    const res = await api.get<{ items: Submission[] }>(route.path);
     return res.data.items || [];
   }
   return [];
 }
 
 export async function getClaim(id: string): Promise<Submission> {
-  if (isSupabaseConfigured()) {
-    const res = await apiFetch(`/api/claims/${id}`);
+  const route = resolveClaimClientPath(isSupabaseConfigured(), "get", id);
+  if (route.hosted) {
+    const res = await apiFetch(route.path);
     if (!res.ok) throw new Error("Claim not found");
     return (await res.json()) as Submission;
   }
   if (hasRealApiSession()) {
-    return (await api.get<Submission>(`/review/${id}`)).data;
+    return (await api.get<Submission>(route.path)).data;
   }
   throw new Error("Claim not found");
 }
 
 export async function applyReviewAction(id: string, payload: ReviewActionPayload) {
-  if (isSupabaseConfigured()) {
-    const res = await apiFetch(`/api/claims/${id}/action`, {
+  const route = resolveClaimClientPath(isSupabaseConfigured(), "action", id);
+  if (route.hosted) {
+    const res = await apiFetch(route.path, {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -379,7 +385,7 @@ export async function applyReviewAction(id: string, payload: ReviewActionPayload
     return res.json();
   }
   if (hasRealApiSession()) {
-    return (await api.post(`/review/${id}/action`, payload)).data;
+    return (await api.post(route.path, payload)).data;
   }
   throw new Error("Sign in required to record a review action");
 }
@@ -414,7 +420,8 @@ export async function submitWebClaim(input: {
   if (!isSupabaseConfigured()) {
     throw new Error("Supabase is not configured");
   }
-  const res = await apiFetch("/api/claims", {
+  const route = resolveClaimClientPath(true, "submit");
+  const res = await apiFetch(route.path, {
     method: "POST",
     body: JSON.stringify(input),
   });

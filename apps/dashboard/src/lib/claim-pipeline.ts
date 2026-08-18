@@ -12,7 +12,8 @@ export const REQUIRED_ANGLES = [
 export type PersistedImageInput = {
   id?: string;
   angleType: string;
-  bytes: Uint8Array;
+  bytes?: Uint8Array;
+  present?: boolean;
   contentType?: string;
   sha256?: string;
   lat?: number | null;
@@ -87,7 +88,88 @@ export type WebClaimRow = {
   created_by?: string | null;
   created_at?: string;
   updated_at?: string;
+  corrected_crop?: string | null;
+  corrected_grade?: string | null;
+  corrected_severity?: string | null;
+  corrected_damage_codes?: string[] | null;
+  corrected_affected_area_pct?: number | null;
+  corrected_growth_stage?: string | null;
 };
+
+export type ReviewerActionInput = {
+  action: string;
+  notes?: string;
+  reason?: string;
+  required_angles?: string[];
+  actor?: string;
+  corrected_crop?: string;
+  corrected_grade?: string;
+  corrected_severity?: string;
+  corrected_damage_codes?: string[];
+  corrected_affected_area_pct?: number;
+  corrected_growth_stage?: string;
+};
+
+export type RecaptureInput = {
+  claimId: string;
+  images: PersistedImageInput[];
+  farmerObservations?: string;
+  captureLat?: number | null;
+  captureLon?: number | null;
+  captureAccuracyM?: number | null;
+  gpsStatus?: string | null;
+};
+
+export type RecaptureClientImage = {
+  angleType: string;
+  imageUrl: string;
+  sha256?: string;
+  lat?: number | null;
+  lon?: number | null;
+  accuracyM?: number | null;
+};
+
+export function buildRecaptureSubmitInput(
+  claimId: string,
+  existing: {
+    plotId?: string;
+    plotName?: string;
+    plotNameHi?: string;
+    khasraNumber?: string;
+    cropType?: string;
+    cropTypeHi?: string;
+    cropVariety?: string;
+    farmerObservations?: string;
+  },
+  recapturedImages: RecaptureClientImage[],
+) {
+  const fresh = recapturedImages.filter((img) => img.imageUrl.startsWith("data:"));
+  if (!fresh.length) {
+    throw new Error("Recapture requires newly captured images");
+  }
+  return {
+    id: claimId,
+    plotId: existing.plotId,
+    plotName: existing.plotName,
+    plotNameHi: existing.plotNameHi,
+    khasraNumber: existing.khasraNumber,
+    cropType: existing.cropType,
+    cropTypeHi: existing.cropTypeHi,
+    cropVariety: existing.cropVariety,
+    farmerObservations: existing.farmerObservations,
+    captureLat: fresh[0]?.lat,
+    captureLon: fresh[0]?.lon,
+    captureAccuracyM: fresh[0]?.accuracyM,
+    images: fresh.map((img) => ({
+      angleType: img.angleType,
+      imageDataUrl: img.imageUrl,
+      sha256: img.sha256,
+      lat: img.lat,
+      lon: img.lon,
+      accuracyM: img.accuracyM,
+    })),
+  };
+}
 
 export type WebImageRow = {
   id: string;
@@ -111,6 +193,7 @@ export type ClaimStore = {
   getClaim(id: string): Promise<WebClaimRow | null>;
   listClaims(): Promise<WebClaimRow[]>;
   insertImages(rows: WebImageRow[]): Promise<void>;
+  replaceAngleImages(claimId: string, rows: WebImageRow[]): Promise<void>;
   listImages(claimId: string): Promise<WebImageRow[]>;
   uploadImage(path: string, bytes: Uint8Array, contentType: string): Promise<{ url: string; storagePath: string }>;
   insertReviewAction(row: {
@@ -124,9 +207,18 @@ export type ClaimStore = {
   }): Promise<void>;
 };
 
+function imageIsPresent(image: PersistedImageInput): boolean {
+  if (image.present) return true;
+  return Boolean(image.bytes && image.bytes.byteLength > 0);
+}
+
+export function workflowGrade(value?: string | null): "A" | "B" | "C" | "U" | null {
+  return value === "A" || value === "B" || value === "C" || value === "U" ? value : null;
+}
+
 export function computeEvidencePreview(images: PersistedImageInput[]) {
   const present = new Set(images.map((img) => img.angleType));
-  const usable = images.filter((img) => img.bytes.byteLength > 0);
+  const usable = images.filter(imageIsPresent);
   const coverage = Math.round((usable.length / REQUIRED_ANGLES.length) * 100);
   const missing = REQUIRED_ANGLES.filter((angle) => !present.has(angle));
   const measuredQuality = images
@@ -168,12 +260,22 @@ export function normalizePlotId(plotId?: string | null): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function requireImageBytes(image: PersistedImageInput, label: string): Uint8Array {
+  if (!image.bytes || image.bytes.byteLength === 0) {
+    throw new Error(`${label} requires image bytes`);
+  }
+  return image.bytes;
+}
+
 export async function persistFarmerSubmission(
   store: ClaimStore,
   input: PersistClaimInput,
 ): Promise<{ claimId: string; claim: WebClaimRow }> {
   if (!input.images.length) {
     throw new Error("At least one image is required");
+  }
+  if (input.images.some((image) => !image.bytes || image.bytes.byteLength === 0)) {
+    throw new Error("Each new image must include bytes");
   }
   const claimId = input.id || newId("claim");
   const preview = computeEvidencePreview(input.images);
@@ -215,7 +317,11 @@ export async function persistFarmerSubmission(
     const imageId = image.id || newId("img");
     const ext = (image.contentType || "image/jpeg").includes("png") ? "png" : "jpg";
     const path = `${claimId}/${image.angleType}-${imageId}.${ext}`;
-    const uploaded = await store.uploadImage(path, image.bytes, image.contentType || "image/jpeg");
+    const uploaded = await store.uploadImage(
+      path,
+      requireImageBytes(image, image.angleType),
+      image.contentType || "image/jpeg",
+    );
     imageRows.push({
       id: imageId,
       claim_id: claimId,
@@ -269,12 +375,12 @@ export async function persistAndInfer(
     input.images.find((img) => img.angleType === "closeup_damage") || input.images[0];
   try {
     const prediction = await infer({
-      imageBytes: closeup.bytes,
+      imageBytes: requireImageBytes(closeup, closeup.angleType),
       expectedCrop: input.cropType,
       angleType: closeup.angleType,
       extraImages: input.images.map((image) => ({
         angleType: image.angleType,
-        bytes: image.bytes,
+        bytes: requireImageBytes(image, image.angleType),
       })),
       apiToken: inferOptions?.apiToken,
       fetchImpl: inferOptions?.fetchImpl,
@@ -285,6 +391,124 @@ export async function persistAndInfer(
   } catch (error) {
     return {
       claimId: persisted.claimId,
+      prediction: null,
+      inferError: error instanceof Error ? error.message : "Inference failed",
+    };
+  }
+}
+
+function rowToPreviewInput(row: WebImageRow): PersistedImageInput {
+  return {
+    angleType: row.angle_type,
+    present: Boolean(row.storage_path || row.image_url),
+    sha256: row.sha256 || undefined,
+    lat: row.lat,
+    lon: row.lon,
+    accuracyM: row.accuracy_m,
+    blurScore: row.blur_score,
+    lightingScore: row.lighting_score,
+    qualityPassed: row.quality_passed,
+  };
+}
+
+async function uploadNewImages(
+  store: ClaimStore,
+  claimId: string,
+  images: PersistedImageInput[],
+): Promise<WebImageRow[]> {
+  const now = new Date().toISOString();
+  const imageRows: WebImageRow[] = [];
+  for (const image of images) {
+    const imageId = image.id || newId("img");
+    const ext = (image.contentType || "image/jpeg").includes("png") ? "png" : "jpg";
+    const path = `${claimId}/${image.angleType}-${imageId}.${ext}`;
+    const uploaded = await store.uploadImage(
+      path,
+      requireImageBytes(image, image.angleType),
+      image.contentType || "image/jpeg",
+    );
+    imageRows.push({
+      id: imageId,
+      claim_id: claimId,
+      angle_type: image.angleType,
+      image_url: uploaded.url,
+      storage_path: uploaded.storagePath,
+      captured_at: image.capturedAt || now,
+      lat: image.lat ?? null,
+      lon: image.lon ?? null,
+      accuracy_m: image.accuracyM ?? null,
+      sha256: image.sha256 || null,
+      quality_passed: image.qualityPassed ?? null,
+      blur_score: image.blurScore ?? null,
+      lighting_score: image.lightingScore ?? null,
+    });
+  }
+  return imageRows;
+}
+
+export async function recaptureAndInfer(
+  store: ClaimStore,
+  input: RecaptureInput,
+  infer: typeof inferCropDisease = inferCropDisease,
+  inferOptions?: { apiToken?: string; fetchImpl?: typeof fetch; spaceUrl?: string },
+): Promise<{ claimId: string; prediction: HfPrediction | null; inferError?: string }> {
+  if (!input.images.length) {
+    throw new Error("At least one image is required");
+  }
+  if (input.images.some((image) => !image.bytes || image.bytes.byteLength === 0)) {
+    throw new Error("Recapture images must include bytes");
+  }
+  const existing = await store.getClaim(input.claimId);
+  if (!existing) {
+    throw new Error("Claim not found");
+  }
+  const uploaded = await uploadNewImages(store, input.claimId, input.images);
+  await store.replaceAngleImages(input.claimId, uploaded);
+  const merged = await store.listImages(input.claimId);
+  const preview = computeEvidencePreview(merged.map(rowToPreviewInput));
+  const now = new Date().toISOString();
+  await store.updateClaim(input.claimId, {
+    status: "under_review",
+    farmer_observations: input.farmerObservations ?? existing.farmer_observations,
+    missing_angles: preview.missingAngles,
+    recapture_reason: null,
+    quality_score: preview.qualityScore,
+    coverage_score: preview.coverageScore,
+    context_score: preview.contextScore,
+    integrity_score: preview.integrityScore,
+    overall_confidence: preview.overallConfidence,
+    quality_notes: preview.qualityNotes,
+    coverage_notes: preview.coverageNotes,
+    context_notes: preview.contextNotes,
+    integrity_notes: preview.integrityNotes,
+    capture_lat: input.captureLat ?? existing.capture_lat,
+    capture_lon: input.captureLon ?? existing.capture_lon,
+    capture_accuracy_m: input.captureAccuracyM ?? existing.capture_accuracy_m,
+    gps_status: input.gpsStatus ?? existing.gps_status,
+    payout_status: existing.payout_status || "pending_review",
+    updated_at: now,
+  });
+
+  const closeup =
+    input.images.find((img) => img.angleType === "closeup_damage") || input.images[0];
+  try {
+    const prediction = await infer({
+      imageBytes: requireImageBytes(closeup, closeup.angleType),
+      expectedCrop: existing.crop_type || undefined,
+      angleType: closeup.angleType,
+      extraImages: input.images.map((image) => ({
+        angleType: image.angleType,
+        bytes: requireImageBytes(image, image.angleType),
+      })),
+      apiToken: inferOptions?.apiToken,
+      fetchImpl: inferOptions?.fetchImpl,
+      spaceUrl: inferOptions?.spaceUrl,
+    });
+    await attachHfPrediction(store, input.claimId, prediction);
+    return { claimId: input.claimId, prediction };
+  } catch (error) {
+    return {
+      claimId: input.claimId,
       prediction: null,
       inferError: error instanceof Error ? error.message : "Inference failed",
     };
@@ -316,10 +540,14 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
           is_production_validated: false,
           predicted_crop: claim.crop_identified,
           crop_confidence: (claim.crop_confidence ?? 0) / 100,
+          predicted_grade: workflowGrade(claim.severity_grade),
+          grade_label: workflowGrade(claim.severity_grade)
+            ? "workflow_bucket"
+            : null,
           primary_damage: claim.disease_detected || claim.hf_label,
-          severity: null,
+          severity: claim.corrected_severity ?? null,
           overall_confidence: claim.hf_score ?? 0,
-          affected_area_pct: null,
+          affected_area_pct: claim.corrected_affected_area_pct ?? null,
           quality_warnings: [],
           anomaly_flags: [],
           human_review_recommendation: "Review recommended",
@@ -383,7 +611,7 @@ export async function getReviewerClaim(store: ClaimStore, id: string): Promise<S
 export async function applyReviewerAction(
   store: ClaimStore,
   id: string,
-  payload: { action: string; notes?: string; reason?: string; required_angles?: string[]; actor?: string },
+  payload: ReviewerActionInput,
 ): Promise<Submission> {
   const existing = await store.getClaim(id);
   if (!existing) {
@@ -395,13 +623,48 @@ export async function applyReviewerAction(
   else if (payload.action === "physical_inspection") status = "physical_inspection";
   else if (payload.action === "reject") status = "rejected";
 
-  await store.updateClaim(id, {
+  const patch: Partial<WebClaimRow> = {
     status,
     reviewer_notes: payload.notes || existing.reviewer_notes,
-    recapture_reason: payload.action === "request_recapture" ? payload.reason || payload.notes : existing.recapture_reason,
-    missing_angles: payload.required_angles || existing.missing_angles,
+    recapture_reason:
+      payload.action === "request_recapture"
+        ? payload.reason || payload.notes
+        : existing.recapture_reason,
+    missing_angles:
+      payload.action === "request_recapture"
+        ? payload.required_angles || existing.missing_angles
+        : payload.action === "accept" || payload.action === "correct"
+          ? []
+          : existing.missing_angles,
     updated_at: new Date().toISOString(),
-  });
+  };
+
+  if (payload.action === "correct") {
+    if (payload.corrected_crop) {
+      patch.corrected_crop = payload.corrected_crop;
+      patch.crop_identified = payload.corrected_crop;
+    }
+    if (payload.corrected_grade) {
+      patch.corrected_grade = payload.corrected_grade;
+      patch.severity_grade = payload.corrected_grade;
+    }
+    if (payload.corrected_severity) {
+      patch.corrected_severity = payload.corrected_severity;
+    }
+    if (payload.corrected_damage_codes?.length) {
+      patch.corrected_damage_codes = payload.corrected_damage_codes;
+      patch.disease_detected = payload.corrected_damage_codes[0];
+    }
+    if (payload.corrected_affected_area_pct != null && Number.isFinite(payload.corrected_affected_area_pct)) {
+      patch.corrected_affected_area_pct = payload.corrected_affected_area_pct;
+      patch.severity_percentage = payload.corrected_affected_area_pct;
+    }
+    if (payload.corrected_growth_stage) {
+      patch.corrected_growth_stage = payload.corrected_growth_stage;
+    }
+  }
+
+  await store.updateClaim(id, patch);
   await store.insertReviewAction({
     id: newId("act"),
     claim_id: id,
@@ -420,14 +683,33 @@ export function createMemoryClaimStore(): ClaimStore & {
   claims: Map<string, WebClaimRow>;
   images: Map<string, WebImageRow[]>;
   blobs: Map<string, Uint8Array>;
+  reviewActions: Array<{
+    id: string;
+    claim_id: string;
+    action: string;
+    notes?: string;
+    reason?: string;
+    required_angles?: string[];
+    actor?: string;
+  }>;
 } {
   const claims = new Map<string, WebClaimRow>();
   const images = new Map<string, WebImageRow[]>();
   const blobs = new Map<string, Uint8Array>();
+  const reviewActions: Array<{
+    id: string;
+    claim_id: string;
+    action: string;
+    notes?: string;
+    reason?: string;
+    required_angles?: string[];
+    actor?: string;
+  }> = [];
   return {
     claims,
     images,
     blobs,
+    reviewActions,
     async insertClaim(row) {
       claims.set(row.id, { ...row });
       return row;
@@ -452,6 +734,11 @@ export function createMemoryClaimStore(): ClaimStore & {
         images.set(row.claim_id, list);
       }
     },
+    async replaceAngleImages(claimId, rows) {
+      const existing = images.get(claimId) || [];
+      const replaced = new Set(rows.map((row) => row.angle_type));
+      images.set(claimId, [...existing.filter((row) => !replaced.has(row.angle_type)), ...rows]);
+    },
     async listImages(claimId) {
       return images.get(claimId) || [];
     },
@@ -459,8 +746,8 @@ export function createMemoryClaimStore(): ClaimStore & {
       blobs.set(path, bytes);
       return { url: `memory://${path}`, storagePath: path };
     },
-    async insertReviewAction() {
-      return;
+    async insertReviewAction(row) {
+      reviewActions.push({ ...row });
     },
   };
 }
