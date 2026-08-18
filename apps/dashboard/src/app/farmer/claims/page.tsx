@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useFarmerData, ClaimStatus } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
+import { safeDisplayUrl } from "@/lib/media";
 import clsx from "clsx";
 
 export default function FarmerClaimsPage() {
@@ -293,11 +294,13 @@ export default function FarmerClaimsPage() {
                           className="relative h-12 w-12 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 group shrink-0"
                           title={img.angleType}
                         >
-                          <img
-                            src={img.imageUrl}
-                            alt={img.angleType}
-                            className="h-full w-full object-cover group-hover:scale-110 transition-transform"
-                          />
+                          {safeDisplayUrl(img.imageUrl) ? (
+                            <img
+                              src={safeDisplayUrl(img.imageUrl)}
+                              alt={img.angleType}
+                              className="h-full w-full object-cover group-hover:scale-110 transition-transform"
+                            />
+                          ) : null}
                           {!img.qualityPassed && (
                             <div className="absolute inset-0 bg-red-900/60 flex items-center justify-center">
                               <AlertCircle className="h-4 w-4 text-white" />

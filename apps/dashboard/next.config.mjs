@@ -1,7 +1,8 @@
 const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "/backend";
 const internalApiBase = process.env.INTERNAL_API_BASE_URL || "http://api:8000";
-const mediaOrigin =
-  process.env.NEXT_PUBLIC_MEDIA_ORIGIN || "http://localhost:9000";
+const mediaOrigin = process.env.VERCEL
+  ? ""
+  : process.env.NEXT_PUBLIC_MEDIA_ORIGIN || "http://localhost:9000";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseOrigin = (() => {
   if (!supabaseUrl) return "";
@@ -24,9 +25,22 @@ const connectSrc = [
   apiConnectOrigin,
   "https://*.supabase.co",
   "wss://*.supabase.co",
+  "https://*.supabase.in",
   supabaseOrigin,
   "https://generativelanguage.googleapis.com",
   "wss://generativelanguage.googleapis.com",
+]
+  .filter(Boolean)
+  .join(" ");
+
+const imgSrc = [
+  "'self'",
+  "data:",
+  "blob:",
+  mediaOrigin,
+  "https://*.tile.openstreetmap.org",
+  "https://*.supabase.co",
+  "https://*.supabase.in",
 ]
   .filter(Boolean)
   .join(" ");
@@ -40,7 +54,8 @@ const contentSecurityPolicy = [
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  `img-src 'self' data: blob: ${mediaOrigin} https://*.tile.openstreetmap.org https://*.supabase.co`,
+  `img-src ${imgSrc}`,
+  `media-src 'self' blob: data:`,
   `connect-src ${connectSrc}`,
   "worker-src 'self' blob:",
 ].join("; ");

@@ -209,14 +209,27 @@ export default function FasalSaathiOverlay() {
               }
             }
           } catch {
-            setError("Invalid voice message");
+            console.warn("Ignored a non-JSON Gemini Live frame");
           }
         })();
       };
       const ctx = new AudioContext();
       audioCtxRef.current = ctx;
+      if (ctx.state === "suspended") await ctx.resume();
       playTimeRef.current = ctx.currentTime;
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true },
+          video: false,
+        });
+      } catch {
+        throw new Error(
+          lang === "hi"
+            ? "माइक्रोफ़ोन अनुमति चाहिए। ब्राउज़र में Allow दबाएँ।"
+            : "Microphone permission is required. Allow the mic in the browser prompt.",
+        );
+      }
       streamRef.current = stream;
       const source = ctx.createMediaStreamSource(stream);
       const processor = ctx.createScriptProcessor(4096, 1, 1);

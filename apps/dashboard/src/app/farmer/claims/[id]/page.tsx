@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
+import { safeDisplayUrl } from "@/lib/media";
 import clsx from "clsx";
 
 export default function FarmerClaimDetailPage() {
@@ -457,11 +458,13 @@ export default function FarmerClaimDetailPage() {
                 )}
               >
                 <div className="relative aspect-4/3 overflow-hidden bg-slate-200">
-                  <img
-                    src={img.imageUrl}
-                    alt={img.angleType}
-                    className="h-full w-full object-cover group-hover:scale-105 transition-transform"
-                  />
+                  {safeDisplayUrl(img.imageUrl) ? (
+                    <img
+                      src={safeDisplayUrl(img.imageUrl)}
+                      alt={img.angleType}
+                      className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+                    />
+                  ) : null}
                   <div className="absolute top-2 left-2 rounded bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white font-mono uppercase">
                     {img.angleType}
                   </div>
@@ -506,11 +509,13 @@ export default function FarmerClaimDetailPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="relative aspect-16/10 bg-black">
-              <img
-                src={selectedImage.imageUrl}
-                alt={selectedImage.angleType}
-                className="h-full w-full object-contain"
-              />
+              {safeDisplayUrl(selectedImage.imageUrl) ? (
+                <img
+                  src={safeDisplayUrl(selectedImage.imageUrl)}
+                  alt={selectedImage.angleType}
+                  className="h-full w-full object-contain"
+                />
+              ) : null}
               <button
                 type="button"
                 onClick={() => setSelectedImage(null)}
