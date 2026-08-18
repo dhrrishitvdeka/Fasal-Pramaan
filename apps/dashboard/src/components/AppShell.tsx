@@ -20,6 +20,7 @@ import { currentSessionRoles, loadStoredToken, logoutSession } from "@/lib/api";
 import { canAccessReviewerPortal, reviewerLoginHref } from "@/lib/review-access";
 import { useLanguage } from "@/lib/LanguageContext";
 import type { DictKey, Lang } from "@/lib/i18n";
+import { LanguageSelect } from "@/components/LanguageSelect";
 import clsx from "clsx";
 
 const reviewerNav = [
@@ -108,28 +109,7 @@ function ReviewerNav({
       </nav>
 
       <div className="fp-ui space-y-2 border-t border-[var(--line)] p-3">
-        <div className="flex" role="group" aria-label="Language selection">
-          <button
-            type="button"
-            onClick={() => setLang("en")}
-            className={clsx(
-              "flex-1 border border-[var(--line)] px-2 py-1.5 text-xs",
-              lang === "en" ? "bg-[var(--ink)] text-[var(--surface)]" : "bg-[var(--surface)] text-[var(--ink)]",
-            )}
-          >
-            English
-          </button>
-          <button
-            type="button"
-            onClick={() => setLang("hi")}
-            className={clsx(
-              "-ml-px flex-1 border border-[var(--line)] px-2 py-1.5 text-xs",
-              lang === "hi" ? "bg-[var(--ink)] text-[var(--surface)]" : "bg-[var(--surface)] text-[var(--ink)]",
-            )}
-          >
-            हिंदी
-          </button>
-        </div>
+        <LanguageSelect value={lang} onChange={setLang} className="w-full max-w-none" />
         <Link href="/" onClick={onNavigate} className="fp-btn-secondary w-full text-xs">
           {lang === "hi" ? "होम" : "Home"}
         </Link>
@@ -250,28 +230,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/overview" className="fp-ui text-sm text-[var(--ink)] hover:underline">
                 {lang === "hi" ? "समीक्षक" : "Reviewer"}
               </Link>
-              <div className="fp-ui flex text-xs">
-                <button
-                  type="button"
-                  onClick={() => setLang("en")}
-                  className={clsx(
-                    "border border-[var(--line)] px-2 py-1",
-                    lang === "en" ? "bg-[var(--ink)] text-[var(--surface)]" : "bg-[var(--surface)] text-[var(--ink)]",
-                  )}
-                >
-                  EN
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLang("hi")}
-                  className={clsx(
-                    "-ml-px border border-[var(--line)] px-2 py-1",
-                    lang === "hi" ? "bg-[var(--ink)] text-[var(--surface)]" : "bg-[var(--surface)] text-[var(--ink)]",
-                  )}
-                >
-                  हि
-                </button>
-              </div>
+              <LanguageSelect value={lang} onChange={setLang} />
             </div>
           </div>
         </header>

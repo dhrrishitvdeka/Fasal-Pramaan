@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { FarmerLang } from "./farmerI18n";
+import { parseAppLang, persistAppLang } from "./live-indian-languages";
 import { getWebClaim, listWebClaims, submitWebClaim } from "./api";
 import { apiFetch } from "./auth-headers";
 import { buildRecaptureSubmitInput, computeEvidencePreview } from "./claim-pipeline";
@@ -235,8 +236,7 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<FarmerLang>(() => {
     if (typeof window === "undefined") return "hi";
     try {
-      const storedLang = localStorage.getItem(STORAGE_KEY_LANG) as FarmerLang | null;
-      if (storedLang === "en" || storedLang === "hi") return storedLang;
+      return persistAppLang(localStorage.getItem(STORAGE_KEY_LANG), "hi");
     } catch {
       // ignore
     }
@@ -283,8 +283,14 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setLang = (newLang: FarmerLang) => {
-    setLangState(newLang);
-    localStorage.setItem(STORAGE_KEY_LANG, newLang);
+    const next = parseAppLang(newLang);
+    if (!next) return;
+    setLangState(next);
+    try {
+      localStorage.setItem(STORAGE_KEY_LANG, next);
+    } catch {
+      // ignore
+    }
   };
 
   const addPlot = (plot: FarmerPlot) => {

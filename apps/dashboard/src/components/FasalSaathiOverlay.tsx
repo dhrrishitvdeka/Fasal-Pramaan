@@ -4,12 +4,14 @@ import { apiFetch } from "@/lib/auth-headers";
 import { webCaptureBridge } from "@/lib/voice/capture-bridge";
 import { decodeGeminiLiveFrame, parseGeminiLiveMessage } from "@/lib/voice/gemini-live-parse";
 import { connectSilentProcessor } from "@/lib/voice/mic-graph";
-import { WebVoiceBroker } from "@/lib/voice/web-voice-broker";
+import { farmerScreenFromPath, WebVoiceBroker, type VoiceToolResult } from "@/lib/voice/web-voice-broker";
 import { useFarmerData } from "@/lib/farmerStore";
+import type { AppLang } from "@/lib/live-indian-languages";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Line = { role: "farmer" | "saathi" | "system"; text: string };
+type LiveStatus = "idle" | "connecting" | "live" | "error";
 
 function downsampleTo16k(input: Float32Array, inputRate: number): Int16Array {
   if (inputRate === 16000) {
@@ -37,14 +39,31 @@ function pcm16FromBase64(b64: string): Int16Array {
   return new Int16Array(bytes.buffer);
 }
 
+function statusLabel(status: LiveStatus, lang: AppLang): string {
+  if (status === "live") return lang === "hi" ? "लाइव" : "Live";
+  if (status === "connecting") return lang === "hi" ? "जुड़ रहा है…" : "Connecting…";
+  if (status === "error") return lang === "hi" ? "त्रुटि · फिर से टैप करें" : "Error · tap to retry";
+  return lang === "hi" ? "तैयार" : "Ready";
+}
+
 export default function FasalSaathiOverlay() {
   const router = useRouter();
   const pathname = usePathname();
-  const { lang, setLang, plots, claims, milestones, snoozeMilestone, completeMilestone } = useFarmerData();
+  const {
+    lang,
+    setLang,
+    plots,
+    claims,
+    milestones,
+    farmerProfile,
+    snoozeMilestone,
+    completeMilestone,
+  } = useFarmerData();
   const [open, setOpen] = useState(false);
-  const [status, setStatus] = useState<"idle" | "connecting" | "live" | "error">("idle");
+  const [status, setStatus] = useState<LiveStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
+  const [lastTool, setLastTool] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
@@ -54,6 +73,17 @@ export default function FasalSaathiOverlay() {
   const userTurnRef = useRef(1);
   const inputBufRef = useRef("");
   const outputBufRef = useRef("");
+  const connectingRef = useRef(false);
+  const intentionalCloseRef = useRef(false);
+  const setupCompleteRef = useRef(false);
+  const lastContextRef = useRef("");
+  const expiryTimerRef = useRef<number | null>(null);
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const statusRef = useRef<LiveStatus>("idle");
+  const langRef = useRef(lang);
+
+  statusRef.current = status;
+  langRef.current = lang;
 
   const broker = useMemo(
     () =>
@@ -61,29 +91,62 @@ export default function FasalSaathiOverlay() {
         plots: plots.map((plot) => ({
           id: plot.id,
           name: plot.name,
+          nameHi: plot.nameHi,
           cropType: plot.cropType,
+          cropTypeHi: plot.cropTypeHi,
           khasraNumber: plot.khasraNumber,
+          areaHectares: plot.areaHectares,
+          currentStage: plot.currentStage,
+          village: plot.village,
+          district: plot.district,
+          state: plot.state,
         })),
         claims: claims.map((claim) => ({
           id: claim.id,
           status: claim.status,
           plotName: claim.plotName,
           cropType: claim.cropType,
+          missingAngles: claim.missingAngles,
+          recaptureReason: claim.recaptureReason,
+          imageCount: claim.images?.length ?? 0,
+          createdAt: claim.createdAt,
+          reviewerNotes: claim.reviewerNotes,
         })),
         reminders: milestones.map((item) => ({
           id: item.id,
           stageName: item.stageName,
+          stageNameHi: item.stageNameHi,
           dueDate: item.dueDate,
           completed: item.completed,
+          isOverdue: item.isOverdue,
+          plotId: item.plotId,
+          cropName: item.cropName,
         })),
+        farmerProfile: {
+          name: farmerProfile.name,
+          nameHi: farmerProfile.nameHi,
+          kisanId: farmerProfile.kisanId,
+          phone: farmerProfile.phone,
+          village: farmerProfile.village,
+          district: farmerProfile.district,
+          state: farmerProfile.state,
+        },
+        currentPath: pathname,
+        language: lang,
         navigate: (path) => router.push(path),
         changeLanguage: setLang,
         snoozeReminder: (id, days) => snoozeMilestone(id, days),
         completeReminder: (id) => completeMilestone(id, "", ""),
         capture: webCaptureBridge,
       }),
-    [plots, claims, milestones, router, setLang, snoozeMilestone, completeMilestone],
+    [plots, claims, milestones, farmerProfile, pathname, lang, router, setLang, snoozeMilestone, completeMilestone],
   );
+
+  const brokerRef = useRef(broker);
+  brokerRef.current = broker;
+
+  const snapshotRef = useRef({ pathname, lang, plots, claims, milestones });
+  snapshotRef.current = { pathname, lang, plots, claims, milestones };
 
   const stopAudio = useCallback(() => {
     processorRef.current?.disconnect();
@@ -96,14 +159,48 @@ export default function FasalSaathiOverlay() {
     audioCtxRef.current = null;
   }, []);
 
+  const clearExpiryTimer = useCallback(() => {
+    if (expiryTimerRef.current != null) {
+      window.clearTimeout(expiryTimerRef.current);
+      expiryTimerRef.current = null;
+    }
+  }, []);
+
   const disconnect = useCallback(() => {
+    intentionalCloseRef.current = true;
+    connectingRef.current = false;
+    setupCompleteRef.current = false;
+    lastContextRef.current = "";
+    clearExpiryTimer();
     socketRef.current?.close();
     socketRef.current = null;
     stopAudio();
     setStatus("idle");
-  }, [stopAudio]);
+  }, [clearExpiryTimer, stopAudio]);
+
+  const failSession = useCallback(
+    (message: string) => {
+      intentionalCloseRef.current = true;
+      connectingRef.current = false;
+      setupCompleteRef.current = false;
+      lastContextRef.current = "";
+      clearExpiryTimer();
+      socketRef.current?.close();
+      socketRef.current = null;
+      stopAudio();
+      setStatus("error");
+      setError(message);
+    },
+    [clearExpiryTimer, stopAudio],
+  );
 
   useEffect(() => () => disconnect(), [disconnect]);
+
+  useEffect(() => {
+    const el = transcriptRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [lines, error]);
 
   const playPcm24k = useCallback((b64: string) => {
     const ctx = audioCtxRef.current;
@@ -121,11 +218,73 @@ export default function FasalSaathiOverlay() {
     playTimeRef.current = startAt + buffer.duration;
   }, []);
 
+  const pushPortalContext = useCallback((reason: string) => {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN || !setupCompleteRef.current) return;
+    const snap = snapshotRef.current;
+    const recapture = snap.claims.filter((claim) => claim.status === "needs_recapture");
+    const nextReminder = snap.milestones
+      .filter((item) => !item.completed)
+      .sort((a, b) => {
+        if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+        return a.dueDate.localeCompare(b.dueDate);
+      })[0];
+    const payload = {
+      type: "portal_context",
+      reason,
+      path: snap.pathname,
+      screen: farmerScreenFromPath(snap.pathname),
+      language: snap.lang,
+      plot_count: snap.plots.length,
+      claim_count: snap.claims.length,
+      recapture_count: recapture.length,
+      recapture_ids: recapture.slice(0, 5).map((claim) => claim.id),
+      next_reminder: nextReminder
+        ? {
+            id: nextReminder.id,
+            stage: nextReminder.stageName,
+            due: nextReminder.dueDate,
+            overdue: nextReminder.isOverdue,
+          }
+        : null,
+    };
+    const text = `PORTAL CONTEXT (internal; do not read aloud unless asked):\n${JSON.stringify(payload)}`;
+    if (text === lastContextRef.current) return;
+    lastContextRef.current = text;
+    try {
+      socket.send(
+        JSON.stringify({
+          clientContent: {
+            turns: [{ role: "user", parts: [{ text }] }],
+            turnComplete: false,
+          },
+        }),
+      );
+    } catch {
+      // A dropped context frame is recoverable on the next change.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (status !== "live") return;
+    const timer = window.setTimeout(() => pushPortalContext("state_change"), 800);
+    return () => window.clearTimeout(timer);
+  }, [status, pathname, lang, plots, claims, milestones, pushPortalContext]);
+
   const handleTools = useCallback(
     async (calls: { id: string; name: string; arguments: Record<string, unknown> }[]) => {
       const responses = [];
       for (const call of calls) {
-        const result = await broker.execute(call.name, call.arguments, userTurnRef.current);
+        let result: VoiceToolResult;
+        try {
+          result = await brokerRef.current.execute(call.name, call.arguments, userTurnRef.current);
+        } catch (err) {
+          result = {
+            outcome: "failed",
+            message: err instanceof Error ? err.message : "The app action failed.",
+          };
+        }
+        setLastTool(`${call.name} · ${result.outcome}`);
         responses.push({
           id: call.id,
           name: call.name,
@@ -133,15 +292,37 @@ export default function FasalSaathiOverlay() {
         });
         setLines((prev) => [...prev, { role: "system", text: result.message }]);
       }
-      socketRef.current?.send(JSON.stringify({ toolResponse: { functionResponses: responses } }));
+      const socket = socketRef.current;
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+      try {
+        socket.send(JSON.stringify({ toolResponse: { functionResponses: responses } }));
+      } catch {
+        failSession(
+          langRef.current === "hi"
+            ? "औज़ार का जवाब नहीं भेजा जा सका। फिर से बात करें।"
+            : "Could not send the tool result. Tap to talk again.",
+        );
+      }
     },
-    [broker],
+    [failSession],
   );
 
   const connect = useCallback(async () => {
+    if (connectingRef.current) return;
+    if (socketRef.current && (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    connectingRef.current = true;
+    intentionalCloseRef.current = false;
+    setupCompleteRef.current = false;
+    lastContextRef.current = "";
+    userTurnRef.current = 1;
+    inputBufRef.current = "";
+    outputBufRef.current = "";
+    setLastTool(null);
     setError(null);
     setStatus("connecting");
-    setLines([{ role: "system", text: lang === "hi" ? "फसल साथी शुरू हो रहा है…" : "Starting Fasal Saathi…" }]);
+    setLines([{ role: "system", text: langRef.current === "hi" ? "फसल साथी शुरू हो रहा है…" : "Starting Fasal Saathi…" }]);
     try {
       const minted = await apiFetch("/api/voice/session", { method: "POST" });
       const body = (await minted.json()) as {
@@ -149,6 +330,7 @@ export default function FasalSaathiOverlay() {
         token?: string;
         websocketUrl?: string;
         model?: string;
+        expiresAt?: string;
       };
       if (!minted.ok || !body.token || !body.websocketUrl) {
         throw new Error(body.error || "Could not start voice session");
@@ -168,6 +350,27 @@ export default function FasalSaathiOverlay() {
           reject(new Error("Could not open Gemini Live"));
         };
       });
+      socket.onclose = () => {
+        if (intentionalCloseRef.current) return;
+        if (socketRef.current === socket) socketRef.current = null;
+        connectingRef.current = false;
+        setupCompleteRef.current = false;
+        stopAudio();
+        setStatus("error");
+        setError(
+          langRef.current === "hi"
+            ? "कनेक्शन टूट गया। फिर से बात करने के लिए टैप करें।"
+            : "Connection dropped. Tap to talk again.",
+        );
+      };
+      socket.onerror = () => {
+        if (intentionalCloseRef.current) return;
+        failSession(
+          langRef.current === "hi"
+            ? "आवाज़ सत्र में त्रुटि। फिर से बात करने के लिए टैप करें।"
+            : "Voice session error. Tap to talk again.",
+        );
+      };
       socket.onmessage = (event) => {
         void (async () => {
           try {
@@ -175,7 +378,11 @@ export default function FasalSaathiOverlay() {
             if (!frame) return;
             const parsed = parseGeminiLiveMessage(frame);
             for (const item of parsed.events) {
-              if (item.type === "setupComplete") setStatus("live");
+              if (item.type === "setupComplete") {
+                setupCompleteRef.current = true;
+                setStatus("live");
+                pushPortalContext("session_start");
+              }
               if (item.type === "inputTranscript") {
                 inputBufRef.current += item.text;
                 setLines((prev) => {
@@ -199,13 +406,20 @@ export default function FasalSaathiOverlay() {
               if (item.type === "audio") playPcm24k(item.bytesBase64);
               if (item.type === "toolCalls") void handleTools(item.calls);
               if (item.type === "turnComplete") {
-                if (inputBufRef.current.trim()) userTurnRef.current += 1;
+                const spoken = inputBufRef.current.trim();
+                if (spoken) userTurnRef.current += 1;
                 inputBufRef.current = "";
                 outputBufRef.current = "";
               }
               if (item.type === "error") {
-                setError(item.message);
-                setStatus("error");
+                const restart = /restart|session/i.test(item.message);
+                failSession(
+                  restart
+                    ? langRef.current === "hi"
+                      ? "सत्र समाप्त हो गया। फिर से बात करने के लिए टैप करें।"
+                      : "Session ended. Tap to talk again."
+                    : item.message,
+                );
               }
             }
           } catch {
@@ -213,19 +427,32 @@ export default function FasalSaathiOverlay() {
           }
         })();
       };
+      if (body.expiresAt) {
+        const remain = new Date(body.expiresAt).getTime() - Date.now() - 15_000;
+        if (remain > 0) {
+          expiryTimerRef.current = window.setTimeout(() => {
+            failSession(
+              langRef.current === "hi"
+                ? "सत्र समाप्त हो रहा है। फिर से बात करने के लिए टैप करें।"
+                : "Session is ending. Tap to talk again.",
+            );
+          }, remain);
+        }
+      }
       const ctx = new AudioContext();
       audioCtxRef.current = ctx;
       if (ctx.state === "suspended") await ctx.resume();
       playTimeRef.current = ctx.currentTime;
       let stream: MediaStream;
       try {
+        // Capture page owns the video device; this session is audio-only forever.
         stream = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: true, noiseSuppression: true },
           video: false,
         });
       } catch {
         throw new Error(
-          lang === "hi"
+          langRef.current === "hi"
             ? "माइक्रोफ़ोन अनुमति चाहिए। ब्राउज़र में Allow दबाएँ।"
             : "Microphone permission is required. Allow the mic in the browser prompt.",
         );
@@ -252,13 +479,23 @@ export default function FasalSaathiOverlay() {
       };
       source.connect(processor);
       connectSilentProcessor(processor, ctx);
+      connectingRef.current = false;
       setStatus("live");
     } catch (err) {
+      connectingRef.current = false;
       setStatus("error");
       setError(err instanceof Error ? err.message : "Could not start Fasal Saathi");
-      disconnect();
+      intentionalCloseRef.current = true;
+      socketRef.current?.close();
+      socketRef.current = null;
+      stopAudio();
     }
-  }, [disconnect, handleTools, lang, playPcm24k]);
+  }, [failSession, handleTools, playPcm24k, pushPortalContext, stopAudio]);
+
+  const startOrReconnect = useCallback(() => {
+    setOpen(true);
+    if (statusRef.current === "idle" || statusRef.current === "error") void connect();
+  }, [connect]);
 
   if (!pathname.startsWith("/farmer")) return null;
 
@@ -266,10 +503,7 @@ export default function FasalSaathiOverlay() {
     <>
       <button
         type="button"
-        onClick={() => {
-          setOpen(true);
-          if (status === "idle" || status === "error") void connect();
-        }}
+        onClick={startOrReconnect}
         className="fp-btn-primary fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-40 min-h-11 gap-2 px-3 py-2 text-xs sm:right-4 sm:px-4 sm:text-sm md:bottom-8"
       >
         <span aria-hidden>🎙️</span>
@@ -279,24 +513,42 @@ export default function FasalSaathiOverlay() {
       {open && (
         <div className="fp-panel fixed inset-x-3 bottom-[calc(8.25rem+env(safe-area-inset-bottom))] z-40 max-h-[50vh] overflow-hidden sm:inset-x-4 md:inset-auto md:bottom-24 md:right-4 md:w-96">
           <div className="flex items-center justify-between border-b border-[var(--line)] bg-[var(--ink)] px-4 py-2 text-[var(--surface)]">
-            <div>
+            <div className="min-w-0">
               <div className="text-sm font-semibold">Fasal Saathi</div>
-              <div className="text-[11px] text-emerald-200">
-                {status === "live" ? (lang === "hi" ? "लाइव" : "Live") : status}
+              <div
+                className={
+                  status === "error"
+                    ? "text-[11px] text-rose-200"
+                    : status === "connecting"
+                      ? "text-[11px] text-amber-200"
+                      : "text-[11px] text-emerald-200"
+                }
+              >
+                {statusLabel(status, lang)}
               </div>
+              {lastTool && status === "live" && (
+                <div className="truncate text-[10px] text-emerald-100/80">{lastTool}</div>
+              )}
             </div>
-            <button
-              type="button"
-              className="text-xs text-emerald-100 hover:text-white"
-              onClick={() => {
-                disconnect();
-                setOpen(false);
-              }}
-            >
-              {lang === "hi" ? "बंद करें" : "Close"}
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {status === "error" && (
+                <button type="button" className="text-xs text-amber-100 hover:text-white" onClick={() => void connect()}>
+                  {lang === "hi" ? "फिर से" : "Retry"}
+                </button>
+              )}
+              <button
+                type="button"
+                className="text-xs text-emerald-100 hover:text-white"
+                onClick={() => {
+                  disconnect();
+                  setOpen(false);
+                }}
+              >
+                {lang === "hi" ? "बंद करें" : "Close"}
+              </button>
+            </div>
           </div>
-          <div className="max-h-64 space-y-2 overflow-y-auto p-3 text-sm">
+          <div ref={transcriptRef} className="max-h-64 space-y-2 overflow-y-auto p-3 text-sm">
             {lines.map((line, index) => (
               <p
                 key={`${line.role}-${index}`}
