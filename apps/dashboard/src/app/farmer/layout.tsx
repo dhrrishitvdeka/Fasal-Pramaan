@@ -98,9 +98,9 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
             <span className="text-emerald-700">|</span>
             <Link
-              href="/overview"
+              href="/login?next=/overview"
               className="flex items-center gap-1 text-emerald-300 hover:text-white transition-colors"
-              title="Official Reviewer Command Centre"
+              title="Reviewer Command Centre sign in"
             >
               <span className="hidden md:inline">Command Centre</span>
               <ExternalLink className="h-2.5 w-2.5" />
