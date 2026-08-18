@@ -32,9 +32,24 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const updated = await applyReviewerAction(createSupabaseClaimStore(supabase), id, {
       action,
       notes: payload.notes,
-      reason: payload.reason,
+      reason: payload.reason || payload.override_reason,
       required_angles: Array.isArray(payload.required_angles) ? payload.required_angles.map(String) : undefined,
       actor: auth.actor.email || auth.actor.userId,
+      corrected_crop: payload.corrected_crop == null ? undefined : String(payload.corrected_crop),
+      corrected_grade: payload.corrected_grade == null ? undefined : String(payload.corrected_grade),
+      corrected_severity: payload.corrected_severity == null ? undefined : String(payload.corrected_severity),
+      corrected_damage_codes: Array.isArray(payload.corrected_damage_codes)
+        ? payload.corrected_damage_codes.map(String)
+        : undefined,
+      corrected_affected_area_pct: (() => {
+        if (payload.corrected_affected_area_pct == null || payload.corrected_affected_area_pct === "") {
+          return undefined;
+        }
+        const pct = Number(payload.corrected_affected_area_pct);
+        return Number.isFinite(pct) ? pct : undefined;
+      })(),
+      corrected_growth_stage:
+        payload.corrected_growth_stage == null ? undefined : String(payload.corrected_growth_stage),
     });
     return NextResponse.json(updated);
   } catch (error) {

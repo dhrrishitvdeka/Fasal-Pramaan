@@ -179,7 +179,8 @@ function asStatus(value: string | null | undefined): ClaimStatus {
     case "draft":
     case "submitted":
     case "physical_inspection":
-      return "under_review";
+    case "rejected":
+      return value;
     default:
       return "submitted";
   }
