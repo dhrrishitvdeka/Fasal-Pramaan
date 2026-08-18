@@ -1,4 +1,6 @@
-export type FarmerLang = "en" | "hi";
+import type { AppLang } from "./live-indian-languages";
+
+export type FarmerLang = AppLang;
 
 export interface AngleGuidance {
   id: string;
@@ -398,5 +400,6 @@ export const farmerTranslations = {
 } as const;
 
 export function getFarmerT(lang: FarmerLang) {
-  return farmerTranslations[lang] || farmerTranslations.en;
+  if (lang === "hi") return farmerTranslations.hi;
+  return farmerTranslations.en;
 }

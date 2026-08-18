@@ -1,5 +1,20 @@
 export type FacingMode = "environment" | "user";
 
+/** IR / covered-lens luma. Dim field photos sit well above this. */
+export const BLANK_SENSOR_LUMA_MAX = 3;
+
+let cameraWorkQueue: Promise<void> = Promise.resolve();
+
+/** Serialize getUserMedia so Strict Mode remounts do not overlap allocations. */
+export function enqueueCameraWork<T>(work: () => Promise<T>): Promise<T> {
+  const run = cameraWorkQueue.then(work, work);
+  cameraWorkQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 export function stopMediaStream(stream: MediaStream | null | undefined): void {
   if (!stream) return;
   for (const track of stream.getTracks()) {
@@ -41,8 +56,20 @@ export function cameraConstraintLadder(facing: FacingMode): MediaStreamConstrain
   ];
 }
 
+/** Native frame size only. Never invent 1280×720 when videoWidth is 0. */
+export function videoFrameCaptureSize(
+  video: Pick<HTMLVideoElement, "videoWidth" | "videoHeight">,
+): { width: number; height: number } | null {
+  const width = Number(video.videoWidth);
+  const height = Number(video.videoHeight);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null;
+  }
+  return { width, height };
+}
+
 export function videoHasFrame(video: Pick<HTMLVideoElement, "videoWidth" | "videoHeight">): boolean {
-  return Number(video.videoWidth) > 0 && Number(video.videoHeight) > 0;
+  return videoFrameCaptureSize(video) != null;
 }
 
 export function applyVideoPlaybackFlags(video: HTMLVideoElement): void {
@@ -129,16 +156,25 @@ export function sampleVideoMeanLuma(video: HTMLVideoElement): number | null {
 export async function attachStreamToVideo(
   video: HTMLVideoElement,
   stream: MediaStream,
-  timeoutMs = 8000,
+  timeoutMs = 4000,
 ): Promise<boolean> {
   applyVideoPlaybackFlags(video);
-  const waiting = waitForVideoFrame(video, timeoutMs);
   if (video.srcObject !== stream) {
     video.srcObject = stream;
   }
-  await video.play().catch(() => undefined);
+  // Poll videoWidth / loadedmetadata before play() when the engine sizes early.
+  const metadataWait = Math.min(600, timeoutMs);
   try {
-    await waiting;
+    await waitForVideoFrame(video, metadataWait);
+  } catch {
+    // Some engines only report videoWidth after play().
+  }
+  await video.play().catch(() => undefined);
+  if (videoHasFrame(video)) return true;
+  const remaining = Math.max(0, timeoutMs - metadataWait);
+  if (!remaining) return false;
+  try {
+    await waitForVideoFrame(video, remaining);
     return true;
   } catch {
     return videoHasFrame(video);

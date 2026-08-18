@@ -1,4 +1,6 @@
-export type Lang = "en" | "hi";
+import type { AppLang } from "./live-indian-languages";
+
+export type Lang = AppLang;
 
 const dict = {
   en: {
@@ -128,5 +130,6 @@ const dict = {
 export type DictKey = keyof (typeof dict)["en"];
 
 export function t(lang: Lang, key: DictKey): string {
-  return dict[lang][key] || dict.en[key];
+  const table = lang === "hi" ? dict.hi : dict.en;
+  return table[key] || dict.en[key];
 }

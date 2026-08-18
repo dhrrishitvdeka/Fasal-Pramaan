@@ -42,11 +42,13 @@ import {
 import {
   applyVideoPlaybackFlags,
   attachStreamToVideo,
+  BLANK_SENSOR_LUMA_MAX,
   cameraConstraintLadder,
+  enqueueCameraWork,
   sampleVideoMeanLuma,
   safeDisplayUrl,
   stopMediaStream,
-  videoHasFrame,
+  videoFrameCaptureSize,
 } from "@/lib/media";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { runVoiceShutter, runVoiceSubmitDraft } from "@/lib/voice/capture-actions";
@@ -162,42 +164,57 @@ function CaptureStudioContent() {
       return;
     }
     const gen = ++cameraGenRef.current;
-    stopMediaStream(streamRef.current);
-    streamRef.current = null;
-    if (videoRef.current) {
-      applyVideoPlaybackFlags(videoRef.current);
-      videoRef.current.srcObject = null;
-    }
-    setCameraError(null);
-    setIsCameraActive(false);
-    let lastError: unknown;
-    const ladder = cameraConstraintLadder(cameraFacing);
-    for (let step = 0; step < ladder.length; step += 1) {
-      const constraints = ladder[step];
+    await enqueueCameraWork(async () => {
       if (gen !== cameraGenRef.current) return;
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (gen !== cameraGenRef.current) {
-          stopMediaStream(stream);
-          return;
-        }
-        streamRef.current = stream;
-        const video = videoRef.current;
-        if (video) {
+      stopMediaStream(streamRef.current);
+      streamRef.current = null;
+      if (videoRef.current) {
+        applyVideoPlaybackFlags(videoRef.current);
+        videoRef.current.srcObject = null;
+      }
+      setCameraError(null);
+      setIsCameraActive(false);
+      let lastError: unknown;
+      const ladder = cameraConstraintLadder(cameraFacing);
+      for (let step = 0; step < ladder.length; step += 1) {
+        const constraints = ladder[step];
+        if (gen !== cameraGenRef.current) return;
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          if (gen !== cameraGenRef.current) {
+            stopMediaStream(stream);
+            return;
+          }
+          streamRef.current = stream;
+          let video = videoRef.current;
+          if (!video) {
+            const waitUntil = Date.now() + 800;
+            while (!video && Date.now() < waitUntil) {
+              await new Promise((resolve) => setTimeout(resolve, 32));
+              video = videoRef.current;
+            }
+          }
+          if (!video) {
+            // Permission already granted — keep the stream; do not tear it down.
+            setIsCameraActive(true);
+            return;
+          }
           applyVideoPlaybackFlags(video);
-          const gotFrame = await attachStreamToVideo(video, stream);
+          const gotFrame = await attachStreamToVideo(video, stream, 2500);
           if (gen !== cameraGenRef.current) {
             stopMediaStream(stream);
             return;
           }
           const luma = gotFrame ? sampleVideoMeanLuma(video) : null;
-          const blankSensor = luma != null && luma < 3 && step < ladder.length - 1;
+          const blankSensor =
+            luma != null && luma < BLANK_SENSOR_LUMA_MAX && step < ladder.length - 1;
           if (blankSensor) {
             stopMediaStream(stream);
             if (streamRef.current === stream) streamRef.current = null;
             if (video.srcObject === stream) video.srcObject = null;
             continue;
           }
+          // getUserMedia success = camera is on. A late first frame is not fatal.
           setIsCameraActive(true);
           if (!gotFrame) {
             setCameraError(
@@ -209,17 +226,15 @@ function CaptureStudioContent() {
             setCameraError(null);
           }
           return;
+        } catch (err) {
+          lastError = err;
+          await new Promise((resolve) => setTimeout(resolve, 150));
         }
-        setIsCameraActive(true);
-        return;
-      } catch (err) {
-        lastError = err;
-        await new Promise((resolve) => setTimeout(resolve, 150));
       }
-    }
-    console.warn("Camera access failed or unavailable:", lastError);
-    setCameraError(t.cameraUnavailable);
-    setIsCameraActive(false);
+      console.warn("Camera access failed or unavailable:", lastError);
+      setCameraError(t.cameraUnavailable);
+      setIsCameraActive(false);
+    });
   };
 
   useEffect(() => {
@@ -314,13 +329,14 @@ function CaptureStudioContent() {
   const grabCameraFrame = async (): Promise<{ dataUrl: string; lightingScore?: number } | null> => {
     if (!videoRef.current) return null;
     const video = videoRef.current;
-    if (!videoHasFrame(video)) return null;
+    const size = videoFrameCaptureSize(video);
+    if (!size) return null;
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = size.width;
+    canvas.height = size.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, size.width, size.height);
     let lightingScore: number | undefined;
     try {
       lightingScore = measureLightingScore(ctx.getImageData(0, 0, canvas.width, canvas.height));
@@ -508,6 +524,8 @@ function CaptureStudioContent() {
   };
 
   useEffect(() => {
+    const total = activeAngleDefs.length;
+    const captured = activeAngleDefs.filter((angle) => Boolean(capturedImages[angle.id])).length;
     return webCaptureBridge.register({
       captureCurrentAngle: () => capturePhotoFromCamera(),
       readGuidance: async () => ({
@@ -517,13 +535,22 @@ function CaptureStudioContent() {
           : "No capture angle is selected.",
         angle: currentAngle?.id,
       }),
+      readProgress: async () => ({
+        ok: true,
+        message: currentAngle
+          ? `Captured ${captured} of ${total} angles. Current: ${currentAngle.id}.`
+          : `Captured ${captured} of ${total} angles.`,
+        captured,
+        total,
+        currentAngle: currentAngle?.id,
+      }),
       setObservation: async (observation) => {
         setObservations(observation);
         return { ok: true, message: "Observation stored on the capture draft." };
       },
       submitDraft: () => handleSubmitClaim(),
     });
-  }, [isCameraActive, currentAngle, isAllCaptured, handleSubmitClaim]);
+  }, [isCameraActive, currentAngle, isAllCaptured, handleSubmitClaim, capturedImages, activeAngleDefs]);
 
   const getAngleIcon = (iconName: string) => {
     switch (iconName) {
@@ -663,9 +690,12 @@ function CaptureStudioContent() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left Column (7 cols): Camera Viewfinder & Controls */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="relative flex aspect-4/3 items-center justify-center overflow-hidden border border-[var(--ink)] bg-black sm:aspect-16/10">
+          <div className="fp-viewfinder relative flex aspect-[4/3] h-[min(52vh,420px)] min-h-[240px] w-full items-center justify-center overflow-hidden border border-[var(--ink)] bg-black sm:aspect-[16/10] sm:h-auto">
             <video
-              ref={videoRef}
+              ref={(el) => {
+                videoRef.current = el;
+                if (el) applyVideoPlaybackFlags(el);
+              }}
               autoPlay
               playsInline
               muted
@@ -680,7 +710,7 @@ function CaptureStudioContent() {
               />
             ) : null}
             {!isCameraActive && !capturedImages[currentAngle.id] ? (
-              <div className="relative z-[3] p-6 text-center text-slate-400">
+              <div className="absolute inset-0 z-[3] flex flex-col items-center justify-center p-6 text-center text-slate-400">
                 <Camera className="mx-auto mb-2 h-12 w-12 opacity-40" />
                 <p className="text-sm font-medium">
                   {cameraError || (lang === "hi" ? "कैमरा शुरू हो रहा है…" : "Starting camera…")}

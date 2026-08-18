@@ -1,3 +1,5 @@
+import { nativeLabelForLang, parseAppLang, type AppLang } from "../live-indian-languages";
+
 export type VoiceOutcome = "succeeded" | "failed" | "confirmation_required" | "cancelled";
 
 export type VoiceToolResult = {
@@ -7,27 +9,103 @@ export type VoiceToolResult = {
   entityId?: string;
 };
 
+export type VoiceCaptureProgress = {
+  ok: boolean;
+  message: string;
+  captured?: number;
+  total?: number;
+  currentAngle?: string;
+};
+
 export type VoiceCaptureBridge = {
   captureCurrentAngle(): Promise<{ ok: boolean; message: string; angle?: string }>;
   readGuidance(): Promise<{ ok: boolean; message: string; angle?: string }>;
   setObservation(observation: string): Promise<{ ok: boolean; message: string }>;
   submitDraft(): Promise<{ ok: boolean; message: string; claimId?: string }>;
+  readProgress?(): Promise<VoiceCaptureProgress>;
 };
 
-export type VoicePlot = { id: string; name: string; cropType?: string; khasraNumber?: string };
-export type VoiceClaim = { id: string; status: string; plotName?: string; cropType?: string };
-export type VoiceReminder = { id: string; stageName: string; dueDate: string; completed: boolean };
+export type VoiceFarmerProfile = {
+  name?: string;
+  nameHi?: string;
+  kisanId?: string;
+  phone?: string;
+  village?: string;
+  district?: string;
+  state?: string;
+};
+
+export type VoicePlot = {
+  id: string;
+  name: string;
+  nameHi?: string;
+  cropType?: string;
+  cropTypeHi?: string;
+  khasraNumber?: string;
+  areaHectares?: number;
+  currentStage?: string;
+  village?: string;
+  district?: string;
+  state?: string;
+};
+
+export type VoiceClaim = {
+  id: string;
+  status: string;
+  plotName?: string;
+  cropType?: string;
+  missingAngles?: string[];
+  recaptureReason?: string;
+  imageCount?: number;
+  createdAt?: string;
+  reviewerNotes?: string;
+};
+
+export type VoiceReminder = {
+  id: string;
+  stageName: string;
+  stageNameHi?: string;
+  dueDate: string;
+  completed: boolean;
+  isOverdue?: boolean;
+  plotId?: string;
+  cropName?: string;
+};
 
 export type WebVoiceGateway = {
   plots: VoicePlot[];
   claims: VoiceClaim[];
   reminders: VoiceReminder[];
+  farmerProfile?: VoiceFarmerProfile;
+  currentPath?: string;
+  language?: AppLang;
   navigate(path: string): void;
-  changeLanguage(code: "en" | "hi"): void;
+  changeLanguage(code: AppLang): void;
   snoozeReminder(id: string, days: number): Promise<void> | void;
   completeReminder(id: string): Promise<void> | void;
   capture: VoiceCaptureBridge;
 };
+
+export type FarmerScreen = "home" | "capture" | "claims" | "claim_detail" | "reminders" | "other";
+
+const SCREEN_LABELS: Record<FarmerScreen, string> = {
+  home: "Home",
+  capture: "Guided capture",
+  claims: "Claims list",
+  claim_detail: "Claim detail",
+  reminders: "Reminders",
+  other: "Other",
+};
+
+export function farmerScreenFromPath(path: string): FarmerScreen {
+  const raw = (path || "").split("?")[0].replace(/\/+$/, "") || "/";
+  if (raw === "/farmer") return "home";
+  if (raw.startsWith("/farmer/capture")) return "capture";
+  if (/^\/farmer\/claims\/[^/]+$/.test(raw)) return "claim_detail";
+  if (raw === "/farmer/claims" || raw.startsWith("/farmer/claims/")) return "claims";
+  if (raw.startsWith("/farmer/reminders")) return "reminders";
+  return "other";
+}
 
 type PendingKind = "submit_claim" | "snooze_reminder" | "complete_reminder";
 
@@ -55,6 +133,20 @@ const SUPPORTED_CROPS = [
   { id: "wheat", name: "Wheat", name_hi: "गेहूँ" },
 ];
 
+const WEBSITE_UNAVAILABLE =
+  "That action is not available on the website. Use plots, claims, capture, or reminders here.";
+
+function asStringList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 export class WebVoiceBroker {
   constructor(
     private readonly gateway: WebVoiceGateway,
@@ -78,20 +170,14 @@ export class WebVoiceBroker {
           return this.navigate(args);
         case "change_language":
           return this.changeLanguage(args);
+        case "get_farmer_profile":
+          return this.getFarmerProfile();
+        case "get_portal_snapshot":
+          return this.getPortalSnapshot();
+        case "get_current_screen":
+          return this.getCurrentScreen();
         case "list_plots":
-          return {
-            outcome: "succeeded",
-            message: `Found ${this.gateway.plots.length} plots.`,
-            data: {
-              count: this.gateway.plots.length,
-              plots: this.gateway.plots.slice(0, 12).map((plot) => ({
-                id: plot.id,
-                name: plot.name,
-                crop_type: plot.cropType,
-                khasra_number: plot.khasraNumber,
-              })),
-            },
-          };
+          return this.listPlots();
         case "list_crop_types":
           return {
             outcome: "succeeded",
@@ -99,48 +185,40 @@ export class WebVoiceBroker {
             data: { crop_types: SUPPORTED_CROPS },
           };
         case "list_my_submissions":
-          return {
-            outcome: "succeeded",
-            message: `Found ${this.gateway.claims.length} claims.`,
-            data: {
-              count: this.gateway.claims.length,
-              submissions: this.gateway.claims.slice(0, 10).map((claim) => ({
-                id: claim.id,
-                status: claim.status,
-                plot_name: claim.plotName,
-                crop_type: claim.cropType,
-              })),
-            },
-          };
+          return this.listSubmissions();
+        case "get_claim_detail":
+          return this.getClaimDetail(args);
+        case "open_claim":
+          return this.openClaim(args);
         case "list_evidence_reminders":
-          return {
-            outcome: "succeeded",
-            message: `Found ${this.gateway.reminders.length} reminders.`,
-            data: {
-              count: this.gateway.reminders.length,
-              reminders: this.gateway.reminders.slice(0, 12),
-            },
-          };
+          return this.listReminders();
+        case "list_due_reminders":
+          return this.listDueReminders();
         case "list_my_farms":
         case "prepare_sync_offline_queue":
         case "prepare_create_farm":
         case "prepare_create_plot":
         case "prepare_create_crop_cycle":
         case "prepare_logout":
-          return {
-            outcome: "failed",
-            message: "That action is not available on the website. Use plots, claims, capture, or reminders here.",
-          };
+          return { outcome: "failed", message: WEBSITE_UNAVAILABLE };
         case "begin_guided_capture":
           return this.beginCapture(args);
+        case "begin_recapture":
+          return this.beginRecapture(args);
         case "read_capture_guidance":
           return this.fromCapture(await this.gateway.capture.readGuidance());
+        case "read_capture_progress":
+          return this.readCaptureProgress();
         case "capture_current_angle":
           return this.fromCapture(await this.gateway.capture.captureCurrentAngle());
         case "set_capture_observation":
           return this.setObservation(args);
         case "prepare_submit_claim":
-          return this.prepare("submit_claim", userTurn, "Ready to submit the current capture as a claim. Ask for a clear yes or no.");
+          return this.prepare(
+            "submit_claim",
+            userTurn,
+            "Ready to submit the current capture as a claim. Ask for a clear yes or no.",
+          );
         case "prepare_snooze_evidence_reminder":
           return this.prepareSnooze(args, userTurn);
         case "prepare_complete_reminder":
@@ -160,6 +238,219 @@ export class WebVoiceBroker {
     }
   }
 
+  private listPlots(): VoiceToolResult {
+    const plots = this.gateway.plots.slice(0, 12).map((plot) => ({
+      id: plot.id,
+      name: plot.name,
+      name_hi: plot.nameHi,
+      crop_type: plot.cropType,
+      crop_type_hi: plot.cropTypeHi,
+      khasra_number: plot.khasraNumber,
+      area_hectares: plot.areaHectares,
+      current_stage: plot.currentStage,
+      village: plot.village,
+      district: plot.district,
+      state: plot.state,
+    }));
+    return {
+      outcome: "succeeded",
+      message:
+        plots.length === 0
+          ? "No registered plots. The farmer can still file a claim without a stored plot."
+          : `Found ${this.gateway.plots.length} plots.`,
+      data: { count: this.gateway.plots.length, plots },
+    };
+  }
+
+  private listSubmissions(): VoiceToolResult {
+    const submissions = this.gateway.claims.slice(0, 10).map((claim) => this.serializeClaim(claim));
+    const recaptureCount = this.gateway.claims.filter((claim) => claim.status === "needs_recapture").length;
+    return {
+      outcome: "succeeded",
+      message:
+        submissions.length === 0
+          ? "No claims yet."
+          : `Found ${this.gateway.claims.length} claims${recaptureCount ? `, ${recaptureCount} need recapture` : ""}.`,
+      data: { count: this.gateway.claims.length, recapture_count: recaptureCount, submissions },
+    };
+  }
+
+  private listReminders(): VoiceToolResult {
+    const reminders = this.gateway.reminders.slice(0, 12).map((item) => this.serializeReminder(item));
+    return {
+      outcome: "succeeded",
+      message:
+        reminders.length === 0 ? "No reminders are stored." : `Found ${this.gateway.reminders.length} reminders.`,
+      data: { count: this.gateway.reminders.length, reminders },
+    };
+  }
+
+  private listDueReminders(): VoiceToolResult {
+    const due = this.gateway.reminders
+      .filter((item) => !item.completed)
+      .sort((a, b) => {
+        if (Boolean(a.isOverdue) !== Boolean(b.isOverdue)) return a.isOverdue ? -1 : 1;
+        return a.dueDate.localeCompare(b.dueDate);
+      })
+      .slice(0, 12)
+      .map((item) => this.serializeReminder(item));
+    const overdueCount = due.filter((item) => item.is_overdue).length;
+    return {
+      outcome: "succeeded",
+      message:
+        due.length === 0
+          ? "No overdue or upcoming reminders."
+          : `Found ${due.length} incomplete reminders${overdueCount ? `, ${overdueCount} overdue` : ""}.`,
+      data: { count: due.length, overdue_count: overdueCount, reminders: due },
+    };
+  }
+
+  private getFarmerProfile(): VoiceToolResult {
+    const profile = this.gateway.farmerProfile || {};
+    const stored =
+      Boolean(profile.kisanId) ||
+      Boolean(profile.phone) ||
+      Boolean(profile.village) ||
+      Boolean(profile.district) ||
+      (Boolean(profile.name) && profile.name !== "Farmer");
+    return {
+      outcome: "succeeded",
+      message: stored ? "Loaded the farmer profile." : "No farmer profile details are stored yet.",
+      data: {
+        name: profile.name || null,
+        name_hi: profile.nameHi || null,
+        kisan_id: profile.kisanId || null,
+        phone: profile.phone || null,
+        village: profile.village || null,
+        district: profile.district || null,
+        state: profile.state || null,
+      },
+    };
+  }
+
+  private getPortalSnapshot(): VoiceToolResult {
+    const path = this.gateway.currentPath || "";
+    const screen = farmerScreenFromPath(path);
+    const recapture = this.gateway.claims.filter((claim) => claim.status === "needs_recapture");
+    const verifiedCount = this.gateway.claims.filter((claim) => claim.status === "verified").length;
+    const nextReminders = this.gateway.reminders
+      .filter((item) => !item.completed)
+      .sort((a, b) => {
+        if (Boolean(a.isOverdue) !== Boolean(b.isOverdue)) return a.isOverdue ? -1 : 1;
+        return a.dueDate.localeCompare(b.dueDate);
+      })
+      .slice(0, 3)
+      .map((item) => this.serializeReminder(item));
+    return {
+      outcome: "succeeded",
+      message: `Portal snapshot: ${this.gateway.plots.length} plots, ${this.gateway.claims.length} claims, ${recapture.length} need recapture.`,
+      data: {
+        path: path || null,
+        screen,
+        language: this.gateway.language || null,
+        plot_count: this.gateway.plots.length,
+        claim_count: this.gateway.claims.length,
+        verified_count: verifiedCount,
+        recapture_count: recapture.length,
+        recapture_ids: recapture.slice(0, 5).map((claim) => claim.id),
+        recapture: recapture.slice(0, 5).map((claim) => ({
+          id: claim.id,
+          plot_name: claim.plotName,
+          crop_type: claim.cropType,
+          missing_angles: claim.missingAngles || [],
+        })),
+        next_reminders: nextReminders,
+      },
+    };
+  }
+
+  private getCurrentScreen(): VoiceToolResult {
+    const path = this.gateway.currentPath || "";
+    const screen = farmerScreenFromPath(path);
+    return {
+      outcome: "succeeded",
+      message: path ? `The farmer is on ${SCREEN_LABELS[screen]} (${path}).` : "Current screen is not known yet.",
+      data: { path: path || null, screen, label: SCREEN_LABELS[screen] },
+    };
+  }
+
+  private getClaimDetail(args: Record<string, unknown>): VoiceToolResult {
+    const rawId = String(args.claim_id || "").trim();
+    if (!rawId) return { outcome: "failed", message: "A claim id is required." };
+    const found = this.findClaim(rawId);
+    if (found === "ambiguous") {
+      return { outcome: "failed", message: "Several claims match that id. Use the full claim id." };
+    }
+    if (!found) return { outcome: "failed", message: "No claim found with that id." };
+    return {
+      outcome: "succeeded",
+      message:
+        found.status === "needs_recapture"
+          ? `Claim ${found.id} needs recapture.`
+          : `Loaded claim ${found.id} (${found.status}).`,
+      data: {
+        ...this.serializeClaim(found),
+        recapture_reason: found.recaptureReason || null,
+        reviewer_notes: found.reviewerNotes || null,
+      },
+      entityId: found.id,
+    };
+  }
+
+  private openClaim(args: Record<string, unknown>): VoiceToolResult {
+    const rawId = String(args.claim_id || "").trim();
+    if (!rawId) return { outcome: "failed", message: "A claim id is required." };
+    const found = this.findClaim(rawId);
+    if (found === "ambiguous") {
+      return { outcome: "failed", message: "Several claims match that id. Use the full claim id." };
+    }
+    if (!found) return { outcome: "failed", message: "No claim found with that id." };
+    const path = `/farmer/claims/${found.id}`;
+    this.gateway.navigate(path);
+    return { outcome: "succeeded", message: `Opened claim ${found.id}.`, data: { path }, entityId: found.id };
+  }
+
+  private beginRecapture(args: Record<string, unknown>): VoiceToolResult {
+    const rawId = String(args.claim_id || "").trim();
+    if (!rawId) return { outcome: "failed", message: "A claim id is required." };
+    const found = this.findClaim(rawId);
+    if (found === "ambiguous") {
+      return { outcome: "failed", message: "Several claims match that id. Use the full claim id." };
+    }
+    if (!found) return { outcome: "failed", message: "No claim found with that id." };
+    const requested = asStringList(args.angles);
+    const angles = requested.length ? requested : found.missingAngles || [];
+    const path = angles.length
+      ? `/farmer/capture?recapture=${encodeURIComponent(found.id)}&angles=${angles.join(",")}`
+      : `/farmer/capture?recapture=${encodeURIComponent(found.id)}`;
+    this.gateway.navigate(path);
+    return {
+      outcome: "succeeded",
+      message: angles.length
+        ? `Opened recapture for claim ${found.id} (${angles.join(", ")}).`
+        : `Opened recapture for claim ${found.id}.`,
+      data: { path, claim_id: found.id, angles, status: found.status },
+      entityId: found.id,
+    };
+  }
+
+  private async readCaptureProgress(): Promise<VoiceToolResult> {
+    const reader = this.gateway.capture.readProgress;
+    if (!reader) {
+      return {
+        outcome: "failed",
+        message: "Capture progress is not available. Use read_capture_guidance.",
+      };
+    }
+    const value = await reader();
+    return {
+      outcome: value.ok ? "succeeded" : "failed",
+      message: value.message,
+      data: value,
+      entityId: value.currentAngle,
+    };
+  }
+
   private navigate(args: Record<string, unknown>): VoiceToolResult {
     const screen = String(args.screen || "");
     const path = ROUTES[screen];
@@ -171,15 +462,22 @@ export class WebVoiceBroker {
   }
 
   private changeLanguage(args: Record<string, unknown>): VoiceToolResult {
-    const code = String(args.language_code || "").trim().toLowerCase();
-    if (code !== "en" && code !== "hi") {
-      return { outcome: "failed", message: "Language must be English or Hindi." };
+    const parsed = parseAppLang(args.language_code);
+    if (!parsed) {
+      return {
+        outcome: "failed",
+        message: "That language is not available. Use an Indian Gemini Live language.",
+      };
     }
-    this.gateway.changeLanguage(code);
+    this.gateway.changeLanguage(parsed);
+    const label = nativeLabelForLang(parsed);
     return {
       outcome: "succeeded",
-      message: code === "hi" ? "ऐप की भाषा हिन्दी कर दी गई है।" : "The app language is now English.",
-      data: { language_code: code },
+      message:
+        parsed === "hi"
+          ? "ऐप की भाषा हिन्दी कर दी गई है।"
+          : `The app language is now ${label}.`,
+      data: { language_code: parsed },
     };
   }
 
@@ -187,7 +485,7 @@ export class WebVoiceBroker {
     const plotId = String(args.plot_id || "").trim();
     const path = plotId ? `/farmer/capture?plotId=${encodeURIComponent(plotId)}` : "/farmer/capture";
     this.gateway.navigate(path);
-    return { outcome: "succeeded", message: "Guided capture is open.", entityId: plotId || undefined };
+    return { outcome: "succeeded", message: "Guided capture is open.", entityId: plotId || undefined, data: { path } };
   }
 
   private async setObservation(args: Record<string, unknown>): Promise<VoiceToolResult> {
@@ -281,6 +579,42 @@ export class WebVoiceBroker {
     return {
       outcome: "cancelled",
       message: had ? "The pending action was cancelled." : "There was no pending action.",
+    };
+  }
+
+  private findClaim(rawId: string): VoiceClaim | "ambiguous" | undefined {
+    const id = rawId.toLowerCase();
+    const exact = this.gateway.claims.find((claim) => claim.id.toLowerCase() === id);
+    if (exact) return exact;
+    const prefix = this.gateway.claims.filter((claim) => claim.id.toLowerCase().startsWith(id));
+    if (prefix.length === 1) return prefix[0];
+    if (prefix.length > 1) return "ambiguous";
+    return undefined;
+  }
+
+  private serializeClaim(claim: VoiceClaim) {
+    return {
+      id: claim.id,
+      status: claim.status,
+      plot_name: claim.plotName,
+      crop_type: claim.cropType,
+      missing_angles: claim.missingAngles || [],
+      recapture_reason: claim.recaptureReason || null,
+      image_count: claim.imageCount ?? 0,
+      created_at: claim.createdAt || null,
+    };
+  }
+
+  private serializeReminder(item: VoiceReminder) {
+    return {
+      id: item.id,
+      stage_name: item.stageName,
+      stage_name_hi: item.stageNameHi,
+      due_date: item.dueDate,
+      completed: item.completed,
+      is_overdue: item.isOverdue ?? false,
+      plot_id: item.plotId,
+      crop_name: item.cropName,
     };
   }
 }
