@@ -43,6 +43,7 @@ import {
   applyVideoPlaybackFlags,
   attachStreamToVideo,
   cameraConstraintLadder,
+  sampleVideoMeanLuma,
   safeDisplayUrl,
   stopMediaStream,
   videoHasFrame,
@@ -170,7 +171,9 @@ function CaptureStudioContent() {
     setCameraError(null);
     setIsCameraActive(false);
     let lastError: unknown;
-    for (const constraints of cameraConstraintLadder(cameraFacing)) {
+    const ladder = cameraConstraintLadder(cameraFacing);
+    for (let step = 0; step < ladder.length; step += 1) {
+      const constraints = ladder[step];
       if (gen !== cameraGenRef.current) return;
       try {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -186,6 +189,14 @@ function CaptureStudioContent() {
           if (gen !== cameraGenRef.current) {
             stopMediaStream(stream);
             return;
+          }
+          const luma = gotFrame ? sampleVideoMeanLuma(video) : null;
+          const blankSensor = luma != null && luma < 3 && step < ladder.length - 1;
+          if (blankSensor) {
+            stopMediaStream(stream);
+            if (streamRef.current === stream) streamRef.current = null;
+            if (video.srcObject === stream) video.srcObject = null;
+            continue;
           }
           setIsCameraActive(true);
           if (!gotFrame) {
