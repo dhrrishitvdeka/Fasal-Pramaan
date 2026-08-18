@@ -30,7 +30,7 @@ export default function MetricCard({
           : null;
 
   return (
-    <div className={`border border-slate-200 border-l-4 bg-white px-3 py-3 ${border}`}>
+    <div className={`fp-panel border-l-4 px-3 py-3 ${border}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
           {label}

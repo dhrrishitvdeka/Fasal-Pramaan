@@ -23,7 +23,7 @@ export default function FarmerHomePage() {
   const upcoming = milestones.filter((m) => !m.completed).slice(0, 3);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
@@ -32,10 +32,7 @@ export default function FarmerHomePage() {
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-slate-600">{t.dashboardSub}</p>
         </div>
-        <Link
-          href="/farmer/capture"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-emerald-900"
-        >
+        <Link href="/farmer/capture" className="fp-btn-primary gap-2">
           <Camera className="h-4 w-4" />
           <span>{t.quickActionNewClaim}</span>
         </Link>
@@ -54,7 +51,7 @@ export default function FarmerHomePage() {
           { label: t.statVerified, value: verifiedCount },
           { label: t.statPendingAction, value: recaptureClaims.length },
         ].map((stat) => (
-          <div key={stat.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
+          <div key={stat.label} className="fp-panel p-4">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{stat.label}</div>
             <div className="mt-1 text-2xl font-bold text-slate-900">{isLoading ? "—" : stat.value}</div>
           </div>
@@ -62,7 +59,7 @@ export default function FarmerHomePage() {
       </div>
 
       {recaptureClaims.length > 0 && (
-        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-5 space-y-3">
+        <div className="fp-panel space-y-3 border-[var(--ink)] p-5">
           <div className="flex items-start gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-700 shrink-0" />
             <div>
@@ -82,7 +79,7 @@ export default function FarmerHomePage() {
                 </div>
                 <Link
                   href={`/farmer/capture?recapture=${claim.id}&angles=${(claim.missingAngles || []).join(",")}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
+                  className="fp-btn-primary gap-1.5 px-3 py-1.5 text-xs"
                 >
                   <Camera className="h-3.5 w-3.5" />
                   {t.startRecaptureNow}
@@ -94,7 +91,7 @@ export default function FarmerHomePage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+        <section className="fp-panel p-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Layers className="h-4 w-4 text-emerald-700" />
@@ -144,13 +141,13 @@ export default function FarmerHomePage() {
           )}
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+        <section className="fp-panel p-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <FileText className="h-4 w-4 text-emerald-700" />
               {t.activeClaims}
             </h2>
-            <Link href="/farmer/claims" className="text-xs font-semibold text-emerald-800 hover:underline">
+            <Link href="/farmer/claims" className="fp-link text-xs">
               {t.viewAllClaims}
             </Link>
           </div>
@@ -184,7 +181,7 @@ export default function FarmerHomePage() {
                   <span
                     className={clsx(
                       "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
-                      claim.status === "verified" && "bg-emerald-100 text-emerald-800",
+                      claim.status === "verified" && "fp-badge-ok",
                       claim.status === "needs_recapture" && "bg-amber-100 text-amber-900",
                       (claim.status === "under_review" || claim.status === "submitted") && "bg-blue-100 text-blue-800"
                     )}
@@ -198,13 +195,13 @@ export default function FarmerHomePage() {
         </section>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+      <section className="fp-panel p-5">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
           <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <Clock className="h-4 w-4 text-emerald-700" />
             {t.upcomingReminders}
           </h2>
-          <Link href="/farmer/reminders" className="text-xs font-semibold text-emerald-800 hover:underline">
+          <Link href="/farmer/reminders" className="fp-link text-xs">
             {t.viewTimeline}
           </Link>
         </div>
