@@ -101,9 +101,14 @@ export async function mintVoiceSession(input: {
   if (input.lockActive && !input.unlocked) {
     return { ok: false, status: 401, error: "Site locked" };
   }
-  const enabled = input.voiceEnabled ?? voiceAssistantEnabled();
   const apiKey = input.apiKey ?? geminiApiKey();
-  if (!enabled || !apiKey) {
+  // Hosted Vercel: a server GEMINI_API_KEY is enough. The env flag is only an
+  // explicit off-switch when the caller passes voiceEnabled: false (tests).
+  // VOICE_ASSISTANT_ENABLED=false in .env.example used to block live sessions.
+  if (!apiKey) {
+    return { ok: false, status: 503, error: "Voice assistant is not configured" };
+  }
+  if (input.voiceEnabled === false) {
     return { ok: false, status: 503, error: "Voice assistant is not configured" };
   }
   const { body, expiresAt, model } = buildAuthTokenRequest(input.now);
