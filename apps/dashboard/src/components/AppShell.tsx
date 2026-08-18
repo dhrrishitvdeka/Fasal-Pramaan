@@ -306,22 +306,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--surface)]">
-          <div className="flex items-start gap-2 px-3 py-2.5 sm:px-4 md:px-6 md:py-3">
+        <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--surface)] md:hidden">
+          <div className="flex items-center gap-1 px-2 py-1.5">
             <button
               type="button"
-              className="-ml-1 mt-0.5 p-2 text-[var(--ink)] md:hidden"
+              className="p-2 text-[var(--ink)]"
               aria-label="Open menu"
               onClick={() => setNavOpen(true)}
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div className="min-w-0 flex-1">
-              <h1 className="fp-ui text-sm font-semibold text-[var(--ink)]">{t("appName")}</h1>
-              <p className="mt-0.5 hidden max-w-3xl text-xs text-[var(--ink-muted)] sm:block">
-                {t("disclaimer")}
-              </p>
-            </div>
           </div>
         </header>
         <div className="min-w-0 flex-1 px-3 py-3 sm:px-4 md:px-6 md:py-5">{children}</div>
