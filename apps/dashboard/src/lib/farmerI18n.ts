@@ -1,4 +1,5 @@
 import type { AppLang } from "./live-indian-languages";
+import { FARMER_LOCALES } from "./farmer-locales";
 
 export type FarmerLang = AppLang;
 
@@ -142,6 +143,9 @@ export const farmerTranslations = {
     switchLanguage: "हिन्दी",
     offlineNotice: "Working in Offline Mode. Captures will auto-sync when online.",
     onlineNotice: "Connected to PMFBY / State Insurance Network",
+    pmfbyBanner: "PMFBY · Digital evidence",
+    reviewerSignIn: "Reviewer sign in",
+    farmerPortalLabel: "Farmer portal",
 
     // Dashboard Home
     greeting: "Welcome, Kisan Brother",
@@ -262,6 +266,32 @@ export const farmerTranslations = {
     reminderNotificationChannels: "Alert Channels",
     smsAlerts: "SMS Notifications",
     whatsappAlerts: "WhatsApp Reminders",
+    profile: "Profile",
+    help: "Help",
+    draftsQueue: "Saved draft",
+    logGrowthEvidence: "Save growth evidence",
+    milestoneMode: "Growth timeline photo",
+    seedTimeline: "Start 30-day timeline",
+    registerPlot: "Register a plot",
+    noPlotsForTimeline: "Register a plot to get a sowing-to-harvest photo timeline.",
+    noStagesForPlot: "This plot has no growth stages yet.",
+    snoozeDays: "Snooze (days)",
+    alertPrefsDeviceOnly: "Saved on this phone. This website does not send SMS or WhatsApp.",
+    timelineWhy: "Why keep a growth timeline?",
+    timelineBenefit1: "A dated pre-disaster photo set is ready if you need to file a claim.",
+    timelineBenefit2: "Reviewers can see the same plot across the season, not only after damage.",
+    timelineBenefit3: "Overdue stages stay visible until you photograph them.",
+    addPlotName: "Plot name",
+    addPlotKhasra: "Khasra number",
+    addPlotArea: "Area (hectares)",
+    addPlotCrop: "Crop",
+    addPlotSowing: "Sowing date",
+    helpTitle: "Help & 5-angle guide",
+    helpSub: "How to photograph a plot so a reviewer can use the pictures.",
+    profileTitle: "Farmer profile",
+    queueTitle: "Offline draft",
+    queueEmpty: "No saved capture draft on this device.",
+    signOut: "Sign out",
   },
   hi: {
     // Nav & Shell
@@ -276,6 +306,9 @@ export const farmerTranslations = {
     switchLanguage: "English",
     offlineNotice: "ऑफ़लाइन मोड में कार्य कर रहे हैं। इंटरनेट आने पर स्वचालित रूप से सिंक होगा।",
     onlineNotice: "पीएमएफबीवाई / राज्य बीमा नेटवर्क से जुड़ा हुआ है",
+    pmfbyBanner: "प्रधानमंत्री फसल बीमा योजना",
+    reviewerSignIn: "समीक्षक प्रवेश",
+    farmerPortalLabel: "किसान पोर्टल",
 
     // Dashboard Home
     greeting: "नमस्ते, किसान भाई",
@@ -396,10 +429,40 @@ export const farmerTranslations = {
     reminderNotificationChannels: "सूचना माध्यम",
     smsAlerts: "एसएमएस संदेश",
     whatsappAlerts: "व्हाट्सएप अलर्ट",
+    profile: "प्रोफ़ाइल",
+    help: "सहायता",
+    draftsQueue: "सहेजा प्रारूप",
+    logGrowthEvidence: "विकास साक्ष्य सहेजें",
+    milestoneMode: "विकास समय-सीमा फोटो",
+    seedTimeline: "30-दिवसीय समय-सीमा शुरू करें",
+    registerPlot: "भूखंड पंजीकृत करें",
+    noPlotsForTimeline: "बुवाई से कटाई तक फोटो समय-सीमा के लिए एक भूखंड पंजीकृत करें।",
+    noStagesForPlot: "इस भूखंड पर अभी कोई विकास चरण नहीं है।",
+    snoozeDays: "स्थगित करें (दिन)",
+    alertPrefsDeviceOnly: "इस फ़ोन पर सहेजा गया। यह वेबसाइट एसएमएस या व्हाट्सएप नहीं भेजती।",
+    timelineWhy: "विकास समय-सीमा क्यों रखें?",
+    timelineBenefit1: "दावा करते समय पूर्व-आपदा फोटो तैयार रहती हैं।",
+    timelineBenefit2: "समीक्षक मौसम भर उसी खेत को देख सकते हैं, केवल नुकसान के बाद नहीं।",
+    timelineBenefit3: "बकाया चरण फोटो लेने तक दिखते रहते हैं।",
+    addPlotName: "भूखंड का नाम",
+    addPlotKhasra: "खसरा संख्या",
+    addPlotArea: "क्षेत्रफल (हेक्टेयर)",
+    addPlotCrop: "फसल",
+    addPlotSowing: "बुवाई तिथि",
+    helpTitle: "सहायता और 5-कोण गाइड",
+    helpSub: "ऐसी फोटो लें जिन्हें समीक्षक उपयोग कर सके।",
+    profileTitle: "किसान प्रोफ़ाइल",
+    queueTitle: "ऑफ़लाइन प्रारूप",
+    queueEmpty: "इस डिवाइस पर कोई सहेजा हुआ कैप्चर प्रारूप नहीं है।",
+    signOut: "साइन आउट",
   },
 } as const;
 
-export function getFarmerT(lang: FarmerLang) {
-  if (lang === "hi") return farmerTranslations.hi;
-  return farmerTranslations.en;
+export type FarmerCopy = { [K in keyof typeof farmerTranslations.en]: string };
+
+export function getFarmerT(lang: FarmerLang): FarmerCopy {
+  if (lang === "en") return farmerTranslations.en;
+  if (lang === "hi") return { ...farmerTranslations.en, ...farmerTranslations.hi };
+  const overlay = FARMER_LOCALES[lang];
+  return overlay ? { ...farmerTranslations.en, ...overlay } : farmerTranslations.en;
 }
