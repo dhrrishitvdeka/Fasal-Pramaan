@@ -30,6 +30,18 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
       const { error } = await client.from("web_claim_images").insert(rows);
       if (error) throw new Error(error.message);
     },
+    async replaceAngleImages(claimId, rows) {
+      if (!rows.length) return;
+      const angles = [...new Set(rows.map((row) => row.angle_type))];
+      const { error: deleteError } = await client
+        .from("web_claim_images")
+        .delete()
+        .eq("claim_id", claimId)
+        .in("angle_type", angles);
+      if (deleteError) throw new Error(deleteError.message);
+      const { error } = await client.from("web_claim_images").insert(rows);
+      if (error) throw new Error(error.message);
+    },
     async listImages(claimId) {
       const { data, error } = await client.from("web_claim_images").select("*").eq("claim_id", claimId);
       if (error) throw new Error(error.message);

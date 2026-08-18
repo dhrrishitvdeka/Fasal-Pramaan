@@ -9,6 +9,7 @@ import { useState, useMemo } from "react";
 import { AiConfidenceBreakdown } from "@/components/AiConfidenceBreakdown";
 import { ReviewKeyboardShortcuts } from "@/components/ReviewKeyboardShortcuts";
 import { EvidenceConfidenceSection, resolveEvidenceEvaluation } from "@/components/EvidenceConfidenceSection";
+import { predictionIsAcceptable } from "@/lib/review-accept";
 
 const ALL_ANGLES = [
   { key: "wide_field", label: "Wide Field" },
@@ -103,16 +104,7 @@ export default function ReviewDetailPage() {
   }
   const pred = data.latest_prediction;
 
-  // SAFETY: Disallow accepting AI result if mandatory integrity condition fails or prediction is missing
-  const canAccept = Boolean(
-    pred &&
-      !integrityFailed &&
-      (pred.predicted_grade ||
-        (pred.primary_damage &&
-          pred.primary_damage !== "unknown" &&
-          pred.severity &&
-          pred.affected_area_pct != null))
-  );
+  const canAccept = predictionIsAcceptable(pred, integrityFailed);
 
   const handleAccept = () => {
     if (canAccept) {

@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { FarmerLang } from "./farmerI18n";
 import { getWebClaim, listWebClaims, submitWebClaim } from "./api";
 import { apiFetch } from "./auth-headers";
-import { computeEvidencePreview } from "./claim-pipeline";
+import { buildRecaptureSubmitInput, computeEvidencePreview } from "./claim-pipeline";
 import { isSupabaseConfigured } from "./supabase";
 import { EMPTY_FARMER_PROFILE } from "./web-db";
 
@@ -76,7 +76,8 @@ export type ClaimStatus =
   | "under_review"
   | "draft"
   | "submitted"
-  | "physical_inspection";
+  | "physical_inspection"
+  | "rejected";
 
 export interface FarmerClaim {
   id: string;
@@ -339,14 +340,15 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   ): Promise<FarmerClaim | undefined> => {
     const existing = getClaimById(claimId);
     if (!existing) return undefined;
-    const imageMap = new Map<string, ClaimImageEvidence>();
-    existing.images.forEach((img) => imageMap.set(img.angleType, img));
-    recapturedImages.forEach((img) => imageMap.set(img.angleType, img));
-    return createClaim({
-      ...existing,
-      images: Array.from(imageMap.values()),
-      status: "under_review",
-    });
+    if (!isSupabaseConfigured()) {
+      throw new Error("Supabase is not configured — claim was not stored");
+    }
+    const payload = buildRecaptureSubmitInput(claimId, existing, recapturedImages);
+    const result = await submitWebClaim(payload);
+    const persisted = await getWebClaim(result.claimId);
+    const claim = submissionToClaim(persisted);
+    setClaims((prev) => prev.map((item) => (item.id === claim.id ? claim : item)));
+    return claim;
   };
 
   const saveClaimDraft = (draft: Partial<FarmerClaim>): string => {
