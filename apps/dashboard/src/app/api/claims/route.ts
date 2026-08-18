@@ -75,6 +75,8 @@ export async function POST(request: Request) {
           lat?: number;
           lon?: number;
           accuracyM?: number;
+          lightingScore?: number | null;
+          qualityPassed?: boolean | null;
         }) => {
           const decoded = decodeDataUrl(String(img.imageDataUrl || ""));
           return {
@@ -85,6 +87,8 @@ export async function POST(request: Request) {
             lat: img.lat,
             lon: img.lon,
             accuracyM: img.accuracyM,
+            lightingScore: img.lightingScore,
+            qualityPassed: img.qualityPassed,
           };
         },
       );

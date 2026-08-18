@@ -24,21 +24,21 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-slate-200 pb-3">
         <div>
           <h2 className="fp-page-title">Executive overview</h2>
           <p className="fp-page-sub">Crop evidence assessment · operational snapshot</p>
         </div>
-        <p className="text-xs text-slate-400">Auto-refreshes every 15 seconds</p>
+        <p className="hidden text-xs text-slate-400 sm:block">Auto-refreshes every 15 seconds</p>
       </div>
 
       <section aria-label="Evidence Trust & Integrity">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
+        <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-700">
             <span className="inline-block h-2 w-2 rounded-full bg-[var(--ink)]" aria-hidden="true" />
             Evidence Trust & Integrity
           </h3>
-          <span className="text-[11px] text-slate-500 font-medium">Independent from AI model probability</span>
+          <span className="hidden text-[11px] font-medium text-slate-500 sm:inline">Independent from AI model probability</span>
         </div>
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
           <MetricCard

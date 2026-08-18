@@ -32,6 +32,21 @@ describe("voice shutter and submit outcomes", () => {
     expect(saved).toEqual([]);
   });
 
+  it("does not save a black frame", async () => {
+    const saved: string[] = [];
+    const result = await runVoiceShutter({
+      cameraActive: true,
+      grabFrame: async () => ({ dataUrl: "data:image/jpeg;base64,xx", lightingScore: 0 }),
+      saveFrame: async (dataUrl) => {
+        saved.push(dataUrl);
+      },
+      angleId: "closeup_damage",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/too dark/i);
+    expect(saved).toEqual([]);
+  });
+
   it("awaits save before reporting shutter success", async () => {
     const order: string[] = [];
     const result = await runVoiceShutter({

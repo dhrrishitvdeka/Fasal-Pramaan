@@ -51,7 +51,7 @@ export default function AnalyticsPage() {
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <div className="fp-panel h-80 p-3">
+        <div className="fp-panel h-64 p-2.5 sm:p-3 md:h-80">
           <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
             By damage category
           </h3>
@@ -65,7 +65,7 @@ export default function AnalyticsPage() {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className="fp-panel h-80 p-3">
+        <div className="fp-panel h-64 p-2.5 sm:p-3 md:h-80">
           <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
             Severity distribution
           </h3>
@@ -80,7 +80,7 @@ export default function AnalyticsPage() {
             </PieChart>
           </ResponsiveContainer>
         </div>
-        <div className="fp-panel h-80 p-3 lg:col-span-2">
+        <div className="fp-panel h-64 p-2.5 sm:p-3 md:h-80 lg:col-span-2">
           <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
             Submissions by crop
           </h3>

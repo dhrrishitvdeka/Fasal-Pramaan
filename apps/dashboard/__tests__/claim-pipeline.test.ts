@@ -9,6 +9,7 @@ import {
   persistAndInfer,
   persistFarmerSubmission,
   recaptureAndInfer,
+  sanitizeHfPrediction,
 } from "../src/lib/claim-pipeline";
 import { inferCropDisease, parseSpacePrediction } from "../src/lib/hf-infer";
 import { predictionIsAcceptable } from "../src/lib/review-accept";
@@ -422,5 +423,60 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(resolveClaimClientPath(true, "submit").path).not.toMatch(/backend/);
     expect(resolveClaimClientPath(false, "list").hosted).toBe(false);
     expect(resolveClaimClientPath(false, "action", "x").path).toBe("/review/x/action");
+  });
+
+  it("does not send black frames to the Space and stores grade U without a crop", async () => {
+    let inferCalls = 0;
+    const store = createMemoryClaimStore();
+    const result = await persistAndInfer(
+      store,
+      {
+        cropType: "Wheat",
+        images: [
+          {
+            angleType: "closeup_damage",
+            bytes: jpegLikeBytes(),
+            lightingScore: 0,
+            qualityPassed: false,
+          },
+          {
+            angleType: "wide_field",
+            bytes: jpegLikeBytes(),
+            lightingScore: 3,
+            qualityPassed: false,
+          },
+        ],
+      },
+      async () => {
+        inferCalls += 1;
+        throw new Error("Space should not be called");
+      },
+    );
+    expect(inferCalls).toBe(0);
+    expect(result.prediction?.predictedGrade).toBe("U");
+    expect(result.prediction?.predictedCrop).toBe("unknown");
+    expect(result.prediction?.score).toBe(0);
+    const detail = await getReviewerClaim(store, result.claimId);
+    expect(detail!.latest_prediction?.predicted_grade).toBe("U");
+    expect(detail!.latest_prediction?.predicted_crop).toBe("unknown");
+    expect(detail!.latest_prediction?.crop_confidence).toBe(0);
+    expect(detail!.latest_prediction?.overall_confidence).toBe(0);
+  });
+
+  it("strips wheat 100% from an unusable Space payload", () => {
+    const sanitized = sanitizeHfPrediction({
+      modelId: "dhrrishitvdeka/fasal-pramaan-model",
+      label: "wheat",
+      score: 1,
+      predictedCrop: "wheat",
+      cropConfidence: 1,
+      predictedGrade: "U",
+      primaryDamage: "unknown",
+      qualityWarnings: ["image_too_dark"],
+      raw: {},
+    });
+    expect(sanitized.predictedCrop).toBe("unknown");
+    expect(sanitized.cropConfidence).toBe(0);
+    expect(sanitized.score).toBe(0);
   });
 });

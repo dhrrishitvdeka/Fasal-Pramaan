@@ -321,6 +321,8 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         lat: img.lat,
         lon: img.lon,
         accuracyM: img.accuracyM,
+        lightingScore: img.lightingScore,
+        qualityPassed: img.qualityPassed,
       })),
     });
     const persisted = await getWebClaim(result.claimId);

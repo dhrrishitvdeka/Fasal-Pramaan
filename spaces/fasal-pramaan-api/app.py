@@ -182,6 +182,14 @@ def _decode_image(raw: Any) -> Image.Image | None:
     return None
 
 
+def _is_unusable_image(image: Image.Image) -> bool:
+    sample = image.convert("RGB").resize((64, 64), Image.Resampling.BILINEAR)
+    pixels = np.asarray(sample, dtype=np.float32)
+    mean = float(pixels.mean())
+    variance = float(pixels.var())
+    return mean < 12.0 or variance < 4.0
+
+
 def _preprocess(image: Image.Image, runtime: dict[str, Any]) -> np.ndarray:
     resized = image.resize((224, 224), Image.Resampling.BILINEAR)
     values = np.asarray(resized, dtype=np.float32) / 255.0
@@ -220,6 +228,10 @@ def analyze(
         if image is None:
             warnings.append("image_pixels_unavailable_or_invalid")
             per_image.append({"angle_type": angle, "skipped": True})
+            continue
+        if _is_unusable_image(image):
+            warnings.append("image_too_dark")
+            per_image.append({"angle_type": angle, "skipped": True, "reason": "image_too_dark"})
             continue
         if min(image.size) < 96:
             warnings.append("very_low_resolution")
@@ -260,11 +272,14 @@ def analyze(
         aggregate_heads[:, 2] = 1.0
         warnings.append("no_usable_image_pixels")
 
-    predicted_crop, crop_confidence, crop_health_mass = _head_summary(aggregate_heads, crops)
+    if weighted_heads:
+        predicted_crop, crop_confidence, crop_health_mass = _head_summary(aggregate_heads, crops)
+    else:
+        predicted_crop, crop_confidence, crop_health_mass = "unknown", 0.0, np.zeros(len(crops), dtype=np.float32)
     grade = "U"
     grade_label = "unusable_or_out_of_domain"
     recommendation = "recapture"
-    decision_confidence = 1.0
+    decision_confidence = 0.0 if not weighted_heads else 1.0
     healthy_score = 0.0
     disease_score = 0.0
     invalid_score = 1.0
