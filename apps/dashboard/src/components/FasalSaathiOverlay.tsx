@@ -2,7 +2,7 @@
 
 import { apiFetch } from "@/lib/auth-headers";
 import { webCaptureBridge } from "@/lib/voice/capture-bridge";
-import { parseGeminiLiveMessage } from "@/lib/voice/gemini-live-parse";
+import { decodeGeminiLiveFrame, parseGeminiLiveMessage } from "@/lib/voice/gemini-live-parse";
 import { connectSilentProcessor } from "@/lib/voice/mic-graph";
 import { WebVoiceBroker } from "@/lib/voice/web-voice-broker";
 import { useFarmerData } from "@/lib/farmerStore";
@@ -169,45 +169,49 @@ export default function FasalSaathiOverlay() {
         };
       });
       socket.onmessage = (event) => {
-        try {
-          const parsed = parseGeminiLiveMessage(JSON.parse(String(event.data)) as Record<string, unknown>);
-          for (const item of parsed.events) {
-            if (item.type === "setupComplete") setStatus("live");
-            if (item.type === "inputTranscript") {
-              inputBufRef.current += item.text;
-              setLines((prev) => {
-                const copy = [...prev];
-                const last = copy[copy.length - 1];
-                if (last?.role === "farmer") last.text = inputBufRef.current;
-                else copy.push({ role: "farmer", text: inputBufRef.current });
-                return copy;
-              });
+        void (async () => {
+          try {
+            const frame = await decodeGeminiLiveFrame(event.data);
+            if (!frame) return;
+            const parsed = parseGeminiLiveMessage(frame);
+            for (const item of parsed.events) {
+              if (item.type === "setupComplete") setStatus("live");
+              if (item.type === "inputTranscript") {
+                inputBufRef.current += item.text;
+                setLines((prev) => {
+                  const copy = [...prev];
+                  const last = copy[copy.length - 1];
+                  if (last?.role === "farmer") last.text = inputBufRef.current;
+                  else copy.push({ role: "farmer", text: inputBufRef.current });
+                  return copy;
+                });
+              }
+              if (item.type === "outputTranscript") {
+                outputBufRef.current += item.text;
+                setLines((prev) => {
+                  const copy = [...prev];
+                  const last = copy[copy.length - 1];
+                  if (last?.role === "saathi") last.text = outputBufRef.current;
+                  else copy.push({ role: "saathi", text: outputBufRef.current });
+                  return copy;
+                });
+              }
+              if (item.type === "audio") playPcm24k(item.bytesBase64);
+              if (item.type === "toolCalls") void handleTools(item.calls);
+              if (item.type === "turnComplete") {
+                if (inputBufRef.current.trim()) userTurnRef.current += 1;
+                inputBufRef.current = "";
+                outputBufRef.current = "";
+              }
+              if (item.type === "error") {
+                setError(item.message);
+                setStatus("error");
+              }
             }
-            if (item.type === "outputTranscript") {
-              outputBufRef.current += item.text;
-              setLines((prev) => {
-                const copy = [...prev];
-                const last = copy[copy.length - 1];
-                if (last?.role === "saathi") last.text = outputBufRef.current;
-                else copy.push({ role: "saathi", text: outputBufRef.current });
-                return copy;
-              });
-            }
-            if (item.type === "audio") playPcm24k(item.bytesBase64);
-            if (item.type === "toolCalls") void handleTools(item.calls);
-            if (item.type === "turnComplete") {
-              if (inputBufRef.current.trim()) userTurnRef.current += 1;
-              inputBufRef.current = "";
-              outputBufRef.current = "";
-            }
-            if (item.type === "error") {
-              setError(item.message);
-              setStatus("error");
-            }
+          } catch {
+            setError("Invalid voice message");
           }
-        } catch {
-          setError("Invalid voice message");
-        }
+        })();
       };
       const ctx = new AudioContext();
       audioCtxRef.current = ctx;

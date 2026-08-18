@@ -4,7 +4,7 @@ import {
   buildAuthTokenRequest,
   mintVoiceSession,
 } from "../src/lib/voice/gemini-session";
-import { parseGeminiLiveMessage } from "../src/lib/voice/gemini-live-parse";
+import { decodeGeminiLiveFrame, parseGeminiLiveMessage } from "../src/lib/voice/gemini-live-parse";
 
 describe("voice session mint", () => {
   it("fails closed when the site lock is on and the request is locked", async () => {
@@ -114,5 +114,17 @@ describe("gemini live parser", () => {
     expect(parsed.events.some((event) => event.type === "toolCalls")).toBe(true);
     expect(parsed.events.some((event) => event.type === "audio")).toBe(true);
     expect(parsed.events.some((event) => event.type === "inputTranscript")).toBe(true);
+  });
+
+  it("decodes browser Blob and ArrayBuffer Live frames instead of String(blob)", async () => {
+    const payload = JSON.stringify({ setupComplete: {} });
+    const fromString = await decodeGeminiLiveFrame(payload);
+    const fromBlob = await decodeGeminiLiveFrame(new Blob([payload], { type: "application/json" }));
+    const fromBytes = await decodeGeminiLiveFrame(new TextEncoder().encode(payload));
+    expect(fromString).toEqual({ setupComplete: {} });
+    expect(fromBlob).toEqual({ setupComplete: {} });
+    expect(fromBytes).toEqual({ setupComplete: {} });
+    expect(await decodeGeminiLiveFrame("   ")).toBeNull();
+    await expect(decodeGeminiLiveFrame("[object Blob]")).rejects.toThrow();
   });
 });
