@@ -35,27 +35,27 @@ export function AiConfidenceBreakdown({
   > = {
     A: {
       label: "A — Healthy Leaf Signal",
-      bg: "bg-emerald-50",
-      text: "text-emerald-800",
-      border: "border-emerald-200",
+      bg: "bg-[var(--accent-soft)]",
+      text: "text-[var(--ink)]",
+      border: "border-[var(--line)]",
     },
     B: {
       label: "B — Uncertain / Borderline",
-      bg: "bg-amber-50",
-      text: "text-amber-800",
-      border: "border-amber-200",
+      bg: "bg-[var(--surface)]",
+      text: "text-[var(--ink)]",
+      border: "border-[var(--ink)]",
     },
     C: {
       label: "C — Disease Pattern Signal",
-      bg: "bg-rose-50",
-      text: "text-rose-800",
-      border: "border-rose-200",
+      bg: "bg-[var(--ink)]",
+      text: "text-[var(--surface)]",
+      border: "border-[var(--ink)]",
     },
     U: {
       label: "U — Unusable or Unsupported",
-      bg: "bg-slate-100",
-      text: "text-slate-700",
-      border: "border-slate-300",
+      bg: "bg-[var(--canvas)]",
+      text: "text-[var(--ink-muted)]",
+      border: "border-[var(--line)]",
     },
   };
 
@@ -113,10 +113,10 @@ export function AiConfidenceBreakdown({
           <div
             className={`h-full transition-all duration-300 ${
               isHighConfidence
-                ? "bg-emerald-500"
+                ? "bg-[var(--ink)]"
                 : isModerateConfidence
-                ? "bg-amber-500"
-                : "bg-rose-500"
+                ? "bg-[var(--ink-muted)]"
+                : "bg-[var(--line)]"
             }`}
             style={{ width: `${Math.min(Math.max(confidencePct, 0), 100)}%` }}
           />
@@ -152,8 +152,8 @@ export function AiConfidenceBreakdown({
                 key={angle.key}
                 className={`flex items-center gap-1.5 rounded px-2 py-1 text-[11px] border ${
                   isUploaded
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border-amber-200 bg-amber-50 text-amber-800"
+                    ? "border-[var(--ink)] bg-[var(--accent-soft)] text-[var(--ink)]"
+                    : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)]"
                 }`}
               >
                 <span className="text-xs">{isUploaded ? "✓" : "⚠️"}</span>

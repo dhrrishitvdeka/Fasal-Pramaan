@@ -404,7 +404,7 @@ export default function ReviewDetailPage() {
             title={integrityFailed ? "Acceptance disabled due to failed integrity checks" : "Accept AI result (A)"}
           >
             <span>Accept AI result</span>
-            <kbd className="rounded bg-emerald-700 px-1 font-mono text-[10px] text-white">A</kbd>
+            <kbd className="rounded bg-[var(--ink)] px-1 font-mono text-[10px] text-[var(--surface)]">A</kbd>
           </button>
 
           <button
@@ -476,7 +476,7 @@ export default function ReviewDetailPage() {
                       key={angle.key}
                       className={`flex items-center gap-2 rounded border p-2 text-xs cursor-pointer transition-colors ${
                         isChecked
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-900 font-medium"
+                          ? "border-[var(--ink)] bg-[var(--accent-soft)] font-medium text-[var(--ink)]"
                           : "border-slate-200 hover:bg-slate-50 text-slate-700"
                       }`}
                     >
@@ -484,7 +484,7 @@ export default function ReviewDetailPage() {
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => toggleAngle(angle.key)}
-                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                        className="rounded border-[var(--line)]"
                       />
                       <span>{angle.label}</span>
                       {isSuggested && (

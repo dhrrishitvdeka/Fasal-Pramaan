@@ -14,7 +14,6 @@ import {
   MapPin,
   Calendar,
   Layers,
-  Sparkles,
   ExternalLink,
   ChevronRight,
   FileText,
@@ -59,7 +58,7 @@ export default function FarmerClaimDetailPage() {
         </p>
         <Link
           href="/farmer/claims"
-          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-900"
+          className="fp-btn-primary mt-4 gap-2 text-xs"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>{t.backToClaims}</span>
@@ -94,7 +93,7 @@ export default function FarmerClaimDetailPage() {
 
       {/* Success Toasts on Redirect */}
       {justSubmitted && (
-        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-950 shadow-sm flex items-center gap-3">
+        <div className="fp-panel flex items-center gap-3 p-4">
           <CheckCircle2 className="h-6 w-6 text-emerald-700 shrink-0" />
           <div>
             <div className="font-bold text-sm text-emerald-900">
@@ -110,7 +109,7 @@ export default function FarmerClaimDetailPage() {
       )}
 
       {justRecaptured && (
-        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-950 shadow-sm flex items-center gap-3">
+        <div className="fp-panel flex items-center gap-3 p-4">
           <CheckCircle2 className="h-6 w-6 text-emerald-700 shrink-0" />
           <div>
             <div className="font-bold text-sm text-emerald-900">
@@ -126,25 +125,16 @@ export default function FarmerClaimDetailPage() {
       )}
 
       {/* Main Status Header Card */}
-      <div
-        className={clsx(
-          "rounded-2xl border p-6 sm:p-7 shadow-sm text-slate-900",
-          isVerified
-            ? "border-emerald-300 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/30"
-            : isRecapture
-            ? "border-amber-300 bg-gradient-to-br from-amber-50 via-white to-amber-50/30"
-            : "border-blue-200 bg-gradient-to-br from-blue-50 via-white to-slate-50"
-        )}
-      >
+      <div className="fp-panel p-6 sm:p-7">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="flex items-center gap-2">
               <span
                 className={clsx(
-                  "rounded-full px-3 py-0.5 text-xs font-bold uppercase tracking-wider",
-                  isVerified && "bg-emerald-800 text-white",
-                  isRecapture && "bg-amber-500 text-white animate-pulse",
-                  isUnderReview && "bg-blue-700 text-white"
+                  "px-2 py-0.5 text-xs font-medium uppercase tracking-wide",
+                  isVerified && "fp-badge-ok",
+                  isRecapture && "fp-badge-alert",
+                  isUnderReview && "fp-badge-neutral",
                 )}
               >
                 {isVerified
@@ -160,7 +150,7 @@ export default function FarmerClaimDetailPage() {
 
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
               {lang === "hi" ? claim.plotNameHi : claim.plotName} ·{" "}
-              <span className="text-emerald-800 font-semibold">
+              <span className="font-semibold text-[var(--ink)]">
                 {lang === "hi" ? claim.cropTypeHi : claim.cropType} ({claim.cropVariety})
               </span>
             </h1>
@@ -183,7 +173,7 @@ export default function FarmerClaimDetailPage() {
           {/* Right Payout / CTA Box */}
           <div className="shrink-0 flex flex-col items-start md:items-end justify-center">
             {isVerified && claim.payoutAmountInr && (
-              <div className="rounded-xl bg-white border border-emerald-300 p-4 shadow-sm text-left md:text-right">
+              <div className="fp-panel p-4 text-left md:text-right">
                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   {t.recommendedPayout}
                 </div>
@@ -200,7 +190,7 @@ export default function FarmerClaimDetailPage() {
             {isRecapture && (
               <Link
                 href={`/farmer/capture?recapture=${claim.id}&angles=${missingAnglesStr}`}
-                className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg hover:bg-amber-700 transition-all transform active:scale-98"
+                className="fp-btn-primary gap-2 px-6 py-3.5"
               >
                 <Camera className="h-4 w-4" />
                 <span>{t.startTargetedRecaptureCTA}</span>
@@ -213,9 +203,9 @@ export default function FarmerClaimDetailPage() {
 
       {/* If Needs Recapture: Specific Warning & Missing Angle Instructions Card */}
       {isRecapture && (
-        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-5 sm:p-6 text-amber-950 shadow-sm space-y-4">
+        <div className="fp-panel space-y-4 border-[var(--ink)] p-5 sm:p-6">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-sm">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)]">
               <ShieldAlert className="h-6 w-6" />
             </div>
             <div>
@@ -253,7 +243,7 @@ export default function FarmerClaimDetailPage() {
           <div className="flex justify-end">
             <Link
               href={`/farmer/capture?recapture=${claim.id}&angles=${missingAnglesStr}`}
-              className="inline-flex items-center gap-2 rounded-lg bg-amber-700 px-5 py-2.5 text-xs sm:text-sm font-bold text-white hover:bg-amber-800 transition-colors shadow"
+              className="fp-btn-primary gap-2 px-5 py-2.5 text-xs sm:text-sm"
             >
               <Camera className="h-4 w-4" />
               <span>{t.startTargetedRecaptureCTA}</span>
@@ -274,7 +264,7 @@ export default function FarmerClaimDetailPage() {
                 {t.evidenceTrustScore}
               </h2>
             </div>
-            <span className="font-mono text-sm font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+            <span className="fp-badge-neutral font-mono text-sm">
               {claim.evidenceTrust.overallConfidence}%
             </span>
           </div>
@@ -292,7 +282,7 @@ export default function FarmerClaimDetailPage() {
                 <div
                   className={clsx(
                     "h-full rounded-full",
-                    claim.evidenceTrust.qualityScore >= 80 ? "bg-emerald-600" : "bg-amber-500"
+                    claim.evidenceTrust.qualityScore >= 80 ? "bg-[var(--ink)]" : "bg-[var(--ink-muted)]"
                   )}
                   style={{ width: `${claim.evidenceTrust.qualityScore}%` }}
                 />
@@ -316,7 +306,7 @@ export default function FarmerClaimDetailPage() {
                 <div
                   className={clsx(
                     "h-full rounded-full",
-                    claim.evidenceTrust.coverageScore >= 80 ? "bg-emerald-600" : "bg-amber-500"
+                    claim.evidenceTrust.coverageScore >= 80 ? "bg-[var(--ink)]" : "bg-[var(--ink-muted)]"
                   )}
                   style={{ width: `${claim.evidenceTrust.coverageScore}%` }}
                 />
@@ -338,7 +328,7 @@ export default function FarmerClaimDetailPage() {
               </div>
               <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-emerald-600"
+                  className="h-full bg-[var(--ink)]"
                   style={{ width: `${claim.evidenceTrust.contextScore}%` }}
                 />
               </div>
@@ -359,7 +349,7 @@ export default function FarmerClaimDetailPage() {
               </div>
               <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-emerald-600"
+                  className="h-full bg-[var(--ink)]"
                   style={{ width: `${claim.evidenceTrust.integrityScore}%` }}
                 />
               </div>
@@ -376,14 +366,11 @@ export default function FarmerClaimDetailPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-emerald-800" />
               <h2 className="text-sm sm:text-base font-bold text-slate-900">
                 {t.aiPredictionTitle}
               </h2>
             </div>
-            <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-              AI v2.4 Multi-View
-            </span>
+            <span className="fp-badge-neutral text-[10px]">Assistive screen</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-xs">
@@ -429,7 +416,7 @@ export default function FarmerClaimDetailPage() {
           </div>
 
           {/* Farmer Observation Text */}
-          <div className="rounded-lg bg-emerald-50/50 border border-emerald-100 p-3 text-xs">
+          <div className="fp-panel p-3 text-xs">
             <div className="text-[11px] font-bold text-emerald-950 uppercase tracking-wider mb-1">
               {lang === "hi" ? "किसान का मूल विवरण:" : "Farmer Observation Notes:"}
             </div>
