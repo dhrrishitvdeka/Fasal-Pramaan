@@ -40,11 +40,12 @@ import {
   sha256Hex,
 } from "@/lib/evidence";
 import {
+  applyVideoPlaybackFlags,
+  attachStreamToVideo,
   cameraConstraintLadder,
   safeDisplayUrl,
   stopMediaStream,
   videoHasFrame,
-  waitForVideoFrame,
 } from "@/lib/media";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { runVoiceShutter, runVoiceSubmitDraft } from "@/lib/voice/capture-actions";
@@ -162,10 +163,15 @@ function CaptureStudioContent() {
     const gen = ++cameraGenRef.current;
     stopMediaStream(streamRef.current);
     streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
+    if (videoRef.current) {
+      applyVideoPlaybackFlags(videoRef.current);
+      videoRef.current.srcObject = null;
+    }
     setCameraError(null);
+    setIsCameraActive(false);
     let lastError: unknown;
     for (const constraints of cameraConstraintLadder(cameraFacing)) {
+      if (gen !== cameraGenRef.current) return;
       try {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (gen !== cameraGenRef.current) {
@@ -175,28 +181,29 @@ function CaptureStudioContent() {
         streamRef.current = stream;
         const video = videoRef.current;
         if (video) {
-          video.srcObject = stream;
-          video.muted = true;
-          video.playsInline = true;
-          await video.play().catch(() => undefined);
-          try {
-            await waitForVideoFrame(video);
-          } catch (err) {
-            lastError = err;
+          applyVideoPlaybackFlags(video);
+          const gotFrame = await attachStreamToVideo(video, stream);
+          if (gen !== cameraGenRef.current) {
             stopMediaStream(stream);
-            if (streamRef.current === stream) streamRef.current = null;
-            if (video.srcObject === stream) video.srcObject = null;
-            continue;
+            return;
           }
-        }
-        if (gen !== cameraGenRef.current) {
-          stopMediaStream(stream);
+          setIsCameraActive(true);
+          if (!gotFrame) {
+            setCameraError(
+              lang === "hi"
+                ? "कैमरा खुला है, फ़्रेम आने में देर हो रही है।"
+                : "Camera is open. Waiting for the first frame…",
+            );
+          } else {
+            setCameraError(null);
+          }
           return;
         }
         setIsCameraActive(true);
         return;
       } catch (err) {
         lastError = err;
+        await new Promise((resolve) => setTimeout(resolve, 150));
       }
     }
     console.warn("Camera access failed or unavailable:", lastError);
@@ -205,8 +212,13 @@ function CaptureStudioContent() {
   };
 
   useEffect(() => {
-    void startCamera();
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled) void startCamera();
+    }, 60);
     return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
       stopCamera();
     };
   }, [cameraFacing]);
@@ -214,14 +226,13 @@ function CaptureStudioContent() {
   useEffect(() => {
     const video = videoRef.current;
     const stream = streamRef.current;
-    if (!video || !stream) return;
+    if (!isCameraActive || !video || !stream) return;
+    applyVideoPlaybackFlags(video);
     if (video.srcObject !== stream) {
       video.srcObject = stream;
-      video.muted = true;
-      video.playsInline = true;
-      void video.play().catch(() => undefined);
     }
-  });
+    void video.play().catch(() => undefined);
+  }, [isCameraActive]);
 
   useEffect(() => {
     if (!("geolocation" in navigator)) {
@@ -647,10 +658,7 @@ function CaptureStudioContent() {
               autoPlay
               playsInline
               muted
-              className={clsx(
-                "absolute inset-0 h-full w-full object-cover",
-                isCameraActive && !capturedImages[currentAngle.id] ? "z-[1]" : "invisible",
-              )}
+              className="absolute inset-0 z-0 h-full w-full bg-black object-cover"
             />
             {capturedImages[currentAngle.id] &&
             safeDisplayUrl(capturedImages[currentAngle.id].imageUrl) ? (
@@ -663,15 +671,19 @@ function CaptureStudioContent() {
             {!isCameraActive && !capturedImages[currentAngle.id] ? (
               <div className="relative z-[3] p-6 text-center text-slate-400">
                 <Camera className="mx-auto mb-2 h-12 w-12 opacity-40" />
-                <p className="text-sm font-medium">{cameraError || t.cameraUnavailable}</p>
-                <button
-                  type="button"
-                  onClick={startCamera}
-                  className="fp-btn-primary mt-3 gap-2 text-xs"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  <span>{lang === "hi" ? "कैमरा पुनः शुरू करें" : "Retry Camera"}</span>
-                </button>
+                <p className="text-sm font-medium">
+                  {cameraError || (lang === "hi" ? "कैमरा शुरू हो रहा है…" : "Starting camera…")}
+                </p>
+                {cameraError ? (
+                  <button
+                    type="button"
+                    onClick={() => void startCamera()}
+                    className="fp-btn-primary mt-3 gap-2 text-xs"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    <span>{lang === "hi" ? "कैमरा पुनः शुरू करें" : "Retry Camera"}</span>
+                  </button>
+                ) : null}
               </div>
             ) : null}
 
