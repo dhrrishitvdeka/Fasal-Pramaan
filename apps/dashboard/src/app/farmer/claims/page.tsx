@@ -99,7 +99,7 @@ export default function FarmerClaimsPage() {
 
         <Link
           href="/farmer/capture"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-emerald-900 transition-all shrink-0"
+          className="fp-btn-primary gap-2 shrink-0"
         >
           <Camera className="h-4 w-4" />
           <span>{t.quickActionNewClaim}</span>
@@ -129,9 +129,9 @@ export default function FarmerClaimsPage() {
                   className={clsx(
                     "rounded-full px-1.5 py-0.2 text-[10px] font-mono",
                     isActive
-                      ? "bg-emerald-100 text-emerald-900 font-bold"
+                      ? "fp-badge-ok font-bold"
                       : tab.alert && tab.count > 0
-                      ? "bg-amber-500 text-white font-bold animate-pulse"
+                      ? "fp-badge-alert"
                       : "bg-slate-300 text-slate-700"
                   )}
                 >
@@ -150,7 +150,7 @@ export default function FarmerClaimsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t.searchClaims}
-            className="w-full rounded-xl border border-slate-300 bg-white pl-9 pr-4 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 shadow-2xs"
+            className="fp-input mt-0 w-full pl-9 text-xs"
           />
         </div>
       </div>
@@ -167,7 +167,7 @@ export default function FarmerClaimsPage() {
           </p>
           <Link
             href="/farmer/capture"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-900"
+            className="fp-btn-primary mt-4 gap-2 text-xs"
           >
             <Camera className="h-4 w-4" />
             <span>{t.quickActionNewClaim}</span>
@@ -203,8 +203,8 @@ export default function FarmerClaimsPage() {
                       <span
                         className={clsx(
                           "rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide",
-                          isVerified && "bg-emerald-100 text-emerald-800 border border-emerald-300",
-                          isRecapture && "bg-amber-100 text-amber-900 border border-amber-300 animate-pulse",
+                          isVerified && "fp-badge-ok",
+                          isRecapture && "fp-badge-alert",
                           isUnderReview && "bg-blue-100 text-blue-800 border border-blue-300",
                           claim.status === "draft" && "bg-slate-100 text-slate-700 border border-slate-300"
                         )}
@@ -244,7 +244,7 @@ export default function FarmerClaimsPage() {
                             : claim.aiPrediction.diseaseDetected}
                         </strong>
                       </span>
-                      <span className="rounded bg-emerald-50 px-2 py-0.5 font-medium text-emerald-900">
+                      <span className="fp-badge-neutral">
                         {lang === "hi" ? "गंभीरता:" : "Severity:"}{" "}
                         <strong>{claim.aiPrediction.severityPercentage}%</strong>
                       </span>
@@ -269,7 +269,7 @@ export default function FarmerClaimsPage() {
 
                     {/* Verified Payout Banner */}
                     {isVerified && claim.payoutAmountInr && (
-                      <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50/80 p-2.5 text-xs text-emerald-950 flex items-center justify-between">
+                      <div className="fp-panel mt-2 flex items-center justify-between p-2.5 text-xs">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-emerald-700" />
                           <span className="font-semibold">
@@ -312,7 +312,7 @@ export default function FarmerClaimsPage() {
                       {isRecapture ? (
                         <Link
                           href={`/farmer/capture?recapture=${claim.id}&angles=${claim.missingAngles?.join(",") || "closeup_damage,mid_canopy"}`}
-                          className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-amber-700 transition-colors"
+                          className="fp-btn-primary flex-1 gap-1.5 px-4 py-2 text-xs sm:flex-initial"
                         >
                           <Camera className="h-3.5 w-3.5" />
                           <span>{t.startRecaptureNow}</span>

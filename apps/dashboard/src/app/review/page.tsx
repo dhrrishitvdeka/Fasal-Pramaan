@@ -230,7 +230,7 @@ export default function ReviewQueuePage() {
                         className={`rounded px-1.5 py-0.5 text-[9px] font-bold border ${
                           isLowConf
                             ? "bg-amber-50 text-amber-700 border-amber-200"
-                            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "fp-badge-ok"
                         }`}
                       >
                         {isLowConf ? "SUB-85" : "OK"}
@@ -265,7 +265,7 @@ export default function ReviewQueuePage() {
                       className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold border ${
                         isIntegrityIssue
                           ? "bg-rose-50 text-rose-800 border-rose-200"
-                          : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          : "fp-badge-ok"
                       }`}
                     >
                       <span>{isIntegrityIssue ? "⚠️ Flagged" : "✓ Passed"}</span>

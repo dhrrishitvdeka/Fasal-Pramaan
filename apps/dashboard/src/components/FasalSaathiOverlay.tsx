@@ -257,14 +257,14 @@ export default function FasalSaathiOverlay() {
           setOpen(true);
           if (status === "idle" || status === "error") void connect();
         }}
-        className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-emerald-900 md:bottom-8"
+        className="fp-btn-primary fixed bottom-20 right-4 z-40 gap-2 px-4 py-2.5 md:bottom-8"
       >
         <span aria-hidden>🎙️</span>
         {lang === "hi" ? "फसल साथी से बात करें" : "Talk to Fasal Saathi"}
       </button>
       {open && (
-        <div className="fixed inset-x-4 bottom-24 z-40 max-h-[60vh] overflow-hidden rounded-xl border border-emerald-900/20 bg-white shadow-2xl md:inset-auto md:bottom-24 md:right-4 md:w-96">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-emerald-950 px-4 py-2 text-emerald-50">
+        <div className="fp-panel fixed inset-x-4 bottom-24 z-40 max-h-[60vh] overflow-hidden md:inset-auto md:bottom-24 md:right-4 md:w-96">
+          <div className="flex items-center justify-between border-b border-[var(--line)] bg-[var(--ink)] px-4 py-2 text-[var(--surface)]">
             <div>
               <div className="text-sm font-semibold">Fasal Saathi</div>
               <div className="text-[11px] text-emerald-200">

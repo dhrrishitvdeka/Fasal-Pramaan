@@ -35,7 +35,7 @@ export default function OverviewPage() {
       <section aria-label="Evidence Trust & Integrity">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700 flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-600" aria-hidden="true" />
+            <span className="inline-block h-2 w-2 rounded-full bg-[var(--ink)]" aria-hidden="true" />
             Evidence Trust & Integrity
           </h3>
           <span className="text-[11px] text-slate-500 font-medium">Independent from AI model probability</span>

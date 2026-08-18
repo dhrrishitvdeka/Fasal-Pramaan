@@ -22,7 +22,6 @@ import {
   Save,
   Send,
   Trash2,
-  Sparkles,
   Info,
   Layers,
   HelpCircle,
@@ -450,8 +449,8 @@ function CaptureStudioContent() {
     <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6 space-y-5">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-16 right-4 z-50 rounded-xl border border-emerald-500 bg-emerald-900 px-4 py-3 text-sm font-semibold text-white shadow-2xl animate-fade-in flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+        <div className="fp-panel fixed top-16 right-4 z-50 flex items-center gap-2 px-4 py-3 text-sm">
+          <CheckCircle2 className="h-5 w-5" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -473,11 +472,11 @@ function CaptureStudioContent() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <Camera className="h-6 w-6 text-emerald-800" />
+              <Camera className="h-6 w-6" />
               <span>{t.studioTitle}</span>
             </h1>
             {isTargetedRecapture && (
-              <span className="rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-xs font-bold text-amber-900 animate-pulse">
+              <span className="fp-badge-alert">
                 {lang === "hi" ? "लक्षित पुनः फोटो मोड" : "Targeted Recapture Mode"}
               </span>
             )}
@@ -541,17 +540,15 @@ function CaptureStudioContent() {
                 className={clsx(
                   "flex flex-col items-center justify-center rounded-lg p-2 text-center transition-all border",
                   isCurrent
-                    ? "border-emerald-700 bg-emerald-800 text-white shadow-sm ring-2 ring-emerald-300"
+                    ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)]"
                     : isCaptured
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-900"
-                    : "border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100"
+                    ? "border-[var(--ink)] bg-[var(--accent-soft)] text-[var(--ink)]"
+                    : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)]"
                 )}
               >
                 <div className="flex items-center justify-center gap-1">
                   {isCaptured ? (
-                    <CheckCircle2
-                      className={clsx("h-4 w-4", isCurrent ? "text-emerald-300" : "text-emerald-700")}
-                    />
+                    <CheckCircle2 className="h-4 w-4" />
                   ) : (
                     <span className="text-xs font-mono font-bold">{idx + 1}</span>
                   )}
@@ -569,7 +566,7 @@ function CaptureStudioContent() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left Column (7 cols): Camera Viewfinder & Controls */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="relative overflow-hidden rounded-2xl border-2 border-slate-800 bg-black aspect-4/3 sm:aspect-16/10 shadow-lg flex items-center justify-center">
+          <div className="relative flex aspect-4/3 items-center justify-center overflow-hidden border border-[var(--ink)] bg-black sm:aspect-16/10">
             {/* Live Video Feed */}
             {isCameraActive ? (
               <video
@@ -592,7 +589,7 @@ function CaptureStudioContent() {
                 <button
                   type="button"
                   onClick={startCamera}
-                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-800"
+                  className="fp-btn-primary mt-3 gap-2 text-xs"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   <span>{lang === "hi" ? "कैमरा पुनः शुरू करें" : "Retry Camera"}</span>
@@ -607,8 +604,8 @@ function CaptureStudioContent() {
               <div className="border-b border-white/20" />
               <div className="border-r border-b border-white/20" />
               <div className="border-r border-b border-white/20 flex items-center justify-center">
-                <div className="h-10 w-10 rounded-full border border-emerald-400/60 flex items-center justify-center">
-                  <span className="h-1 w-1 rounded-full bg-emerald-400" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/50">
+                  <span className="h-1 w-1 rounded-full bg-white" />
                 </div>
               </div>
               <div className="border-b border-white/20" />
@@ -625,8 +622,8 @@ function CaptureStudioContent() {
               </span>
 
               {/* GPS accuracy badge */}
-              <span className="rounded-md bg-emerald-950/85 backdrop-blur-md px-2.5 py-1 text-[11px] font-mono text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
-                <Compass className="h-3.5 w-3.5 text-emerald-400 animate-spin-slow" />
+              <span className="flex items-center gap-1.5 rounded-md border border-white/20 bg-black/75 px-2.5 py-1 font-mono text-[11px] text-white">
+                <Compass className="h-3.5 w-3.5" />
                 <span>
                   {gpsCoords.status === "unavailable" || gpsCoords.lat == null
                     ? "GPS unavailable"
@@ -637,9 +634,9 @@ function CaptureStudioContent() {
 
             {/* If current angle is already captured, show overlay banner */}
             {capturedImages[currentAngle.id] && (
-              <div className="absolute bottom-3 left-3 right-3 rounded-lg bg-emerald-950/90 backdrop-blur-md p-2.5 text-xs text-white border border-emerald-500 flex items-center justify-between">
+              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between border border-white/20 bg-black/80 p-2.5 text-xs text-white">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                  <CheckCircle2 className="h-4 w-4" />
                   <span className="font-semibold">{t.angleCaptured}</span>
                 </div>
                 <div className="flex items-center gap-2 pointer-events-auto">
@@ -674,7 +671,7 @@ function CaptureStudioContent() {
             <button
               type="button"
               onClick={capturePhotoFromCamera}
-              className="flex-1 max-w-xs flex items-center justify-center gap-2 rounded-xl bg-emerald-800 px-6 py-3.5 text-sm sm:text-base font-bold text-white shadow-md hover:bg-emerald-900 active:scale-98 transition-all"
+              className="fp-btn-primary flex-1 max-w-xs gap-2 px-6 py-3.5"
             >
               <Camera className="h-5 w-5" />
               <span>{t.takePhoto}</span>
@@ -710,7 +707,7 @@ function CaptureStudioContent() {
                 {getAngleIcon(currentAngle.illustrationIcon)}
                 <span>{lang === "hi" ? currentAngle.nameHi : currentAngle.name}</span>
               </div>
-              <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 font-mono">
+              <span className="fp-badge-neutral font-mono text-[10px]">
                 {currentAngle.id}
               </span>
             </div>
@@ -722,13 +719,12 @@ function CaptureStudioContent() {
             {/* Best practice bullet points */}
             <div className="mt-3 rounded-lg bg-slate-50 p-3 border border-slate-100">
               <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                <Sparkles className="h-3 w-3 text-emerald-700" />
                 <span>{lang === "hi" ? "सर्वोत्तम फोटो सुझाव" : "Framing Tips"}</span>
               </div>
               <ul className="space-y-1 text-xs text-slate-600">
                 {(lang === "hi" ? currentAngle.tipsHi : currentAngle.tips).map((tip, i) => (
                   <li key={i} className="flex items-start gap-1.5">
-                    <span className="text-emerald-700 font-bold">•</span>
+                    <span className="text-[var(--ink)]">•</span>
                     <span>{tip}</span>
                   </li>
                 ))}
@@ -775,7 +771,7 @@ function CaptureStudioContent() {
                   "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all",
                   isListening
                     ? "bg-red-600 text-white animate-pulse shadow-md"
-                    : "bg-emerald-100 text-emerald-900 hover:bg-emerald-200"
+                    : "bg-[var(--accent-soft)] text-[var(--ink)]"
                 )}
               >
                 {isListening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
@@ -788,7 +784,7 @@ function CaptureStudioContent() {
               value={observations}
               onChange={(e) => setObservations(e.target.value)}
               placeholder={t.farmerObservationsPlaceholder}
-              className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-none"
+              className="fp-input w-full text-xs"
             />
           </div>
 
@@ -828,7 +824,7 @@ function CaptureStudioContent() {
                 type="button"
                 disabled={!isAllCaptured || isSubmitting}
                 onClick={handleSubmitClaim}
-                className="flex-2 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="fp-btn-primary flex-2 gap-2 px-4 py-2.5 text-xs sm:text-sm"
               >
                 {isSubmitting ? (
                   <>

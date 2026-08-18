@@ -15,7 +15,6 @@ import {
   ChevronRight,
   Info,
   Layers,
-  Sparkles,
   ArrowRight,
   RefreshCw,
 } from "lucide-react";
@@ -53,8 +52,8 @@ export default function FarmerRemindersPage() {
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 space-y-6">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-16 right-4 z-50 rounded-xl border border-emerald-500 bg-emerald-900 px-4 py-3 text-xs sm:text-sm font-semibold text-white shadow-2xl flex items-center gap-2">
-          <CheckCircle2 className="h-5 w-5 text-emerald-300" />
+        <div className="fp-panel fixed top-16 right-4 z-50 flex items-center gap-2 px-4 py-3 text-xs sm:text-sm">
+          <CheckCircle2 className="h-5 w-5" />
           <span>{toast}</span>
         </div>
       )}
@@ -63,7 +62,7 @@ export default function FarmerRemindersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-emerald-800" />
+            <Calendar className="h-6 w-6" />
             <span>{t.remindersTitle}</span>
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-slate-600 max-w-3xl">
@@ -73,7 +72,7 @@ export default function FarmerRemindersPage() {
 
         <Link
           href="/farmer/capture"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-800 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-emerald-900 transition-all shrink-0"
+          className="fp-btn-primary gap-2 shrink-0"
         >
           <Camera className="h-4 w-4" />
           <span>{t.captureMilestoneNow}</span>
@@ -81,7 +80,7 @@ export default function FarmerRemindersPage() {
       </div>
 
       {/* Crop Selector Tabs & Progress Card */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+      <div className="fp-panel p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
           {/* Crop Selector Tabs */}
           <div className="flex items-center gap-2">
@@ -91,8 +90,8 @@ export default function FarmerRemindersPage() {
               className={clsx(
                 "rounded-lg px-4 py-2 text-xs font-bold transition-all border",
                 selectedCrop === "Wheat"
-                  ? "border-emerald-700 bg-emerald-800 text-white shadow-sm"
-                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                  ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)]"
+                  : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]"
               )}
             >
               {t.cycleWheat}
@@ -103,8 +102,8 @@ export default function FarmerRemindersPage() {
               className={clsx(
                 "rounded-lg px-4 py-2 text-xs font-bold transition-all border",
                 selectedCrop === "Mustard"
-                  ? "border-emerald-700 bg-emerald-800 text-white shadow-sm"
-                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                  ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)]"
+                  : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]"
               )}
             >
               {t.cycleMustard}
@@ -116,7 +115,7 @@ export default function FarmerRemindersPage() {
             <span className="text-xs text-slate-600 font-medium">
               {lang === "hi" ? "साक्ष्य संग्रह प्रगति:" : "Evidence Progress:"}
             </span>
-            <span className="rounded-full bg-emerald-100 border border-emerald-300 px-3 py-1 text-xs font-bold text-emerald-900 font-mono">
+            <span className="fp-badge-neutral font-mono">
               {completedCount} / {totalCount} {lang === "hi" ? "अवस्थाएं पूर्ण" : "Stages Logged"}
             </span>
           </div>
@@ -131,7 +130,7 @@ export default function FarmerRemindersPage() {
           </div>
           <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden border border-slate-200">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-emerald-800 transition-all duration-500"
+              className="h-full bg-[var(--ink)]"
               style={{ width: `${totalCount ? (completedCount / totalCount) * 100 : 0}%` }}
             />
           </div>
@@ -154,12 +153,9 @@ export default function FarmerRemindersPage() {
               <div
                 key={m.id}
                 className={clsx(
-                  "relative rounded-xl border p-5 transition-all",
-                  m.completed
-                    ? "border-emerald-200 bg-white"
-                    : isNextDue
-                    ? "border-2 border-emerald-600 bg-emerald-50/40 shadow-md ring-2 ring-emerald-100"
-                    : "border-slate-200 bg-slate-50/60 opacity-80"
+                  "fp-panel relative p-5",
+                  isNextDue && !m.completed ? "border-[var(--ink)]" : "",
+                  !m.completed && !isNextDue ? "opacity-70" : ""
                 )}
               >
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -167,12 +163,10 @@ export default function FarmerRemindersPage() {
                     {/* Stage icon / day pill */}
                     <div
                       className={clsx(
-                        "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-mono text-sm font-bold shadow-xs",
-                        m.completed
-                          ? "bg-emerald-800 text-white"
-                          : isNextDue
-                          ? "bg-emerald-600 text-white animate-bounce-gentle"
-                          : "bg-slate-200 text-slate-600"
+                        "flex h-11 w-11 shrink-0 items-center justify-center font-mono text-sm",
+                        m.completed || isNextDue
+                          ? "bg-[var(--ink)] text-[var(--surface)]"
+                          : "border border-[var(--line)] text-[var(--ink-muted)]"
                       )}
                     >
                       {m.completed ? <CheckCircle2 className="h-6 w-6" /> : `D${m.dayNumber}`}
@@ -184,14 +178,10 @@ export default function FarmerRemindersPage() {
                           {lang === "hi" ? m.stageNameHi : m.stageName}
                         </h3>
                         {m.completed && (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                            {t.completedBadge}
-                          </span>
+                          <span className="fp-badge-ok">{t.completedBadge}</span>
                         )}
                         {isNextDue && (
-                          <span className="rounded-full bg-emerald-800 text-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider animate-pulse">
-                            {t.nextDueBadge}
-                          </span>
+                          <span className="fp-badge-alert">{t.nextDueBadge}</span>
                         )}
                       </div>
 
@@ -212,7 +202,7 @@ export default function FarmerRemindersPage() {
                   {/* Right side: Action Button or Photo Preview */}
                   <div className="shrink-0 flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200">
                     {m.completed && m.evidenceImageUrl ? (
-                      <div className="relative h-14 w-14 rounded-lg overflow-hidden border border-emerald-300 bg-slate-100 group">
+                      <div className="relative h-14 w-14 overflow-hidden border border-[var(--line)] bg-[var(--canvas)]">
                         <img
                           src={m.evidenceImageUrl}
                           alt={m.stageName}
@@ -230,7 +220,7 @@ export default function FarmerRemindersPage() {
                         </button>
                         <Link
                           href={`/farmer/capture?milestone=${m.id}&crop=${selectedCrop}`}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-800 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-900 transition-colors"
+                          className="fp-btn-primary gap-1.5 px-4 py-2 text-xs"
                         >
                           <Camera className="h-3.5 w-3.5" />
                           <span>{t.captureMilestoneNow}</span>
@@ -251,7 +241,7 @@ export default function FarmerRemindersPage() {
         {/* Right Column (4 cols): Cadence & Alert Settings Card */}
         <div className="lg:col-span-4 space-y-5">
           {/* Notification Preferences */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+          <div className="fp-panel space-y-4 p-5">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
               <Bell className="h-5 w-5 text-emerald-800" />
               <h2 className="text-sm sm:text-base font-bold text-slate-900">
@@ -269,7 +259,7 @@ export default function FarmerRemindersPage() {
                   type="checkbox"
                   checked={smsEnabled}
                   onChange={(e) => setSmsEnabled(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+                  className="h-4 w-4 rounded border-[var(--line)]"
                 />
               </div>
 
@@ -282,7 +272,7 @@ export default function FarmerRemindersPage() {
                   type="checkbox"
                   checked={whatsappEnabled}
                   onChange={(e) => setWhatsappEnabled(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+                  className="h-4 w-4 rounded border-[var(--line)]"
                 />
               </div>
 
@@ -293,7 +283,7 @@ export default function FarmerRemindersPage() {
           </div>
 
           {/* PMFBY Digital Baseline Explainer */}
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 space-y-3 text-emerald-950">
+          <div className="fp-panel space-y-3 p-5">
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
               <ShieldCheck className="h-4 w-4" />
               <span>{lang === "hi" ? "30-दिवसीय लाभ" : "Digital Baseline Benefits"}</span>

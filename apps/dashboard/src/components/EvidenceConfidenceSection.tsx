@@ -211,7 +211,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
     if (score < 80) {
       return { text: "ATTENTION NEEDED", bg: "bg-amber-100 text-amber-800 border-amber-300" };
     }
-    return { text: "PASSED / VERIFIED", bg: "bg-emerald-100 text-emerald-800 border-emerald-300" };
+    return { text: "PASSED / VERIFIED", bg: "fp-badge-ok" };
   };
 
   const qStatus = getStatusBadge(quality.score, (qDetails.issues && qDetails.issues.length > 0 && quality.score < 50));
@@ -225,7 +225,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-600" aria-hidden="true" />
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--ink)]" aria-hidden="true" />
             <h3 id="evidence-confidence-heading" className="text-sm font-bold uppercase tracking-wider text-slate-800">
               Evidence Confidence & Trust Layer
             </h3>
@@ -242,7 +242,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
       </div>
 
       {/* Prominent Evidence Confidence Display */}
-      <div className="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
+      <div className="fp-panel p-4">
         <div className="grid gap-4 sm:grid-cols-12 items-center">
           {/* Large Final Score */}
           <div className="sm:col-span-4 flex flex-col items-center justify-center rounded-lg border border-slate-200 bg-white p-4 text-center">
@@ -259,7 +259,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
               <span
                 className={`rounded px-1.5 py-0.5 font-bold text-[10px] border ${
                   isAboveThreshold
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    ? "fp-badge-ok"
                     : "bg-amber-50 text-amber-700 border-amber-200"
                 }`}
               >
@@ -455,7 +455,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
                 <span className="font-semibold">Missing Views:</span> {cDetails.missing_views.join(", ")}
               </div>
             ) : (
-              <div className="rounded bg-emerald-50 p-2 text-[11px] text-emerald-800 border border-emerald-200">
+              <div className="fp-panel p-2 text-[11px]">
                 All 5 recommended angle sweeps available.
               </div>
             )}

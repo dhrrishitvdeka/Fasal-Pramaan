@@ -4,9 +4,8 @@ import Providers from "./providers";
 import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
-  title: "FasalPramaan Command Centre",
-  description:
-    "FasalPramaan AI – Smart Crop Evidence and Assessment Platform. Capture. Verify. Protect.",
+  title: "Fasal-Pramaan",
+  description: "Crop evidence capture and reviewer triage.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
