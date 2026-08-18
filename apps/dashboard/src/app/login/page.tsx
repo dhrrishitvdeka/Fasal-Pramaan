@@ -5,9 +5,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { api, logoutSession, setSessionTokens } from "@/lib/api";
 import { apiFetch } from "@/lib/auth-headers";
 import { LoginForm, loginSchema } from "@/lib/schemas";
+import { canAccessReviewerPortal } from "@/lib/review-access";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 function safeNext(value: string | null): string | null {
   if (!value) return null;
@@ -19,6 +20,26 @@ function LoginFormView() {
   const router = useRouter();
   const search = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const nextPath = safeNext(search.get("next"));
+  const commandCentreLogin = Boolean(nextPath && !nextPath.startsWith("/farmer"));
+
+  useEffect(() => {
+    let cancelled = false;
+    async function bounceExistingReviewer() {
+      if (!isSupabaseConfigured()) return;
+      const meRes = await apiFetch("/api/me");
+      if (!meRes.ok || cancelled) return;
+      const me = (await meRes.json().catch(() => ({}))) as { roles?: string[] };
+      if (cancelled) return;
+      if (canAccessReviewerPortal(me.roles)) {
+        router.replace(nextPath && !nextPath.startsWith("/farmer") ? nextPath : "/overview");
+      }
+    }
+    void bounceExistingReviewer();
+    return () => {
+      cancelled = true;
+    };
+  }, [nextPath, router]);
   const {
     register,
     handleSubmit,
@@ -80,7 +101,9 @@ function LoginFormView() {
         <div className="mx-auto flex max-w-lg items-baseline justify-between">
           <div>
             <div className="text-sm font-semibold text-slate-900">FasalPramaan</div>
-            <div className="text-xs text-slate-500">Command Centre · Official access</div>
+            <div className="text-xs text-slate-500">
+              {commandCentreLogin ? "Reviewer Command Centre · sign in required" : "Official access"}
+            </div>
           </div>
           <div className="text-xs text-slate-400">फसल प्रमाण</div>
         </div>
@@ -90,8 +113,9 @@ function LoginFormView() {
         <div className="w-full max-w-sm border border-slate-300 bg-white p-6">
           <h1 className="text-base font-semibold text-slate-900">Sign in</h1>
           <p className="mt-1 text-xs text-slate-500">
-            Use the Supabase Auth account created for you. Farmers land on the capture portal;
-            reviewers land on the command centre.
+            {commandCentreLogin
+              ? "This area is for reviewer accounts only. A farmer login cannot open the Command Centre."
+              : "Use the Supabase Auth account created for you. Farmers land on the capture portal; reviewers land on the command centre."}
           </p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>

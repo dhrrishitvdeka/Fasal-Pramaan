@@ -21,6 +21,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { currentSessionRoles, loadStoredToken, logoutSession } from "@/lib/api";
+import { canAccessReviewerPortal, reviewerLoginHref } from "@/lib/review-access";
 import { useLanguage } from "@/lib/LanguageContext";
 import clsx from "clsx";
 
@@ -76,23 +77,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           if (sessionRoles) {
             setRoles(sessionRoles);
             setAuthenticated(true);
-            const isReviewer = sessionRoles.includes("reviewer") || sessionRoles.includes("administrator");
-            if (isFarmerRoute && isReviewer) {
-              // reviewers may use the farmer portal
-            } else if (!isFarmerRoute && !isReviewer) {
-              router.replace("/farmer");
+            const isReviewer = canAccessReviewerPortal(sessionRoles);
+            if (!isFarmerRoute && !isReviewer) {
+              router.replace(reviewerLoginHref(pathname));
             }
           } else {
             setRoles([]);
             setAuthenticated(false);
-            router.replace(isFarmerRoute ? "/login?next=/farmer" : "/login");
+            router.replace(isFarmerRoute ? "/login?next=/farmer" : reviewerLoginHref(pathname));
           }
         }
       } catch {
         if (!cancelled) {
           setRoles([]);
           setAuthenticated(false);
-          router.replace(isFarmerRoute ? "/login?next=/farmer" : "/login");
+          router.replace(isFarmerRoute ? "/login?next=/farmer" : reviewerLoginHref(pathname));
         }
       }
       if (!cancelled) setReady(true);
@@ -101,7 +100,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [pathname, isLandingRoute, isFarmerRoute, isLoginRoute, isUnlockRoute]);
+  }, [pathname, isLandingRoute, isFarmerRoute, isLoginRoute, isUnlockRoute, router]);
 
   if (isLoginRoute || isUnlockRoute) {
     return <>{children}</>;
@@ -218,6 +217,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const isReviewer = canAccessReviewerPortal(roles);
+
   if (!ready) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
@@ -226,10 +227,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!authenticated) {
+  if (!authenticated || !isReviewer) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
-        Redirecting to sign in…
+        Redirecting to reviewer sign in…
       </div>
     );
   }
