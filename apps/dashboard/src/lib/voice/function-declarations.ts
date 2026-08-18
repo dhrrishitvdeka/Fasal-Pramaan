@@ -84,7 +84,7 @@ export const WEB_FUNCTION_DECLARATIONS = [
       {
         screen: {
           type: "STRING",
-          enum: ["home", "capture", "claims", "reminders", "queue", "results"],
+          enum: ["home", "capture", "claims", "reminders", "queue", "results", "help", "profile"],
         },
       },
       ["screen"],

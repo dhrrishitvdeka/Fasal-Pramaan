@@ -58,27 +58,27 @@ function ReviewerNav({
         <Link href="/" onClick={onNavigate} className="block">
           <div className="text-sm tracking-tight text-[var(--ink)]">Fasal-Pramaan</div>
           <div className="mt-0.5 text-xs text-[var(--ink-muted)]">
-            {lang === "hi" ? "समीक्षक केंद्र" : "Reviewer centre"}
+            {t("portalReviewer")}
           </div>
         </Link>
       </div>
 
       <div className="border-b border-[var(--line)] p-3">
-        <div className="fp-kicker mb-2">{lang === "hi" ? "पोर्टल" : "Portal"}</div>
+        <div className="fp-kicker mb-2">{t("portalKicker")}</div>
         <div className="fp-ui grid grid-cols-2 text-xs">
           <Link
             href="/farmer"
             onClick={onNavigate}
             className="border border-[var(--line)] px-2 py-1.5 text-center text-[var(--ink)] hover:bg-[var(--accent-soft)]"
           >
-            {lang === "hi" ? "किसान" : "Farmer"}
+            {t("farmerShort")}
           </Link>
           <Link
             href="/overview"
             onClick={onNavigate}
             className="-ml-px border border-[var(--ink)] bg-[var(--ink)] px-2 py-1.5 text-center text-[var(--surface)]"
           >
-            {lang === "hi" ? "समीक्षक" : "Reviewer"}
+            {t("reviewerShort")}
           </Link>
         </div>
       </div>
@@ -111,7 +111,7 @@ function ReviewerNav({
       <div className="fp-ui space-y-2 border-t border-[var(--line)] p-3">
         <LanguageSelect value={lang} onChange={setLang} className="w-full max-w-none" />
         <Link href="/" onClick={onNavigate} className="fp-btn-secondary w-full text-xs">
-          {lang === "hi" ? "होम" : "Home"}
+          {t("portalShowcase")}
         </Link>
         <button type="button" onClick={onLogout} className="fp-btn-secondary w-full text-xs">
           {t("logout")}
@@ -225,10 +225,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
             <div className="flex items-center gap-4">
               <Link href="/farmer" className="fp-ui text-sm text-[var(--ink)] hover:underline">
-                {lang === "hi" ? "किसान" : "Farmer"}
+                {t("farmerShort")}
               </Link>
               <Link href="/overview" className="fp-ui text-sm text-[var(--ink)] hover:underline">
-                {lang === "hi" ? "समीक्षक" : "Reviewer"}
+                {t("reviewerShort")}
               </Link>
               <LanguageSelect value={lang} onChange={setLang} />
             </div>
@@ -238,7 +238,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <footer className="border-t border-[var(--line)] px-5 py-6 text-xs text-[var(--ink-muted)]">
           <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:justify-between">
             <span>Fasal-Pramaan</span>
-            <span>{lang === "hi" ? "साक्ष्य कैप्चर और समीक्षक जाँच" : "Evidence capture and reviewer triage"}</span>
+            <span>{t("evidenceTriage")}</span>
           </div>
         </footer>
       </div>

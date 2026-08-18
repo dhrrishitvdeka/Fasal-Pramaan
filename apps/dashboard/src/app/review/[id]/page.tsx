@@ -187,6 +187,24 @@ export default function ReviewDetailPage() {
         <p className="mt-1 font-mono text-xs text-slate-500">Case ID: {data.id}</p>
       </div>
 
+      <section className="fp-panel space-y-2 p-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          Farmer & plot
+        </h3>
+        <dl className="grid grid-cols-1 gap-y-1.5 text-sm sm:grid-cols-[auto_1fr] sm:gap-x-4">
+          <dt className="text-slate-500">Plot / cycle</dt>
+          <dd className="font-mono text-xs">{data.crop_cycle_id || "—"}</dd>
+          <dt className="text-slate-500">Farmer notes</dt>
+          <dd className="break-words text-slate-700">{data.farmer_observations || "—"}</dd>
+          <dt className="text-slate-500">GPS / location</dt>
+          <dd className="break-all font-mono text-xs tabular-nums">
+            {data.capture_lat != null && data.capture_lon != null
+              ? `${data.capture_lat.toFixed(5)}, ${data.capture_lon.toFixed(5)} (±${data.capture_accuracy_m ?? "?"} m)`
+              : "No GPS on this case"}
+          </dd>
+        </dl>
+      </section>
+
       {message && (
         <div
           className="border border-slate-400 bg-slate-50 px-3 py-2 text-sm text-slate-800"

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
+import { isMilestoneOverdue, milestoneCaptureHref } from "@/lib/farmer-timeline";
 import clsx from "clsx";
 
 export default function FarmerHomePage() {
@@ -20,7 +21,10 @@ export default function FarmerHomePage() {
 
   const recaptureClaims = claims.filter((c) => c.status === "needs_recapture");
   const verifiedCount = claims.filter((c) => c.status === "verified").length;
-  const upcoming = milestones.filter((m) => !m.completed).slice(0, 3);
+  const upcoming = milestones
+    .filter((m) => !m.completed)
+    .sort((a, b) => Number(isMilestoneOverdue(b)) - Number(isMilestoneOverdue(a)) || a.dueDate.localeCompare(b.dueDate))
+    .slice(0, 3);
 
   return (
     <div className="space-y-4">
@@ -212,9 +216,16 @@ export default function FarmerHomePage() {
         ) : (
           <ul className="space-y-2">
             {upcoming.map((m) => (
-              <li key={m.id} className="flex items-center justify-between text-xs">
-                <span className="font-medium text-slate-800">{lang === "hi" ? m.stageNameHi || m.stageName : m.stageName}</span>
-                <span className="text-slate-500">{m.dueDate}</span>
+              <li key={m.id} className="flex items-center justify-between gap-2 text-xs">
+                <span className="min-w-0 font-medium text-slate-800">
+                  {lang === "hi" ? m.stageNameHi || m.stageName : m.stageName}
+                  {isMilestoneOverdue(m) ? (
+                    <span className="ml-2 text-amber-800">{t.overdueBadge}</span>
+                  ) : null}
+                </span>
+                <Link href={milestoneCaptureHref(m)} className="fp-link shrink-0">
+                  {m.dueDate} →
+                </Link>
               </li>
             ))}
           </ul>

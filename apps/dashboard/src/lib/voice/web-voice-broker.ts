@@ -86,7 +86,16 @@ export type WebVoiceGateway = {
   capture: VoiceCaptureBridge;
 };
 
-export type FarmerScreen = "home" | "capture" | "claims" | "claim_detail" | "reminders" | "other";
+export type FarmerScreen =
+  | "home"
+  | "capture"
+  | "claims"
+  | "claim_detail"
+  | "reminders"
+  | "help"
+  | "profile"
+  | "queue"
+  | "other";
 
 const SCREEN_LABELS: Record<FarmerScreen, string> = {
   home: "Home",
@@ -94,6 +103,9 @@ const SCREEN_LABELS: Record<FarmerScreen, string> = {
   claims: "Claims list",
   claim_detail: "Claim detail",
   reminders: "Reminders",
+  help: "Help",
+  profile: "Profile",
+  queue: "Offline draft",
   other: "Other",
 };
 
@@ -104,6 +116,9 @@ export function farmerScreenFromPath(path: string): FarmerScreen {
   if (/^\/farmer\/claims\/[^/]+$/.test(raw)) return "claim_detail";
   if (raw === "/farmer/claims" || raw.startsWith("/farmer/claims/")) return "claims";
   if (raw.startsWith("/farmer/reminders")) return "reminders";
+  if (raw.startsWith("/farmer/help")) return "help";
+  if (raw.startsWith("/farmer/profile")) return "profile";
+  if (raw.startsWith("/farmer/queue")) return "queue";
   return "other";
 }
 
@@ -121,9 +136,11 @@ const ROUTES: Record<string, string> = {
   home: "/farmer",
   capture: "/farmer/capture",
   claims: "/farmer/claims",
-  queue: "/farmer/claims",
+  queue: "/farmer/queue",
   results: "/farmer/claims",
   reminders: "/farmer/reminders",
+  help: "/farmer/help",
+  profile: "/farmer/profile",
 };
 
 const SUPPORTED_CROPS = [

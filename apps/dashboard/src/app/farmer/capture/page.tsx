@@ -66,6 +66,8 @@ function CaptureStudioContent() {
     updateClaimRecapture,
     saveClaimDraft,
     loadClaimDraft,
+    completeMilestone,
+    milestones,
     persistError,
   } = useFarmerData();
   const t = getFarmerT(lang);
@@ -74,6 +76,8 @@ function CaptureStudioContent() {
   const recaptureClaimId = searchParams.get("recapture");
   const requestedAnglesParam = searchParams.get("angles");
   const plotIdParam = searchParams.get("plotId");
+  const milestoneId = searchParams.get("milestone");
+  const milestone = milestones.find((item) => item.id === milestoneId);
 
   // Determine active angles to capture
   const isTargetedRecapture = Boolean(recaptureClaimId);
@@ -86,8 +90,14 @@ function CaptureStudioContent() {
     : ANGLE_DEFS;
 
   // Selected plot
-  const [selectedPlotId, setSelectedPlotId] = useState<string>(plotIdParam || plots[0]?.id || "");
+  const [selectedPlotId, setSelectedPlotId] = useState<string>(
+    plotIdParam || milestone?.plotId || plots[0]?.id || "",
+  );
   const selectedPlot = plots.find((p) => p.id === selectedPlotId);
+
+  useEffect(() => {
+    if (milestone?.plotId) setSelectedPlotId(milestone.plotId);
+  }, [milestone?.plotId]);
 
   // Active step in stepper
   const [currentAngleIndex, setCurrentAngleIndex] = useState<number>(0);
@@ -129,9 +139,9 @@ function CaptureStudioContent() {
   // File input ref for fallback
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Load existing draft if not in recapture mode
+  // Load existing draft if not in recapture or milestone mode
   useEffect(() => {
-    if (!isTargetedRecapture) {
+    if (!isTargetedRecapture && !milestoneId) {
       const draft = loadClaimDraft();
       if (draft) {
         if (draft.plotId) setSelectedPlotId(draft.plotId);
@@ -475,6 +485,15 @@ function CaptureStudioContent() {
         try {
           const imagesList = Object.values(capturedImages);
           const plot = selectedPlot;
+          if (milestoneId) {
+            const thumb =
+              imagesList.find((img) => img.angleType === "mid_canopy")?.imageUrl ||
+              imagesList[0]?.imageUrl ||
+              "";
+            await completeMilestone(milestoneId, thumb, observations);
+            router.push("/farmer/reminders?logged=1");
+            return { id: milestoneId };
+          }
           if (isTargetedRecapture && recaptureClaimId) {
             const updated = await updateClaimRecapture(recaptureClaimId, imagesList);
             const id = updated?.id || recaptureClaimId;
@@ -604,13 +623,20 @@ function CaptureStudioContent() {
                 {lang === "hi" ? "लक्षित पुनः फोटो मोड" : "Targeted Recapture Mode"}
               </span>
             )}
+            {milestone && (
+              <span className="fp-badge-alert">{t.milestoneMode}</span>
+            )}
           </div>
           <p className="mt-1 text-xs sm:text-sm text-slate-600">
             {isTargetedRecapture
               ? lang === "hi"
                 ? `दावा #${recaptureClaimId} के लिए केवल चिह्नित कोणों की फोटो आवश्यक है।`
                 : `Targeted recapture for Claim #${recaptureClaimId}. Only missing angles required.`
-              : t.studioSub}
+              : milestone
+                ? lang === "hi"
+                  ? `${milestone.stageNameHi || milestone.stageName} के लिए विकास साक्ष्य लें। यह दावा नहीं है।`
+                  : `Photograph ${milestone.stageName} for the growth timeline. This is not a damage claim.`
+                : t.studioSub}
           </p>
         </div>
 
@@ -965,7 +991,7 @@ function CaptureStudioContent() {
                 ) : (
                   <>
                     <Send className="h-4 w-4" />
-                    <span>{t.submitClaimBtn}</span>
+                    <span>{milestone ? t.logGrowthEvidence : t.submitClaimBtn}</span>
                   </>
                 )}
               </button>
