@@ -13,10 +13,13 @@ import {
   Shield,
   BarChart3,
   Home,
+  Menu,
+  X,
 } from "lucide-react";
 import { currentSessionRoles, loadStoredToken, logoutSession } from "@/lib/api";
 import { canAccessReviewerPortal, reviewerLoginHref } from "@/lib/review-access";
 import { useLanguage } from "@/lib/LanguageContext";
+import type { DictKey, Lang } from "@/lib/i18n";
 import clsx from "clsx";
 
 const reviewerNav = [
@@ -31,6 +34,121 @@ const reviewerNav = [
   { href: "/audit", key: "audit" as const, icon: Shield, adminOnly: true },
 ];
 
+function ReviewerNav({
+  pathname,
+  roles,
+  lang,
+  setLang,
+  t,
+  onNavigate,
+  onLogout,
+}: {
+  pathname: string;
+  roles: string[];
+  lang: Lang;
+  setLang: (lang: Lang) => void;
+  t: (key: DictKey) => string;
+  onNavigate?: () => void;
+  onLogout: () => void;
+}) {
+  return (
+    <>
+      <div className="border-b border-[var(--line)] px-4 py-3">
+        <Link href="/" onClick={onNavigate} className="block">
+          <div className="text-sm tracking-tight text-[var(--ink)]">Fasal-Pramaan</div>
+          <div className="mt-0.5 text-xs text-[var(--ink-muted)]">
+            {lang === "hi" ? "समीक्षक केंद्र" : "Reviewer centre"}
+          </div>
+        </Link>
+      </div>
+
+      <div className="border-b border-[var(--line)] p-3">
+        <div className="fp-kicker mb-2">{lang === "hi" ? "पोर्टल" : "Portal"}</div>
+        <div className="fp-ui grid grid-cols-2 text-xs">
+          <Link
+            href="/farmer"
+            onClick={onNavigate}
+            className="border border-[var(--line)] px-2 py-1.5 text-center text-[var(--ink)] hover:bg-[var(--accent-soft)]"
+          >
+            {lang === "hi" ? "किसान" : "Farmer"}
+          </Link>
+          <Link
+            href="/overview"
+            onClick={onNavigate}
+            className="-ml-px border border-[var(--ink)] bg-[var(--ink)] px-2 py-1.5 text-center text-[var(--surface)]"
+          >
+            {lang === "hi" ? "समीक्षक" : "Reviewer"}
+          </Link>
+        </div>
+      </div>
+
+      <nav className="fp-ui flex-1 space-y-0.5 overflow-y-auto p-2" aria-label="Main Navigation">
+        {reviewerNav
+          .filter((item) => !item.adminOnly || roles.includes("administrator"))
+          .map((item) => {
+            const Icon = item.icon;
+            const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onNavigate}
+                className={clsx(
+                  "flex items-center gap-2.5 border-l px-3 py-2.5 text-sm md:py-2",
+                  active
+                    ? "border-[var(--ink)] bg-[var(--accent-soft)] font-medium text-[var(--ink)]"
+                    : "border-transparent text-[var(--ink-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]",
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden strokeWidth={1.5} />
+                <span>{t(item.key)}</span>
+              </Link>
+            );
+          })}
+      </nav>
+
+      <div className="fp-ui space-y-2 border-t border-[var(--line)] p-3">
+        <div className="flex" role="group" aria-label="Language selection">
+          <button
+            type="button"
+            onClick={() => setLang("en")}
+            className={clsx(
+              "flex-1 border border-[var(--line)] px-2 py-1.5 text-xs",
+              lang === "en" ? "bg-[var(--ink)] text-[var(--surface)]" : "bg-[var(--surface)] text-[var(--ink)]",
+            )}
+          >
+            English
+          </button>
+          <button
+            type="button"
+            onClick={() => setLang("hi")}
+            className={clsx(
+              "-ml-px flex-1 border border-[var(--line)] px-2 py-1.5 text-xs",
+              lang === "hi" ? "bg-[var(--ink)] text-[var(--surface)]" : "bg-[var(--surface)] text-[var(--ink)]",
+            )}
+          >
+            हिंदी
+          </button>
+        </div>
+        <Link href="/" onClick={onNavigate} className="fp-btn-secondary w-full text-xs">
+          {lang === "hi" ? "होम" : "Home"}
+        </Link>
+        <button type="button" onClick={onLogout} className="fp-btn-secondary w-full text-xs">
+          {t("logout")}
+        </button>
+      </div>
+    </>
+  );
+}
+
+function GateScreen({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--canvas)] px-4 text-sm text-[var(--ink-muted)]">
+      {children}
+    </div>
+  );
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -38,11 +156,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [roles, setRoles] = useState<string[]>([]);
   const [authenticated, setAuthenticated] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   const isFarmerRoute = pathname.startsWith("/farmer");
   const isLandingRoute = pathname === "/";
   const isLoginRoute = pathname === "/login";
   const isUnlockRoute = pathname === "/unlock";
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [navOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,18 +226,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isFarmerRoute) {
     if (!ready) {
-      return (
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
-          Loading…
-        </div>
-      );
+      return <GateScreen>Loading…</GateScreen>;
     }
     if (!authenticated) {
-      return (
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
-          Redirecting to sign in…
-        </div>
-      );
+      return <GateScreen>Redirecting to sign in…</GateScreen>;
     }
     return <>{children}</>;
   }
@@ -165,19 +289,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isReviewer = canAccessReviewerPortal(roles);
 
   if (!ready) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
-        Loading…
-      </div>
-    );
+    return <GateScreen>Loading…</GateScreen>;
   }
 
   if (!authenticated || !isReviewer) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-600">
-        Redirecting to reviewer sign in…
-      </div>
-    );
+    return <GateScreen>Redirecting to reviewer sign in…</GateScreen>;
   }
 
   async function logout() {
@@ -187,99 +303,69 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--surface)]">
-        <div className="border-b border-[var(--line)] px-4 py-4">
-          <Link href="/" className="block">
-            <div className="text-sm tracking-tight text-[var(--ink)]">Fasal-Pramaan</div>
-            <div className="mt-0.5 text-xs text-[var(--ink-muted)]">
-              {lang === "hi" ? "समीक्षक केंद्र" : "Reviewer centre"}
-            </div>
-          </Link>
-        </div>
-
-        <div className="border-b border-[var(--line)] p-3">
-          <div className="fp-kicker mb-2">{lang === "hi" ? "पोर्टल" : "Portal"}</div>
-          <div className="fp-ui grid grid-cols-2 text-xs">
-            <Link
-              href="/farmer"
-              className="border border-[var(--line)] px-2 py-1.5 text-center text-[var(--ink)] hover:bg-[var(--accent-soft)]"
-            >
-              {lang === "hi" ? "किसान" : "Farmer"}
-            </Link>
-            <Link
-              href="/overview"
-              className="-ml-px border border-[var(--ink)] bg-[var(--ink)] px-2 py-1.5 text-center text-[var(--surface)]"
-            >
-              {lang === "hi" ? "समीक्षक" : "Reviewer"}
-            </Link>
-          </div>
-        </div>
-
-        {/* Navigation list */}
-        <nav className="fp-ui flex-1 space-y-0.5 p-2" aria-label="Main Navigation">
-          {reviewerNav
-            .filter((item) => !item.adminOnly || roles.includes("administrator"))
-            .map((item) => {
-              const Icon = item.icon;
-              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={clsx(
-                    "flex items-center gap-2.5 border-l px-3 py-2 text-sm",
-                    active
-                      ? "border-[var(--ink)] bg-[var(--accent-soft)] font-medium text-[var(--ink)]"
-                      : "border-transparent text-[var(--ink-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]",
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden strokeWidth={1.5} />
-                  <span>{t(item.key)}</span>
-                </Link>
-              );
-            })}
-        </nav>
-
-        <div className="fp-ui space-y-2 border-t border-[var(--line)] p-3">
-          <div className="flex" role="group" aria-label="Language selection">
-            <button
-              type="button"
-              onClick={() => setLang("en")}
-              className={clsx(
-                "flex-1 border border-[var(--line)] px-2 py-1 text-xs",
-                lang === "en" ? "bg-[var(--ink)] text-[var(--surface)]" : "bg-[var(--surface)] text-[var(--ink)]",
-              )}
-            >
-              English
-            </button>
-            <button
-              type="button"
-              onClick={() => setLang("hi")}
-              className={clsx(
-                "-ml-px flex-1 border border-[var(--line)] px-2 py-1 text-xs",
-                lang === "hi" ? "bg-[var(--ink)] text-[var(--surface)]" : "bg-[var(--surface)] text-[var(--ink)]",
-              )}
-            >
-              हिंदी
-            </button>
-          </div>
-          <Link href="/" className="fp-btn-secondary w-full text-xs">
-            {lang === "hi" ? "होम" : "Home"}
-          </Link>
-          <button type="button" onClick={logout} className="fp-btn-secondary w-full text-xs">
-            {t("logout")}
-          </button>
-        </div>
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--surface)] md:flex">
+        <ReviewerNav
+          pathname={pathname}
+          roles={roles}
+          lang={lang}
+          setLang={setLang}
+          t={t}
+          onLogout={logout}
+        />
       </aside>
 
+      {navOpen ? (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-[var(--ink)]/40"
+            aria-label="Close menu"
+            onClick={() => setNavOpen(false)}
+          />
+          <aside className="relative flex h-full w-[min(18rem,86vw)] flex-col bg-[var(--surface)] shadow-lg">
+            <div className="flex items-center justify-end border-b border-[var(--line)] px-2 py-1">
+              <button
+                type="button"
+                className="p-2 text-[var(--ink)]"
+                aria-label="Close menu"
+                onClick={() => setNavOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <ReviewerNav
+              pathname={pathname}
+              roles={roles}
+              lang={lang}
+              setLang={setLang}
+              t={t}
+              onNavigate={() => setNavOpen(false)}
+              onLogout={logout}
+            />
+          </aside>
+        </div>
+      ) : null}
+
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-[var(--line)] bg-[var(--surface)]">
-          <div className="px-6 py-3">
-            <h1 className="fp-ui text-sm font-semibold text-[var(--ink)]">{t("appName")}</h1>
-            <p className="mt-0.5 max-w-3xl text-xs text-[var(--ink-muted)]">{t("disclaimer")}</p>
+        <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--surface)]">
+          <div className="flex items-start gap-2 px-3 py-2.5 sm:px-4 md:px-6 md:py-3">
+            <button
+              type="button"
+              className="-ml-1 mt-0.5 p-2 text-[var(--ink)] md:hidden"
+              aria-label="Open menu"
+              onClick={() => setNavOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="fp-ui text-sm font-semibold text-[var(--ink)]">{t("appName")}</h1>
+              <p className="mt-0.5 hidden max-w-3xl text-xs text-[var(--ink-muted)] sm:block">
+                {t("disclaimer")}
+              </p>
+            </div>
           </div>
         </header>
-        <div className="flex-1 px-6 py-5">{children}</div>
+        <div className="min-w-0 flex-1 px-3 py-3 sm:px-4 md:px-6 md:py-5">{children}</div>
       </main>
     </div>
   );

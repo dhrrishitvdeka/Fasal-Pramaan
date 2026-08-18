@@ -23,9 +23,10 @@ export function AiConfidenceBreakdown({
   const [showScores, setShowScores] = useState(false);
 
   const confidence = prediction?.overall_confidence ?? 0;
-  const confidencePct = Math.round(confidence * 100);
-  const isHighConfidence = confidence >= 0.7;
-  const isModerateConfidence = confidence >= 0.55 && confidence < 0.7;
+  const isUnusable = (prediction?.predicted_grade || "U") === "U";
+  const confidencePct = isUnusable ? 0 : Math.round(confidence * 100);
+  const isHighConfidence = !isUnusable && confidence >= 0.7;
+  const isModerateConfidence = !isUnusable && confidence >= 0.55 && confidence < 0.7;
 
   // Grade badge styling & labels
   const grade = prediction?.predicted_grade || "U";
@@ -104,7 +105,9 @@ export function AiConfidenceBreakdown({
       {/* Confidence Meter Bar */}
       <div>
         <div className="flex items-center justify-between text-xs mb-1">
-          <span className="font-medium text-slate-700">Overall Confidence</span>
+          <span className="font-medium text-slate-700">
+            {isUnusable ? "Unusable evidence — crop not determined" : "Overall Confidence"}
+          </span>
           <span className="font-mono font-bold tabular-nums text-slate-900">
             {confidencePct}%
           </span>

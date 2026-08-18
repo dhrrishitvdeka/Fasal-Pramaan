@@ -54,8 +54,16 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
 
   // Quality score calculation
   const warnings = submission.latest_prediction?.quality_warnings || [];
+  const lightingScores = images
+    .map((img) => img.quality_flags?.lighting_score)
+    .filter((value): value is number => typeof value === "number");
+  const blurScores = images
+    .map((img) => img.quality_flags?.blur_score)
+    .filter((value): value is number => typeof value === "number");
   let qualityScore = Math.max(20, 100 - warnings.length * 20);
-  if (!hasCloseup) {
+  if (lightingScores.length) {
+    qualityScore = Math.round(lightingScores.reduce((a, b) => a + b, 0) / lightingScores.length);
+  } else if (!hasCloseup) {
     qualityScore = Math.min(qualityScore, 75);
   }
 
@@ -99,13 +107,12 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
   }
 
   const qualityDetails: EvidenceQualityDetails = {
-    blur_score: qualityScore >= 70 ? 0.85 : 0.45,
-    brightness_score: qualityScore >= 70 ? 0.82 : 0.4,
-    resolution_score: 1.0,
-    framing_score: 0.8,
-    crop_visibility: 0.85,
-    damage_visibility: hasCloseup ? 0.85 : 0.3,
-    consistency_score: 0.9,
+    blur_score: blurScores.length
+      ? blurScores.reduce((a, b) => a + b, 0) / blurScores.length / 100
+      : undefined,
+    brightness_score: lightingScores.length
+      ? lightingScores.reduce((a, b) => a + b, 0) / lightingScores.length / 100
+      : undefined,
     issues: warnings.map(String),
   };
 
@@ -235,7 +242,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
           </p>
         </div>
         {evaluation.evaluation_version && (
-          <span className="font-mono text-[11px] rounded bg-slate-100 px-2 py-0.5 text-slate-600 border border-slate-200">
+          <span className="hidden rounded border border-slate-200 bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600 sm:inline">
             {evaluation.evaluation_version}
           </span>
         )}
@@ -380,31 +387,31 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
             <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
               <dt className="text-slate-500">Blur:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {qDetails.blur_score != null ? `${(qDetails.blur_score * 100).toFixed(0)}% (Sharp)` : "Passed"}
+                {qDetails.blur_score != null ? `${(qDetails.blur_score * 100).toFixed(0)}%` : "Not measured"}
               </dd>
               <dt className="text-slate-500">Brightness:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {qDetails.brightness_score != null ? `${(qDetails.brightness_score * 100).toFixed(0)}% (Normal)` : "Optimal"}
+                {qDetails.brightness_score != null ? `${(qDetails.brightness_score * 100).toFixed(0)}%` : "Not measured"}
               </dd>
               <dt className="text-slate-500">Resolution:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {qDetails.resolution_score != null ? `${(qDetails.resolution_score * 100).toFixed(0)}% (Valid)` : "1280x720+"}
+                {qDetails.resolution_score != null ? `${(qDetails.resolution_score * 100).toFixed(0)}%` : "Not measured"}
               </dd>
               <dt className="text-slate-500">Framing:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {qDetails.framing_score != null ? `${(qDetails.framing_score * 100).toFixed(0)}%` : "Centered"}
+                {qDetails.framing_score != null ? `${(qDetails.framing_score * 100).toFixed(0)}%` : "Not measured"}
               </dd>
               <dt className="text-slate-500">Crop Visibility:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {qDetails.crop_visibility != null ? String(qDetails.crop_visibility) : "Clear"}
+                {qDetails.crop_visibility != null ? String(qDetails.crop_visibility) : "Not measured"}
               </dd>
               <dt className="text-slate-500">Damage Visibility:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {qDetails.damage_visibility != null ? String(qDetails.damage_visibility) : "Visible"}
+                {qDetails.damage_visibility != null ? String(qDetails.damage_visibility) : "Not measured"}
               </dd>
               <dt className="text-slate-500">Consistency:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {qDetails.consistency_score != null ? `${(qDetails.consistency_score * 100).toFixed(0)}%` : "Consistent"}
+                {qDetails.consistency_score != null ? `${(qDetails.consistency_score * 100).toFixed(0)}%` : "Not measured"}
               </dd>
             </dl>
 

@@ -57,7 +57,8 @@ export default function AdminPage() {
         {users.error ? (
           <p className="px-4 py-3 text-sm text-slate-600">Administrator role required for user list.</p>
         ) : (
-          <table className="fp-table">
+          <div className="fp-table-wrap">
+          <table className="fp-table min-w-[28rem]">
             <thead>
               <tr>
                 <th>Name</th>
@@ -75,6 +76,7 @@ export default function AdminPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 

@@ -415,6 +415,8 @@ export async function submitWebClaim(input: {
     lat?: number | null;
     lon?: number | null;
     accuracyM?: number | null;
+    lightingScore?: number | null;
+    qualityPassed?: boolean | null;
   }>;
 }): Promise<{ claimId: string }> {
   if (!isSupabaseConfigured()) {

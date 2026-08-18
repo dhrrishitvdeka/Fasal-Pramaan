@@ -84,7 +84,7 @@ export function ReviewKeyboardShortcuts({
       {/* Keyboard Shortcuts Trigger Button */}
       <button
         type="button"
-        className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
+        className="hidden items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 md:inline-flex"
         onClick={() => setIsOpen(true)}
         title="View keyboard shortcuts (Press '?')"
       >

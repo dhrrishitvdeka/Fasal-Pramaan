@@ -31,8 +31,21 @@ import {
 } from "lucide-react";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
-import { measureLightingScore, qualityPassedFromSignals, sha256FromDataUrl, sha256Hex } from "@/lib/evidence";
-import { cameraConstraintLadder, safeDisplayUrl, stopMediaStream } from "@/lib/media";
+import {
+  isUnusableLighting,
+  measureLightingFromDataUrl,
+  measureLightingScore,
+  qualityPassedFromSignals,
+  sha256FromDataUrl,
+  sha256Hex,
+} from "@/lib/evidence";
+import {
+  cameraConstraintLadder,
+  safeDisplayUrl,
+  stopMediaStream,
+  videoHasFrame,
+  waitForVideoFrame,
+} from "@/lib/media";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { runVoiceShutter, runVoiceSubmitDraft } from "@/lib/voice/capture-actions";
 import { webCaptureBridge } from "@/lib/voice/capture-bridge";
@@ -160,9 +173,25 @@ function CaptureStudioContent() {
           return;
         }
         streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => undefined);
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          video.muted = true;
+          video.playsInline = true;
+          await video.play().catch(() => undefined);
+          try {
+            await waitForVideoFrame(video);
+          } catch (err) {
+            lastError = err;
+            stopMediaStream(stream);
+            if (streamRef.current === stream) streamRef.current = null;
+            if (video.srcObject === stream) video.srcObject = null;
+            continue;
+          }
+        }
+        if (gen !== cameraGenRef.current) {
+          stopMediaStream(stream);
+          return;
         }
         setIsCameraActive(true);
         return;
@@ -181,6 +210,18 @@ function CaptureStudioContent() {
       stopCamera();
     };
   }, [cameraFacing]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return;
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
+      void video.play().catch(() => undefined);
+    }
+  });
 
   useEffect(() => {
     if (!("geolocation" in navigator)) {
@@ -251,9 +292,10 @@ function CaptureStudioContent() {
   const grabCameraFrame = async (): Promise<{ dataUrl: string; lightingScore?: number } | null> => {
     if (!videoRef.current) return null;
     const video = videoRef.current;
+    if (!videoHasFrame(video)) return null;
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -290,7 +332,17 @@ function CaptureStudioContent() {
       }),
       sha256Hex(await file.arrayBuffer()),
     ]);
-    if (dataUrl) await saveEvidenceImage(dataUrl, { sha256: hash });
+    if (!dataUrl) return;
+    const lightingScore = await measureLightingFromDataUrl(dataUrl);
+    if (isUnusableLighting(lightingScore)) {
+      showToast(
+        lang === "hi"
+          ? "तस्वीर बहुत अँधेरी है — फसल की ओर कैमरा करें या दूसरी फोटो चुनें।"
+          : "Photo is too dark. Point the camera at the crop, or pick another file.",
+      );
+      return;
+    }
+    await saveEvidenceImage(dataUrl, { sha256: hash, lightingScore });
   };
 
   const saveEvidenceImage = async (
@@ -365,6 +417,18 @@ function CaptureStudioContent() {
   };
 
   const handleSubmitClaim = async () => {
+    const unusable = activeAngleDefs.some((angle) => {
+      const img = capturedImages[angle.id];
+      return Boolean(img && isUnusableLighting(img.lightingScore));
+    });
+    if (unusable) {
+      showToast(
+        lang === "hi"
+          ? "कुछ तस्वीरें बहुत अँधेरी या अयोग्य हैं — पहले साफ़ फोटो लें।"
+          : "Some frames are too dark or unusable. Recapture them before submitting.",
+      );
+      return { ok: false as const, message: "Unusable frames" };
+    }
     const result = await runVoiceSubmitDraft({
       allCaptured: isAllCaptured,
       incompleteMessage: t.captureAllRequired,
@@ -457,10 +521,10 @@ function CaptureStudioContent() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6 space-y-5">
+    <div className="space-y-4">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fp-panel fixed top-16 right-4 z-50 flex items-center gap-2 px-4 py-3 text-sm">
+        <div className="fp-panel fixed left-3 right-3 top-20 z-50 flex items-center gap-2 px-3 py-2.5 text-sm sm:left-auto sm:right-4 sm:max-w-sm">
           <CheckCircle2 className="h-5 w-5" />
           <span>{toastMessage}</span>
         </div>
@@ -479,11 +543,11 @@ function CaptureStudioContent() {
       )}
 
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <Camera className="h-6 w-6" />
+      <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 sm:flex-row sm:items-center sm:justify-between sm:pb-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="flex items-center gap-2 text-lg font-bold text-slate-900 sm:text-2xl">
+              <Camera className="h-5 w-5 sm:h-6 sm:w-6" />
               <span>{t.studioTitle}</span>
             </h1>
             {isTargetedRecapture && (
@@ -502,7 +566,7 @@ function CaptureStudioContent() {
         </div>
 
         {!isTargetedRecapture && (
-          <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-300 px-3 py-1.5 shadow-2xs">
+          <div className="flex w-full min-w-0 items-center gap-2 border border-slate-300 bg-white px-3 py-1.5 sm:w-auto">
             <Layers className="h-4 w-4 text-emerald-800 shrink-0" />
             {plots.length === 0 ? (
               <span className="text-xs text-slate-600">
@@ -512,7 +576,7 @@ function CaptureStudioContent() {
               <select
                 value={selectedPlotId}
                 onChange={(e) => setSelectedPlotId(e.target.value)}
-                className="text-xs font-semibold text-slate-800 bg-transparent focus:outline-none"
+                className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-800 focus:outline-none"
               >
                 {plots.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -526,7 +590,7 @@ function CaptureStudioContent() {
       </div>
 
       {/* 5-Angle Stepper / Progress Bar */}
-      <div className="rounded-xl border border-slate-200 bg-white p-3 sm:p-4 shadow-xs">
+      <div className="fp-panel p-2.5 sm:p-4">
         <div className="flex items-center justify-between mb-3 text-xs font-semibold text-slate-600">
           <span>
             {lang === "hi" ? "कोण प्रगति" : "Angle Progress"}: {capturedCount} / {requiredCount}{" "}
@@ -549,7 +613,7 @@ function CaptureStudioContent() {
                 type="button"
                 onClick={() => setCurrentAngleIndex(idx)}
                 className={clsx(
-                  "flex flex-col items-center justify-center rounded-lg p-2 text-center transition-all border",
+                  "flex min-w-0 flex-col items-center justify-center rounded-lg p-1.5 text-center transition-all border sm:p-2",
                   isCurrent
                     ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)]"
                     : isCaptured
@@ -578,25 +642,27 @@ function CaptureStudioContent() {
         {/* Left Column (7 cols): Camera Viewfinder & Controls */}
         <div className="lg:col-span-7 space-y-4">
           <div className="relative flex aspect-4/3 items-center justify-center overflow-hidden border border-[var(--ink)] bg-black sm:aspect-16/10">
-            {/* Live Video Feed */}
-            {isCameraActive ? (
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="h-full w-full object-cover"
-              />
-            ) : capturedImages[currentAngle.id] &&
-              safeDisplayUrl(capturedImages[currentAngle.id].imageUrl) ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className={clsx(
+                "absolute inset-0 h-full w-full object-cover",
+                isCameraActive && !capturedImages[currentAngle.id] ? "z-[1]" : "invisible",
+              )}
+            />
+            {capturedImages[currentAngle.id] &&
+            safeDisplayUrl(capturedImages[currentAngle.id].imageUrl) ? (
               <img
                 src={safeDisplayUrl(capturedImages[currentAngle.id].imageUrl)}
                 alt={currentAngle.name}
-                className="h-full w-full object-cover"
+                className="absolute inset-0 z-[2] h-full w-full object-cover"
               />
-            ) : (
-              <div className="p-6 text-center text-slate-400">
-                <Camera className="mx-auto h-12 w-12 opacity-40 mb-2" />
+            ) : null}
+            {!isCameraActive && !capturedImages[currentAngle.id] ? (
+              <div className="relative z-[3] p-6 text-center text-slate-400">
+                <Camera className="mx-auto mb-2 h-12 w-12 opacity-40" />
                 <p className="text-sm font-medium">{cameraError || t.cameraUnavailable}</p>
                 <button
                   type="button"
@@ -607,7 +673,7 @@ function CaptureStudioContent() {
                   <span>{lang === "hi" ? "कैमरा पुनः शुरू करें" : "Retry Camera"}</span>
                 </button>
               </div>
-            )}
+            ) : null}
 
             {/* Overlaid Canonical Framing Guidelines */}
             <div className="pointer-events-none absolute inset-0 border border-white/20 grid grid-cols-3 grid-rows-3">
@@ -627,19 +693,19 @@ function CaptureStudioContent() {
             </div>
 
             {/* Top Overlay: Active Angle Badge & GPS Meter */}
-            <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
-              <span className="rounded-md bg-black/75 backdrop-blur-md px-2.5 py-1 text-xs font-bold text-white border border-white/20 flex items-center gap-1.5">
+            <div className="pointer-events-none absolute left-2 right-2 top-2 flex flex-wrap items-start justify-between gap-1.5 sm:left-3 sm:right-3 sm:top-3">
+              <span className="flex max-w-full items-center gap-1.5 rounded-md border border-white/20 bg-black/75 px-2 py-1 text-[11px] font-bold text-white sm:text-xs">
                 {getAngleIcon(currentAngle.illustrationIcon)}
-                <span>{lang === "hi" ? currentAngle.nameHi : currentAngle.name}</span>
+                <span className="truncate">{lang === "hi" ? currentAngle.nameHi : currentAngle.name}</span>
               </span>
 
               {/* GPS accuracy badge */}
-              <span className="flex items-center gap-1.5 rounded-md border border-white/20 bg-black/75 px-2.5 py-1 font-mono text-[11px] text-white">
-                <Compass className="h-3.5 w-3.5" />
-                <span>
+              <span className="flex max-w-full items-center gap-1.5 rounded-md border border-white/20 bg-black/75 px-2 py-1 font-mono text-[10px] text-white sm:text-[11px]">
+                <Compass className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
                   {gpsCoords.status === "unavailable" || gpsCoords.lat == null
                     ? "GPS unavailable"
-                    : `±${gpsCoords.accuracyM}m · ${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lon?.toFixed(4)}`}
+                    : `±${gpsCoords.accuracyM}m`}
                 </span>
               </span>
             </div>
@@ -666,24 +732,24 @@ function CaptureStudioContent() {
           </div>
 
           {/* Primary Viewport Action Buttons */}
-          <div className="flex flex-wrap items-center justify-between gap-2 p-1">
+          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
             {/* Flip camera */}
             <button
               type="button"
               onClick={() =>
                 setCameraFacing((prev) => (prev === "environment" ? "user" : "environment"))
               }
-              className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
+              className="inline-flex min-h-11 items-center gap-1.5 border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:px-3"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              <span>{t.switchCamera}</span>
+              <span className="hidden sm:inline">{t.switchCamera}</span>
             </button>
 
             {/* Main Shutter / Capture Button */}
             <button
               type="button"
               onClick={capturePhotoFromCamera}
-              className="fp-btn-primary flex-1 max-w-xs gap-2 px-6 py-3.5"
+              className="fp-btn-primary w-full gap-2 px-3 py-3 sm:px-6"
             >
               <Camera className="h-5 w-5" />
               <span>{t.takePhoto}</span>
@@ -700,7 +766,7 @@ function CaptureStudioContent() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
+              className="inline-flex min-h-11 items-center gap-1.5 border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:px-3"
               title="Upload existing photo"
             >
               <Upload className="h-3.5 w-3.5 text-slate-600" />
@@ -820,12 +886,12 @@ function CaptureStudioContent() {
               </span>
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
+            <div className="flex flex-col gap-2 pt-1 sm:flex-row">
               {/* Save Draft */}
               <button
                 type="button"
                 onClick={handleSaveDraft}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-xs font-bold text-slate-800 hover:bg-slate-100 shadow-2xs transition-colors"
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 border border-slate-300 bg-white px-3 py-2.5 text-xs font-bold text-slate-800 hover:bg-slate-100"
               >
                 <Save className="h-4 w-4 text-slate-600" />
                 <span>{t.saveDraftBtn}</span>
@@ -836,7 +902,7 @@ function CaptureStudioContent() {
                 type="button"
                 disabled={!isAllCaptured || isSubmitting}
                 onClick={handleSubmitClaim}
-                className="fp-btn-primary flex-2 gap-2 px-4 py-2.5 text-xs sm:text-sm"
+                className="fp-btn-primary flex-1 gap-2 px-4 py-2.5 text-xs sm:flex-[1.4] sm:text-sm"
               >
                 {isSubmitting ? (
                   <>

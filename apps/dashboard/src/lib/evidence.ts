@@ -61,6 +61,8 @@ export async function sha256FromDataUrl(dataUrl: string): Promise<string> {
   }
 }
 
+export const UNUSABLE_LIGHTING_MAX = 12;
+
 export function measureLightingScore(imageData: ImageData): number {
   const pixels = imageData.data;
   let sum = 0;
@@ -72,6 +74,35 @@ export function measureLightingScore(imageData: ImageData): number {
   }
   if (!count) return 0;
   return Math.round((sum / count / 255) * 100);
+}
+
+export function isUnusableLighting(score?: number | null): boolean {
+  return score != null && Number.isFinite(score) && score < UNUSABLE_LIGHTING_MAX;
+}
+
+export async function measureLightingFromDataUrl(dataUrl: string): Promise<number | undefined> {
+  if (typeof document === "undefined" || !dataUrl.startsWith("data:image/")) return undefined;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx || !canvas.width || !canvas.height) {
+        resolve(undefined);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      try {
+        resolve(measureLightingScore(ctx.getImageData(0, 0, canvas.width, canvas.height)));
+      } catch {
+        resolve(undefined);
+      }
+    };
+    img.onerror = () => resolve(undefined);
+    img.src = dataUrl;
+  });
 }
 
 export function qualityPassedFromSignals(opts: {

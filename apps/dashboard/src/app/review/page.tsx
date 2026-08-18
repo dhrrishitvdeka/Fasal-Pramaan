@@ -122,7 +122,7 @@ export default function ReviewQueuePage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 pb-2 text-xs">
+      <div className="fp-chip-row border-b border-slate-200 pb-2 text-xs">
         {[
           { id: "all", label: "All Cases", count: tabCounts.all },
           { id: "low_confidence", label: "Low Evidence Conf (<85%)", count: tabCounts.low_confidence, tone: "amber" },
@@ -136,7 +136,7 @@ export default function ReviewQueuePage() {
             key={tab.id}
             type="button"
             onClick={() => setFilterTab(tab.id as typeof filterTab)}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition-colors ${
               filterTab === tab.id
                 ? "bg-slate-900 text-white"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
@@ -161,22 +161,22 @@ export default function ReviewQueuePage() {
       </div>
 
       {/* Search & Sort Row */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="flex flex-col gap-2 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
         <div className="w-full sm:w-72">
           <input
             type="search"
             placeholder="Search by ID, peril, uncertainty…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="fp-input"
+            className="fp-input mt-0"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-slate-500 font-medium">Sort by:</label>
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <label className="shrink-0 font-medium text-slate-500">Sort by:</label>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="fp-input py-1 text-xs"
+            className="fp-input mt-0 min-w-0 flex-1 py-1 text-xs sm:flex-none"
           >
             <option value="newest">Newest First</option>
             <option value="evidence_asc">Evidence Confidence (Lowest First)</option>
@@ -188,8 +188,42 @@ export default function ReviewQueuePage() {
 
       {isLoading && <p className="text-sm text-slate-500">Loading queue…</p>}
 
-      <div className="fp-panel overflow-x-auto shadow-sm">
-        <table className="fp-table text-xs">
+      <div className="space-y-2 md:hidden">
+        {filteredItems.map(({ submission: s, evaluation: ev }) => {
+          const finalConf = ev.confidence.final;
+          return (
+            <Link
+              key={s.id}
+              href={`/review/${s.id}`}
+              className="fp-panel block p-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-mono text-xs font-semibold text-slate-800">{s.id.slice(0, 8)}…</div>
+                  <div className="mt-0.5 truncate text-xs capitalize text-slate-600">
+                    {s.latest_prediction?.primary_damage?.replaceAll("_", " ") || "—"} · {s.status.replaceAll("_", " ")}
+                  </div>
+                </div>
+                <span className="fp-badge-neutral shrink-0">{finalConf}%</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
+                <span className="capitalize">{s.severity || s.latest_prediction?.severity || "—"}</span>
+                <span>·</span>
+                <span className="capitalize">{ev.uncertainty.type || "no uncertainty"}</span>
+                {ev.integrity.score < 70 ? <span className="fp-badge-alert">Integrity</span> : null}
+              </div>
+            </Link>
+          );
+        })}
+        {!isLoading && filteredItems.length === 0 && (
+          <div className="fp-panel px-3 py-8 text-center text-sm text-slate-500">
+            No cases found matching the selected filter criteria.
+          </div>
+        )}
+      </div>
+
+      <div className="fp-panel hidden overflow-x-auto shadow-sm md:block">
+        <table className="fp-table min-w-[64rem] text-xs">
           <thead>
             <tr>
               <th>Reference</th>

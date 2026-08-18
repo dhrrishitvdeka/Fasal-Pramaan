@@ -1,3 +1,5 @@
+import { isUnusableLighting } from "../evidence";
+
 export type VoiceActionResult = {
   ok: boolean;
   message: string;
@@ -18,6 +20,12 @@ export async function runVoiceShutter(input: {
   const frame = await input.grabFrame();
   if (!frame?.dataUrl) {
     return { ok: false, message: "Could not capture a photo." };
+  }
+  if (isUnusableLighting(frame.lightingScore)) {
+    return {
+      ok: false,
+      message: "Frame is too dark. Point the camera at the crop, or use Upload.",
+    };
   }
   await input.saveFrame(frame.dataUrl, { lightingScore: frame.lightingScore });
   return {

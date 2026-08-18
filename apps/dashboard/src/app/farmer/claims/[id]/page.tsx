@@ -47,7 +47,7 @@ export default function FarmerClaimDetailPage() {
 
   if (!claim) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-16 text-center">
+      <div className="py-12 text-center">
         <AlertCircle className="mx-auto h-12 w-12 text-slate-400 mb-3" />
         <h2 className="text-lg font-bold text-slate-800">
           {lang === "hi" ? "दावा नहीं मिला" : "Claim Record Not Found"}
@@ -75,7 +75,7 @@ export default function FarmerClaimDetailPage() {
   const missingAnglesStr = claim.missingAngles?.join(",") || "closeup_damage,mid_canopy";
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 space-y-6">
+    <div className="space-y-4">
       {/* Back Button & Top Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <Link
@@ -86,9 +86,9 @@ export default function FarmerClaimDetailPage() {
           <span>{t.backToClaims}</span>
         </Link>
 
-        <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
-          <span>{t.claimId}:</span>
-          <strong className="text-slate-900">{claim.id}</strong>
+        <div className="flex max-w-full items-center gap-2 font-mono text-xs text-slate-500">
+          <span className="shrink-0">{t.claimId}:</span>
+          <strong className="truncate text-slate-900">{claim.id}</strong>
         </div>
       </div>
 
@@ -126,8 +126,8 @@ export default function FarmerClaimDetailPage() {
       )}
 
       {/* Main Status Header Card */}
-      <div className="fp-panel p-6 sm:p-7">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="fp-panel p-4 sm:p-7">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center md:gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="flex items-center gap-2">
               <span
@@ -149,7 +149,7 @@ export default function FarmerClaimDetailPage() {
               </span>
             </div>
 
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+            <h1 className="text-lg font-bold text-slate-900 sm:text-2xl">
               {lang === "hi" ? claim.plotNameHi : claim.plotName} ·{" "}
               <span className="font-semibold text-[var(--ink)]">
                 {lang === "hi" ? claim.cropTypeHi : claim.cropType} ({claim.cropVariety})
@@ -191,7 +191,7 @@ export default function FarmerClaimDetailPage() {
             {isRecapture && (
               <Link
                 href={`/farmer/capture?recapture=${claim.id}&angles=${missingAnglesStr}`}
-                className="fp-btn-primary gap-2 px-6 py-3.5"
+                className="fp-btn-primary w-full gap-2 px-4 py-3 sm:w-auto sm:px-6"
               >
                 <Camera className="h-4 w-4" />
                 <span>{t.startTargetedRecaptureCTA}</span>
@@ -204,7 +204,7 @@ export default function FarmerClaimDetailPage() {
 
       {/* If Needs Recapture: Specific Warning & Missing Angle Instructions Card */}
       {isRecapture && (
-        <div className="fp-panel space-y-4 border-[var(--ink)] p-5 sm:p-6">
+        <div className="fp-panel space-y-4 border-[var(--ink)] p-3 sm:p-6">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)]">
               <ShieldAlert className="h-6 w-6" />
@@ -244,7 +244,7 @@ export default function FarmerClaimDetailPage() {
           <div className="flex justify-end">
             <Link
               href={`/farmer/capture?recapture=${claim.id}&angles=${missingAnglesStr}`}
-              className="fp-btn-primary gap-2 px-5 py-2.5 text-xs sm:text-sm"
+              className="fp-btn-primary w-full gap-2 px-5 py-2.5 text-xs sm:w-auto sm:text-sm"
             >
               <Camera className="h-4 w-4" />
               <span>{t.startTargetedRecaptureCTA}</span>
@@ -255,9 +255,9 @@ export default function FarmerClaimDetailPage() {
       )}
 
       {/* 2-Column Grid: Evidence Trust Card & AI Damage Prediction */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Evidence Trust Confidence Card */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-3 shadow-xs sm:p-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-emerald-800" />
@@ -364,7 +364,7 @@ export default function FarmerClaimDetailPage() {
         </div>
 
         {/* AI Damage Prediction Breakdown */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+        <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-3 shadow-xs sm:p-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
               <h2 className="text-sm sm:text-base font-bold text-slate-900">
@@ -429,7 +429,7 @@ export default function FarmerClaimDetailPage() {
       </div>
 
       {/* Captured Evidence Photos Gallery */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
+      <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-3 shadow-xs sm:p-5">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Camera className="h-5 w-5 text-emerald-800" />
@@ -501,11 +501,11 @@ export default function FarmerClaimDetailPage() {
       {/* Image Modal Preview */}
       {selectedImage && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-0 sm:items-center sm:p-4"
           onClick={() => setSelectedImage(null)}
         >
           <div
-            className="relative max-w-3xl w-full rounded-2xl bg-white overflow-hidden shadow-2xl"
+            className="relative w-full max-w-3xl overflow-hidden rounded-t-xl bg-white shadow-2xl sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="relative aspect-16/10 bg-black">

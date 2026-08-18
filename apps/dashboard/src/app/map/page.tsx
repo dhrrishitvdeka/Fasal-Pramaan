@@ -34,18 +34,18 @@ export default function MapPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-3">
+      <div className="space-y-3 border-b border-slate-200 pb-3">
         <div>
           <h2 className="fp-page-title">Submissions map</h2>
           <p className="fp-page-sub">
             Geographic distribution · OpenStreetMap · farmer PII not displayed
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <label className="text-xs text-slate-600">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
+          <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             Status
             <select
-              className="ml-2 border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
+              className="w-full border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
             >
@@ -56,10 +56,10 @@ export default function MapPage() {
               <option value="physical_inspection">Physical inspection</option>
             </select>
           </label>
-          <label className="text-xs text-slate-600">
+          <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             Severity
             <select
-              className="ml-2 border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
+              className="w-full border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
               value={severity}
               onChange={(e) => setSeverity(e.target.value)}
             >
@@ -70,9 +70,9 @@ export default function MapPage() {
               <option value="high">High</option>
             </select>
           </label>
-          <label className="text-xs text-slate-600">
+          <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             Crop
-            <select className="ml-2 border border-slate-300 bg-white px-2 py-1.5 text-sm" value={crop} onChange={(e) => setCrop(e.target.value)}>
+            <select className="w-full border border-slate-300 bg-white px-2 py-1.5 text-sm" value={crop} onChange={(e) => setCrop(e.target.value)}>
               <option value="">All</option>
               <option value="paddy">Paddy</option>
               <option value="wheat">Wheat</option>
@@ -81,9 +81,9 @@ export default function MapPage() {
               <option value="maize">Maize</option>
             </select>
           </label>
-          <label className="text-xs text-slate-600">
+          <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             Damage
-            <select className="ml-2 border border-slate-300 bg-white px-2 py-1.5 text-sm" value={damage} onChange={(e) => setDamage(e.target.value)}>
+            <select className="w-full border border-slate-300 bg-white px-2 py-1.5 text-sm" value={damage} onChange={(e) => setDamage(e.target.value)}>
               <option value="">All</option>
               <option value="healthy">Healthy</option>
               <option value="disease">Disease</option>
@@ -95,17 +95,17 @@ export default function MapPage() {
               <option value="unknown">Unknown</option>
             </select>
           </label>
-          <label className="text-xs text-slate-600">
+          <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             District
-            <input className="ml-2 w-36 border border-slate-300 px-2 py-1.5 text-sm" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Name or code" />
+            <input className="w-full border border-slate-300 px-2 py-1.5 text-sm" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Name or code" />
           </label>
-          <label className="text-xs text-slate-600">
+          <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             From
-            <input type="date" className="ml-2 border border-slate-300 px-2 py-1.5 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <input type="date" className="w-full border border-slate-300 px-2 py-1.5 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </label>
-          <label className="text-xs text-slate-600">
+          <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             To
-            <input type="date" className="ml-2 border border-slate-300 px-2 py-1.5 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            <input type="date" className="w-full border border-slate-300 px-2 py-1.5 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </label>
         </div>
       </div>

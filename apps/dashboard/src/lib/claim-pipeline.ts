@@ -1,4 +1,5 @@
-import { inferCropDisease, type HfPrediction } from "./hf-infer";
+import { inferCropDisease, resolveHfModelId, type HfPrediction } from "./hf-infer";
+import { isUnusableLighting } from "./evidence";
 import type { Submission } from "./api";
 
 export const REQUIRED_ANGLES = [
@@ -127,6 +128,8 @@ export type RecaptureClientImage = {
   lat?: number | null;
   lon?: number | null;
   accuracyM?: number | null;
+  lightingScore?: number | null;
+  qualityPassed?: boolean | null;
 };
 
 export function buildRecaptureSubmitInput(
@@ -167,6 +170,8 @@ export function buildRecaptureSubmitInput(
       lat: img.lat,
       lon: img.lon,
       accuracyM: img.accuracyM,
+      lightingScore: img.lightingScore,
+      qualityPassed: img.qualityPassed,
     })),
   };
 }
@@ -214,6 +219,47 @@ function imageIsPresent(image: PersistedImageInput): boolean {
 
 export function workflowGrade(value?: string | null): "A" | "B" | "C" | "U" | null {
   return value === "A" || value === "B" || value === "C" || value === "U" ? value : null;
+}
+
+export function imagesAreUnusable(images: PersistedImageInput[]): boolean {
+  const measured = images.filter((image) => image.lightingScore != null);
+  return measured.length > 0 && measured.every((image) => isUnusableLighting(image.lightingScore));
+}
+
+export function unusablePrediction(warnings: string[] = ["image_too_dark"]): HfPrediction {
+  return {
+    modelId: resolveHfModelId(),
+    label: "unusable_or_out_of_domain",
+    score: 0,
+    predictedCrop: "unknown",
+    cropConfidence: 0,
+    predictedGrade: "U",
+    gradeLabel: "unusable_or_out_of_domain",
+    primaryDamage: "unknown",
+    plantDiseaseClass: null,
+    qualityWarnings: warnings,
+    humanReviewRecommendation: "recapture",
+    raw: { skipped: true, quality_warnings: warnings },
+  };
+}
+
+export function sanitizeHfPrediction(prediction: HfPrediction): HfPrediction {
+  const warnings = prediction.qualityWarnings || [];
+  const unusable =
+    prediction.predictedGrade === "U" ||
+    warnings.some((item) => /too_dark|no_usable_image|unusable/i.test(item));
+  if (!unusable) return prediction;
+  return {
+    ...prediction,
+    predictedCrop: "unknown",
+    cropConfidence: 0,
+    predictedGrade: "U",
+    score: 0,
+    primaryDamage: "unknown",
+    plantDiseaseClass: null,
+    label: prediction.gradeLabel || prediction.label || "unusable_or_out_of_domain",
+    qualityWarnings: warnings.length ? warnings : ["unusable_or_out_of_domain"],
+  };
 }
 
 export function computeEvidencePreview(images: PersistedImageInput[]) {
@@ -347,19 +393,22 @@ export async function attachHfPrediction(
   claimId: string,
   prediction: HfPrediction,
 ): Promise<void> {
+  const safe = sanitizeHfPrediction(prediction);
+  const warningNote = (safe.qualityWarnings || []).join(", ");
   await store.updateClaim(claimId, {
-    model_id: prediction.modelId,
-    hf_label: prediction.plantDiseaseClass || prediction.label,
-    hf_score: prediction.score,
-    disease_detected: prediction.plantDiseaseClass || prediction.primaryDamage || prediction.label,
-    model_confidence: Math.round(prediction.score * 1000) / 10,
-    crop_identified: prediction.predictedCrop || null,
+    model_id: safe.modelId,
+    hf_label: safe.plantDiseaseClass || safe.label,
+    hf_score: safe.score,
+    disease_detected: safe.plantDiseaseClass || safe.primaryDamage || safe.label,
+    model_confidence: Math.round(safe.score * 1000) / 10,
+    crop_identified: safe.predictedCrop || null,
     crop_confidence:
-      prediction.cropConfidence == null ? null : Math.round(prediction.cropConfidence * 1000) / 10,
-    severity_grade: prediction.predictedGrade || null,
+      safe.cropConfidence == null ? null : Math.round(safe.cropConfidence * 1000) / 10,
+    severity_grade: safe.predictedGrade || null,
     severity_percentage: null,
     affected_area_hectares: null,
     estimated_loss_inr: null,
+    ...(warningNote ? { quality_notes: warningNote } : {}),
     updated_at: new Date().toISOString(),
   });
 }
@@ -371,6 +420,11 @@ export async function persistAndInfer(
   inferOptions?: { apiToken?: string; fetchImpl?: typeof fetch; spaceUrl?: string },
 ): Promise<{ claimId: string; prediction: HfPrediction | null; inferError?: string }> {
   const persisted = await persistFarmerSubmission(store, input);
+  if (imagesAreUnusable(input.images)) {
+    const prediction = unusablePrediction();
+    await attachHfPrediction(store, persisted.claimId, prediction);
+    return { claimId: persisted.claimId, prediction };
+  }
   const closeup =
     input.images.find((img) => img.angleType === "closeup_damage") || input.images[0];
   try {
@@ -489,6 +543,12 @@ export async function recaptureAndInfer(
     updated_at: now,
   });
 
+  if (imagesAreUnusable(input.images)) {
+    const prediction = unusablePrediction();
+    await attachHfPrediction(store, input.claimId, prediction);
+    return { claimId: input.claimId, prediction };
+  }
+
   const closeup =
     input.images.find((img) => img.angleType === "closeup_damage") || input.images[0];
   try {
@@ -532,25 +592,40 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
       upload_status: img.storage_path || img.image_url ? "uploaded" : "pending",
       download_url: img.image_url,
       sha256: img.sha256,
+      quality_flags: {
+        quality_passed: img.quality_passed,
+        blur_score: img.blur_score,
+        lighting_score: img.lighting_score,
+      },
     })),
     latest_prediction: claim.hf_label
       ? {
           model_version: claim.model_id || "",
           adapter_type: "crop_health_v4",
           is_production_validated: false,
-          predicted_crop: claim.crop_identified,
-          crop_confidence: (claim.crop_confidence ?? 0) / 100,
+          predicted_crop: workflowGrade(claim.severity_grade) === "U" ? "unknown" : claim.crop_identified,
+          crop_confidence:
+            workflowGrade(claim.severity_grade) === "U" ? 0 : (claim.crop_confidence ?? 0) / 100,
           predicted_grade: workflowGrade(claim.severity_grade),
           grade_label: workflowGrade(claim.severity_grade)
-            ? "workflow_bucket"
+            ? workflowGrade(claim.severity_grade) === "U"
+              ? "unusable_or_out_of_domain"
+              : "workflow_bucket"
             : null,
-          primary_damage: claim.disease_detected || claim.hf_label,
+          primary_damage:
+            workflowGrade(claim.severity_grade) === "U"
+              ? "unknown"
+              : claim.disease_detected || claim.hf_label,
           severity: claim.corrected_severity ?? null,
-          overall_confidence: claim.hf_score ?? 0,
+          overall_confidence: workflowGrade(claim.severity_grade) === "U" ? 0 : claim.hf_score ?? 0,
           affected_area_pct: claim.corrected_affected_area_pct ?? null,
-          quality_warnings: [],
+          quality_warnings:
+            workflowGrade(claim.severity_grade) === "U"
+              ? [claim.quality_notes || "unusable_or_out_of_domain"]
+              : [],
           anomaly_flags: [],
-          human_review_recommendation: "Review recommended",
+          human_review_recommendation:
+            workflowGrade(claim.severity_grade) === "U" ? "recapture" : "Review recommended",
           explanation: {
             hf_label: claim.hf_label,
             hf_score: claim.hf_score,

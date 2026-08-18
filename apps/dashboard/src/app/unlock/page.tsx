@@ -46,7 +46,7 @@ function UnlockForm() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--canvas)]">
-      <div className="border-b border-[var(--line)] bg-[var(--surface)] px-6 py-3">
+      <div className="border-b border-[var(--line)] bg-[var(--surface)] px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-lg items-baseline justify-between">
           <div>
             <div className="text-sm tracking-tight text-[var(--ink)]">Fasal-Pramaan</div>
@@ -55,8 +55,8 @@ function UnlockForm() {
           <div className="text-xs text-slate-400">फसल प्रमाण</div>
         </div>
       </div>
-      <div className="flex flex-1 items-center justify-center p-6">
-        <div className="fp-panel w-full max-w-sm p-6">
+      <div className="flex flex-1 items-center justify-center p-4 sm:p-6">
+        <div className="fp-panel w-full max-w-sm p-4 sm:p-6">
           <h1 className="text-base font-semibold text-slate-900">Enter access password</h1>
           <p className="mt-1 text-xs text-slate-500">
             This site is locked so hosted API quota is not used by casual visitors.
