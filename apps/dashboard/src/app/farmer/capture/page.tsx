@@ -32,6 +32,7 @@ import {
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
 import { measureLightingScore, qualityPassedFromSignals, sha256FromDataUrl, sha256Hex } from "@/lib/evidence";
+import { cameraConstraintLadder, safeDisplayUrl, stopMediaStream } from "@/lib/media";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { runVoiceShutter, runVoiceSubmitDraft } from "@/lib/voice/capture-actions";
 import { webCaptureBridge } from "@/lib/voice/capture-bridge";
@@ -80,7 +81,8 @@ function CaptureStudioContent() {
 
   // Camera state
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const cameraGenRef = useRef(0);
   const [cameraFacing, setCameraFacing] = useState<"environment" | "user">("environment");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
@@ -120,7 +122,9 @@ function CaptureStudioContent() {
         if (draft.images) {
           const map: Record<string, ClaimImageEvidence> = {};
           draft.images.forEach((img) => {
-            map[img.angleType] = img;
+            const url = safeDisplayUrl(img.imageUrl);
+            if (!url) return;
+            map[img.angleType] = { ...img, imageUrl: url };
           });
           setCapturedImages(map);
         }
@@ -128,44 +132,51 @@ function CaptureStudioContent() {
     }
   }, [isTargetedRecapture]);
 
-  // Start / stop camera
-  const startCamera = async () => {
-    setCameraError(null);
-    try {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach((track) => track.stop());
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: cameraFacing,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      });
-      setCameraStream(stream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      setIsCameraActive(true);
-    } catch (err) {
-      console.warn("Camera access failed or unavailable:", err);
-      setCameraError(t.cameraUnavailable);
-      setIsCameraActive(false);
-    }
+  const stopCamera = () => {
+    cameraGenRef.current += 1;
+    stopMediaStream(streamRef.current);
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setIsCameraActive(false);
   };
 
-  const stopCamera = () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => track.stop());
-      setCameraStream(null);
+  const startCamera = async () => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setCameraError(t.cameraUnavailable);
+      setIsCameraActive(false);
+      return;
     }
+    const gen = ++cameraGenRef.current;
+    stopMediaStream(streamRef.current);
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setCameraError(null);
+    let lastError: unknown;
+    for (const constraints of cameraConstraintLadder(cameraFacing)) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (gen !== cameraGenRef.current) {
+          stopMediaStream(stream);
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => undefined);
+        }
+        setIsCameraActive(true);
+        return;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    console.warn("Camera access failed or unavailable:", lastError);
+    setCameraError(t.cameraUnavailable);
     setIsCameraActive(false);
   };
 
   useEffect(() => {
-    startCamera();
+    void startCamera();
     return () => {
       stopCamera();
     };
@@ -576,9 +587,10 @@ function CaptureStudioContent() {
                 muted
                 className="h-full w-full object-cover"
               />
-            ) : capturedImages[currentAngle.id] ? (
+            ) : capturedImages[currentAngle.id] &&
+              safeDisplayUrl(capturedImages[currentAngle.id].imageUrl) ? (
               <img
-                src={capturedImages[currentAngle.id].imageUrl}
+                src={safeDisplayUrl(capturedImages[currentAngle.id].imageUrl)}
                 alt={currentAngle.name}
                 className="h-full w-full object-cover"
               />
