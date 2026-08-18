@@ -43,6 +43,21 @@ describe("voice session mint", () => {
     expect(JSON.stringify(missing)).not.toMatch(/GEMINI_API_KEY|SITE_LOCK_PASSWORD/i);
   });
 
+  it("mints when GEMINI_API_KEY is provided even if the env flag is omitted", async () => {
+    const result = await mintVoiceSession({
+      lockActive: false,
+      unlocked: true,
+      apiKey: "server-only-key",
+      fetchImpl: async () =>
+        new Response(JSON.stringify({ name: "auth_tokens/ephemeral-demo" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.token).toBe("auth_tokens/ephemeral-demo");
+  });
+
   it("returns only ephemeral session fields when mint succeeds", async () => {
     const result = await mintVoiceSession({
       lockActive: true,
