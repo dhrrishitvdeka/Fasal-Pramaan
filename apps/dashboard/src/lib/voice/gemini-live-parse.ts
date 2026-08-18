@@ -38,6 +38,28 @@ function describeError(error: unknown): string {
   return String(error);
 }
 
+export async function frameToText(data: unknown): Promise<string> {
+  if (typeof data === "string") return data;
+  if (typeof Blob !== "undefined" && data instanceof Blob) return data.text();
+  if (data instanceof ArrayBuffer) return new TextDecoder().decode(data);
+  if (ArrayBuffer.isView(data)) {
+    const view = data as ArrayBufferView;
+    return new TextDecoder().decode(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
+  }
+  throw new Error(`Unsupported Gemini Live frame type: ${Object.prototype.toString.call(data)}`);
+}
+
+/** Browser Gemini Live often delivers JSON as Blob/ArrayBuffer, not a string. */
+export async function decodeGeminiLiveFrame(data: unknown): Promise<Record<string, unknown> | null> {
+  const text = (await frameToText(data)).trim();
+  if (!text) return null;
+  const parsed: unknown = JSON.parse(text);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Voice frame was not a JSON object");
+  }
+  return parsed as Record<string, unknown>;
+}
+
 /** Decode one Gemini Live JSON frame. Shipped parser used by the overlay. */
 export function parseGeminiLiveMessage(message: Record<string, unknown>): GeminiLiveMessageParse {
   const events: GeminiLiveEvent[] = [];
