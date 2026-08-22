@@ -5,19 +5,24 @@ import { useRouter } from "next/navigation";
 import { useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
 import { logoutSession } from "@/lib/api";
+import { getFarmerNavLabel } from "@/lib/name-sanitizer";
 
 export default function FarmerProfilePage() {
   const router = useRouter();
   const { lang, farmerProfile, plots, claims, milestones } = useFarmerData();
   const t = getFarmerT(lang);
   const openStages = milestones.filter((item) => !item.completed).length;
+  const navLabel = getFarmerNavLabel(farmerProfile, lang);
 
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-bold text-slate-900 sm:text-2xl">{t.profileTitle}</h1>
       <div className="fp-panel space-y-2 p-3 sm:p-5">
-        <div className="text-base font-bold">
-          {lang === "hi" ? farmerProfile.nameHi || farmerProfile.name : farmerProfile.name}
+        <div className="text-base font-bold flex items-center gap-2">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
+            {navLabel.initial}
+          </div>
+          <span>{navLabel.name}</span>
         </div>
         <dl className="grid gap-2 text-xs text-slate-700 sm:grid-cols-2">
           <div>
