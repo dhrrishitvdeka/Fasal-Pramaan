@@ -1,6 +1,9 @@
 function escapeCell(value: unknown): string {
   if (value == null) return "";
   let s = value instanceof Date ? value.toISOString() : String(value);
+  if (/^[=+\-@\t\r]/.test(s)) {
+    s = `'${s}`;
+  }
   if (/[",\r\n]/.test(s)) {
     s = `"${s.replaceAll('"', '""')}"`;
   }

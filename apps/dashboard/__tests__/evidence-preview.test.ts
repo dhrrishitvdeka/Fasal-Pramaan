@@ -2,14 +2,23 @@ import { describe, expect, it } from "vitest";
 import { computeEvidencePreview, isRealSha256 } from "../src/lib/evidence";
 
 describe("honest evidence preview", () => {
-  it("scores coverage from usable captured angles only", () => {
+  it("scores coverage from usable distinct required angles only", () => {
     const preview = computeEvidencePreview([
-      { imageUrl: "data:image/jpeg;base64,xx", qualityPassed: true },
-      { imageUrl: "data:image/jpeg;base64,yy", qualityPassed: true },
+      { angleId: "wide_field", imageUrl: "data:image/jpeg;base64,xx", qualityPassed: true },
+      { angleId: "closeup_damage", imageUrl: "data:image/jpeg;base64,yy", qualityPassed: true },
     ]);
     expect(preview.coverageScore).toBe(40);
     expect(preview.qualityScore).toBe(0);
     expect(preview.integrityScore).toBe(0);
+  });
+
+  it("does not inflate coverage when duplicate images of the same angle are uploaded", () => {
+    const preview = computeEvidencePreview([
+      { angleId: "wide_field", imageUrl: "data:image/jpeg;base64,xx", qualityPassed: true },
+      { angleId: "wide_field", imageUrl: "data:image/jpeg;base64,yy", qualityPassed: true },
+    ]);
+    // 1 distinct angle out of 5 = 20%, not 40%
+    expect(preview.coverageScore).toBe(20);
   });
 
   it("uses measured lighting and does not invent a hash", () => {

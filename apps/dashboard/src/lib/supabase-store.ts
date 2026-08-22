@@ -10,8 +10,8 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
         return data as WebClaimRow;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (/peril|intent_id|gate_result|context_signals/i.test(msg)) {
-          const { peril: _p, intent_id: _i, gate_result: _g, context_signals: _c, ...stripped } = row as any;
+        if (/peril|intent_id|gate_result|context_signals|adaptive_result/i.test(msg)) {
+          const { peril: _p, intent_id: _i, gate_result: _g, context_signals: _c, adaptive_result: _a, ...stripped } = row as any;
           const { data, error } = await client.from("web_claims").insert(stripped).select().single();
           if (error) throw new Error(error.message);
           return data as WebClaimRow;
@@ -25,8 +25,8 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
         if (error) throw new Error(error.message);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (/peril|intent_id|gate_result|context_signals/i.test(msg)) {
-          const { peril: _p, intent_id: _i, gate_result: _g, context_signals: _c, ...stripped } = patch as any;
+        if (/peril|intent_id|gate_result|context_signals|adaptive_result/i.test(msg)) {
+          const { peril: _p, intent_id: _i, gate_result: _g, context_signals: _c, adaptive_result: _a, ...stripped } = patch as any;
           const { error } = await client.from("web_claims").update(stripped).eq("id", id);
           if (error) throw new Error(error.message);
         } else {
@@ -89,7 +89,24 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
     async listImages(claimId) {
       const { data, error } = await client.from("web_claim_images").select("*").eq("claim_id", claimId);
       if (error) throw new Error(error.message);
-      return (data || []) as WebImageRow[];
+      const rows = (data || []) as WebImageRow[];
+      return Promise.all(
+        rows.map(async (row) => {
+          if (row.storage_path) {
+            try {
+              const { data: signed } = await client.storage
+                .from("fasal-web-evidence")
+                .createSignedUrl(row.storage_path, 60 * 60 * 24 * 7);
+              if (signed?.signedUrl) {
+                return { ...row, image_url: signed.signedUrl };
+              }
+            } catch {
+              // keep existing image_url if signed url refresh fails
+            }
+          }
+          return row;
+        }),
+      );
     },
     async uploadImage(path, bytes, contentType) {
       const { error } = await client.storage.from("fasal-web-evidence").upload(path, bytes, {

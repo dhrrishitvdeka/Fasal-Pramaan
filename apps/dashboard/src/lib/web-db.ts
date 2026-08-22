@@ -91,9 +91,16 @@ export interface WebClaimRow {
   intent_id?: string | null;
   gate_result?: unknown;
   context_signals?: unknown;
+  adaptive_result?: unknown;
   created_at: string | null;
   updated_at: string | null;
   created_by: string | null;
+  corrected_crop?: string | null;
+  corrected_grade?: string | null;
+  corrected_severity?: string | null;
+  corrected_damage_codes?: string[] | null;
+  corrected_affected_area_pct?: number | null;
+  corrected_growth_stage?: string | null;
 }
 
 export interface WebClaimImageRow {
@@ -299,12 +306,15 @@ export function claimFromRow(row: WebClaimRow, images: ClaimImageEvidence[]): Fa
     },
     aiPrediction: hasPrediction
       ? {
-          cropIdentified: row.crop_identified || "",
+          cropIdentified: row.corrected_crop || row.crop_identified || "",
           cropConfidence: row.crop_confidence ?? 0,
-          diseaseDetected: row.disease_detected || "",
+          diseaseDetected:
+            (row.corrected_damage_codes && row.corrected_damage_codes.length > 0
+              ? row.corrected_damage_codes[0]
+              : row.disease_detected) || "",
           diseaseDetectedHi: row.disease_detected_hi || "",
-          severityPercentage: row.severity_percentage ?? 0,
-          severityGrade: asSeverityGrade(row.severity_grade),
+          severityPercentage: row.corrected_affected_area_pct ?? row.severity_percentage ?? 0,
+          severityGrade: asSeverityGrade(row.corrected_grade || row.corrected_severity || row.severity_grade),
           affectedAreaHectares: row.affected_area_hectares ?? 0,
           estimatedLossInr: row.estimated_loss_inr ?? 0,
           modelConfidence: row.model_confidence ?? 0,

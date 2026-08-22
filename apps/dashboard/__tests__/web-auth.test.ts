@@ -15,6 +15,12 @@ describe("hosted web roles", () => {
     expect(isReviewerRole("farmer")).toBe(false);
   });
 
+  it("never allows user metadata to elevate role to reviewer or administrator", () => {
+    // resolveWebRole does not accept userRoles, only appRoles and profileRole
+    expect(resolveWebRole({ appRoles: ["farmer"] })).toBe("farmer");
+    expect(resolveWebRole({ email: "attacker@example.com" })).toBe("farmer");
+  });
+
   it("treats REVIEWER_EMAILS as a reviewer allowlist", () => {
     const previous = process.env.REVIEWER_EMAILS;
     process.env.REVIEWER_EMAILS = "lead@example.com, other@example.com";
