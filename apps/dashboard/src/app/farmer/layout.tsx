@@ -10,7 +10,6 @@ import { useOnlineStatus } from "@/lib/use-online-status";
 import FasalSaathiOverlay from "@/components/FasalSaathiOverlay";
 import OfflineBanner from "@/components/offline-banner";
 import { LanguageSelect } from "@/components/LanguageSelect";
-import { GitHubStarsBadge } from "@/components/GitHubStarsBadge";
 import clsx from "clsx";
 
 function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
@@ -76,14 +75,13 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
 
       <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--surface)]/95 backdrop-blur-md shadow-2xs">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-2 sm:px-4 sm:py-2.5 md:px-6">
-          <Link href="/farmer" className="min-w-0">
-            <div className="truncate text-sm tracking-tight text-[var(--ink)]">
+          <Link href="/farmer" className="flex shrink-0 items-center gap-1.5 min-w-max">
+            <span className="text-sm font-semibold tracking-tight text-[var(--ink)] sm:text-base">
               Fasal-Pramaan
-              <span className="ml-1.5 hidden text-[var(--ink-muted)] sm:ml-2 sm:inline">
-                {t.farmerPortalLabel}
-              </span>
-            </div>
-            <p className="hidden text-xs text-[var(--ink-muted)] md:block">{t.tagline}</p>
+            </span>
+            <span className="hidden text-xs text-[var(--ink-muted)] xl:inline">
+              · {t.farmerPortalLabel}
+            </span>
           </Link>
 
           <nav className="fp-ui hidden items-center gap-1 md:flex">
@@ -127,7 +125,6 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="fp-ui flex shrink-0 items-center gap-2">
-            <GitHubStarsBadge />
             <Link href="/farmer/help" className="hidden text-xs text-[var(--ink-muted)] hover:text-[var(--ink)] sm:inline">
               {t.help}
             </Link>
