@@ -902,60 +902,91 @@ function CaptureStudioContent() {
               </div>
             ) : null}
 
-            {/* Overlaid Canonical Framing Guidelines */}
-            <div className="pointer-events-none absolute inset-0 border border-white/20 grid grid-cols-3 grid-rows-3">
+            {/* Overlaid Canonical Framing Guidelines (3x3 grid) */}
+            <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-60">
               <div className="border-r border-b border-white/20" />
               <div className="border-r border-b border-white/20" />
               <div className="border-b border-white/20" />
               <div className="border-r border-b border-white/20" />
               <div className="border-r border-b border-white/20 flex items-center justify-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/50">
-                  <span className="h-1 w-1 rounded-full bg-white" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/40">
+                  <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
                 </div>
               </div>
               <div className="border-b border-white/20" />
-              <div className="border-r border-white/20" />
-              <div className="border-r border-white/20" />
+              <div className="border-r border-b border-white/20" />
+              <div className="border-r border-b border-white/20" />
               <div />
             </div>
-            {/* CV bbox overlay */}
+
+            {/* Seamless Realtime CV Reticle & Bounding Box */}
             {cvResult?.bbox && isCameraActive && !capturedImages[currentAngle.id] && (
               <div
-                className="pointer-events-none absolute border-2 border-emerald-400 bg-emerald-400/10"
+                className={clsx(
+                  "pointer-events-none absolute transition-all duration-200 ease-out",
+                  cvResult.hintCode === "ok"
+                    ? "border-emerald-400/90 bg-emerald-500/10 shadow-[0_0_20px_rgba(52,211,153,0.25)]"
+                    : cvResult.hintCode === "hold_steady" || cvResult.hintCode === "too_close" || cvResult.hintCode === "too_far"
+                    ? "border-amber-400/90 bg-amber-500/10 shadow-[0_0_15px_rgba(251,191,36,0.2)]"
+                    : "border-white/30 bg-black/10"
+                )}
                 style={{
                   left: `${cvResult.bbox.x * 100}%`,
                   top: `${cvResult.bbox.y * 100}%`,
                   width: `${cvResult.bbox.w * 100}%`,
                   height: `${cvResult.bbox.h * 100}%`,
+                  borderWidth: "1.5px",
+                  borderRadius: "8px",
                 }}
-              />
+              >
+                {/* Corner bracket accents */}
+                <div className="absolute -top-1 -left-1 h-3 w-3 border-t-2 border-l-2 border-inherit rounded-tl-sm" />
+                <div className="absolute -top-1 -right-1 h-3 w-3 border-t-2 border-r-2 border-inherit rounded-tr-sm" />
+                <div className="absolute -bottom-1 -left-1 h-3 w-3 border-b-2 border-l-2 border-inherit rounded-bl-sm" />
+                <div className="absolute -bottom-1 -right-1 h-3 w-3 border-b-2 border-r-2 border-inherit rounded-br-sm" />
+              </div>
             )}
-            {/* CV model warmup badge + hint chip */}
-            {isCameraActive && !capturedImages[currentAngle.id] && (cvResult || cvModelStatus === "loading" || cvModelStatus === "ready") && (
-              <div className="pointer-events-none absolute bottom-14 left-2 right-2 flex flex-col items-center gap-1.5 sm:bottom-16">
-                {(cvModelStatus === "ready" || cvModelStatus === "loading") && (
+
+            {/* Seamless Viewfinder Floating Glass HUD */}
+            {isCameraActive && !capturedImages[currentAngle.id] && (
+              <div className="pointer-events-none absolute bottom-3 left-2 right-2 flex flex-col items-center gap-1.5 sm:bottom-4 sm:left-4 sm:right-4">
+                <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-white/20 bg-black/75 px-3.5 py-1.5 text-xs text-white shadow-lg backdrop-blur-md">
+                  {/* Status Indicator Dot */}
                   <span
                     className={clsx(
-                      "rounded-full px-3 py-1 text-xs font-bold shadow",
-                      cvModelStatus === "ready" ? "bg-emerald-600 text-white" : "animate-pulse bg-slate-700/90 text-white",
+                      "h-2 w-2 rounded-full shrink-0",
+                      cvResult?.hintCode === "ok"
+                        ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"
+                        : cvResult?.hintCode === "too_dark"
+                        ? "bg-rose-500"
+                        : "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
                     )}
-                  >
-                    {cvModelStatus === "ready"
+                  />
+
+                  {/* Localized Guidance Text */}
+                  <span className="font-semibold tracking-wide truncate">
+                    {cvResult
                       ? lang === "hi"
-                        ? "CV: AI तैयार"
-                        : "CV: AI ready"
+                        ? cvResult.hintHi
+                        : cvResult.hintEn
                       : lang === "hi"
-                        ? "CV: मॉडल लोड हो रहा…"
-                        : "CV: loading model…"}
+                      ? "कैमरा सक्रिय — फसल पर केंद्रित करें"
+                      : "Camera active — focus on crop"}
                   </span>
-                )}
-                {cvResult && (
-                  <span
-                    className={`max-w-full rounded-full px-3 py-1 text-xs font-bold shadow ${cvResult.hintCode === "ok" ? "bg-emerald-600 text-white" : "bg-amber-400 text-slate-900"}`}
-                  >
-                    {lang === "hi" ? cvResult.hintHi : cvResult.hintEn} · {cvResult.greenPct}% green · {cvResult.luma ?? "?"} luma
-                  </span>
-                )}
+
+                  {/* Canopy & AI status tags */}
+                  {cvResult && cvResult.greenPct > 0 && (
+                    <span className="rounded bg-white/20 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white/90">
+                      {cvResult.greenPct}% {lang === "hi" ? "कैनोपी" : "canopy"}
+                    </span>
+                  )}
+
+                  {cvModelStatus === "ready" && (
+                    <span className="hidden sm:inline rounded bg-emerald-500/30 border border-emerald-400/40 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-200">
+                      AI Ready
+                    </span>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1019,7 +1050,11 @@ function CaptureStudioContent() {
             <button
               type="button"
               onClick={capturePhotoFromCamera}
-              className="fp-btn-primary w-full gap-2 px-3 py-3 sm:px-6"
+              className={clsx(
+                "fp-btn-primary w-full gap-2 px-3 py-3 sm:px-6 transition-all",
+                cvResult?.hintCode === "ok" &&
+                  "ring-2 ring-emerald-500 ring-offset-2 ring-offset-[var(--surface)] shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+              )}
             >
               <Camera className="h-5 w-5" />
               <span>{t.takePhoto}</span>
