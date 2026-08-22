@@ -140,14 +140,14 @@ Every agricultural claim is evaluated dynamically via the **Variable Peril Routi
 
 | Peril Protocol | Required Field Angles | External Signal Triangulation | Trust Threshold | Satellite Prerequisite |
 |---|---|---|:---:|:---:|
-| 🔥 **Fire & Burn** (`fire_burn`) | **2 Angles**<br/>`wide_field` • `closeup_damage` | 🛰️ Sentinel-2 Burn Scar (L2A NDVI)<br/>🌡️ IMD/Open-Meteo High Heat Proxy<br/>🗺️ ISRO Bhuvan Land Use | **70%** | **Mandatory** *(Sentinel)* |
-| 🌊 **Flood & Inundation** (`flood`) | **3 Angles**<br/>`wide_field` • `mid_canopy` • `closeup` | 🌧️ IMD Extreme Precipitation & Runoff<br/>🛰️ Sentinel-2 Water Index<br/>📍 Cadastral Plot Proximity | **75%** | Standard |
-| 🐾 **Wildlife Damage** (`animal_damage`) | **3 Angles**<br/>`wide_field` • `mid_canopy` • `closeup` | 🌲 Overpass Wildlife Buffer (5km)<br/>🌦️ IMD Weather Station Data<br/>🗺️ ISRO Bhuvan Reserve Boundary | **75%** | Standard |
-| ☀️ **Drought Stress** (`drought`) | **3 Angles**<br/>`wide_field` • `mid_canopy` • `closeup` | 🌡️ IMD Consecutive Dry-Spell Index<br/>🗺️ Bhuvan Soil/Canopy Moisture<br/>📍 Adjacent Plot Triangulation | **80%** | Standard |
-| 🐛 **Pest & Disease** (`pest_disease`) | **3 Angles**<br/>`closeup` • `mid_canopy` • `wide_field` | 🌡️ IMD Temperature/Humidity Trajectory<br/>📍 Adjacent Field Infestation Clustered<br/>🗺️ Bhuvan Crop Boundary | **85%** | Standard |
-| 🌨️ **Hailstorm & Freeze** (`hailstorm`) | **3 Angles**<br/>`wide_field` • `closeup` • `mid_canopy` | ⚡ IMD Radar & Severe Storm Log<br/>📍 Neighborhood Damage Cluster<br/>🗺️ ISRO Bhuvan Land Cover | **75%** | Standard |
-| 🌾 **Crop Lodging** (`lodging`) | **3 Angles**<br/>`wide_field` • `mid_canopy` • `closeup` | 💨 IMD Wind Gust & Cyclonic Pressure<br/>📍 Neighboring Plot Lodging Cross-Check<br/>🗺️ Bhuvan WMS Tile | **75%** | Standard |
-| 🌿 **General / Multi-Peril** (`normal`) | **5 Angles (Full)**<br/>`wide` • `left` • `canopy` • `right` • `closeup` | 🌦️ IMD Multi-Week Historical Weather<br/>🗺️ ISRO Bhuvan Land Classification<br/>📍 Cadastral Boundary Haversine Check | **85%** | Standard |
+| **Fire & Burn** (`fire_burn`) | **2 Angles**<br/>`wide_field` • `closeup_damage` | Sentinel-2 Burn Scar (L2A NDVI)<br/>IMD/Open-Meteo High Heat Proxy<br/>ISRO Bhuvan Land Use | **70%** | **Mandatory** *(Sentinel)* |
+| **Flood & Inundation** (`flood`) | **3 Angles**<br/>`wide_field` • `mid_canopy` • `closeup` | IMD Extreme Precipitation & Runoff<br/>Sentinel-2 Water Index<br/>Cadastral Plot Proximity | **75%** | Standard |
+| **Wildlife Damage** (`animal_damage`) | **3 Angles**<br/>`wide_field` • `mid_canopy` • `closeup` | Overpass Wildlife Buffer (5km)<br/>IMD Weather Station Data<br/>ISRO Bhuvan Reserve Boundary | **75%** | Standard |
+| **Drought Stress** (`drought`) | **3 Angles**<br/>`wide_field` • `mid_canopy` • `closeup` | IMD Consecutive Dry-Spell Index<br/>Bhuvan Soil/Canopy Moisture<br/>Adjacent Plot Triangulation | **80%** | Standard |
+| **Pest & Disease** (`pest_disease`) | **3 Angles**<br/>`closeup` • `mid_canopy` • `wide_field` | IMD Temperature/Humidity Trajectory<br/>Adjacent Field Infestation Clustered<br/>Bhuvan Crop Boundary | **85%** | Standard |
+| **Hailstorm & Freeze** (`hailstorm`) | **3 Angles**<br/>`wide_field` • `closeup` • `mid_canopy` | IMD Radar & Severe Storm Log<br/>Neighborhood Damage Cluster<br/>ISRO Bhuvan Land Cover | **75%** | Standard |
+| **Crop Lodging** (`lodging`) | **3 Angles**<br/>`wide_field` • `mid_canopy` • `closeup` | IMD Wind Gust & Cyclonic Pressure<br/>Neighboring Plot Lodging Cross-Check<br/>Bhuvan WMS Tile | **75%** | Standard |
+| **General / Multi-Peril** (`normal`) | **5 Angles (Full)**<br/>`wide` • `left` • `canopy` • `right` • `closeup` | IMD Multi-Week Historical Weather<br/>ISRO Bhuvan Land Classification<br/>Cadastral Boundary Haversine Check | **85%** | Standard |
 
 **Transparent reviewer dashboard:** the review queue and claim detail show adaptive level, threshold per peril, context signal statuses, visual score breakdowns, and the audit trail. The claim detail adds a **Multi-Signal Context & Satellite Cross-Check card** (per-signal status chips, side-by-side `wide_field` photo vs Bhuvan WMS tile, and a Copernicus Browser deep-link showing Sentinel-2 L2A for the last 3 days via `meta.burnMapUrl`), and both the queue and the executive overview offer **CSV export** (`src/lib/csv.ts` — dependency-free `toCsv`/`downloadCsv`) over the currently filtered rows; the overview's per-peril rows also show average confidence (color-coded) and recapture rate from `analyticsFromClaims().byPeril`.
 
@@ -385,9 +385,9 @@ python scripts/test_supabase_conn.py
 
 ## Future Roadmap & Upcoming Milestones
 
-- 🧠 **Enhance Vision Transformer (ViT) Models**: Continuous fine-tuning of the DINOv2 / ViT-S/14 crop health classifiers across multi-state localized Indian agro-climatic datasets with automated multi-spectral satellite band fusion.
-- 📱 **Redesign & Engineer Dedicated Mobile App**: Build an offline-first native mobile application (Flutter / React Native) with embedded on-device ONNX runtime edge CV inference and sub-100ms conversational audio pipelines.
-- 🐳 **Full Containerization & One-Click Shipping**: Provide complete multi-container Docker compose topologies and Helm charts to effortlessly deploy and ship the full stack across cloud and edge servers.
+- **Enhance Vision Transformer (ViT) Models**: Continuous fine-tuning of the DINOv2 / ViT-S/14 crop health classifiers across multi-state localized Indian agro-climatic datasets with automated multi-spectral satellite band fusion.
+- **Redesign & Engineer Dedicated Mobile App**: Build an offline-first native mobile application (Flutter / React Native) with embedded on-device ONNX runtime edge CV inference and sub-100ms conversational audio pipelines.
+- **Full Containerization & One-Click Shipping**: Provide complete multi-container Docker compose topologies and Helm charts to effortlessly deploy and ship the full stack across cloud and edge servers.
 
 ---
 
