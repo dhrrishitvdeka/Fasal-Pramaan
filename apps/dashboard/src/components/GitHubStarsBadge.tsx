@@ -5,45 +5,80 @@ import { Star } from "lucide-react";
 
 interface GitHubStarsBadgeProps {
   className?: string;
+  repo?: string;
 }
 
-export function GitHubStarsBadge({ className = "" }: GitHubStarsBadgeProps) {
-  // Default to the current verified repo star count (5) so it is never blank or showing '—'
-  const [stars, setStars] = useState<number>(5);
+const DEFAULT_REPO = "dhrrishitvdeka/Fasal-Pramaan";
+const CACHE_KEY = "fp_gh_stars_v2";
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export function GitHubStarsBadge({ className = "", repo }: GitHubStarsBadgeProps) {
+  const targetRepo = repo || process.env.NEXT_PUBLIC_GITHUB_REPO || DEFAULT_REPO;
+  const repoUrl = `https://github.com/${targetRepo}`;
+  const [stars, setStars] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const cached = localStorage.getItem(`${CACHE_KEY}_${targetRepo}`);
+      if (cached) {
+        const parsed = JSON.parse(cached) as { count: number; ts: number };
+        if (typeof parsed?.count === "number" && Date.now() - parsed.ts < CACHE_TTL_MS) {
+          return parsed.count;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
 
   useEffect(() => {
     let cancelled = false;
 
-    // Check cached stars in sessionStorage
-    if (typeof window !== "undefined") {
-      try {
-        const cached = sessionStorage.getItem("fp_gh_stars");
-        if (cached) {
-          const parsed = parseInt(cached, 10);
-          if (!isNaN(parsed) && parsed > 0) {
-            setStars(parsed);
-          }
-        }
-      } catch {
-        // ignore
-      }
-    }
-
     async function fetchStars() {
+      // 1. Try our internal server route first (avoids browser client rate limits)
       try {
-        const res = await fetch("https://api.github.com/repos/dhrrishitvdeka/Fasal-Pramaan");
-        if (!res.ok) return;
-        const data = (await res.json()) as { stargazers_count?: number };
-        if (!cancelled && typeof data.stargazers_count === "number") {
-          setStars(data.stargazers_count);
-          try {
-            sessionStorage.setItem("fp_gh_stars", String(data.stargazers_count));
-          } catch {
-            // ignore
+        const res = await fetch(`/api/github/stars?repo=${encodeURIComponent(targetRepo)}`);
+        if (res.ok) {
+          const data = (await res.json()) as { stars?: number };
+          if (!cancelled && typeof data.stars === "number") {
+            setStars(data.stars);
+            try {
+              localStorage.setItem(
+                `${CACHE_KEY}_${targetRepo}`,
+                JSON.stringify({ count: data.stars, ts: Date.now() })
+              );
+            } catch {
+              // ignore
+            }
+            return;
           }
         }
       } catch {
-        // graceful fallback to initial value
+        // Fallback to direct client fetch
+      }
+
+      // 2. Direct GitHub API fallback
+      try {
+        const res = await fetch(`https://api.github.com/repos/${targetRepo}`, {
+          headers: { Accept: "application/vnd.github+json" },
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { stargazers_count?: number };
+          if (!cancelled && typeof data.stargazers_count === "number") {
+            setStars(data.stargazers_count);
+            try {
+              localStorage.setItem(
+                `${CACHE_KEY}_${targetRepo}`,
+                JSON.stringify({ count: data.stargazers_count, ts: Date.now() })
+              );
+            } catch {
+              // ignore
+            }
+            return;
+          }
+        }
+      } catch {
+        // Graceful ignore
       }
     }
 
@@ -52,7 +87,7 @@ export function GitHubStarsBadge({ className = "" }: GitHubStarsBadgeProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [targetRepo]);
 
   const formatCount = (count: number) => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
@@ -62,11 +97,11 @@ export function GitHubStarsBadge({ className = "" }: GitHubStarsBadgeProps) {
 
   return (
     <a
-      href="https://github.com/dhrrishitvdeka/Fasal-Pramaan"
+      href={repoUrl}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="GitHub repository"
-      title="GitHub · Fasal-Pramaan"
+      aria-label={`GitHub repository ${targetRepo}`}
+      title={`GitHub · ${targetRepo}`}
       className={`group flex items-center gap-1 rounded px-1.5 py-1 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--canvas)] hover:text-[var(--ink)] sm:gap-1.5 sm:px-2 sm:text-sm ${className}`}
     >
       {/* Natural GitHub Icon */}
@@ -87,7 +122,7 @@ export function GitHubStarsBadge({ className = "" }: GitHubStarsBadgeProps) {
 
       <span className="flex items-center gap-1 text-xs">
         <Star className="h-3 w-3 fill-amber-400 text-amber-500" aria-hidden="true" />
-        <span className="font-semibold">{formatCount(stars)}</span>
+        <span className="font-semibold">{stars !== null ? formatCount(stars) : "…"}</span>
       </span>
     </a>
   );
