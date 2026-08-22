@@ -8,16 +8,16 @@ Fasal-Pramaan implements a **defense-in-depth security model** engineered to pro
 
 | Security Domain | Implemented Control | Technical Implementation |
 |---|---|---|
-| **Identity & Passwords** | Argon2id Hashing | High-memory cost parameters; automated account lockout after 5 consecutive failed attempts. |
-| **Session & Tokens** | JWT Token Versioning | Short-lived access tokens (30 min); user `token_version` checked in DB; global logout revokes all active tokens. |
-| **Refresh Tokens** | Cryptographic Token Families | Opaque SHA-256 hashed tokens with automatic family revocation if token reuse/theft is detected. |
-| **Role-Based Access (RBAC)** | Principle of Least Privilege | Distinct permission matrices for Farmers, Field Officers, Reviewers, and System Administrators. |
-| **Spatial Fencing** | PostGIS Jurisdiction Scoping | Field officers are restricted to plots within their assigned administrative geometry ($State \rightarrow District \rightarrow Block \rightarrow Village$). |
-| **Inter-Service Auth** | `X-Service-Token` Header | Microservices (API $\rightarrow$ AI $\rightarrow$ Worker) communicate over private networks with strong HMAC tokens (≥32 chars). |
-| **Evidence Immutability** | Content-Addressed Storage | Object keys are server-generated UUIDs; direct client file naming is prohibited; uploaded bytes are immutable. |
-| **Anti-Tamper & Anti-Fraud** | Multi-Factor Verification | SHA-256 checksums, Perceptual Hashes ($pHash$), EXIF capture time consistency, and mock-location detection. |
+| **Identity & Passwords** | Supabase Auth | Managed credential hashing and lockout-resistant defaults; the public site additionally sits behind a shared gate password (`SITE_LOCK_PASSWORD`). |
+| **Session & Tokens** | Supabase Auth JWT | Short-lived signed session tokens; global logout revokes the session; server routes verify the JWT before acting. |
+| **Refresh Tokens** | Supabase Token Rotation | Refresh tokens are rotated automatically with reuse detection by Supabase Auth. |
+| **Role-Based Access (RBAC)** | Principle of Least Privilege | Reviewer vs farmer roles resolved from `REVIEWER_EMAILS` / `app_metadata.roles`; farmers only access their own claims and plots. |
+| **Spatial Fencing** | Plot Ownership Scoping | Farmer data is ownership-scoped in `web_*` tables; plot boundary geometry is stored in Supabase Postgres (PostGIS extension). |
+| **Service-Role Isolation** | Server-Only Keys | All privileged writes flow through Next.js server routes holding `SUPABASE_SERVICE_ROLE_KEY`; outbound calls to the Hugging Face Space use server-only `HF_TOKEN`. Neither is ever exposed to the browser. |
+| **Evidence Immutability** | Content-Addressed Storage | Object keys are server-generated; direct client file naming is prohibited; uploaded bytes are immutable in the private `fasal-web-evidence` bucket. |
+| **Anti-Tamper & Anti-Fraud** | Multi-Factor Verification | SHA-256 checksums, duplicate detection across angles, EXIF capture time consistency, and GPS accuracy validation. |
 | **Browser Protection** | CSP & Memory Retention | Strict Content Security Policy; tokens retained in memory rather than `localStorage` to prevent XSS exfiltration. |
-| **Container Hardening** | Non-Root User Execution | All Docker containers run under unprivileged service users with minimal Linux capabilities. |
+| **Managed Platform Hardening** | Serverless + RLS | Vercel serverless runtime with no long-lived processes; Supabase anon RLS policies on `web_*` tables and storage stay closed. |
 
 ---
 
@@ -35,7 +35,7 @@ flowchart TD
 
   subgraph Mitigations["Fasal-Pramaan Defenses"]
     M1["SHA-256 + Perceptual Hash (pHash) Deduplication"]
-    M2["Android Mock-Provider Check + PostGIS Plot Boundary Match"]
+    M2["GPS Accuracy Validation + Registered Plot Boundary Match"]
     M3["High-Frequency Texture & Moiré Pattern Analysis"]
     M4["Strict UUID Ownership & Jurisdiction Database Scoping"]
     M5["Model Separation: AI Assists, Evidence Engine Governs, Reviewer Decides"]
@@ -55,23 +55,18 @@ flowchart TD
 ```mermaid
 sequenceDiagram
   autonumber
-  participant Client as Mobile Client
-  participant API as FastAPI Gateway
-  participant S3 as MinIO S3 Store
-  participant Worker as Celery Worker
+  participant Client as Browser (Capture Studio)
+  participant API as Next.js Server Route (POST /api/claims)
+  participant Store as Supabase Storage (fasal-web-evidence)
 
-  Client->>API: 1. Declares SHA-256, byte size, and MIME type
-  API-->>Client: 2. Issues Presigned S3 PUT URL with Content-Length & Type constraints
-  Client->>S3: 3. Streams raw image bytes directly to S3
-  Client->>API: 4. Calls /confirm with S3 ETag
-  API->>Worker: 5. Dispatches Verification Job
-  Worker->>S3: 6. Fetches object metadata and raw bytes
-  Worker->>Worker: 7. Recomputes SHA-256 & pHash independently
-  Worker->>Worker: 8. Verifies image headers (JPEG/PNG decoding)
-  alt Hash or Byte Size Mismatch
-    Worker->>API: Mark Image as "failed" & Deduct Integrity Score (-65.0)
+  Client->>API: 1. Sends images with declared SHA-256, byte size, and MIME type
+  API->>API: 2. Validates payload limits and recomputes SHA-256 server-side
+  API->>Store: 3. Writes raw image bytes to the private bucket (server-generated keys)
+  API->>Store: 4. Persists metadata with integrity flags in web_claim_images
+  alt Hash or Byte Size Mismatch / Duplicate Across Angles
+    API->>API: Mark Image as "failed" & Deduct Integrity Score (-65.0)
   else Verification Passes
-    Worker->>API: Mark Image as "uploaded" & Set is_original_immutable=True
+    API->>API: Mark Image as "uploaded" & Set is_original_immutable=True
   end
 ```
 
@@ -81,5 +76,5 @@ sequenceDiagram
 
 1. **Zero Hardcoded Secrets**: All cryptographic keys, database passwords, and API tokens are injected strictly via environment variables. Never commit `SUPABASE_DB_PASSWORD`, `HF_TOKEN`, or publishable/service keys. `scripts/test_supabase_conn.py` reads env only.
 2. **Vercel server-only keys**: `SUPABASE_SERVICE_ROLE_KEY` and `HF_TOKEN` must never be named `NEXT_PUBLIC_*`. The evidence bucket `fasal-web-evidence` is private.
-3. **Local vs. Production Isolation**: When `ENVIRONMENT=production`, the application startup lifecycle strictly verifies that no demo credentials, default passwords, or mock fallbacks are active.
+3. **Local vs. Production Isolation**: Never enable demo credentials or mock inference fallbacks on a hosted deployment; keep demo data out of the production Supabase project.
 4. **Audit Trails**: All reviewer overrides, claim status mutations, and voice assistant operations write immutable records to the `audit_logs` table with actor UUID and timestamp. Hosted web actions also go to `web_review_actions`.

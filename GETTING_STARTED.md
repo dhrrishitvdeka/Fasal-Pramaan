@@ -1,161 +1,137 @@
 # Getting Started with Fasal-Pramaan
 
-Welcome to **Fasal-Pramaan (*फसल प्रमाण*)** — the AI-assisted crop evidence capture, trust evaluation, and verification platform.
+Welcome to **Fasal-Pramaan (*फसल प्रमाण*)** — the AI-assisted crop evidence capture, trust evaluation, and verification webapp.
 
-This guide walks you through setting up and running the complete distributed platform locally using Docker. All microservices, database schemas, seed accounts, and local Vision Transformer ONNX model artifacts are packaged within the repository.
+This guide walks you through setting up and running the Next.js webapp (`apps/dashboard`) locally against your own Supabase project, and deploying it to Vercel. There is a single deployable: the dashboard.
 
 ---
 
 ## 1. Prerequisites
 
-- **Operating System**: Windows 10/11, macOS (Apple Silicon or Intel), or Linux (Ubuntu 22.04+ recommended).
-- **Container Runtime**: Docker Desktop or Docker Engine (version 24.0+) with Docker Compose v2.
-- **Hardware Requirements**: Minimum 8 GB RAM and 12 GB free disk space (for base images and dependencies).
-- **Git**: For cloning the repository.
-
-*Note: You do not need to install Python, Flutter, Node.js, PostgreSQL, Redis, or MinIO on your host machine. Everything runs containerized inside Docker.*
+- **Node.js 20+** (Node 22 recommended — CI uses Node 22) and npm.
+- **A Supabase account** (free tier works): you will create one project for auth, Postgres tables, and evidence storage.
+- **Git**: for cloning the repository.
+- **Optional API keys**:
+  - `GEMINI_API_KEY` — enables the Gemini vision gate on `POST /api/vision/gate` and Saathi Live voice; without it the gate falls back to a size/type heuristic.
+  - Hugging Face token (`HF_TOKEN`) — used for crop-model inference via the Space when claims are submitted.
+  - `SENTINEL_TOKEN` / `IMD_API_KEY` — optional external context signals; without them signals return `pending` (IMD rainfall still works through the open-meteo proxy with no key).
 
 ---
 
-## 2. Clone & Launch
+## 2. Clone & Install
 
-### Step 1: Clone the Repository
 ```bash
 git clone https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
-cd Fasal-Pramaan
+cd Fasal-Pramaan/apps/dashboard
+
+# Clean, reproducible install from the lockfile
+npm ci
 ```
 
-### Step 2: Configure Environment
-Copy the pre-configured environment template:
+(From the repository root, `npm run dev`, `npm run build`, `npm test`, etc. all proxy into `apps/dashboard` via `--prefix`.)
+
+---
+
+## 3. Configure Environment
+
 ```bash
 # Windows (PowerShell)
-Copy-Item .env.example .env
+Copy-Item .env.example .env.local
 
 # macOS / Linux (Bash)
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-### Step 3: Start the Platform
+Fill in at minimum:
 
-#### Windows (PowerShell Launcher)
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1
-```
+| Variable | Required | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | yes | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes | Browser-safe publishable key |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | Server-only; never expose to the client |
+| `HF_TOKEN` | recommended | Hugging Face inference token |
+| `HF_SPACE_URL` | no | Defaults to `https://dhrrishitvdeka-fasal-pramaan-api.hf.space` |
+| `SITE_LOCK_PASSWORD` | no | Leave empty locally; set on Vercel to password-lock the site |
+| `GEMINI_API_KEY` | optional | Vision gate + Saathi Live voice |
+| `GEMINI_LIVE_MODEL` / `GEMINI_LIVE_VOICE` / `GEMINI_LIVE_SESSION_MINUTES` | optional | Saathi Live tuning (defaults provided) |
+| `SENTINEL_TOKEN` / `IMD_API_KEY` | optional | External context signals |
+| `REVIEWER_EMAILS` | yes | Comma-separated reviewer emails; everyone else is a farmer |
 
-#### macOS / Linux (Bash Launcher)
-```bash
-sh scripts/start-portable.sh
-```
-
-#### Alternative: Direct Docker Compose
-```bash
-docker compose up -d --build
-```
-
-The launcher automatically builds all container images, runs Alembic database migrations, seeds reference crop catalogs and test accounts, waits for health checks to pass, and prints application URLs.
-
-From the `local/` folder you can also run `.\start.ps1` / `sh start.sh` (same Docker stack). Do not point Vercel at `local/`.
+Never commit `.env.local`. Server-only keys must never be named `NEXT_PUBLIC_*`.
 
 ---
 
-## Hosted web (Vercel) — not this Docker walkthrough
+## 4. Apply the Supabase SQL
 
-To run **only** the Next.js farmer/reviewer app on Vercel (Supabase + Hugging Face, no FastAPI):
+In the Supabase dashboard open **SQL Editor** and run these files in order (all in `scripts/`):
 
-1. SQL: `scripts/setup_supabase.sql` then `scripts/setup_web_schema.sql`.
-2. Vercel env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, optional `HF_SPACE_URL`.
-3. Leave `NEXT_PUBLIC_API_BASE_URL` unset. No Maps / weather / Gemini keys.
+1. `scripts/setup_supabase.sql` — base project setup (storage bucket, roles).
+2. `scripts/setup_web_schema.sql` — `web_*` tables for claims, plots, evaluations.
+3. `scripts/setup_web_schema_peril.sql` — peril-aware columns/updates for adaptive routing.
+4. `scripts/lock_web_rls.sql` — Row Level Security policies locking `web_*` tables down.
 
-Details: [docs/supabase-integration.md](docs/supabase-integration.md) and [docs/deployment.md](docs/deployment.md).
+Then create Auth users for yourself (and reviewers). Emails listed in `REVIEWER_EMAILS` get the reviewer role at `/review`; everyone else is a farmer.
 
----
-
-## 3. Accessing System Portals
-
-| Application Portal | Local URL | Pre-Seeded Credentials | Role & Purpose |
-|---|---|---|---|
-| **Farmer Field App** | `http://localhost:8085` | `farmer@fasalpramaan.local` / `Demo@12345` | Farm registration, guided 5-angle capture, offline sync, status tracking |
-| **Field Officer Portal** | `http://localhost:8085` | `officer@fasalpramaan.local` / `Demo@12345` | Jurisdiction-scoped assisted capture and field validation |
-| **Reviewer Command Centre** | `http://localhost:3000` | `reviewer@fasalpramaan.local` / `Demo@12345` | Review queue, GIS mapping, evidence score breakdown, claim adjudication |
-| **System Administrator** | `http://localhost:3000` | `admin@fasalpramaan.local` / `Demo@12345` | User administration, audit log inspection, system health metrics |
-| **API Gateway & Swagger** | `http://localhost:8000/docs` | Bearer Token Auth | Interactive OpenAPI documentation and REST testing |
-| **AI Inference Service** | `http://localhost:8001/health` | `X-Service-Token` Header | Vision Transformer inference health and model metadata |
-| **MinIO S3 Evidence Vault** | `http://localhost:9001` | `minioadmin` / `minioadmin_dev_only` | S3-compatible private object storage console |
-
----
-
-## 4. Complete 10-Minute End-to-End Walkthrough
-
-### 1. Register Farm, Plot & Crop Cycle
-1. Open `http://localhost:8085` in your browser and sign in as the farmer (`farmer@fasalpramaan.local` / `Demo@12345`).
-2. Navigate to **Farms** $\rightarrow$ **Add Farm** (e.g., *"Kisan Samriddhi Farm"*).
-3. Under the farm, tap **Add Plot** (e.g., *"North Plot 1"*, 2.5 Hectares).
-4. Tap **Start Crop Cycle**, select **Paddy (Rice)**, and set season to **Kharif 2026**.
-
-### 2. Capture Guided Evidence
-1. On the active crop cycle, tap **Capture Crop Evidence**.
-2. Capture the 5 canonical angles following the on-screen framing guides:
-   - `wide_field` (Landscape overview)
-   - `left_context` (Left lateral perspective)
-   - `mid_canopy` (Eye-level canopy structure)
-   - `right_context` (Right lateral perspective)
-   - `closeup_damage` (Macro symptomatic leaf/crop view)
-3. Enter optional farmer observations (e.g., *"Observed leaf yellowing and brown spots on lower leaves"*).
-4. Tap **Save & Submit**. The app uploads the encrypted images to MinIO and finalizes the submission.
-
-### 3. Review & Adjudicate
-1. Open `http://localhost:3000` in a new browser tab and sign in as the reviewer (`reviewer@fasalpramaan.local` / `Demo@12345`).
-2. Navigate to **Review Queue**. The newly submitted case will appear in the queue.
-3. Open the case detail to inspect:
-   - **Evidence Confidence Score** (e.g., `92.4 / 100` — Evidence Sufficient).
-   - **4-Component Score Breakdown** (Quality: `95.0`, Coverage: `100.0`, Context: `85.0`, Integrity: `100.0`).
-   - **DINOv2 AI Screening Grade** (Grade `C` — Disease Pattern Detected).
-   - **Interactive GIS Map** with PostGIS plot boundary overlay and capture GPS pin.
-4. Click **Accept Claim** or **Correct Assessment** with an override note. The case status updates to `verified` and writes an immutable audit record.
-
----
-
-## 5. Verifying System Health
-
-Verify all microservice health endpoints:
+Optionally verify connectivity:
 
 ```bash
-# API Gateway
-curl http://localhost:8000/health
-
-# AI Inference Service
-curl http://localhost:8001/health
-
-# Reviewer Command Centre
-curl -I http://localhost:3000
-
-# Field Mobile Web App
-curl -I http://localhost:8085/healthz
-```
-
-Expected AI Health Response:
-```json
-{
-  "status": "healthy",
-  "default_adapter": "crop_health_v4",
-  "crop_health_v4_model": true,
-  "inference_ready": true
-}
+python scripts/test_supabase_conn.py
 ```
 
 ---
 
-## 6. Stopping & Resetting the Environment
+## 5. Run Locally
 
 ```bash
-# Stop all containers while preserving database and evidence volumes
-docker compose down
-
-# Stop all containers and remove all local volumes (clean state reset)
-docker compose down -v
-
-# Clear captured operational data while preserving seed accounts and crop catalogs
-docker compose stop worker beat
-docker compose exec api python scripts/clear_operational_data.py --confirm-local-reset
-docker compose start worker beat
+npm run dev        # inside apps/dashboard → http://localhost:3000
 ```
+
+Sign in at `/login`, then:
+
+- **Farmer**: start at `/farmer/saathi` (Saathi intake) or go straight to `/farmer/capture`.
+- **Reviewer** (email in `REVIEWER_EMAILS`): open `/review`.
+
+Weather context uses the `api.open-meteo.com` IMD proxy with no key; Gemini vision gate and Sentinel activate automatically when their keys are present.
+
+---
+
+## 6. Test, Lint, Typecheck
+
+```bash
+# Inside apps/dashboard
+npm run lint
+npm run typecheck
+npm test
+npm run build
+
+# Or from the repository root (same commands via --prefix apps/dashboard)
+```
+
+CI runs exactly this suite on every push and pull request (see `.github/workflows/ci.yml`).
+
+---
+
+## 7. Deploy to Vercel
+
+1. Push this repository to GitHub and import it into Vercel (**Add New… → Project**).
+2. Framework preset: **Next.js**.
+3. **Set Root Directory to `apps/dashboard`** (Settings → General). This is required so Vercel finds `next` in `apps/dashboard/package.json`.
+4. Add the environment variables from step 3 in Project Settings → Environment Variables. Never commit their values.
+5. Deploy.
+
+After deploy, confirm:
+
+- The site loads (site lock appears if `SITE_LOCK_PASSWORD` is set).
+- A farmer can sign in and submit a claim from `/farmer/capture`; photos land in the Supabase storage bucket with `web_claims.created_by` recorded.
+- The same claim id appears at `/review` only for reviewer accounts.
+
+---
+
+## Troubleshooting
+
+- **Claims fail to save** — check `SUPABASE_SERVICE_ROLE_KEY` is set server-side and the SQL scripts were applied; run `python scripts/test_supabase_conn.py`.
+- **Vision gate always heuristic** — `GEMINI_API_KEY` missing or invalid.
+- **Context signals stuck on `pending`** — expected without `SENTINEL_TOKEN`; IMD works keyless via the open-meteo proxy.
+- **New user can't see `/review`** — add their email to `REVIEWER_EMAILS` and redeploy/restart.
+
+Details: [docs/supabase-integration.md](docs/supabase-integration.md), [docs/environment-variables.md](docs/environment-variables.md), [docs/deployment.md](docs/deployment.md).

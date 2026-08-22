@@ -9,10 +9,13 @@ import { inferCropDisease } from "@/lib/hf-infer";
 import { createServerSupabase } from "@/lib/supabase";
 import { createSupabaseClaimStore } from "@/lib/supabase-store";
 import { isReviewerRole, requireWebActor } from "@/lib/web-auth";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 const MAX_BYTES = 15 * 1024 * 1024;
 const MAX_IMAGES = 6;
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 function decodeDataUrl(value: string): { bytes: Uint8Array; contentType: string } {
   const match = value.match(/^data:([^;]+);base64,(.+)$/);
@@ -28,6 +31,12 @@ function decodeDataUrl(value: string): { bytes: Uint8Array; contentType: string 
     throw new Error("Each image must be between 1 byte and 15 MB");
   }
   return { contentType, bytes };
+}
+
+function clampNumber(value: unknown, min: number, max: number): number | undefined {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.max(min, Math.min(max, n));
 }
 
 export async function GET(request: Request) {
@@ -52,6 +61,13 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
+  const limit = checkRateLimit(`claims:${auth.actor.userId}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many claim submissions. Try again shortly." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
   const supabase = createServerSupabase();
   if (!supabase) {
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
@@ -141,6 +157,14 @@ export async function POST(request: Request) {
       captureLon: body.captureLon,
       captureAccuracyM: body.captureAccuracyM,
       gpsStatus: body.gpsStatus,
+      peril: typeof body.peril === "string" ? body.peril.trim().toLowerCase() : undefined,
+      intentId: typeof body.intentId === "string" ? body.intentId.trim() : undefined,
+      plotLat: clampNumber(body.plotLat, -90, 90) ?? null,
+      plotLon: clampNumber(body.plotLon, -180, 180) ?? null,
+      sowingDate:
+        typeof body.sowingDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.sowingDate.trim())
+          ? body.sowingDate.trim()
+          : undefined,
       createdBy: auth.actor.userId,
       images,
     };

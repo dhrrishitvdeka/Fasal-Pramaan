@@ -292,6 +292,10 @@ export const farmerTranslations = {
     queueTitle: "Offline draft",
     queueEmpty: "No saved capture draft on this device.",
     signOut: "Sign out",
+    refresh: "Refresh",
+    refreshing: "Refreshing…",
+    loadingPlots: "Loading plots…",
+    loadingClaims: "Loading claims…",
   },
   hi: {
     // Nav & Shell
@@ -455,6 +459,10 @@ export const farmerTranslations = {
     queueTitle: "ऑफ़लाइन प्रारूप",
     queueEmpty: "इस डिवाइस पर कोई सहेजा हुआ कैप्चर प्रारूप नहीं है।",
     signOut: "साइन आउट",
+    refresh: "रिफ्रेश",
+    refreshing: "रिफ्रेश हो रहा है…",
+    loadingPlots: "प्लॉट लोड हो रहे हैं…",
+    loadingClaims: "दावे लोड हो रहे हैं…",
   },
 } as const;
 

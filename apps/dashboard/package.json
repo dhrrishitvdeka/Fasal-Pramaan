@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "eslint . --quiet",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -29,6 +31,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^20",
     "@types/react": "19.2.18",

@@ -3,6 +3,7 @@ import { applyReviewerAction } from "@/lib/claim-pipeline";
 import { createServerSupabase } from "@/lib/supabase";
 import { createSupabaseClaimStore } from "@/lib/supabase-store";
 import { actorUnauthorized, isReviewerRole, requireWebActor } from "@/lib/web-auth";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 
 const ALLOWED_ACTIONS = new Set([
   "accept",
@@ -10,13 +11,23 @@ const ALLOWED_ACTIONS = new Set([
   "request_recapture",
   "physical_inspection",
   "reject",
+  "override_gate",
 ]);
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
   if (!isReviewerRole(auth.actor.role)) {
     return actorUnauthorized("Reviewer role required");
+  }
+  const limit = checkRateLimit(`claim-action:${auth.actor.userId}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many review actions. Try again shortly." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
   }
   const { id } = await context.params;
   const supabase = createServerSupabase();

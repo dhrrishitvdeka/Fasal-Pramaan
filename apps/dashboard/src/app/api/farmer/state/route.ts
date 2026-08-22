@@ -38,9 +38,18 @@ export async function GET(request: Request) {
     milestonesQuery,
     supabase.from("web_profiles").select("*").eq("id", auth.actor.userId).maybeSingle(),
   ]);
-  if (plotsRes.error) return NextResponse.json({ error: plotsRes.error.message }, { status: 500 });
-  if (claimsRes.error) return NextResponse.json({ error: claimsRes.error.message }, { status: 500 });
-  if (milestonesRes.error) return NextResponse.json({ error: milestonesRes.error.message }, { status: 500 });
+  if (plotsRes.error) {
+    console.error("plots query failed:", plotsRes.error.message);
+    return NextResponse.json({ error: "Request failed" }, { status: 500 });
+  }
+  if (claimsRes.error) {
+    console.error("claims query failed:", claimsRes.error.message);
+    return NextResponse.json({ error: "Request failed" }, { status: 500 });
+  }
+  if (milestonesRes.error) {
+    console.error("milestones query failed:", milestonesRes.error.message);
+    return NextResponse.json({ error: "Request failed" }, { status: 500 });
+  }
 
   const claims = (claimsRes.data || []) as WebClaimRow[];
   const imageRows: WebClaimImageRow[] = [];
@@ -52,7 +61,10 @@ export async function GET(request: Request) {
         "claim_id",
         claims.map((claim) => claim.id),
       );
-    if (imagesRes.error) return NextResponse.json({ error: imagesRes.error.message }, { status: 500 });
+    if (imagesRes.error) {
+      console.error("claim images query failed:", imagesRes.error.message);
+      return NextResponse.json({ error: "Request failed" }, { status: 500 });
+    }
     imageRows.push(...((imagesRes.data || []) as WebClaimImageRow[]));
   }
 

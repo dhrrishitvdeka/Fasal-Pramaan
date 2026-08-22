@@ -6,8 +6,11 @@ import { parseAppLang, persistAppLang } from "./live-indian-languages";
 import { getWebClaim, listWebClaims, submitWebClaim } from "./api";
 import { apiFetch } from "./auth-headers";
 import { buildRecaptureSubmitInput, computeEvidencePreview } from "./claim-pipeline";
+import { diffNewRecaptures, markSeen, type RecaptureNotice } from "./farmer-notifications";
 import { isSupabaseConfigured } from "./supabase";
 import { EMPTY_FARMER_PROFILE } from "./web-db";
+import type { ClaimIntent, Peril } from "./claim-routing";
+import { INTENT_STORAGE_KEY } from "./claim-routing";
 
 export interface FarmerPlot {
   id: string;
@@ -103,6 +106,16 @@ export interface FarmerClaim {
   aiPrediction: ClaimAiPrediction;
   payoutStatus?: "approved" | "pending_review" | "needs_action" | "processing";
   payoutAmountInr?: number;
+  plotLat?: number | null;
+  plotLon?: number | null;
+  peril?: string | null;
+  intentId?: string | null;
+  gateResult?: unknown;
+  contextSignals?: unknown;
+  adaptive_result?: unknown;
+  // compat aliases for DB column names
+  gate_result?: unknown;
+  context_signals?: unknown;
 }
 
 export interface GrowthTimelineMilestone {
@@ -138,6 +151,11 @@ interface FarmerContextType {
     claim: Omit<FarmerClaim, "id" | "createdAt" | "updatedAt" | "evidenceTrust" | "aiPrediction"> & {
       evidenceTrust?: ClaimEvidenceTrust;
       aiPrediction?: ClaimAiPrediction;
+      peril?: Peril;
+      intentId?: string;
+      plotLat?: number | null;
+      plotLon?: number | null;
+      sowingDate?: string | null;
     }
   ) => Promise<FarmerClaim>;
   updateClaimRecapture: (
@@ -158,11 +176,38 @@ interface FarmerContextType {
     district: string;
     state: string;
   };
+  activeIntent: ClaimIntent | null;
+  setActiveIntent: (intent: ClaimIntent | null) => void;
+  clearActiveIntent: () => void;
+  newRecaptureNotices: RecaptureNotice[];
+  dismissNotice: (claimId: string) => void;
 }
 
 const FarmerContext = createContext<FarmerContextType | null>(null);
 const STORAGE_KEY_LANG = "fp_farmer_lang_v1";
 const STORAGE_KEY_DRAFT = "fp_farmer_active_draft_v1";
+
+function loadStoredIntent(): ClaimIntent | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(INTENT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ClaimIntent;
+    if (!parsed?.id || !parsed?.peril) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+function persistIntent(intent: ClaimIntent | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (!intent) sessionStorage.removeItem(INTENT_STORAGE_KEY);
+    else sessionStorage.setItem(INTENT_STORAGE_KEY, JSON.stringify(intent));
+  } catch {
+    // ignore
+  }
+}
 
 function workflowGradeFromPrediction(
   prediction: Awaited<ReturnType<typeof listWebClaims>>[number]["latest_prediction"],
@@ -229,6 +274,7 @@ function submissionToClaim(item: Awaited<ReturnType<typeof listWebClaims>>[numbe
       severityGrade: workflowGradeFromPrediction(item.latest_prediction),
     },
     payoutStatus: "pending_review",
+    adaptive_result: item.adaptive_result ?? undefined,
   };
 }
 
@@ -248,6 +294,8 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   const [farmerProfile, setFarmerProfile] = useState(EMPTY_FARMER_PROFILE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeIntent, setActiveIntentState] = useState<ClaimIntent | null>(() => loadStoredIntent());
+  const [newRecaptureNotices, setNewRecaptureNotices] = useState<RecaptureNotice[]>([]);
 
   const refresh = async () => {
     try {
@@ -282,6 +330,16 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     void refresh();
   }, []);
 
+  // Recompute unseen recapture notices whenever the claims list changes (refresh flow).
+  useEffect(() => {
+    setNewRecaptureNotices(diffNewRecaptures(claims));
+  }, [claims]);
+
+  const dismissNotice = (claimId: string) => {
+    markSeen(claimId);
+    setNewRecaptureNotices((prev) => prev.filter((notice) => notice.claimId !== claimId));
+  };
+
   const setLang = (newLang: FarmerLang) => {
     const next = parseAppLang(newLang);
     if (!next) return;
@@ -297,17 +355,33 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     setPlots((prev) => [plot, ...prev.filter((p) => p.id !== plot.id)]);
   };
 
+  const setActiveIntent = (intent: ClaimIntent | null) => {
+    setActiveIntentState(intent);
+    persistIntent(intent);
+  };
+  const clearActiveIntent = () => {
+    setActiveIntentState(null);
+    persistIntent(null);
+  };
+
   const getClaimById = (id: string) => claims.find((c) => c.id.toLowerCase() === id.toLowerCase());
 
   const createClaim = async (
     claimData: Omit<FarmerClaim, "id" | "createdAt" | "updatedAt" | "evidenceTrust" | "aiPrediction"> & {
       evidenceTrust?: ClaimEvidenceTrust;
       aiPrediction?: ClaimAiPrediction;
+      peril?: Peril;
+      intentId?: string;
+      plotLat?: number | null;
+      plotLon?: number | null;
+      sowingDate?: string | null;
     },
   ): Promise<FarmerClaim> => {
     if (!isSupabaseConfigured()) {
       throw new Error("Supabase is not configured — claim was not stored");
     }
+    const peril = claimData.peril || activeIntent?.peril || "normal";
+    const intentId = claimData.intentId || activeIntent?.id;
     const result = await submitWebClaim({
       plotId: claimData.plotId,
       plotName: claimData.plotName,
@@ -320,6 +394,11 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
       captureLat: claimData.images[0]?.lat,
       captureLon: claimData.images[0]?.lon,
       captureAccuracyM: claimData.images[0]?.accuracyM,
+      peril,
+      intentId,
+      plotLat: claimData.plotLat,
+      plotLon: claimData.plotLon,
+      sowingDate: claimData.sowingDate ?? null,
       images: claimData.images.map((img) => ({
         angleType: img.angleType,
         imageDataUrl: img.imageUrl,
@@ -339,6 +418,7 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
+    // keep intent until navigation leaves — caller clears after success
     return claim;
   };
 
@@ -463,6 +543,11 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         snoozeMilestone,
         completeMilestone,
         farmerProfile,
+        activeIntent,
+        setActiveIntent,
+        clearActiveIntent,
+        newRecaptureNotices,
+        dismissNotice,
       }}
     >
       {children}

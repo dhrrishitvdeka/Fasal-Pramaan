@@ -8,6 +8,7 @@ import { LoginForm, loginSchema } from "@/lib/schemas";
 import { canAccessReviewerPortal } from "@/lib/review-access";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 
 function safeNext(value: string | null): string | null {
@@ -40,6 +41,7 @@ function LoginFormView() {
       cancelled = true;
     };
   }, [nextPath, router]);
+
   const {
     register,
     handleSubmit,
@@ -115,7 +117,7 @@ function LoginFormView() {
           <p className="mt-1 text-xs text-slate-500">
             {commandCentreLogin
               ? "This area is for reviewer accounts only. A farmer login cannot open the Command Centre."
-              : "Use the Supabase Auth account created for you. Farmers land on the capture portal; reviewers land on the command centre."}
+              : "Reviewers land on the command centre; farmers land on the capture portal."}
           </p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
@@ -168,10 +170,18 @@ function LoginFormView() {
 
           {process.env.NEXT_PUBLIC_DEMO_MODE === "true" && (
             <p className="mt-6 border-t border-slate-200 pt-4 text-[11px] leading-relaxed text-slate-400">
-              Local demo: reviewer@fasalpramaan.local / Demo@12345. Do not use production credentials
-              in this environment.
+              Local demo: reviewer@fasalpramaan.local / Demo@12345.
             </p>
           )}
+
+          <div className="mt-4 flex gap-3 border-t border-slate-100 pt-3 text-[11px] text-slate-400">
+            <Link href="/privacy" className="underline-offset-2 hover:text-slate-600 hover:underline">
+              Privacy
+            </Link>
+            <Link href="/terms" className="underline-offset-2 hover:text-slate-600 hover:underline">
+              Terms
+            </Link>
+          </div>
         </div>
       </div>
     </div>

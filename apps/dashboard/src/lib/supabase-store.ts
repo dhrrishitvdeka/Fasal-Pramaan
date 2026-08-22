@@ -4,13 +4,35 @@ import type { ClaimStore, WebClaimRow, WebImageRow } from "./claim-pipeline";
 export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
   return {
     async insertClaim(row) {
-      const { data, error } = await client.from("web_claims").insert(row).select().single();
-      if (error) throw new Error(error.message);
-      return data as WebClaimRow;
+      try {
+        const { data, error } = await client.from("web_claims").insert(row).select().single();
+        if (error) throw new Error(error.message);
+        return data as WebClaimRow;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/peril|intent_id|gate_result|context_signals/i.test(msg)) {
+          const { peril: _p, intent_id: _i, gate_result: _g, context_signals: _c, ...stripped } = row as any;
+          const { data, error } = await client.from("web_claims").insert(stripped).select().single();
+          if (error) throw new Error(error.message);
+          return data as WebClaimRow;
+        }
+        throw err;
+      }
     },
     async updateClaim(id, patch) {
-      const { error } = await client.from("web_claims").update(patch).eq("id", id);
-      if (error) throw new Error(error.message);
+      try {
+        const { error } = await client.from("web_claims").update(patch).eq("id", id);
+        if (error) throw new Error(error.message);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/peril|intent_id|gate_result|context_signals/i.test(msg)) {
+          const { peril: _p, intent_id: _i, gate_result: _g, context_signals: _c, ...stripped } = patch as any;
+          const { error } = await client.from("web_claims").update(stripped).eq("id", id);
+          if (error) throw new Error(error.message);
+        } else {
+          throw err;
+        }
+      }
     },
     async getClaim(id) {
       const { data, error } = await client.from("web_claims").select("*").eq("id", id).maybeSingle();
@@ -27,8 +49,19 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
     },
     async insertImages(rows) {
       if (!rows.length) return;
-      const { error } = await client.from("web_claim_images").insert(rows);
-      if (error) throw new Error(error.message);
+      try {
+        const { error } = await client.from("web_claim_images").insert(rows);
+        if (error) throw new Error(error.message);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/gate_result/i.test(msg)) {
+          const stripped = rows.map(({ gate_result: _g, ...rest }: any) => rest);
+          const { error } = await client.from("web_claim_images").insert(stripped);
+          if (error) throw new Error(error.message);
+        } else {
+          throw err;
+        }
+      }
     },
     async replaceAngleImages(claimId, rows) {
       if (!rows.length) return;
@@ -39,8 +72,19 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
         .eq("claim_id", claimId)
         .in("angle_type", angles);
       if (deleteError) throw new Error(deleteError.message);
-      const { error } = await client.from("web_claim_images").insert(rows);
-      if (error) throw new Error(error.message);
+      try {
+        const { error } = await client.from("web_claim_images").insert(rows);
+        if (error) throw new Error(error.message);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/gate_result/i.test(msg)) {
+          const stripped = rows.map(({ gate_result: _g, ...rest }: any) => rest);
+          const { error } = await client.from("web_claim_images").insert(stripped);
+          if (error) throw new Error(error.message);
+        } else {
+          throw err;
+        }
+      }
     },
     async listImages(claimId) {
       const { data, error } = await client.from("web_claim_images").select("*").eq("claim_id", claimId);

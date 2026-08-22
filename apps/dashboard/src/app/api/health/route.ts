@@ -12,50 +12,40 @@ export async function GET() {
         supabase = { ok: false, error: "service role key missing" };
       } else {
         const { error } = await client.from("web_claims").select("id").limit(1);
-        supabase = error ? { ok: false, error: error.message } : { ok: true };
+        if (error) console.error("health: supabase probe failed:", error.message);
+        supabase = error ? { ok: false, error: "unavailable" } : { ok: true };
       }
     } catch (error) {
-      supabase = { ok: false, error: error instanceof Error ? error.message : "supabase probe failed" };
+      console.error("health: supabase probe threw:", error instanceof Error ? error.message : error);
+      supabase = { ok: false, error: "unavailable" };
     }
   }
 
   const spaceUrl = getHfSpaceUrl();
-  let space: { ok: boolean; error?: string; payload?: unknown } = { ok: false };
+  let space: { ok: boolean; error?: string } = { ok: false };
   try {
     const response = await fetch(`${spaceUrl}/gradio_api/call/health`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ data: [] }),
+      signal: AbortSignal.timeout(5000),
     });
     space = {
       ok: response.ok,
       error: response.ok ? undefined : `HTTP ${response.status}`,
     };
   } catch (error) {
-    space = { ok: false, error: error instanceof Error ? error.message : "space probe failed" };
+    console.error("health: space probe failed:", error instanceof Error ? error.message : error);
+    space = { ok: false, error: "probe failed" };
   }
 
-  const dockerApiBase = process.env.NEXT_PUBLIC_API_BASE_URL;
-  let dockerApi: { ok: boolean; error?: string; payload?: unknown } | null = null;
-  if (dockerApiBase && dockerApiBase !== "/backend") {
-    try {
-      const response = await fetch(`${dockerApiBase.replace(/\/$/, "")}/health`);
-      dockerApi = {
-        ok: response.ok,
-        payload: await response.json().catch(() => null),
-        error: response.ok ? undefined : `HTTP ${response.status}`,
-      };
-    } catch (error) {
-      dockerApi = { ok: false, error: error instanceof Error ? error.message : "docker api unreachable" };
-    }
-  }
-
+  const geminiConfigured = Boolean(process.env.GEMINI_API_KEY);
   const status =
     supabase.ok && (space.ok || !spaceUrl)
       ? "ok"
       : supabaseConfigured
         ? "degraded"
-        : "local_only";
+        : "not_configured";
 
   return NextResponse.json({
     ok: status === "ok" || status === "degraded",
@@ -70,10 +60,7 @@ export async function GET() {
         space_id: getHfSpaceId(),
         space_url: spaceUrl,
       },
-      voice: {
-        configured: Boolean(process.env.GEMINI_API_KEY) && process.env.VOICE_ASSISTANT_ENABLED !== "false",
-      },
-      docker_api: dockerApi,
+      gemini: { configured: geminiConfigured },
     },
   });
 }

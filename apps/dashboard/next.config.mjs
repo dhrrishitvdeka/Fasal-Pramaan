@@ -1,8 +1,4 @@
-const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "/backend";
-const internalApiBase = process.env.INTERNAL_API_BASE_URL || "http://api:8000";
-const mediaOrigin = process.env.VERCEL
-  ? ""
-  : process.env.NEXT_PUBLIC_MEDIA_ORIGIN || "http://localhost:9000";
+const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseOrigin = (() => {
   if (!supabaseUrl) return "";
@@ -13,10 +9,11 @@ const supabaseOrigin = (() => {
   }
 })();
 const apiConnectOrigin = (() => {
+  if (!apiBase) return "";
   try {
     return new URL(apiBase).origin;
   } catch {
-    return "'self'";
+    return "";
   }
 })();
 
@@ -37,7 +34,6 @@ const imgSrc = [
   "'self'",
   "data:",
   "blob:",
-  mediaOrigin,
   "https://*.tile.openstreetmap.org",
   "https://*.supabase.co",
   "https://*.supabase.in",
@@ -62,19 +58,7 @@ const contentSecurityPolicy = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  ...(!process.env.VERCEL ? { output: "standalone" } : {}),
   reactStrictMode: true,
-  turbopack: {
-    root: process.cwd(),
-  },
-  async rewrites() {
-    return [
-      {
-        source: "/backend/:path*",
-        destination: `${internalApiBase}/:path*`,
-      },
-    ];
-  },
   async headers() {
     return [
       {

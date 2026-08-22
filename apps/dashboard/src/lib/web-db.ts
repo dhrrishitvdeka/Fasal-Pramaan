@@ -1,6 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
-import { computeEvidencePreview, isRealSha256 } from "./evidence";
+﻿import type { SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseClient } from "./supabase";
+import { isRealSha256 } from "./evidence";
 import { HF_MODEL_ID } from "./hf-model";
 import type {
   ClaimAiPrediction,
@@ -81,6 +81,11 @@ export interface WebClaimRow {
   capture_lat: number | null;
   capture_lon: number | null;
   capture_accuracy_m: number | null;
+  gps_status?: string | null;
+  peril?: string | null;
+  intent_id?: string | null;
+  gate_result?: unknown;
+  context_signals?: unknown;
   created_at: string | null;
   updated_at: string | null;
   created_by: string | null;
@@ -100,6 +105,7 @@ export interface WebClaimImageRow {
   quality_passed: boolean | null;
   blur_score: number | null;
   lighting_score: number | null;
+  gate_result?: unknown;
 }
 
 export interface WebMilestoneRow {
@@ -157,7 +163,7 @@ export const EMPTY_AI_PREDICTION: ClaimAiPrediction = {
 
 export const EMPTY_FARMER_PROFILE = {
   name: "Farmer",
-  nameHi: "किसान",
+  nameHi: "à¤•à¤¿à¤¸à¤¾à¤¨",
   kisanId: "",
   phone: "",
   village: "",
@@ -236,6 +242,19 @@ export function imageFromRow(row: WebClaimImageRow): ClaimImageEvidence {
 
 export function claimFromRow(row: WebClaimRow, images: ClaimImageEvidence[]): FarmerClaim {
   const hasPrediction = Boolean(row.crop_identified || row.disease_detected || (row.model_confidence ?? 0) > 0);
+  let extra: Partial<FarmerClaim> = {};
+  try {
+    extra = {
+      peril: (row as any).peril ?? null,
+      intentId: (row as any).intent_id ?? null,
+      gateResult: (row as any).gate_result ?? null,
+      gate_result: (row as any).gate_result ?? null,
+      contextSignals: (row as any).context_signals ?? null,
+      context_signals: (row as any).context_signals ?? null,
+    };
+  } catch {
+    extra = {};
+  }
   return {
     id: row.id,
     plotId: row.plot_id || "",
@@ -286,6 +305,7 @@ export function claimFromRow(row: WebClaimRow, images: ClaimImageEvidence[]): Fa
         ? row.payout_status
         : undefined,
     payoutAmountInr: row.payout_amount_inr ?? undefined,
+    ...extra,
   };
 }
 
@@ -307,25 +327,6 @@ export function milestoneFromRow(row: WebMilestoneRow): GrowthTimelineMilestone 
   };
 }
 
-function dataUrlToBlob(dataUrl: string): Blob | null {
-  if (!dataUrl.startsWith("data:")) return null;
-  const comma = dataUrl.indexOf(",");
-  if (comma < 0) return null;
-  const header = dataUrl.slice(0, comma);
-  const mimeMatch = header.match(/data:([^;]+)/);
-  const mime = mimeMatch?.[1] || "image/jpeg";
-  try {
-    const binary = atob(dataUrl.slice(comma + 1));
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return new Blob([bytes], { type: mime });
-  } catch {
-    return null;
-  }
-}
-
 export async function resolveImageUrl(
   imageUrl: string | null,
   storagePath: string | null,
@@ -341,62 +342,13 @@ export async function resolveImageUrl(
   return imageUrl || "";
 }
 
-export async function uploadEvidenceBlob(
-  claimId: string,
-  angleType: string,
-  blob: Blob
-): Promise<{ imageUrl: string; storagePath: string }> {
-  const supabase = getSupabaseClient();
-  if (!supabase) {
-    throw new Error("Supabase is not configured");
-  }
-  const ext = blob.type.includes("png") ? "png" : "jpg";
-  const storagePath = `${claimId}/${angleType}-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from(EVIDENCE_BUCKET).upload(storagePath, blob, {
-    contentType: blob.type || "image/jpeg",
-    upsert: false,
-  });
-  if (error) {
-    throw new Error(error.message || "Evidence upload failed");
-  }
-  const { data, error: signError } = await supabase.storage
-    .from(EVIDENCE_BUCKET)
-    .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
-  if (signError || !data?.signedUrl) {
-    throw new Error(signError?.message || "Could not create a signed URL for uploaded evidence");
-  }
-  return { imageUrl: data.signedUrl, storagePath };
-}
 
-export async function persistClaimImages(
-  claimId: string,
-  images: ClaimImageEvidence[]
-): Promise<ClaimImageEvidence[]> {
-  const persisted: ClaimImageEvidence[] = [];
-  for (const image of images) {
-    if (image.imageUrl.startsWith("data:") && isSupabaseConfigured()) {
-      const blob = dataUrlToBlob(image.imageUrl);
-      if (!blob) {
-        throw new Error(`Could not encode ${image.angleType} for upload`);
-      }
-      const uploaded = await uploadEvidenceBlob(claimId, image.angleType || "angle", blob);
-      persisted.push({
-        ...image,
-        imageUrl: uploaded.imageUrl,
-        storagePath: uploaded.storagePath,
-      });
-    } else {
-      persisted.push(image);
-    }
-  }
-  return persisted;
-}
 
 function claimRowFromFarmer(claim: FarmerClaim, createdBy: string | null): Partial<WebClaimRow> {
   const gps = claim.images.find((img) => img.lat != null && img.lon != null);
   const pred = claim.aiPrediction;
   const trust = claim.evidenceTrust;
-  return {
+  const base: Partial<WebClaimRow> = {
     id: claim.id,
     plot_id: claim.plotId || null,
     plot_name: claim.plotName || null,
@@ -434,175 +386,63 @@ function claimRowFromFarmer(claim: FarmerClaim, createdBy: string | null): Parti
     capture_lat: gps?.lat ?? null,
     capture_lon: gps?.lon ?? null,
     capture_accuracy_m: gps?.accuracyM ?? null,
+    gps_status: (claim as any).gpsStatus ?? null,
     created_at: claim.createdAt,
     updated_at: claim.updatedAt,
     created_by: createdBy,
   };
+  // Attach multi-signal columns best-effort â€” swallow unknown column errors via try/catch
+  try {
+    const extra: Partial<WebClaimRow> = {};
+    const peril = (claim as any).peril ?? (claim as any).claimType ?? null;
+    if (peril) (extra as any).peril = String(peril).toLowerCase();
+    const intentId = (claim as any).intentId ?? (claim as any).intent_id ?? null;
+    if (intentId) (extra as any).intent_id = String(intentId);
+    const gate = (claim as any).gateResult ?? (claim as any).gate_result ?? null;
+    if (gate != null) (extra as any).gate_result = gate as any;
+    const ctx = (claim as any).contextSignals ?? (claim as any).context_signals ?? null;
+    if (ctx != null) (extra as any).context_signals = ctx as any;
+    return { ...base, ...extra };
+  } catch {
+    return base;
+  }
 }
 
 function imageRowFromEvidence(claimId: string, image: ClaimImageEvidence): Partial<WebClaimImageRow> {
-  return {
-    id: image.id || newId(),
-    claim_id: claimId,
-    angle_type: image.angleType,
-    image_url: image.imageUrl.startsWith("data:") ? null : image.imageUrl,
-    storage_path: image.storagePath || null,
-    captured_at: image.timestamp,
-    lat: image.lat ?? null,
-    lon: image.lon ?? null,
-    accuracy_m: image.accuracyM ?? null,
-    sha256: isRealSha256(image.sha256) ? image.sha256 : null,
-    quality_passed: image.qualityPassed,
-    blur_score: image.blurScore ?? null,
-    lighting_score: image.lightingScore ?? null,
-  };
-}
-
-export async function fetchWebPlots(): Promise<FarmerPlot[]> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return [];
-  const { data, error } = await supabase.from("web_plots").select("*").order("created_at", { ascending: true });
-  if (error) throw new Error(error.message);
-  return ((data || []) as WebPlotRow[]).map(plotFromRow);
-}
-
-export async function fetchWebClaims(): Promise<FarmerClaim[]> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return [];
-  const { data, error } = await supabase.from("web_claims").select("*").order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  const claims = (data || []) as WebClaimRow[];
-  if (!claims.length) return [];
-  const ids = claims.map((c) => c.id);
-  const { data: imageRows, error: imageError } = await supabase
-    .from("web_claim_images")
-    .select("*")
-    .in("claim_id", ids);
-  if (imageError) throw new Error(imageError.message);
-  const grouped = new Map<string, ClaimImageEvidence[]>();
-  for (const row of (imageRows || []) as WebClaimImageRow[]) {
-    const resolved = await resolveImageUrl(row.image_url, row.storage_path);
-    const list = grouped.get(row.claim_id) || [];
-    list.push(imageFromRow({ ...row, image_url: resolved }));
-    grouped.set(row.claim_id, list);
+  try {
+    return {
+      id: image.id || newId(),
+      claim_id: claimId,
+      angle_type: image.angleType,
+      image_url: image.imageUrl.startsWith("data:") ? null : image.imageUrl,
+      storage_path: image.storagePath || null,
+      captured_at: image.timestamp,
+      lat: image.lat ?? null,
+      lon: image.lon ?? null,
+      accuracy_m: image.accuracyM ?? null,
+      sha256: isRealSha256(image.sha256) ? image.sha256 : null,
+      quality_passed: image.qualityPassed,
+      blur_score: image.blurScore ?? null,
+      lighting_score: image.lightingScore ?? null,
+      gate_result: (image as any).gateResult ?? (image as any).gate_result ?? null,
+    };
+  } catch {
+    return {
+      id: image.id || newId(),
+      claim_id: claimId,
+      angle_type: image.angleType,
+      image_url: image.imageUrl.startsWith("data:") ? null : image.imageUrl,
+      storage_path: image.storagePath || null,
+      captured_at: image.timestamp,
+      lat: image.lat ?? null,
+      lon: image.lon ?? null,
+      accuracy_m: image.accuracyM ?? null,
+      sha256: isRealSha256(image.sha256) ? image.sha256 : null,
+      quality_passed: image.qualityPassed,
+      blur_score: image.blurScore ?? null,
+      lighting_score: image.lightingScore ?? null,
+    };
   }
-  return claims.map((row) => claimFromRow(row, grouped.get(row.id) || []));
-}
-
-export async function fetchWebClaimById(id: string): Promise<FarmerClaim | null> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return null;
-  const { data, error } = await supabase.from("web_claims").select("*").eq("id", id).maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) return null;
-  const { data: imageRows, error: imageError } = await supabase
-    .from("web_claim_images")
-    .select("*")
-    .eq("claim_id", id);
-  if (imageError) throw new Error(imageError.message);
-  const images: ClaimImageEvidence[] = [];
-  for (const row of (imageRows || []) as WebClaimImageRow[]) {
-    const resolved = await resolveImageUrl(row.image_url, row.storage_path);
-    images.push(imageFromRow({ ...row, image_url: resolved }));
-  }
-  return claimFromRow(data as WebClaimRow, images);
-}
-
-export async function fetchWebMilestones(): Promise<GrowthTimelineMilestone[]> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return [];
-  const { data, error } = await supabase.from("web_milestones").select("*").order("day_number", { ascending: true });
-  if (error) throw new Error(error.message);
-  return ((data || []) as WebMilestoneRow[]).map(milestoneFromRow);
-}
-
-export async function fetchWebProfile(): Promise<typeof EMPTY_FARMER_PROFILE> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return { ...EMPTY_FARMER_PROFILE };
-  const { data, error } = await supabase.from("web_profiles").select("*").limit(1).maybeSingle();
-  if (error || !data) return { ...EMPTY_FARMER_PROFILE };
-  const row = data as WebProfileRow;
-  return {
-    name: row.name || "Farmer",
-    nameHi: row.name_hi || "किसान",
-    kisanId: row.kisan_id || "",
-    phone: row.phone || "",
-    village: row.village || "",
-    district: row.district || "",
-    state: row.state || "",
-  };
-}
-
-export async function currentUserId(): Promise<string | null> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return null;
-  const { data } = await supabase.auth.getUser();
-  return data.user?.id ?? null;
-}
-
-export async function currentActorLabel(): Promise<string> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return "reviewer";
-  const { data } = await supabase.auth.getUser();
-  return data.user?.email || data.user?.id || "reviewer";
-}
-
-export async function insertWebClaim(claim: FarmerClaim): Promise<FarmerClaim> {
-  const supabase = getSupabaseClient();
-  if (!supabase) {
-    throw new Error("Supabase is not configured");
-  }
-  const createdBy = await currentUserId();
-  const images = await persistClaimImages(claim.id, claim.images);
-  const ready: FarmerClaim = { ...claim, images, evidenceTrust: computeEvidencePreview(images) };
-  const { error } = await supabase.from("web_claims").insert(claimRowFromFarmer(ready, createdBy));
-  if (error) throw new Error(error.message);
-  if (images.length) {
-    const { error: imageError } = await supabase
-      .from("web_claim_images")
-      .insert(images.map((img) => imageRowFromEvidence(ready.id, img)));
-    if (imageError) throw new Error(imageError.message);
-  }
-  return ready;
-}
-
-export async function updateWebClaim(claim: FarmerClaim): Promise<FarmerClaim> {
-  const supabase = getSupabaseClient();
-  if (!supabase) throw new Error("Supabase is not configured");
-  const createdBy = await currentUserId();
-  const images = await persistClaimImages(claim.id, claim.images);
-  const ready: FarmerClaim = { ...claim, images, evidenceTrust: computeEvidencePreview(images) };
-  const { error } = await supabase
-    .from("web_claims")
-    .update(claimRowFromFarmer(ready, createdBy))
-    .eq("id", ready.id);
-  if (error) throw new Error(error.message);
-  const { error: deleteError } = await supabase.from("web_claim_images").delete().eq("claim_id", ready.id);
-  if (deleteError) throw new Error(deleteError.message);
-  if (images.length) {
-    const { error: imageError } = await supabase
-      .from("web_claim_images")
-      .insert(images.map((img) => imageRowFromEvidence(ready.id, img)));
-    if (imageError) throw new Error(imageError.message);
-  }
-  return ready;
-}
-
-export async function updateWebMilestone(milestone: GrowthTimelineMilestone): Promise<void> {
-  const supabase = getSupabaseClient();
-  if (!supabase) throw new Error("Supabase is not configured");
-  const { error } = await supabase
-    .from("web_milestones")
-    .update({
-      due_date: milestone.dueDate,
-      completed: milestone.completed,
-      completed_date: milestone.completedDate || null,
-      evidence_image_url: milestone.evidenceImageUrl || null,
-      notes: milestone.notes || null,
-      is_overdue: milestone.isOverdue,
-    })
-    .eq("id", milestone.id);
-  if (error) throw new Error(error.message);
 }
 
 export function evaluationFromClaim(claim: FarmerClaim): EvidenceEvaluation {
@@ -694,6 +534,18 @@ export function submissionFromClaim(claim: FarmerClaim): Submission {
   const pred = claim.aiPrediction;
   const hasPrediction = Boolean(pred.cropIdentified || pred.diseaseDetected || pred.modelConfidence > 0);
   const gps = claim.images.find((img) => img.lat != null && img.lon != null);
+  let extra: any = {};
+  try {
+    extra = {
+      peril: (claim as any).peril ?? null,
+      intent_id: (claim as any).intentId ?? (claim as any).intent_id ?? null,
+      gate_result: (claim as any).gateResult ?? (claim as any).gate_result ?? null,
+      context_signals: (claim as any).contextSignals ?? (claim as any).context_signals ?? null,
+      contextSignals: (claim as any).contextSignals ?? (claim as any).context_signals ?? null,
+    };
+  } catch {
+    extra = {};
+  }
   return {
     id: claim.id,
     crop_cycle_id: claim.plotId || claim.id,
@@ -705,6 +557,7 @@ export function submissionFromClaim(claim: FarmerClaim): Submission {
     severity: pred.severityGrade ? pred.severityGrade.toLowerCase() : null,
     final_severity: claim.status === "verified" ? pred.severityGrade?.toLowerCase() ?? null : null,
     final_assessment_notes: claim.reviewerNotes || null,
+    ...extra,
     images: claim.images.map((img) => ({
       id: img.id || `${claim.id}-${img.angleType}`,
       angle_type: img.angleType,
@@ -837,29 +690,6 @@ export function markersFromClaims(claims: FarmerClaim[]): MapMarker[] {
   return markers;
 }
 
-export async function fetchReviewActions(claimId: string): Promise<WebReviewActionRow[]> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("web_review_actions")
-    .select("*")
-    .eq("claim_id", claimId)
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data || []) as WebReviewActionRow[];
-}
-
-export async function fetchAllReviewActions(): Promise<WebReviewActionRow[]> {
-  const supabase = getSupabaseClient();
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("web_review_actions")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (error) throw new Error(error.message);
-  return (data || []) as WebReviewActionRow[];
-}
 
 export interface ReviewActionPayload {
   action: string;
@@ -875,94 +705,19 @@ export interface ReviewActionPayload {
   corrected_grade?: string;
 }
 
-export async function persistReviewAction(
-  claimId: string,
-  payload: ReviewActionPayload
-): Promise<{ success: boolean; submission: Submission }> {
-  const supabase = getSupabaseClient();
-  if (!supabase) throw new Error("Supabase is not configured");
 
-  const existing = await fetchWebClaimById(claimId);
-  if (!existing) throw new Error("Claim not found");
-
-  const action = payload.action;
-  let status: ClaimStatus = existing.status;
-  let missingAngles = existing.missingAngles || [];
-  let recaptureReason = existing.recaptureReason;
-  const reviewerNotes = payload.notes || payload.reason || payload.override_reason || existing.reviewerNotes;
-
-  if (action === "accept" || action === "correct" || action === "override_correct") {
-    status = "verified";
-    missingAngles = [];
-  } else if (action === "request_recapture") {
-    status = "needs_recapture";
-    missingAngles = payload.required_angles?.length ? payload.required_angles : missingAngles;
-    recaptureReason = payload.reason || payload.override_reason || payload.notes || recaptureReason;
-  } else if (action === "physical_inspection" || action === "request_physical_inspection") {
-    status = "physical_inspection";
-  }
-
-  const next: FarmerClaim = {
-    ...existing,
-    status,
-    missingAngles,
-    recaptureReason,
-    reviewerNotes,
-    updatedAt: new Date().toISOString(),
-    payoutStatus: status === "verified" ? "approved" : existing.payoutStatus,
-  };
-
-  if (payload.corrected_crop) {
-    next.aiPrediction = { ...next.aiPrediction, cropIdentified: payload.corrected_crop };
-  }
-  if (payload.corrected_severity) {
-    const grade =
-      payload.corrected_severity === "high"
-        ? "High"
-        : payload.corrected_severity === "medium"
-          ? "Medium"
-          : payload.corrected_severity === "low"
-            ? "Low"
-            : next.aiPrediction.severityGrade;
-    next.aiPrediction = { ...next.aiPrediction, severityGrade: grade };
-  }
-  if (payload.corrected_affected_area_pct != null) {
-    next.aiPrediction = { ...next.aiPrediction, affectedAreaHectares: payload.corrected_affected_area_pct };
-  }
-  if (payload.corrected_damage_codes?.[0]) {
-    next.aiPrediction = { ...next.aiPrediction, diseaseDetected: payload.corrected_damage_codes[0] };
-  }
-
-  const createdBy = await currentUserId();
-  const { error: updateError } = await supabase
-    .from("web_claims")
-    .update({
-      ...claimRowFromFarmer(next, createdBy),
-      updated_at: next.updatedAt,
-    })
-    .eq("id", claimId);
-  if (updateError) throw new Error(updateError.message);
-
-  const actor = await currentActorLabel();
-  const { error: actionError } = await supabase.from("web_review_actions").insert({
-    id: newId(),
-    claim_id: claimId,
-    action,
-    notes: payload.notes || null,
-    reason: payload.reason || payload.override_reason || null,
-    required_angles: payload.required_angles || null,
-    actor,
-    created_at: new Date().toISOString(),
-  });
-  if (actionError) throw new Error(actionError.message);
-
-  return { success: true, submission: submissionFromClaim(next) };
+export interface PerilAnalytics {
+  peril: string;
+  count: number;
+  avgConfidence: number;
+  recaptureRate: number;
 }
 
 export function analyticsFromClaims(claims: FarmerClaim[]) {
   const byCategory = new Map<string, number>();
   const bySeverity = new Map<string, number>();
   const byCrop = new Map<string, number>();
+  const byPeril = new Map<string, { count: number; confSum: number; recaptures: number }>();
   for (const claim of claims) {
     const category = claim.aiPrediction.diseaseDetected || "Unassessed";
     byCategory.set(category, (byCategory.get(category) || 0) + 1);
@@ -970,11 +725,25 @@ export function analyticsFromClaims(claims: FarmerClaim[]) {
     bySeverity.set(severity, (bySeverity.get(severity) || 0) + 1);
     const crop = claim.cropType || "Unknown";
     byCrop.set(crop, (byCrop.get(crop) || 0) + 1);
+    const peril = String((claim as any).peril || "normal");
+    const entry = byPeril.get(peril) || { count: 0, confSum: 0, recaptures: 0 };
+    entry.count += 1;
+    entry.confSum += claim.evidenceTrust?.overallConfidence ?? 0;
+    if (claim.status === "needs_recapture") entry.recaptures += 1;
+    byPeril.set(peril, entry);
   }
   return {
     byCategory: Array.from(byCategory, ([category, count]) => ({ category, count })),
     bySeverity: Array.from(bySeverity, ([severity, count]) => ({ severity, count })),
     byCrop: Array.from(byCrop, ([crop_name, count]) => ({ crop_name, count })),
+    byPeril: Array.from(byPeril.entries())
+      .map(([peril, v]): PerilAnalytics => ({
+        peril,
+        count: v.count,
+        avgConfidence: Number((v.confSum / v.count).toFixed(1)),
+        recaptureRate: v.count ? v.recaptures / v.count : 0,
+      }))
+      .sort((a, b) => b.count - a.count),
   };
 }
 

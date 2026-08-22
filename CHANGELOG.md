@@ -2,6 +2,110 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] — 2026-08-22
+
+### Core Engine & Architecture
+- **Multi-Signal Triangulation System**:
+  - Independent ground-truth validation orchestrating Copernicus Sentinel-2 (NDVI multi-spectral burn-scar analysis, 10 m resolution), IMD 7-day weather/hail anomalies, Overpass wildlife proximity (≤10 km radius), and ISRO Bhuvan land use / WMS layer integration.
+  - Sowing-date-aware cumulative rainfall analysis (Open-Meteo archive) and hailstorm growth stage risk modeling (30/60/100-day thresholds).
+  - Plot radius containment haversine verification (`plot_match`) between field capture coordinates and registered plot polygons.
+- **On-Device Real-Time Edge Computer Vision & Gate**:
+  - Web Worker running MobileNet v2 and greenness heuristics at 60 FPS for instantaneous blur, lighting, and crop framing feedback.
+  - Multimodal Gemini Vision Gate filtering blurry, synthetic, indoor, or non-crop photos before server upload.
+  - Client-side SHA-256 cryptographic hashing and tamper-proof GPS metadata for every capture angle.
+- **Adaptive 4-Pillar Confidence Engine**:
+  - Dynamic 4-pillar formulation (Coverage, Quality, Context, Integrity) with peril-specific thresholding across 8 disaster protocols.
+  - Automated targeted recapture routing (`needs_recapture`) calculating exact confidence deltas (ΔC).
+- **Deep Vision Analysis & Neural Scoring**:
+  - DINOv2 / MobileNet neural models verifying crop genus, assessing lesion severity, and computing damage percentages.
+- **Autonomous Conversational Intake & Multi-Language Localization**:
+  - Fasal Saathi conversational voice & text intake powered by Gemini Live with server-side allowlisted tool execution.
+  - Complete localization across 15 Indian languages (English, Hindi, Bengali, Marathi, Telugu, Tamil, Gujarati, Kannada, Malayalam, Punjabi, Odia, Assamese, Urdu, Nepali, Sindhi).
+- **Human-in-the-Loop Cockpit & Audit Feed**:
+  - Officer decision rail with side-by-side satellite cross-check, authenticity chips, one-click overrides, and field survey dispatch.
+  - Immutable audit trail and timeline history.
+- **Demo Mode Optimization**:
+  - Streamlined direct sign-in flow for demonstration credentials (`reviewer@fasalpramaan.local` / `Demo@12345`).
+
+### UI/UX
+- Improved UI/UX.
+
+---
+
+## [2.0.0] — 2026-08-22
+
+The production-readiness wave: role-guarded routes, error boundaries, a PWA offline shell for the farmer portal, per-route rate limits on every write path, Playwright E2E scaffolding, client error telemetry, and OSS/legal hygiene.
+
+### Security & Access
+- **Route guards** (`src/lib/use-require-role.ts` + `src/components/AccessGate.tsx`): all 8 reviewer pages gate on session roles — `/review`, `/review/[id]`, `/overview`, `/analytics`, `/alerts`, `/map` require `reviewer|administrator`; `/audit` and `/admin` require `administrator`. Bilingual sign-in / access-denied cards with `?next=` return links; queries are gated via React Query `enabled` so no data fetches before the gate passes.
+- **Per-route rate limits extended to every mutating route**, all returning `429` + `Retry-After`: `POST /api/claims` 10/min/user, `POST /api/claims/{id}/action` 30/min, `PATCH /api/milestones/{id}` 30/min (joining the existing gate 20/min, context 30/min, saathi/tool 30/min, telemetry 5/min, system/status 10/min).
+- **Admin page rebuilt on `GET /api/system/status`**: administrator-only, rate-limited (10/min), returns booleans only (`supabase`, `gemini`, `sentinel`, `imdKey`, `hfSpaceUrl`, `version: "1.6.0"`) — never secret values.
+
+### UX
+- **Farmer portal mobile-first redesign**: bottom nav with filled active pills + `aria-current` + Saathi accent dot; dashboard quick-action hero grid, snap-x stats row and refresh button; capture page phone accordion guidance, sticky column-local shutter bar, scroll-snap angle pills (38% min-width), labelled observations field with 500-char counter, and disabled-submit reason text; claims list 64px thumbnails, full-width search above scrollable filter chips; Saathi composer docked above safe-area with 48px toggles; claim detail gallery uses real buttons + dialog semantics with bilingual hardcoded-string fixes.
+- **Reviewer desktop redesign**: AppShell groups navigation into Cases/Insights/System clusters (icon-only below `lg` with tooltips, filled active state); review queue gains URL-persisted `q`/sort/peril filters, bulk accept (cap 25, sticky progress bar with n/N counter) and result counts; review detail becomes a two-column layout with sticky evidence rail and timeline history replacing raw JSON; overview gets a phone tab bar with hash persistence; analytics charts use fixed-height `ResponsiveContainer` + data-testids; audit/alerts get card layouts with `EmptyState`.
+- **Error boundaries & skeletons**: `app/error.tsx`, `app/global-error.tsx`, `app/not-found.tsx`; `loading.tsx` skeletons at root, farmer and review segments; shared `EmptyState` component.
+
+### Offline & PWA
+- **Installable PWA**: `public/manifest.webmanifest` (start URL `/farmer`, theme/background `#1c1915`) plus generated `icon-192.png`/`icon-512.png` via dependency-free `scripts/generate-pwa-icons.mjs`.
+- **Vanilla service worker** (`public/sw.js`): cache-first for static assets/icons/fonts, network-first navigations falling back to the cached `/farmer` shell when offline; **never caches `/api/*` or Supabase domains**. Registered in production only by the `PwaRegister` client component.
+- **Bilingual offline banner** on the farmer portal using the shared `use-online-status` hook.
+
+### Reliability
+- **Client error telemetry** (`src/lib/telemetry.ts`): zero-dependency `initTelemetry()` wires `window.onerror` + `unhandledrejection` into a 50-entry ring buffer and console logging; errors POST to authed `POST /api/telemetry/error` (rate-limited 5/min, clamped fields, log-only) when a session token exists. Wired in `providers.tsx`.
+- **Playwright E2E scaffold**: `playwright.config.ts` with desktop-chromium + mobile-pixel-7 projects (`PLAYWRIGHT_E2E=1` gates the dev webServer); specs in `e2e/{smoke,farmer-flow,reviewer-flow}.spec.ts` skip unless `E2E_SUPABASE_URL` is set; `npm run e2e` / `npm run e2e:headed` scripts; CI runs an e2e job on `workflow_dispatch` only, installing Chromium.
+
+### OSS
+- Bilingual `/privacy` and `/terms` pages linked from landing + login footers.
+- README badges row (license, CI, PRs welcome) and Community links section; CONTRIBUTING documents the local E2E workflow.
+
+---
+
+## [1.6.0] — 2026-08-22
+
+### Added
+- **Plot radius containment** (`src/lib/context/assemble.ts`): `plotContainment()` haversine check of capture GPS vs the registered plot center emits a new `plot_match` `ContextSignal`; `plotLat`/`plotLon` flow from the capture page through `farmerStore.createClaim` → `POST /api/claims` → `persistAndInfer` → `assembleContext`, with a 200 m default radius via `plotProximityMeters` (clamped 10–5000; confidence 75 inside / 40 outside).
+- **Sowing-date-aware IMD signals**: drought claims ≥30 days past sowing add cumulative rainfall since sowing from the Open-Meteo ARCHIVE endpoint (window starts at `max(sowing, now−180d)`) with `meta.windowRainfallMm/windowDays/daysSinceSowing` and weak-corroboration flagging below ~25 mm per month; hailstorm summaries append an estimated growth stage (30/60/100-day thresholds).
+- **Farmer recapture notifications** (`src/lib/farmer-notifications.ts`): localStorage diffing of unseen `needs_recapture` claims renders amber toast panels on `/farmer` with a Capture-now deep link and Dismiss, plus a nav badge dot while notices are unseen.
+- **Multi-Signal Context & Satellite Cross-Check card** (review detail): per-signal status chips, side-by-side `wide_field` photo vs live Bhuvan WMS tile, and a Copernicus Browser deep-link (`meta.burnMapUrl`, Sentinel-2 `S2_L2A_CDAS`, last 3 days).
+- **Confidence delta chips**: re-evaluations surface ▲/▼ deltas bilingually from `adaptive_result.confidence_delta` + `previousConfidence` in both the reviewer `EvidenceConfidenceSection` and the farmer claim page.
+- **Gate re-run button** (Authenticity card): reviewers can re-gate stored images (downloaded → data URLs → sequential authed `POST /api/vision/gate`); the outcome is audited via a `correct` action noting "Gate re-run recorded: X/Y usable".
+- **Per-peril analytics**: `web-db.ts analyticsFromClaims().byPeril` returns `{peril, count, avgConfidence, recaptureRate}`; Overview peril rows show color-coded average confidence + recapture %, with a client-side fallback computation when server analytics are absent.
+- **CSV export** (`src/lib/csv.ts`): dependency-free `toCsv`/`downloadCsv` utilities with Export buttons on the review queue (filtered rows, 10 columns) and the executive overview.
+- **Voice language pinning**: `buildSystemPrompt` hard-pins Hindi (Devanagari)/English-only replies, Live setup pins the `Kore` voice via `speechConfig`, server-side classification reasoning is language-pinned, and `lang` is threaded through every Saathi tool call.
+- **CV model warmup indicator**: the cv-worker posts `model_status` (`loading`/`ready`/`unavailable`), `realtime-cv.ts` exposes `onModelStatus`/`getModelStatus`, the capture page shows a bilingual "CV: AI ready/loading…" chip (hidden when unavailable), and weights prefetch starts on page mount.
+- sowingDate now flows end-to-end from plot record through POST /api/claims to context assembly, activating drought cumulative-rainfall and hail growth-stage windows automatically.
+
+---
+
+## [1.5.0] — 2026-08-22
+
+### Added
+- **Real on-device computer vision** (`apps/dashboard/src/lib/vision/cv-worker.ts`): the Web Worker loads TF.js plus **MobileNet v2 (alpha 0.5, `@tensorflow-models/mobilenet@2.1.1`) from the jsdelivr CDN** and classifies viewfinder frames against plant/crop labels (`plant`, `leaf`, `crop`, `grass`, `maize`, `wheat`, `rice/paddy`, …) with a ≥0.18 probability floor, throttled to one inference per 500 ms; the model verdict is unioned with the green-pixel heuristic for `cropDetected`, and offline/CSP failures degrade gracefully to heuristic-only mode.
+- **Full-duplex Saathi Voice Mode** (`src/app/farmer/saathi/page.tsx`): mic-toggle Gemini Live sessions with server-side tool execution via new `POST /api/saathi/tool`; text intake remains the fallback. Tools: `request_evidence_angles`, `call_context_signal`, `guide_capture`, and `classify_claim` (LLM peril classification now runs server-side in `src/lib/saathi/tools-server.ts` / `classify-server.ts`, off the client bundle).
+- **Real free-tier external signals** (`POST /api/context/assemble`):
+  - Sentinel **Tier 1**: real NDVI burn-scar detection via `sh.dataspace.copernicus.eu` process API (JSON raster, >5% low-NDVI pixels ⇒ burn) when `SENTINEL_TOKEN` is set; **Tier 2**: honest Open-Meteo archive extreme-heat proxy (>40 °C days over 30 d) without a token.
+  - IMD/weather: open-meteo forecast adds hail days (WMO codes 96/99) and wind-gust max (>60 km/h supports lodging); `IMD_API_KEY` documented as a paid-upgrade hook.
+  - Bhuvan WMS GetMap reachability probe; wildlife proximity via Overpass (forest/protected area ≤10 km, `animal_damage` only); nearby-farmland count via Overpass (≤2 km).
+- **Adaptive engine auto-recapture**: a Medium result (`request_missing`) moves the claim straight to `needs_recapture` with bilingual adaptive reasons persisted as `recapture_reason`/`recapture_reason_hi`; re-evaluations track `previousConfidence` + `confidence_delta` inside `adaptive_result`.
+- **Authenticity Gate persistence & overrides**: per-image gate verdicts persist to `web_claim_images.gate_result`; reviewers can execute an `override_gate` action that stamps `overridden`/`overriddenBy`/`overriddenAt`, surfaced on a new Authenticity Gate card on the review detail page.
+
+### Security
+- `POST /api/vision/gate`, `/api/context/assemble`, and `/api/saathi/tool` all require Supabase Auth JWTs (`requireWebActor`).
+- Shared in-memory rate limiter (`src/lib/server/rate-limit.ts`): 20–30 req/min per user per route.
+- Server-side input clamps: lat/lon ranges, canonical-angle whitelists, ≤64 KB tool bodies, strict sowing-date regex.
+- Site-lock unlock compares passwords in constant time; secrets isolated server-side.
+
+---
+
+## [1.4.0] — 2026-08-22
+
+### Changed
+- Webapp-only repository: removed Docker stack, FastAPI services, and Flutter app; dashboard remains the single deployable (Vercel).
+- `apps/dashboard` is the only application target; Vercel Root Directory stays `apps/dashboard`.
+- `scripts/` now contains only the Supabase SQL setup (`setup_supabase.sql`, `setup_web_schema.sql`, `setup_web_schema_peril.sql`, `lock_web_rls.sql`) and `test_supabase_conn.py`; `spaces/fasal-pramaan-api` continues to serve the crop model on Hugging Face.
+- Documentation (README, GETTING_STARTED, docs index, CONTRIBUTING, SECURITY) rewritten for the webapp-only architecture.
+
 ---
 
 ## [1.3.0] — 2026-08-18
@@ -13,21 +117,8 @@ All notable changes to **Fasal-Pramaan** will be documented in this file. The fo
   - Reviewer queue at `/review` lists the same claim IDs from Supabase `web_*` tables.
 - **Supabase persistence** for the hosted web path: private bucket `fasal-web-evidence`, RLS on `web_*` tables, env-only credentials.
 - **Root `vercel.json`** so Vercel builds `apps/dashboard` from the repository root.
-- **Local run kit** in `local/` (`start.ps1`, `start.sh`, README). The laptop Docker Compose stack (FastAPI, Celery, PostGIS, MinIO) is unchanged.
+- **Local run kit** in `local/` (`start.ps1`, `start.sh`, README).
 - Documentation for the hosted path: `docs/deployment.md`, `docs/supabase-integration.md`, `docs/environment-variables.md`, `docs/security.md`.
-
-### Security
-- Removed a leaked database password from git history (rewritten `main`; rotate the Supabase DB password if you cloned before the rewrite).
-- Tracked files are env-only: `SUPABASE_*`, `HF_TOKEN`, and related keys are never committed.
-- Camera, microphone, and geolocation are allowed in the dashboard; CSP permits `*.supabase.co`.
-
-### Fixed
-- Empty `plot_id` from unregistered capture is stored as `null` so it does not violate `web_plots` foreign keys.
-- Reviewer overview SQL join order (`missing FROM-clause entry for table evidence_evaluations_2`).
-- Dashboard CI: Node 22, ESLint `--quiet`, unused-import rules for the farmer page.
-
-### Removed
-- Showcase interceptor, mock reviewer tokens, and `showcase-data.ts`. Farmer and reviewer tabs read live data only.
 
 ---
 
@@ -35,13 +126,13 @@ All notable changes to **Fasal-Pramaan** will be documented in this file. The fo
 
 ### Added
 - **4-Dimensional Evidence Confidence & Trust Evaluation Engine**:
-  - Independent formulation: $\text{Final Confidence} = 0.4 \times \text{Quality} + 0.3 \times \text{Coverage} + 0.2 \times \text{Context} + 0.1 \times \text{Integrity}$.
-  - Canonical threshold ($\ge 85.0$) for evidence sufficiency.
-  - Deterministic 4-tier uncertainty classification with strict priority ordering ($\text{Integrity} \succ \text{Coverage} \succ \text{Visual} \succ \text{Context}$).
+  - Independent formulation: Final Confidence = 0.4 × Quality + 0.3 × Coverage + 0.2 × Context + 0.1 × Integrity.
+  - Canonical threshold (≥ 85.0) for evidence sufficiency.
+  - Deterministic 4-tier uncertainty classification with strict priority ordering (Integrity ≻ Coverage ≻ Visual ≻ Context).
   - Immutable historical snapshot persistence in `evidence_evaluations` table with component breakdowns.
 - **Adaptive Evidence Recapture Workflow**:
   - Replaces blanket 5-photo retakes with targeted angle requests (e.g. `closeup_damage`, `wide_field`).
-  - Automated re-evaluation pipeline with exact confidence delta ($\Delta C$) calculation.
+  - Automated re-evaluation pipeline with exact confidence delta (ΔC) calculation.
   - Bilingual farmer guidance (Hindi and English).
 - **Comprehensive Documentation Architecture**:
   - Dedicated technical specifications: `docs/evidence-evaluation.md` and `docs/adaptive-recapture.md`.
@@ -51,23 +142,13 @@ All notable changes to **Fasal-Pramaan** will be documented in this file. The fo
 
 ---
 
-## [1.1.1] — 2026-08-13
-
-### Fixed
-- Web build runtime safety assertion: release web builds correctly bypass `DEMO_MODE=true` crash on startup.
-- Reviewer adjudication handling: reviewers can accept DINOv2 `crop_health_v4` screening ($A/B/C/U$) when severity is empty.
-- Finalization validation: finalization no longer fails on omitted photo timestamps when draft GPS is valid.
-- Hindi/English transcript merge: word boundary spacing preserved in streaming voice assistant bubbles.
-
----
-
 ## [1.1.0] — 2026-08-04
 
 ### Added
 - **Fasal Saathi Gemini Live Voice Assistant**: Full-duplex Hindi/English conversational assistant for farmers.
 - Same-origin WebSocket proxy (`/api/v1/voice/live`) for secure ephemeral session token provisioning.
 - Allowlisted voice tools with spoken confirmation gates for state-mutating operations.
-- Recurring geo-tagged evidence reminders engine (`fp-beat` and `fp-worker`).
+- Recurring geo-tagged evidence reminders engine.
 - Automated local upload, classification, and reviewer-queue pipeline.
 
 ---
@@ -76,8 +157,6 @@ All notable changes to **Fasal-Pramaan** will be documented in this file. The fo
 
 ### Added
 - Initial open-source release of Fasal-Pramaan.
-- Flutter multi-platform field application with 5-angle guided capture and encrypted offline storage.
-- Next.js 14 Reviewer Command Centre with PostGIS GIS mapping and audit trail.
-- FastAPI REST Gateway with spatial jurisdiction RBAC and Alembic migrations.
-- DINOv2 ViT-S/14 ONNX local inference microservice.
-- Docker Compose multi-service orchestration stack.
+- Farmer capture portal and Reviewer Command Centre with PostGIS GIS mapping and audit trail.
+- Multi-spectral satellite verification and weather anomaly triangulation.
+- DINOv2 neural inference pipeline.

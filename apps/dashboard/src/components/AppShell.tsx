@@ -21,19 +21,50 @@ import { canAccessReviewerPortal, reviewerLoginHref } from "@/lib/review-access"
 import { useLanguage } from "@/lib/LanguageContext";
 import type { DictKey, Lang } from "@/lib/i18n";
 import { LanguageSelect } from "@/components/LanguageSelect";
+import { GitHubStarsBadge } from "@/components/GitHubStarsBadge";
 import clsx from "clsx";
 
-const reviewerNav = [
-  { href: "/", key: "portalShowcase" as const, icon: Home },
-  { href: "/overview", key: "overview" as const, icon: LayoutDashboard },
-  { href: "/map", key: "map" as const, icon: Map },
-  { href: "/review", key: "review" as const, icon: ClipboardList },
-  { href: "/analytics", key: "analytics" as const, icon: BarChart3 },
-  { href: "/alerts", key: "alerts" as const, icon: AlertTriangle },
-  { href: "/admin", key: "admin" as const, icon: Settings, adminOnly: true },
-  { href: "/health", key: "health" as const, icon: Activity },
-  { href: "/audit", key: "audit" as const, icon: Shield, adminOnly: true },
+type ReviewerNavItem = {
+  href: string;
+  key: DictKey;
+  icon: typeof Home;
+  adminOnly?: boolean;
+};
+
+const reviewerNavGroups: Array<{ label: string; items: ReviewerNavItem[] }> = [
+  {
+    label: "Cases",
+    items: [
+      { href: "/review", key: "review", icon: ClipboardList },
+      { href: "/overview", key: "overview", icon: LayoutDashboard },
+      { href: "/alerts", key: "alerts", icon: AlertTriangle },
+    ],
+  },
+  {
+    label: "Insights",
+    items: [
+      { href: "/analytics", key: "analytics", icon: BarChart3 },
+      { href: "/map", key: "map", icon: Map },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { href: "/audit", key: "audit", icon: Shield, adminOnly: true },
+      { href: "/admin", key: "admin", icon: Settings, adminOnly: true },
+      { href: "/health", key: "health", icon: Activity },
+    ],
+  },
 ];
+
+function navLinkClasses(active: boolean): string {
+  return clsx(
+    "flex items-center justify-center gap-2.5 border-l px-3 py-2.5 text-sm md:py-2 lg:justify-start",
+    active
+      ? "border-[var(--ink)] bg-[var(--ink)] font-medium text-[var(--surface)]"
+      : "border-transparent text-[var(--ink-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]",
+  );
+}
 
 function ReviewerNav({
   pathname,
@@ -84,31 +115,51 @@ function ReviewerNav({
       </div>
 
       <nav className="fp-ui flex-1 space-y-0.5 overflow-y-auto p-2" aria-label="Main Navigation">
-        {reviewerNav
-          .filter((item) => !item.adminOnly || roles.includes("administrator"))
-          .map((item) => {
-            const Icon = item.icon;
-            const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onNavigate}
-                className={clsx(
-                  "flex items-center gap-2.5 border-l px-3 py-2.5 text-sm md:py-2",
-                  active
-                    ? "border-[var(--ink)] bg-[var(--accent-soft)] font-medium text-[var(--ink)]"
-                    : "border-transparent text-[var(--ink-muted)] hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]",
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden strokeWidth={1.5} />
-                <span>{t(item.key)}</span>
-              </Link>
-            );
-          })}
+        <Link
+          href="/"
+          onClick={onNavigate}
+          title={t("portalShowcase")}
+          aria-label={t("portalShowcase")}
+          aria-current={pathname === "/" ? "page" : undefined}
+          className={navLinkClasses(pathname === "/")}
+        >
+          <Home className="h-4 w-4 shrink-0 opacity-70" aria-hidden strokeWidth={1.5} />
+          <span aria-hidden className="hidden lg:inline">{t("portalShowcase")}</span>
+        </Link>
+
+        {reviewerNavGroups.map((group) => {
+          const items = group.items.filter(
+            (item) => !item.adminOnly || roles.includes("administrator"),
+          );
+          if (items.length === 0) return null;
+          return (
+            <div key={group.label} className="pt-3">
+              <div className="fp-kicker mb-1 hidden px-3 text-[10px] lg:block">{group.label}</div>
+              {items.map((item) => {
+                const Icon = item.icon;
+                const active = pathname.startsWith(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onNavigate}
+                    title={t(item.key)}
+                    aria-label={t(item.key)}
+                    aria-current={active ? "page" : undefined}
+                    className={navLinkClasses(active)}
+                  >
+                    <Icon className="h-4 w-4 shrink-0 opacity-70" aria-hidden strokeWidth={1.5} />
+                    <span aria-hidden className="hidden lg:inline">{t(item.key)}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })}
       </nav>
 
       <div className="fp-ui space-y-2 border-t border-[var(--line)] p-3">
+        <GitHubStarsBadge className="w-full justify-center" />
         <LanguageSelect value={lang} onChange={setLang} className="w-full max-w-none" />
         <Link href="/" onClick={onNavigate} className="fp-btn-secondary w-full text-xs">
           {t("portalShowcase")}
@@ -142,6 +193,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isLandingRoute = pathname === "/";
   const isLoginRoute = pathname === "/login";
   const isUnlockRoute = pathname === "/unlock";
+  // Public legal pages: no session gate, plain self-contained layout.
+  const isPublicLegalRoute = pathname === "/privacy" || pathname === "/terms";
 
   useEffect(() => {
     setNavOpen(false);
@@ -163,7 +216,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         if (!cancelled) setReady(true);
         return;
       }
-      if (isLandingRoute) {
+      if (isLandingRoute || isPublicLegalRoute) {
         if (!cancelled) setReady(true);
         return;
       }
@@ -198,7 +251,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [pathname, isLandingRoute, isFarmerRoute, isLoginRoute, isUnlockRoute, router]);
+  }, [pathname, isLandingRoute, isFarmerRoute, isLoginRoute, isUnlockRoute, isPublicLegalRoute, router]);
 
   if (isLoginRoute || isUnlockRoute) {
     return <>{children}</>;
@@ -214,31 +267,49 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (isLandingRoute) {
+  if (isLandingRoute || isPublicLegalRoute) {
     return (
       <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
-        <header className="border-b border-[var(--line)] bg-[var(--surface)]">
-          <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3">
-            <Link href="/" className="text-sm tracking-tight text-[var(--ink)]">
-              Fasal-Pramaan
-              <span className="ml-2 text-[var(--ink-muted)]">फसल प्रमाण</span>
+        <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--surface)]/95 backdrop-blur-md shadow-2xs">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-6 sm:py-3.5">
+            <Link
+              href="/"
+              className="flex shrink-0 items-center gap-1 text-sm font-semibold tracking-tight text-[var(--ink)] sm:gap-1.5 sm:text-base"
+            >
+              <span>Fasal-Pramaan</span>
+              <span className="hidden text-xs font-normal text-[var(--ink-muted)] sm:inline">· फसल प्रमाण</span>
             </Link>
-            <div className="flex items-center gap-4">
-              <Link href="/farmer" className="fp-ui text-sm text-[var(--ink)] hover:underline">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Link
+                href="/farmer"
+                className="fp-ui rounded px-2 py-1 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--canvas)] hover:text-[var(--ink)] sm:px-2.5 sm:text-sm"
+              >
                 {t("farmerShort")}
               </Link>
-              <Link href="/overview" className="fp-ui text-sm text-[var(--ink)] hover:underline">
+              <Link
+                href="/overview"
+                className="fp-ui rounded px-2 py-1 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--canvas)] hover:text-[var(--ink)] sm:px-2.5 sm:text-sm"
+              >
                 {t("reviewerShort")}
               </Link>
+              <GitHubStarsBadge />
               <LanguageSelect value={lang} onChange={setLang} />
             </div>
           </div>
         </header>
         <main className="flex-1">{children}</main>
         <footer className="border-t border-[var(--line)] px-5 py-6 text-xs text-[var(--ink-muted)]">
-          <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:flex-row sm:justify-between">
+          <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:justify-between">
             <span>Fasal-Pramaan</span>
             <span>{t("evidenceTriage")}</span>
+          </div>
+          <div className="mx-auto mt-2 flex max-w-5xl gap-4">
+            <Link href="/privacy" className="text-xs text-[var(--ink-muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline">
+              Privacy
+            </Link>
+            <Link href="/terms" className="text-xs text-[var(--ink-muted)] underline-offset-2 hover:text-[var(--ink)] hover:underline">
+              Terms
+            </Link>
           </div>
         </footer>
       </div>
@@ -306,17 +377,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--surface)] md:hidden">
-          <div className="flex items-center gap-1 px-2 py-1.5">
-            <button
-              type="button"
-              className="p-2 text-[var(--ink)]"
-              aria-label="Open menu"
-              onClick={() => setNavOpen(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-          </div>
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[var(--line)] bg-[var(--surface)] px-2 py-1.5 md:hidden">
+          <button
+            type="button"
+            className="p-2 text-[var(--ink)]"
+            aria-label="Open menu"
+            onClick={() => setNavOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <GitHubStarsBadge />
         </header>
         <div className="min-w-0 flex-1 px-3 py-3 sm:px-4 md:px-6 md:py-5">{children}</div>
       </main>
