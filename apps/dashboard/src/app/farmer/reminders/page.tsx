@@ -41,26 +41,37 @@ import {
 import clsx from "clsx";
 
 const INDIAN_STATES = [
-  "Bihar",
-  "Uttar Pradesh",
-  "Madhya Pradesh",
-  "Punjab",
-  "Haryana",
-  "Rajasthan",
-  "Maharashtra",
-  "Gujarat",
-  "West Bengal",
-  "Odisha",
-  "Assam",
-  "Karnataka",
   "Andhra Pradesh",
-  "Telangana",
-  "Tamil Nadu",
-  "Kerala",
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
   "Chhattisgarh",
-  "Jharkhand",
-  "Uttarakhand",
+  "Delhi (NCT)",
+  "Goa",
+  "Gujarat",
+  "Haryana",
   "Himachal Pradesh",
+  "Jammu and Kashmir",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Ladakh",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Telangana",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
 ];
 
 const SOIL_TYPES = [
@@ -90,7 +101,7 @@ export default function FarmerRemindersPage() {
 
   const [plotForm, setPlotForm] = useState({
     name: "",
-    state: "Bihar",
+    state: "Andhra Pradesh",
     district: "",
     tehsil: "",
     village: "",
@@ -286,7 +297,7 @@ export default function FarmerRemindersPage() {
       setSelectedPlotId(createdPlotId);
       setPlotForm({
         name: "",
-        state: "Bihar",
+        state: "Andhra Pradesh",
         district: "",
         tehsil: "",
         village: "",
@@ -786,48 +797,57 @@ export default function FarmerRemindersPage() {
               </div>
             </div>
 
-            {/* Section 4: GPS Geo-location */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5">
+            {/* Section 4: GPS Geo-location (Sensor Geotag Only) */}
+            <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3.5 space-y-2.5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <Compass className="h-3.5 w-3.5 text-emerald-700" />
+                <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                  <Compass className="h-3.5 w-3.5 text-emerald-700 shrink-0" />
                   <span>{lang === "hi" ? "४. खेत का जीपीएस भू-स्थान (Geo-Tagging)" : "4. Field GPS Geo-Tagging"}</span>
                 </div>
                 <button
                   type="button"
                   onClick={handleDetectGps}
                   disabled={locating}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600 bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-800 transition-all active:scale-95 disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-700 bg-emerald-700 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-800 transition-all active:scale-95 disabled:opacity-60"
                 >
                   <MapPin className={clsx("h-3.5 w-3.5", locating && "animate-spin")} />
-                  <span>{locating ? (lang === "hi" ? "स्थान खोज रहे हैं…" : "Locating…") : t.addPlotAutoGps}</span>
+                  <span>
+                    {locating
+                      ? (lang === "hi" ? "सेंसर से स्थान ले रहे हैं…" : "Detecting GPS…")
+                      : plotForm.lat && plotForm.lon
+                        ? (lang === "hi" ? "पुनः जीपीएस लें" : "Update GPS Fix")
+                        : t.addPlotAutoGps}
+                  </span>
                 </button>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-xs font-medium text-slate-600">
-                  {lang === "hi" ? "अक्षांश (Latitude)" : "Latitude"}
-                  <input
-                    type="number"
-                    step="0.000001"
-                    placeholder="25.594100"
-                    value={plotForm.lat}
-                    onChange={(e) => setPlotForm((prev) => ({ ...prev, lat: e.target.value }))}
-                    className="fp-input mt-1 font-mono text-xs"
-                  />
-                </label>
-                <label className="text-xs font-medium text-slate-600">
-                  {lang === "hi" ? "देशांतर (Longitude)" : "Longitude"}
-                  <input
-                    type="number"
-                    step="0.000001"
-                    placeholder="85.137600"
-                    value={plotForm.lon}
-                    onChange={(e) => setPlotForm((prev) => ({ ...prev, lon: e.target.value }))}
-                    className="fp-input mt-1 font-mono text-xs"
-                  />
-                </label>
-              </div>
+              {plotForm.lat && plotForm.lon ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-300/80 bg-white p-3 shadow-2xs">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <div>
+                      <div className="font-mono text-xs font-bold text-slate-900">
+                        {parseFloat(plotForm.lat).toFixed(6)}° N, {parseFloat(plotForm.lon).toFixed(6)}° E
+                      </div>
+                      <div className="text-[11px] text-emerald-800 font-medium mt-0.5">
+                        {lang === "hi" ? "✓ डिवाइस सेंसर से जीपीएस सत्यापित" : "✓ Device GPS sensor geofenced"}
+                      </div>
+                    </div>
+                  </div>
+                  <span className="rounded bg-emerald-100 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide text-emerald-900">
+                    {lang === "hi" ? "सत्यापित फिक्स" : "Verified Fix"}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 rounded-lg border border-dashed border-slate-300 bg-white/80 p-3 text-xs text-slate-600">
+                  <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+                  <p className="leading-relaxed">
+                    {lang === "hi"
+                      ? "खेत पर खड़े होकर 'वर्तमान जीपीएस' बटन दबाएँ। सुरक्षा एवं PMFBY नियमों के तहत निर्देशांक सीधे डिवाइस सेंसर से दर्ज किए जाते हैं।"
+                      : "Tap 'Auto-Detect Live GPS' while at the field. To comply with PMFBY standards, coordinates are captured directly from device sensors."}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
