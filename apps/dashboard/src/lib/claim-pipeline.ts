@@ -69,12 +69,26 @@ async function gateSingleImage(
     return fallback;
   }
 
-  // Try Gemini first if API key is configured; reuse same prompt as gate route (via shared geminiGate).
-  // This is the direct-import path (more efficient than POST /api/vision/gate). If you prefer the
-  // HTTP path, you can POST to /api/vision/gate with AbortSignal.timeout(5000) instead:
-  //   const res = await fetch("/api/vision/gate", { method:"POST", body: JSON.stringify({ imageDataUrl: dataUrl, angleType, expectedCrop, peril }), signal: AbortSignal.timeout(5000) })
+  const meta = {
+    lat: input.lat,
+    lon: input.lon,
+    accuracyM: input.accuracyM,
+    capturedAt: input.capturedAt,
+    facing: input.facing,
+    dimensions: input.dimensions,
+    cvAnalysis: {
+      greenPct: input.greenPct,
+      luma: input.lightingScore,
+      blurScore: input.blurScore,
+      hintCode: input.qualityPassed ? "ok" : undefined,
+    },
+    sha256: input.sha256,
+    farmerObservation: input.farmerObservation,
+  };
+
+  // Try Gemini first with full image + metadata context; reuse same prompt via shared geminiGate.
   try {
-    const gemini = await geminiGate(dataUrl, input.angleType || "closeup_damage", expectedCrop, peril);
+    const gemini = await geminiGate(dataUrl, input.angleType || "closeup_damage", expectedCrop, peril, meta);
     if (gemini) {
       if (isRealSha) gateCache.set(sha, { result: gemini, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
       return gemini;
@@ -83,7 +97,7 @@ async function gateSingleImage(
     // fall through to heuristic
   }
 
-  const heuristic = heuristicGate(dataUrl, expectedCrop, peril);
+  const heuristic = heuristicGate(dataUrl, expectedCrop, peril, meta);
   const result: GateResult = { ...heuristic, fallback: true };
   if (isRealSha) gateCache.set(sha, { result, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
   return result;
@@ -195,6 +209,10 @@ export type PersistedImageInput = {
   qualityPassed?: boolean | null;
   blurScore?: number | null;
   lightingScore?: number | null;
+  greenPct?: number | null;
+  facing?: string | null;
+  dimensions?: { width: number; height: number } | null;
+  farmerObservation?: string | null;
 };
 
 export type PersistClaimInput = {
@@ -312,6 +330,11 @@ export type RecaptureClientImage = {
   accuracyM?: number | null;
   lightingScore?: number | null;
   qualityPassed?: boolean | null;
+  blurScore?: number | null;
+  greenPct?: number | null;
+  facing?: string | null;
+  dimensions?: { width: number; height: number } | null;
+  timestamp?: string | null;
 };
 
 export function buildRecaptureSubmitInput(
@@ -354,6 +377,11 @@ export function buildRecaptureSubmitInput(
       accuracyM: img.accuracyM,
       lightingScore: img.lightingScore,
       qualityPassed: img.qualityPassed,
+      blurScore: img.blurScore,
+      greenPct: img.greenPct,
+      facing: img.facing,
+      dimensions: img.dimensions,
+      capturedAt: img.timestamp || undefined,
     })),
   };
 }

@@ -62,12 +62,19 @@ describe("saathi agent", () => {
     );
   });
 
-  it("declares exactly the four autonomous tools", () => {
+  it("declares the complete autonomous agent tool suite", () => {
     expect(SAATHI_FUNCTION_DECLARATIONS.map((fn) => fn.name)).toEqual([
       "request_evidence_angles",
       "call_context_signal",
       "guide_capture",
       "classify_claim",
+      "take_photo",
+      "switch_camera",
+      "select_angle",
+      "retake_angle",
+      "set_observation",
+      "submit_claim",
+      "check_evidence_quality",
     ]);
   });
 });

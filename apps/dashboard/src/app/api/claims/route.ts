@@ -93,6 +93,11 @@ export async function POST(request: Request) {
           accuracyM?: number;
           lightingScore?: number | null;
           qualityPassed?: boolean | null;
+          blurScore?: number | null;
+          greenPct?: number | null;
+          facing?: string | null;
+          dimensions?: { width: number; height: number } | null;
+          capturedAt?: string | null;
         }) => {
           const decoded = decodeDataUrl(String(img.imageDataUrl || ""));
           return {
@@ -105,6 +110,12 @@ export async function POST(request: Request) {
             accuracyM: img.accuracyM,
             lightingScore: img.lightingScore,
             qualityPassed: img.qualityPassed,
+            blurScore: img.blurScore,
+            greenPct: img.greenPct,
+            facing: img.facing,
+            dimensions: img.dimensions,
+            capturedAt: img.capturedAt || undefined,
+            farmerObservation: typeof body.farmerObservations === "string" ? body.farmerObservations : undefined,
           };
         },
       );
