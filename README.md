@@ -1,223 +1,331 @@
 # Fasal-Pramaan (फसल प्रमाण)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Architecture-Distributed%20Microservices-0A84FF?style=for-the-badge" alt="Architecture" />
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/Next.js%2014-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
-  <img src="https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
-  <img src="https://img.shields.io/badge/PostgreSQL%20%2B%20PostGIS-336791?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
-  <img src="https://img.shields.io/badge/ONNX%20Runtime-005CED?style=for-the-badge&logo=onnx&logoColor=white" alt="ONNX" />
+  <img src="https://img.shields.io/badge/Next.js%2016-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
+  <img src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" alt="Hugging Face" />
+  <img src="https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
+</p>
+<p align="center">
+  <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-github%20actions-2088FF?logo=githubactions&logoColor=white" alt="CI: GitHub Actions" /></a>
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License MIT" />
+  <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs welcome" /></a>
 </p>
 
 ---
 
 ## Executive Summary
 
-**Fasal-Pramaan (*फसल प्रमाण* — Capture. Verify. Protect.)** is an open-source, enterprise-grade agricultural evidence capture, trust evaluation, and verification platform designed for agricultural insurance claim adjudication, disaster loss assessment, and crop monitoring programs.
+**Fasal-Pramaan (*फसल प्रमाण* — Capture. Verify. Protect.)** is an open-source agricultural evidence capture, trust evaluation, and verification webapp designed for agricultural insurance claim adjudication, disaster loss assessment, and crop monitoring programs.
 
-The system addresses the fundamental trust deficit in rural crop insurance by pairing **cryptographically verified multi-angle field evidence capture** with an explainable **Evidence Confidence & Trust Evaluation Engine**, an on-device/local **Vision Transformer (DINOv2 ViT-S/14) Screening Model**, and a **Human-in-the-Loop Reviewer Command Centre**.
+The system addresses the fundamental trust deficit in rural crop insurance by pairing **verified multi-angle field evidence capture** with an explainable **Evidence Confidence & Trust Evaluation Engine**, a **Hugging Face crop-model screening Space**, and a **Human-in-the-Loop Reviewer Dashboard**. The platform includes **Fasal Saathi as autonomous first-line entry point at `/farmer/saathi`**, **variable claims routing per peril (`src/lib/claim-routing.ts`, 8 perils)**, an **evidence quality & authenticity filter (realtime CV + Gemini LLM gate)**, an **adaptive confidence engine (`src/lib/context/adaptive-engine.ts`)**, and **multi-signal context validation (IMD weather + GPS + Sentinel + Bhuvan + nearby fields via `POST /api/context/assemble`)**.
+
+The v1.5.0 release makes every signal real: the CV worker runs **TF.js MobileNet v2 (alpha 0.5)** plant classification inside a Web Worker, Fasal Saathi speaks through a **full-duplex Gemini Live Voice Mode** whose function tools execute server-side via `POST /api/saathi/tool`, context checks hit **live free-tier sources** (Copernicus Sentinel process API, Open-Meteo forecast/archive, ISRO Bhuvan WMS, OpenStreetMap Overpass), and the adaptive engine **auto-creates bilingual recapture requests** instead of waiting for a reviewer.
+
+The v1.6.0 wave closes the loop end-to-end: captures are checked against the **registered plot center** (`plot_match` haversine containment), weather signals become **sowing-date-aware** (drought rainfall since sowing, hail growth-stage estimates), farmers get **in-app recapture notifications** (`farmer-notifications.ts`), reviewers get a **Satellite Cross-Check card** (wide_field vs Bhuvan WMS + Copernicus Browser deep-link), a **Gate re-run button**, **per-peril analytics**, and **CSV export**, plus a bilingual **CV AI-ready warmup badge** in the capture studio.
 
 ```
-                           FASAL-PRAMAAN ARCHITECTURE
- ┌─────────────────────────────────────────────────────────────────────────────┐
- │                            EXPERIENCE LAYER                                 │
- │  ┌─────────────────────────────────────┐  ┌──────────────────────────────┐  │
- │  │      Farmer / Field Officer App     │  │   Reviewer Command Centre    │  │
- │  │ (Flutter Mobile + Offline Resilient)│  │   (Next.js 14 + GIS/Metrics) │  │
- │  └──────────────────┬──────────────────┘  └──────────────┬───────────────┘  │
- └─────────────────────┼────────────────────────────────────┼──────────────────┘
-                       │ HTTPS / Signed S3                  │ REST / SSE
- ┌─────────────────────▼────────────────────────────────────▼──────────────────┐
- │                            APPLICATION LAYER                                │
- │  ┌───────────────────────────────────────────────────────────────────────┐  │
- │  │                       FastAPI Core API Gateway                        │  │
- │  │   (Auth, RBAC, Spatial Jurisdiction, Evidence Lifecycle & Routing)    │  │
- │  └──────────────────┬──────────────────────────────┬─────────────────────┘  │
- │                     │ Enqueue                      │ X-Service-Token        │
- │  ┌──────────────────▼──────────┐         ┌─────────▼─────────────────────┐  │
- │  │   Celery Async Worker Pool  │         │   Local Assistive AI Service  │  │
- │  │ (Evidence Eval Engine v1)   │         │ (DINOv2 ViT-S/14 ONNX Engine) │  │
- │  └─────────────────────────────┘         └───────────────────────────────┘  │
- └─────────────────────────────────────────────────────────────────────────────┘
- ┌─────────────────────────────────────────────────────────────────────────────┐
- │                               DATA LAYER                                    │
- │  ┌────────────────────────┐  ┌────────────────────┐  ┌───────────────────┐  │
- │  │  PostgreSQL + PostGIS  │  │   Redis 7 Cluster  │  │  MinIO S3 Store   │  │
- │  │ (Spatial Data & Audit) │  │(Broker & Rate-Lim) │  │(Immutable Evidence│  │
- │  └────────────────────────┘  └────────────────────┘  └───────────────────┘  │
- └─────────────────────────────────────────────────────────────────────────────┘
+                       FASAL-PRAMAAN WEBAPP ARCHITECTURE
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                  BROWSER                                    │
+│  ┌───────────────────────────────────┐  ┌────────────────────────────────┐ │
+│  │  Farmer Portal                    │  │  Reviewer Dashboard            │ │
+│  │  • Saathi intake /farmer/saathi   │  │  • /review queue + claim detail│ │
+│  │    duplex Gemini Live voice mode  │  │  • Adaptive confidence badge   │ │
+│  │    (mic toggle; tools execute on  │  │  • Multi-signal strip          │ │
+│  │    POST /api/saathi/tool)         │  │  • Authenticity Gate card      │ │
+│  │  • Peril-aware capture studio     │  │  • GIS map + audit trail +     │ │
+│  │    (src/lib/claim-routing.ts)     │  │    override_gate audit stamp   │ │
+│  │  • Realtime CV + AI-ready badge   │  │  • Satellite cross-check card  │ │
+│  │    (cv-worker TF.js MobileNet v2) │  │  • Per-peril analytics + CSV   │ │
+│  │  • Recapture notice toasts        │  │  • Gate re-run (authenticity)  │ │
+│  └─────────────────┬─────────────────┘  └──────────────┬─────────────────┘ │
+└────────────────────┼───────────────────────────────────┼───────────────────┘
+                     │ HTTPS                             │ HTTPS
+┌────────────────────▼───────────────────────────────────▼───────────────────┐
+│                 NEXT.JS WEBAPP (apps/dashboard, hosted on Vercel)           │
+│                                                                             │
+│  Pages: farmer portal (/farmer/*) · reviewer command centre (/review/*)     │
+│                                                                             │
+│  API routes (all auth-gated requireWebActor + per-user rate limits):        │
+│   POST /api/claims              evidence upload → storage + HF inference    │
+│   POST /api/vision/gate         Gemini vision gate (+ heuristic fallback)   │
+│   POST /api/context/assemble    multi-signal context + plot containment     │
+│   POST /api/saathi/tool         Saathi LLM tools executed server-side       │
+│                                                                             │
+│  Libs: claim-routing.ts (Peril ×8, ROUTE_CONFIG, ClaimIntent)               │
+│        saathi-agent.ts · saathi/tools-server.ts · cv-worker (MobileNet v2)  │
+│        context/types.ts · adaptive-engine · farmer-notifications · csv.ts   │
+└───────┬───────────────────┬────────────────────┬───────────────────┬────────┘
+        │                   │                    │                   │
+┌───────▼────────┐  ┌───────▼────────────┐  ┌────▼──────────┐  ┌─────▼──────────────┐
+│   Supabase     │  │  Hugging Face      │  │    Gemini     │  │ External signals   │
+│ Auth (JWT)     │  │  Space             │  │ Vision gate   │  │ open-meteo IMD ·   │
+│ Postgres web_* │  │  spaces/fasal-     │  │ + Saathi Live │  │ hail/gust codes ·  │
+│ Storage bucket │  │  pramaan-api       │  │ voice session │  │ Sentinel T1/T2 ·   │
+│ RLS policies   │  │                    │  │               │  │ Bhuvan WMS·Overpass│
+└────────────────┘  └────────────────────┘  └───────────────┘  └────────────────────┘
 ```
 
 ---
 
-## Key Pillars & Innovations
+## Key Pillars
 
-### 1. Multi-Angle Guided Evidence Capture
-Fasal-Pramaan replaces arbitrary single-photo claims with a standardized **5-Angle Spatial Protocol**:
-1. `wide_field`: Macro landscape showing field boundaries, topography, and entire crop stand.
-2. `left_context`: Peripheral view from the left flank capturing surrounding vegetation health.
-3. `mid_canopy`: Eye-level canopy view showing plant density, spacing, and foliage structure.
-4. `right_context`: Peripheral view from the right flank completing 180° spatial context.
-5. `closeup_damage`: High-resolution macro shot of symptomatic leaves, lesions, or pest damage.
+### 1. Fasal Saathi Autonomous Intake
+`/farmer/saathi` is the first-line entry point. Farmers describe the problem by text or voice (Hindi/English); `src/lib/saathi-agent.ts` classifies one of **8 perils** via `classifyPerilHeuristic`, extracts slots (crop, village, plot), builds a `ClaimIntent`, and stores it in `farmerStore.activeIntent` before routing to the peril-aware capture studio.
 
-### 2. Evidence Confidence & Trust Evaluation Engine
-Rather than treating model probability as ground truth, the platform computes an independent, deterministic **Evidence Confidence Score** ($0 - 100$):
+A **Voice Mode mic toggle** upgrades the chat to a full-duplex Gemini Live session (`POST /api/voice/session` mints an ephemeral token; audio streams over WebSocket while text stays available as fallback). The Live model calls the `SAATHI_FUNCTION_DECLARATIONS` tools — `request_evidence_angles`, `call_context_signal`, `guide_capture`, `classify_claim` — and every tool call is executed **server-side** through auth-gated, rate-limited `POST /api/saathi/tool`, so `GEMINI_API_KEY` (and LLM peril classification) never reaches the browser bundle.
+
+### 2. Variable Claims Routing per Peril
+`src/lib/claim-routing.ts` defines `ROUTE_CONFIG`: required/optional capture angles, context checks, `minConfidence` (70–85), and `needsSatellite` per peril — e.g., `fire_burn` needs only `wide_field` + `closeup_damage` plus a Sentinel check, while `normal` requires the full 5-angle protocol.
+
+### 3. Evidence Quality & Authenticity Filter
+- **Realtime CV on-device with a real model** — `src/lib/vision/realtime-cv.ts` (running in `src/lib/vision/cv-worker.ts`) samples viewfinder frames at 2–4 fps in a Web Worker. The worker loads **TF.js + MobileNet v2 (`@tensorflow-models/mobilenet`, version 2, alpha 0.5) from the jsdelivr CDN** and classifies frames against plant/crop labels (plant, leaf, crop, grass, maize, wheat, rice/paddy, …) with a ≥0.18 probability floor, throttled to one inference per 500 ms. `cropDetected` is the **union of the green-pixel heuristic and the MobileNet plant verdict**; offline or blocked CDN degrades gracefully to heuristic-only mode without ever throwing. The capture page spins up the worker on mount so TF.js/MobileNet weights prefetch while the farmer reads guidance, and a bilingual **"CV: AI ready/loading…"** badge mirrors the worker's `model_status` (`loading`/`ready`/`unavailable`) — hidden when the model is unavailable.
+- **Gemini vision gate** — `POST /api/vision/gate` (`src/app/api/vision/gate/route.ts`, auth-gated) calls Gemini vision with `inlineData` when `GEMINI_API_KEY` is set and returns `{ usable, reason, crop_detected, warnings, confidence }`; without a key it falls back to a size/type heuristic. Rejects AI-generated screenshots and wrong-crop images. Verdicts persist per image to `web_claim_images.gate_result`. Reviewers can also **re-run the gate** on already-stored photos from the review detail Authenticity card (client downloads images → data URLs → sequential authed `/api/vision/gate` calls → audited `correct` action "Gate re-run recorded: X/Y usable").
+
+### 4. Multi-Signal Context Validation
+`POST /api/context/assemble` assembles `ContextSignal[]` from **live free-tier sources**:
+- `sentinel` — Tier 1: with `SENTINEL_TOKEN`, real NDVI burn-scar detection via `sh.dataspace.copernicus.eu` process API (JSON raster, burn when >5% of pixels have NDVI < 0.2). Tier 2: without a token, an honest free Open-Meteo archive proxy counts extreme-heat days (>40 °C in past 30 days).
+- `imd` — Open-Meteo forecast proxy for 7-day rainfall plus hail (WMO codes 96/99 → `hailDays7d`) and wind gusts (`gustMaxKph > 60` supports lodging); `IMD_API_KEY` is a documented slot for the paid IMD upgrade.
+- `bhuvan` — live ISRO Bhuvan WMS GetMap probe with reachable/unreachable status.
+- `wildlife` / `nearby` / `gps` — Overpass API checks: forest/protected-area within 10 km (for `animal_damage`) and farmland-parcel count within 2 km.
+- `plot_match` — haversine containment of the capture GPS against the registered plot center (`plotContainment()` in `src/lib/context/assemble.ts`); radius defaults to 200 m via `plotProximityMeters` (clamped 10–5000). Confidence 75 inside the radius, 40 outside, `unavailable` without a registered plot point.
+
+Sowing-date-aware windows: for `drought` claims ≥30 days past sowing, the IMD signal adds cumulative rainfall since sowing from the Open-Meteo archive (window starts at `max(sowing, now−180d)`; `meta.windowRainfallMm/windowDays/daysSinceSowing`) and marks corroboration weak when rainfall averages <25 mm per 30 days. For `hailstorm`, an estimated crop growth stage (30/60/100-day thresholds) is appended to the summary.
+
+Overall status is `strong`/`mixed`/`weak`/`pending`.
+
+### 5. Adaptive Confidence Engine
+`src/lib/context/adaptive-engine.ts` maps evidence scores against the peril threshold:
+
+```
+overall >= threshold && coverage>=60 && quality>=40  → High   → proceed
+overall >= threshold-20 && coverage>=40              → Medium → request_missing (targeted angles)
+otherwise                                            → Low    → retake / escalate_to_human
+```
+
+Special rules: integrity < 50 → `escalate_to_human`; gate flagged → `retake`; `fire_burn` without Sentinel available stays Medium/Low until satellite data arrives.
+
+**Auto-recapture:** when the engine lands on a level with `nextStep = request_missing`, the claim moves straight to `needs_recapture` — no reviewer round-trip — with the adaptive reasons stored bilingually as `recapture_reason` / `recapture_reason_hi`. Re-submissions track `previousConfidence` and the exact `confidence_delta` inside `adaptive_result`, rendered as bilingual ▲/▼ delta chips on the review detail (`EvidenceConfidenceSection`) and the farmer claim page. Farmers are alerted in-app: `src/lib/farmer-notifications.ts` diffs `needs_recapture` claims against localStorage-seen IDs, the `/farmer` dashboard shows amber toast panels with a Capture-now deep link + Dismiss, and a nav badge dot marks unseen notices.
+
+**Transparent overrides:** reviewers can act with `override_gate` on a gate-flagged image; the action stamps `overridden` / `overriddenBy` / `overriddenAt` into `gate_result` and renders an Authenticity Gate card on the review detail page.
+
+### 6. Hardened API Surface
+Every evidence route (`/api/claims`, `/api/vision/gate`, `/api/context/assemble`, `/api/saathi/tool`) requires a **Supabase Auth JWT** (`requireWebActor`) and is rate-limited per user (20–30 req/min per route via shared `src/lib/server/rate-limit.ts`). Inputs are clamped server-side (lat ±90 / lon ±180, canonical angle whitelists, ≤64 KB tool bodies, strict `sowingDate` date regex), and the site-lock unlock compares passwords in constant time.
+
+### 7. Evidence Confidence & Trust Evaluation Engine
+Deterministic score ($0 - 100$):
 
 $$\text{Final Confidence} = 0.4 \times \text{Quality} + 0.3 \times \text{Coverage} + 0.2 \times \text{Context} + 0.1 \times \text{Integrity}$$
 
-- **Threshold for Evidence Sufficiency**: $\ge 85.0$. Cases below 85 automatically trigger uncertainty classification and targeted remediation.
-- **Deterministic Uncertainty Priority**:
-  $$\text{Integrity} \longrightarrow \text{Coverage} \longrightarrow \text{Visual Quality} \longrightarrow \text{Context}$$
-- **Zero False-Accept Policy**: Integrity anomalies (duplicate hashes, mock GPS, byte mismatches) force mandatory human review and cannot be bypassed.
+- **Threshold for evidence sufficiency**: $\ge 85.0$ (or the peril-specific `ROUTE_CONFIG.minConfidence`).
+- **Zero false-accept policy**: integrity anomalies force mandatory human review.
+- Every evaluation snapshot is immutable; re-evaluations track the exact confidence delta ($\Delta C$).
 
-### 3. Adaptive Evidence Recapture Workflow
-When evidence is incomplete or blurry, the system **does not force farmers to retake all 5 photos**. Instead, it generates targeted requests for *only* the specific missing or defective angles (e.g., retake only `closeup_damage` due to motion blur). 
-- Maintains an **immutable historical audit trail** of every evaluation snapshot.
-- Tracks exact **Confidence Delta ($\Delta C = C_{\text{new}} - C_{\text{prev}}$)** upon re-evaluation.
+### Production readiness (v2.0.0)
 
-### 4. Fully Local, Assistive DINOv2 Vision Transformer
-- **Zero Cloud Dependence**: Shipped with a baked 87 MB ONNX export of DINOv2 ViT-S/14 fine-tuned on maize, paddy, potato, and wheat.
-- **Calibrated $A/B/C/U$ Screening**:
-  - `A`: Confident healthy crop stand.
-  - `B`: Borderline / uncertain signal requiring human inspection.
-  - `C`: Confident disease or damage pattern.
-  - `U`: Unusable, unsupported crop, or out-of-domain evidence.
-- **Model vs. Evidence Independence**: Model predictions never overwrite evidence confidence scores or approve financial claims automatically.
-
-### 5. Offline-First Mobile Resilience
-- **Cryptographic Local Storage**: AES-GCM encrypted local SQLite storage ensures evidence captured in remote areas without connectivity is safe and tamper-resistant.
-- **Idempotent Background Synchronization**: Resumable multi-part upload pipeline with automatic retry backoff and deterministic idempotency keys.
-
-### 6. Fasal Saathi: Spoken AI Assistant (Gemini Live)
-- Full-duplex voice assistance in **Hindi** and **English** for hands-free field operations.
-- Server-mediated ephemeral session token architecture with strict human confirmation gates before state mutations (syncing queue, finalizing submissions).
+- **Role-guarded routes** — all 8 reviewer pages gate on session roles (`useRequireRole` + `AccessGate`); queries stay idle until the gate passes.
+- **Per-route rate limits with `Retry-After`** on every mutating route (claims 10/min, actions/milestones/context/saathi 30/min, gate 20/min, telemetry 5/min, system status 10/min).
+- **Error boundaries + loading skeletons + EmptyState**, plus client error telemetry (ring buffer → authed log-only intake; Sentry DSN slot ready).
+- **Installable PWA** — manifest + vanilla service worker (never caches `/api/*` or Supabase), prod-only registration, bilingual offline banner.
+- **Playwright E2E scaffold** — desktop + mobile projects, manually-triggered CI job.
+- **Bilingual `/privacy` + `/terms` placeholders** linked from landing and login footers.
 
 ---
 
-## System Portals & Access Points
+## Intelligent Adaptive Evidence Collection & Validation
 
-| Component | Endpoint / URL | Default Demo Credentials | Purpose |
-|---|---|---|---|
-| **Farmer Field App** | `http://localhost:8085` | `farmer@fasalpramaan.local` / `Demo@12345` | Farm registration, guided 5-angle capture, offline sync, status tracking |
-| **Field Officer Portal** | `http://localhost:8085` | `officer@fasalpramaan.local` / `Demo@12345` | Jurisdiction-scoped assisted capture and field validation |
-| **Reviewer Command Centre** | `http://localhost:3000` | `reviewer@fasalpramaan.local` / `Demo@12345` | Review queue, GIS mapping, evidence score breakdown, adjudication |
-| **System Administrator** | `http://localhost:3000` | `admin@fasalpramaan.local` / `Demo@12345` | User administration, audit log inspection, system health metrics |
-| **FastAPI Gateway & Docs** | `http://localhost:8000/docs` | Bearer Token Authentication | Interactive OpenAPI documentation and REST contract |
-| **Local AI Service** | `http://localhost:8001/health` | `X-Service-Token` Header | Vision Transformer inference health and model metadata |
-| **MinIO S3 Evidence Console** | `http://localhost:9001` | `minioadmin` / `minioadmin_dev_only` | S3-compatible private object storage console |
+**Variable claims routing table (`ROUTE_CONFIG`):**
+
+| Peril (`Peril`) | Required angles | Optional angles | Context checks | `minConfidence` | `needsSatellite` |
+|---|---|---|---|---|---|
+| `normal` | `wide_field`, `left_context`, `mid_canopy`, `right_context`, `closeup_damage` (full 5) | — | `imd_weather`, `bhuvan_landuse`, `nearby_fields` | 85 | false |
+| `fire_burn` | `wide_field`, `closeup_damage` | `mid_canopy` | `sentinel_fire`, `imd_weather`, `bhuvan_landuse` | 70 | **true** |
+| `animal_damage` | `wide_field`, `mid_canopy`, `closeup_damage` | `left_context`, `right_context` | `wildlife_proximity`, `imd_weather`, `bhuvan_landuse` | 75 | false |
+| `flood` | `wide_field`, `mid_canopy`, `closeup_damage` | `left_context`, `right_context` | `imd_weather`, `sentinel_fire`, `nearby_fields` | 75 | false |
+| `drought` | `wide_field`, `mid_canopy`, `closeup_damage` | `left_context`, `right_context` | `imd_weather`, `bhuvan_landuse`, `nearby_fields` | 80 | false |
+| `pest_disease` | `closeup_damage`, `mid_canopy`, `wide_field` | `left_context`, `right_context` | `imd_weather`, `nearby_fields`, `bhuvan_landuse` | 85 | false |
+| `hailstorm` | `wide_field`, `closeup_damage`, `mid_canopy` | `left_context`, `right_context` | `imd_weather`, `nearby_fields`, `bhuvan_landuse` | 75 | false |
+| `lodging` | `wide_field`, `mid_canopy`, `closeup_damage` | `left_context`, `right_context` | `imd_weather`, `nearby_fields`, `bhuvan_landuse` | 75 | false |
+
+**Transparent reviewer dashboard:** the review queue and claim detail show adaptive level, threshold per peril, context signal statuses, visual score breakdowns, and the audit trail. The claim detail adds a **Multi-Signal Context & Satellite Cross-Check card** (per-signal status chips, side-by-side `wide_field` photo vs Bhuvan WMS tile, and a Copernicus Browser deep-link showing Sentinel-2 L2A for the last 3 days via `meta.burnMapUrl`), and both the queue and the executive overview offer **CSV export** (`src/lib/csv.ts` — dependency-free `toCsv`/`downloadCsv`) over the currently filtered rows; the overview's per-peril rows also show average confidence (color-coded) and recapture rate from `analyticsFromClaims().byPeril`.
 
 ---
 
-## Layout: Vercel webapp vs local Docker
+## Webapp Portals & Access Points
+
+Both roles sign in at `/login`. Users whose email appears in `REVIEWER_EMAILS` are reviewers; everyone else is a farmer.
+
+| Route | Role | Purpose |
+|---|---|---|
+| `/farmer/saathi` | Farmer | Saathi autonomous intake — text/voice → peril classification → capture route |
+| `/farmer/capture` | Farmer | Peril-aware guided capture with realtime CV hints |
+| `/farmer/claims`, `/farmer/queue` | Farmer | Claim status tracking, targeted recapture requests |
+| `/review`, `/review/[id]` | Reviewer | Review queue, adaptive confidence breakdown, adjudication |
+
+Locally the app runs at `http://localhost:3000`. On Vercel it runs at your project domain.
+
+---
+
+## Layout
 
 | Location | What it is |
 |---|---|
-| `apps/dashboard` | Farmer + reviewer Next.js app. This is what Vercel builds. |
-| `apps/dashboard` | Next.js app. Set the Vercel **Root Directory** to this folder. |
-| `local/` | Laptop Docker stack helpers (`local/start.ps1`). Secrets in `local/.env` (gitignored). |
-| `.env` | Gitignored root env for Compose. Same secrets as `local/.env`. |
+| `apps/dashboard` | The Next.js webapp (farmer + reviewer). This is what Vercel builds — set **Root Directory** to this folder. |
+| `docs/` | Webapp documentation. |
+| `scripts/` | Supabase SQL setup (`setup_supabase.sql`, `setup_web_schema.sql`, `setup_web_schema_peril.sql`, `lock_web_rls.sql`) and `test_supabase_conn.py`. |
+| `spaces/fasal-pramaan-api` | Hugging Face Space that serves the crop model used for screening. |
 
-Vercel project: connect this GitHub repo. Framework **Next.js**. Set **Root Directory** to `apps/dashboard` (Settings → General). That is what makes Vercel find `next` in `apps/dashboard/package.json`. Do not leave Root Directory empty and do not point it at `local/`.
-
-## Vercel farmer → Hugging Face → reviewer
-
-The laptop Docker stack is unchanged (`docker compose up`). The Next.js app in `apps/dashboard` can also be hosted on Vercel:
-
-1. Apply `scripts/setup_supabase.sql` and `scripts/setup_web_schema.sql` on your Supabase project.
-2. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `HF_SPACE_URL=https://dhrrishitvdeka-fasal-pramaan-api.hf.space`, `SITE_LOCK_PASSWORD`, and `REVIEWER_EMAILS` (comma-separated reviewer logins) in Vercel. Never commit those values. Leave `NEXT_PUBLIC_API_BASE_URL` unset.
-3. Create Supabase Auth users. Put reviewer emails in `REVIEWER_EMAILS`. Everyone else is a farmer. Both roles sign in at `/login`.
-4. Farmer captures at `/farmer/capture`. `POST /api/claims` checks the user JWT, stores the photo with the service role, calls Hugging Face, and writes `web_claims.created_by`.
-5. The same claim id appears on `/review` only for reviewer JWTs.
-
-There is no showcase/pseudo fallback on these routes. GPS is the device browser (no Maps API). Weather and Gemini are not used on Vercel.
-
-Details: [docs/supabase-integration.md](docs/supabase-integration.md), [docs/environment-variables.md](docs/environment-variables.md), [docs/deployment.md](docs/deployment.md).
+**Repository architecture:** one deployable Next.js webapp (`apps/dashboard`) + Supabase backend + HF Space — see [docs/architecture.md](docs/architecture.md) for the full system architecture, boundary models, and component contracts.
 
 ## Quickstart Guide
 
-### Prerequisites
-- Docker Engine 24.0+ and Docker Compose v2.0+
-- 8 GB RAM and 12 GB free disk space (base images and dependencies)
-- Git (for repository cloning)
+### Option A — Local development
 
-### 1. Launch with One Command
-
-#### Windows (PowerShell)
-```powershell
-git clone https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
-cd Fasal-Pramaan
-Copy-Item .env.example .env
-powershell -ExecutionPolicy Bypass -File .\scripts\start-portable.ps1
-```
-
-#### Linux / macOS (Bash)
 ```bash
 git clone https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
-cd Fasal-Pramaan
-cp .env.example .env
-sh scripts/start-portable.sh
+cd Fasal-Pramaan/apps/dashboard
+npm install
+cp .env.example .env.local   # fill in your Supabase URL/keys
+npm run dev                  # http://localhost:3000
 ```
 
-*Or standard Docker Compose:*
-```bash
-docker compose up -d --build
-```
+(From the repository root you can also use `npm run dev`, which proxies into `apps/dashboard`.)
 
-### 2. Verify System Health
+### Option B — Vercel deploy
 
-```bash
-# Verify API Gateway
-curl http://localhost:8000/health
+1. Push this repo to GitHub and import it into Vercel.
+2. Framework preset: **Next.js**. Set **Root Directory** to `apps/dashboard` (Settings → General). That is what makes Vercel find `next` in `apps/dashboard/package.json`.
+3. Add environment variables (see table below). Never commit their values.
+4. Deploy. Apply the Supabase SQL scripts from `scripts/` in your project's SQL editor first so the `web_*` tables, storage bucket, and RLS policies exist.
 
-# Verify AI Service
-curl http://localhost:8001/health
+## Environment Variables
 
-# Verify Web Portals
-curl -I http://localhost:3000
-curl -I http://localhost:8085/healthz
-```
+Copy `apps/dashboard/.env.example` to `.env.local` locally, or set these in Vercel:
 
-Expected AI Health Output:
-```json
-{
-  "status": "healthy",
-  "default_adapter": "crop_health_v4",
-  "crop_health_v4_model": true,
-  "inference_ready": true
-}
-```
+| Variable | Required | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes | Browser-safe publishable key |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes (server-only) | Server-side writes to storage/tables; never expose to the browser |
+| `HF_TOKEN` | recommended | Token for Hugging Face Space inference on `POST /api/claims` |
+| `HF_SPACE_URL` | no | Inference Space URL (default `https://dhrrishitvdeka-fasal-pramaan-api.hf.space`) |
+| `SITE_LOCK_PASSWORD` | no | When set on Vercel, locks the whole site behind a password (empty locally) |
+| `GEMINI_API_KEY` | no | Powers the Gemini vision gate on `POST /api/vision/gate`, Saathi Live voice sessions, and server-side LLM peril classification (`classify_claim`); heuristic fallbacks without it |
+| `GEMINI_LIVE_MODEL` | no | Saathi Live voice model (default `gemini-3.1-flash-live-preview`) |
+| `GEMINI_LIVE_VOICE` | no | Saathi Live voice (default `Kore`) |
+| `GEMINI_LIVE_SESSION_MINUTES` | no | Saathi Live session cap (default `15`) |
+| `SENTINEL_TOKEN` | no | Optional upgrade: real Sentinel-2 burn-scar checks (NDVI process API) for fire claims; without it a free Open-Meteo extreme-heat proxy runs instead (Tier 2) |
+| `IMD_API_KEY` | no | Reserved hook for the paid IMD weather API; the free Open-Meteo proxy (rain, hail codes, wind gusts) works without it |
+| `REVIEWER_EMAILS` | yes | Comma-separated reviewer emails; everyone else signs in as farmer |
+
+Server-only keys (`SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `GEMINI_API_KEY`, `SENTINEL_TOKEN`, `IMD_API_KEY`) must never be prefixed `NEXT_PUBLIC_`. Leave any legacy API base URL variable unset — there is no separate backend service.
+
+Details: [docs/supabase-integration.md](docs/supabase-integration.md), [docs/environment-variables.md](docs/environment-variables.md), [docs/deployment.md](docs/deployment.md).
 
 ---
 
-## End-to-End Workflow Demonstration
+## End-to-End Workflow Demonstration (8-Step Architecture)
+
+The system operates across a coordinated **8-step pipeline** spanning on-device client edge processing, autonomous AI intake, multi-signal orbital and meteorological triangulation, and human-in-the-loop review.
+
+### 1. Architectural Pipeline Flowchart
+
+```mermaid
+flowchart TD
+    subgraph Phase1["Phase 1: Field Evidence & Edge Verification"]
+        A["1. Farmer Intake<br/>(Fasal Saathi Voice/Text)"] --> B["2. Peril Routing<br/>(8 Disaster Protocols)"]
+        B --> C["3. Guided Capture Studio<br/>(On-Device MobileNet v2)"]
+        C --> D["4. Authenticity & Tamper Gate<br/>(Gemini Vision + SHA-256)"]
+    end
+
+    subgraph Bridge["Handover Bridge"]
+        D --> E["Secure Cloud Ingestion<br/>(POST /api/claims & Supabase)"]
+    end
+
+    subgraph Phase2["Phase 2: Signal Triangulation & Human Adjudication"]
+        E --> F["5. Multi-Signal Triangulation<br/>(Sentinel-2 + IMD + Bhuvan + Plot GPS)"]
+        F --> G["6. 4-Pillar Adaptive Confidence<br/>(0.4Q + 0.3C + 0.2X + 0.1I)"]
+        G --> H{"Confidence Level"}
+        H -- "High (>= Threshold)" --> I["7. Human Reviewer Command Centre<br/>(GIS Overlay + Satellite Cross-Check)"]
+        H -- "Medium (Coverage Gap)" --> J["8. Targeted Recapture Protocol<br/>(Auto-Request Missing Angles Only)"]
+        H -- "Low / Tamper Flagged" --> K["Mandatory Human Investigation<br/>(Anti-Fraud Escrow)"]
+        J -. "Re-Evaluation (ΔC)" .-> G
+        I --> L["Adjudication Decision<br/>(Verified / Rejected / Audit Trail)"]
+    end
+
+    classDef p1 fill:#e4e8e3,stroke:#2a4033,stroke-width:1.5px,color:#1c1915;
+    classDef p2 fill:#f3efe6,stroke:#1c1915,stroke-width:1.5px,color:#1c1915;
+    classDef bridge fill:#fffcf6,stroke:#5c574e,stroke-dasharray: 4 4,color:#1c1915;
+    class Phase1 p1;
+    class Phase2 p2;
+    class Bridge bridge;
+```
+
+### 2. End-to-End Sequence & State Machine
 
 ```mermaid
 sequenceDiagram
   autonumber
-  actor Farmer as Farmer (Mobile App)
-  participant API as FastAPI Gateway
-  participant S3 as MinIO S3
-  participant Worker as Celery Worker
-  participant AI as AI Service (DINOv2)
+  actor Farmer as Farmer (Browser / PWA)
+  participant Saathi as Fasal Saathi (/farmer/saathi)
+  participant Worker as CV Web Worker (MobileNet v2)
+  participant Gate as Gemini Vision Gate (/api/vision/gate)
+  participant API as Next.js API Layer
+  participant DB as Supabase (Auth / Postgres / Storage)
+  participant Ctx as Context Engine (/api/context/assemble)
+  participant HF as Hugging Face Space (DINOv2)
   actor Reviewer as Reviewer (Command Centre)
 
-  Farmer->>API: 1. Register Farm, Plot & Crop Cycle (Paddy)
-  Farmer->>API: 2. Create Submission Draft (GPS + Timestamp)
-  API-->>Farmer: Presigned S3 Upload URLs
-  Farmer->>S3: 3. Upload 5 Canonical Angles (AES/SHA-256)
-  Farmer->>API: 4. Finalize Submission
-  API->>Worker: 5. Enqueue Processing Task
-  Worker->>S3: 6. Verify Byte Size, MIME, SHA-256
-  Worker->>AI: 7. Run DINOv2 ViT-S/14 Screening (A/B/C/U)
-  Worker->>Worker: 8. Execute Evidence Trust Engine (Quality, Coverage, Context, Integrity)
-  Worker->>API: 9. Persist Immutable EvidenceEvaluation & Route Status
-  Reviewer->>API: 10. Inspect Queue, Visual Scores & Predictions
-  Reviewer->>API: 11. Adjudicate (Accept / Correct / Request Specific Recapture)
-  API-->>Farmer: 12. Deliver Targeted Recapture or Final Claim Decision
+  %% Step 1: Autonomous Intake
+  Farmer->>Saathi: 1. Autonomous Intake — Speaks/types issue (15 Indian languages, Gemini Live voice)
+  Saathi->>Saathi: Classifies peril across 8 disaster protocols, extracts crop & plot slots
+  Saathi->>Farmer: Routes to guided capture with tailored angle checklist (ROUTE_CONFIG)
+
+  %% Step 2: Edge CV & Shutter Guidance
+  Farmer->>Worker: 2. Realtime Edge CV — Viewfinder frames sampled at 2–4 fps in Web Worker
+  Worker-->>Farmer: Real-time plant/crop classification hints & "CV: AI Ready" status badge
+
+  %% Step 3: Authenticity & Metadata
+  Farmer->>Gate: 3. Shutter Capture — Submits photos with precision GPS & timestamps
+  Gate-->>Farmer: Validates optical clarity, rejects AI-generated fakes & wrong-crop images
+
+  %% Step 4: Submission & Triangulation
+  Farmer->>API: 4. Secure Submission — POST /api/claims (Auth JWT, SHA-256 checksums)
+  API->>DB: Persists image blobs in storage & creates immutable web_claims record
+  API->>Ctx: Assembles external context signals (Sentinel-2, IMD weather, Bhuvan WMS, GPS)
+
+  %% Step 5: Adaptive Evaluation
+  API->>API: 5. Computes 4-Pillar Confidence: 0.4*Quality + 0.3*Coverage + 0.2*Context + 0.1*Integrity
+  alt High Confidence (>= Peril Threshold)
+      API->>HF: 6. Runs neural crop loss screening (DINOv2 ViT-S/14)
+      API-->>DB: Persists final evaluation snapshot (Status: Pending Review)
+      Reviewer->>API: 7. Human Review — Inspects GIS boundary, satellite cross-check, adjudicates
+      API-->>DB: Records immutable decision & audit log (Status: Verified / Rejected)
+  else Medium Confidence (Coverage / Angle Gap)
+      API-->>DB: Auto-triggers Targeted Recapture (Status: Needs Recapture)
+      DB-->>Farmer: 8. Bilingual Toast Alert — Requests ONLY missing angles (No redundant capture)
+      Farmer->>API: Re-submits missing photo -> Engine recalculates Confidence Delta (ΔC)
+  else Low Confidence / Integrity Breach
+      API-->>DB: Escalates directly to anti-fraud human investigation
+  end
 ```
 
-For complete step-by-step walkthrough instructions, see [docs/demo-walkthrough.md](docs/demo-walkthrough.md).
+### 3. Step-by-Step Pipeline Breakdown
+
+| Step | Component | Technology / Protocol | Key Operational Output |
+|:---|:---|:---|:---|
+| **1. Autonomous Intake** | Fasal Saathi (`/farmer/saathi`) | Gemini Live Voice (full-duplex WebSocket) + heuristic slot extraction | 8-peril classification (`ClaimIntent`), crop slot, plot center binding |
+| **2. Edge CV Assistance** | Capture Studio (`/farmer/capture`) | TF.js MobileNet v2 (Web Worker, 2–4 fps) + Green-pixel heuristic | Real-time plant framing guidance, shutter readiness, warmup badge |
+| **3. Authenticity Gate** | Anti-Tamper Gate (`/api/vision/gate`) | Multimodal Gemini Vision + SHA-256 cryptographic hashing | Detection of fake/screen photos, blur filter, duplicate hash prevention |
+| **4. Multi-Signal Triangulation** | Context Engine (`/api/context/assemble`) | Copernicus Sentinel-2, Open-Meteo IMD, ISRO Bhuvan, OSM Overpass | NDVI burn scars, sowing-aware rain/hail, plot haversine containment |
+| **5. Adaptive Trust Engine** | Confidence Engine (`adaptive-engine.ts`) | 4-Pillar Formula: $0.4Q + 0.3C + 0.2X + 0.1I$ | Deterministic 0–100 score, High/Medium/Low confidence classification |
+| **6. Neural Loss Screening** | Crop Screening Space (`fasal-pramaan-api`) | Hugging Face Space (DINOv2 ViT-S/14 Foundation Model) | Automated loss pattern grading, crop health screening |
+| **7. Human Adjudication** | Reviewer Command Centre (`/review/[id]`) | GIS Leaflet polygon overlay, Bhuvan WMS, Copernicus Browser deep-link | Human verification, gate override audit stamp, one-click CSV export |
+| **8. Targeted Recapture** | Continuous Recapture Protocol | Bilingual in-app alerts (`farmer-notifications.ts`) + $\Delta C$ tracking | Re-capture of missing angles only, transparent confidence progression |
+
+For hands-on demonstration scripts and showcase scenarios, see [docs/demo-walkthrough.md](docs/demo-walkthrough.md).
 
 ---
 
@@ -225,19 +333,30 @@ For complete step-by-step walkthrough instructions, see [docs/demo-walkthrough.m
 
 ```text
 ├── apps/
-│   ├── dashboard/            # Next.js 14 Reviewer Command Centre (TypeScript, Tailwind, React Query)
-│   └── mobile/               # Flutter Multi-Platform App (Offline DB, Camera, Voice Bridge)
-├── services/
-│   ├── api/                  # FastAPI REST Gateway, Celery Worker, PostgreSQL Models, Alembic
-│   │   ├── alembic/          # Database Schema Migrations
-│   │   ├── app/              # Core Routing, Services, Schemas & Security Engine
-│   │   └── scripts/          # Database Seeders, E2E Verifiers, Reset Utilities
-│   └── ai/                   # Vision Transformer Inference Service (DINOv2 ViT-S/14 ONNX)
-│       ├── models/           # Pre-baked ONNX Model Artifacts & Label Mappings
-│       └── research/         # Research manifests, validation reports & benchmarks
-├── docs/                     # Full Technical Specifications, Architecture & API Documentation
-├── scripts/                  # Portable Launchers, Diagnostic Probes & Bundle Builders
-└── docker-compose.yml        # Multi-Container Orchestration Definition
+│   └── dashboard/                        # Next.js 16 farmer + reviewer webapp (TypeScript, Tailwind, React Query)
+│       ├── src/lib/claim-routing.ts      # Peril ×8, ROUTE_CONFIG, ClaimIntent
+│       ├── src/lib/saathi-agent.ts       # Saathi slot extraction & SAATHI_FUNCTION_DECLARATIONS
+│       ├── src/lib/saathi/tools-server.ts# Server-side Saathi tool dispatcher (classify_claim LLM)
+│       ├── src/app/farmer/saathi/page.tsx# Autonomous first-line intake + duplex Live voice
+│       ├── src/lib/vision/realtime-cv.ts # On-device realtime CV
+│       ├── src/lib/vision/cv-worker.ts   # Web Worker: TF.js MobileNet v2 α0.5 + heuristics
+│       ├── src/app/api/vision/gate/route.ts      # Gemini LLM gate + heuristic fallback
+│       ├── src/lib/context/types.ts      # ContextSignal / AssembledContext
+│       ├── src/app/api/context/assemble/route.ts # Sentinel T1/T2, open-meteo IMD/hail/gust, Bhuvan WMS, Overpass
+│       ├── src/lib/server/rate-limit.ts  # Shared per-user rate limiter (20–30 req/min)
+│       ├── src/lib/context/adaptive-engine.ts    # Adaptive confidence (High/Medium/Low)
+│       └── src/components/EvidenceConfidenceSection.tsx # Adaptive + multi-signal strip
+├── docs/                                 # Webapp documentation
+├── scripts/                              # Supabase SQL setup + connection test
+│   ├── setup_supabase.sql
+│   ├── setup_web_schema.sql
+│   ├── setup_web_schema_peril.sql
+│   ├── lock_web_rls.sql
+│   └── test_supabase_conn.py
+├── spaces/
+│   └── fasal-pramaan-api/                # Hugging Face Space serving the crop model
+├── .github/workflows/ci.yml              # CI: lint + typecheck + test + build (apps/dashboard)
+└── package.json                          # Root scripts (--prefix apps/dashboard)
 ```
 
 ---
@@ -247,47 +366,62 @@ For complete step-by-step walkthrough instructions, see [docs/demo-walkthrough.m
 | Document | Description |
 |---|---|
 | [**GETTING_STARTED.md**](GETTING_STARTED.md) | First-time setup, environment configuration, and local launch instructions |
-| [**RUN_GUIDE.md**](RUN_GUIDE.md) | Day-to-day operations, LAN exhibition setup, testing, and troubleshooting |
-| [**docs/architecture.md**](docs/architecture.md) | Comprehensive system architecture, boundary models, and component contracts |
+| [**CONTRIBUTING.md**](CONTRIBUTING.md) | Contribution standards, pull request requirements, and QA checks |
+| [**SECURITY.md**](SECURITY.md) | Security policy and vulnerability disclosure procedures |
+| [**CHANGELOG.md**](CHANGELOG.md) | Version history and release notes |
+| [**docs/architecture.md**](docs/architecture.md) | System architecture, boundary models, and component contracts |
 | [**docs/evidence-evaluation.md**](docs/evidence-evaluation.md) | Mathematical specification of the 4-component Evidence Trust Engine |
 | [**docs/adaptive-recapture.md**](docs/adaptive-recapture.md) | Targeted evidence recapture protocol, UX flows, and confidence delta calculations |
-| [**docs/api.md**](docs/api.md) | Complete OpenAPI endpoint catalog, request/response models, and schemas |
-| [**docs/ai-service.md**](docs/ai-service.md) | Vision Transformer architecture, $A/B/C/U$ screening taxonomy, and inference pipeline |
-| [**docs/AI_MODEL_MVP.md**](docs/AI_MODEL_MVP.md) | Model card, benchmark evaluation metrics (Macro-F1, ECE), and dataset provenance |
-| [**docs/offline-sync.md**](docs/offline-sync.md) | Cryptographic offline queue, sync protocol, and conflict resolution |
-| [**docs/security.md**](docs/security.md) | Defense-in-depth security architecture, RBAC, and anti-tamper controls |
-| [**docs/production-readiness.md**](docs/production-readiness.md) | Production architecture, hardening specifications, and deployment matrix |
+| [**docs/api.md**](docs/api.md) | API endpoint catalog including `POST /api/vision/gate`, `POST /api/context/assemble`, and `POST /api/saathi/tool` |
+| [**docs/security.md**](docs/security.md) | Security architecture, RBAC, and anti-tamper controls |
 | [**docs/governance-and-safety.md**](docs/governance-and-safety.md) | Ethical AI boundaries, human-in-the-loop guarantees, and risk controls |
+| [**docs/known-limitations.md**](docs/known-limitations.md) | Operational scope boundaries and calibrated abstention policies |
 | [**docs/VOICE_ASSISTANT_DEMO.md**](docs/VOICE_ASSISTANT_DEMO.md) | Fasal Saathi Gemini Live full-duplex voice assistant architecture and demo script |
-| [**docs/EVIDENCE_REMINDERS.md**](docs/EVIDENCE_REMINDERS.md) | Recurring evidence schedules and background notification engine |
-| [**docs/deployment.md**](docs/deployment.md) | Local, LAN, and enterprise cloud deployment topologies |
+| [**docs/EVIDENCE_REMINDERS.md**](docs/EVIDENCE_REMINDERS.md) | Recurring evidence schedules and farmer notifications |
+| [**docs/deployment.md**](docs/deployment.md) | Vercel deployment topology |
 | [**docs/environment-variables.md**](docs/environment-variables.md) | Environment configuration reference guide |
+| [**docs/supabase-integration.md**](docs/supabase-integration.md) | Supabase tables, storage bucket, and RLS integration |
+| [**docs/demo-walkthrough.md**](docs/demo-walkthrough.md) | Step-by-step demonstration scenarios |
 
 ---
 
 ## Verification & Quality Assurance Suite
 
-Run the full testing and static analysis suite:
+Run the full testing and static analysis suite (from the repo root or inside `apps/dashboard`):
 
 ```bash
-# 1. API & Evidence Engine Tests
-docker compose exec api pytest -v
+# From the repository root (proxies into apps/dashboard)
+npm run lint
+npm run typecheck
+npm test
+npm run build
 
-# 2. AI Inference & Model Tests
-docker compose exec ai pytest -v
-
-# 3. Reviewer Dashboard Tests (Lint, Typecheck & Jest)
+# Or directly
 cd apps/dashboard
 npm run lint
 npm run typecheck
 npm test
-
-# 4. Mobile App Analysis & Unit Tests
-docker build --target tester -t fasalpramaan-mobile-test apps/mobile
-
-# 5. Full End-to-End Automated Pipeline Verification
-powershell -ExecutionPolicy Bypass -Command "& .\scripts\verify-e2e.ps1 -ImagePaths @('wide.jpg','left.jpg','mid.jpg','right.jpg','close.jpg')"
+npm run build
 ```
+
+CI runs the same suite on every push and pull request (see `.github/workflows/ci.yml`).
+
+To verify your Supabase connection after applying the SQL scripts:
+
+```bash
+python scripts/test_supabase_conn.py
+```
+
+---
+
+## Community & Project Links
+
+| | |
+|---|---|
+| **Contributing** | See [CONTRIBUTING.md](CONTRIBUTING.md) — workflow, branch naming, and required QA checks. |
+| **Security** | See [SECURITY.md](SECURITY.md) — vulnerability reporting and security guidelines. |
+| **Code of Conduct** | See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). |
+| **License** | MIT — see the [LICENSE](LICENSE) file. |
 
 ---
 
@@ -309,5 +443,4 @@ powershell -ExecutionPolicy Bypass -Command "& .\scripts\verify-e2e.ps1 -ImagePa
 
 ## License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.  
-Dataset provenance and model licensing declarations are cataloged in [services/ai/research/reports/LICENSE_REPORT.md](services/ai/research/reports/LICENSE_REPORT.md).
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.

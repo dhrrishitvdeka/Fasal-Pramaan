@@ -140,6 +140,7 @@ async function callGradioPredictApi(
     method: "POST",
     headers,
     body: JSON.stringify({ data }),
+    signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(12000) : undefined,
   });
   const startText = await started.text();
   if (!started.ok) {
@@ -159,6 +160,7 @@ async function callGradioPredictApi(
   const stream = await fetchImpl(`${spaceUrl}/gradio_api/call/predict_api/${eventId}`, {
     method: "GET",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
+    signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(12000) : undefined,
   });
   const streamText = await stream.text();
   if (!stream.ok) {

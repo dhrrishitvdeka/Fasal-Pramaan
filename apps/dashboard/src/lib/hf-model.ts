@@ -1,4 +1,4 @@
-import { FASAL_MODEL_REPO, FASAL_SPACE_ID, resolveHfModelId, resolveHfSpaceUrl } from "./hf-infer";
+import { FASAL_SPACE_ID, resolveHfModelId, resolveHfSpaceUrl } from "./hf-infer";
 
 export const HF_MODEL_ID = resolveHfModelId();
 
@@ -14,4 +14,3 @@ export function getHfSpaceUrl(): string {
   return resolveHfSpaceUrl();
 }
 
-export { FASAL_MODEL_REPO, FASAL_SPACE_ID };

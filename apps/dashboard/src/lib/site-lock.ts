@@ -1,5 +1,4 @@
 export const SITE_LOCK_COOKIE = "fp_site_gate";
-export const SITE_LOCK_STORAGE_KEY = "fp_site_gate_v1";
 const GATE_PAYLOAD = "fasal-pramaan-site-lock-v1";
 
 export function siteLockPassword(): string {

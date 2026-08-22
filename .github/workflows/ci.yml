@@ -14,41 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  api-and-model:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v7
-      - name: Configure local environment
-        run: cp .env.example .env
-      - name: Build API and model images
-        run: docker compose build api ai
-      - name: Start dependencies
-        run: docker compose up -d db redis minio ai
-      - name: Wait for Postgres to accept connections
-        run: |
-          for i in $(seq 1 40); do
-            if docker compose exec -T db pg_isready -U fasalpramaan -d fasalpramaan; then
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Postgres never became ready"
-          docker compose logs db --tail=80
-          exit 1
-      - name: Migrate and bootstrap catalogs
-        run: |
-          docker compose run --rm migrate
-          docker compose run --rm seed
-      - name: Test API
-        run: docker compose run --rm api pytest -q
-      - name: Test model service
-        run: docker compose run --rm ai pytest -q
-      - name: Service logs on failure
-        if: failure()
-        run: docker compose logs --tail=200
-
-  dashboard:
+  webapp:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -66,25 +32,31 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  mobile:
+  # Playwright E2E — never runs on push/PR. Trigger manually via
+  # `gh workflow run ci.yml` (workflow_dispatch) with E2E_SUPABASE_URL /
+  # E2E_SUPABASE_ANON_KEY configured as repo secrets.
+  e2e:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/mobile
+        working-directory: apps/dashboard
+    env:
+      E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v7
-      - uses: subosito/flutter-action@v2
+      - uses: actions/setup-node@v7
         with:
-          flutter-version: '3.44.7'
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
-
-  compose:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - run: cp .env.example .env
-      - run: docker compose config --quiet
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/dashboard/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: PLAYWRIGHT_E2E=1 npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: apps/dashboard/playwright-report/
+          retention-days: 7

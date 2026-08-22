@@ -14,6 +14,9 @@ export type CaptureBridgeHandlers = {
   readProgress?(): Promise<CaptureProgressResult>;
 };
 
+import type { ClaimIntent } from "../claim-routing";
+import { INTENT_STORAGE_KEY } from "../claim-routing";
+
 const unavailable = (action: string) => ({
   ok: false,
   message: `Guided capture is not open, so ${action} cannot run.`,
@@ -21,12 +24,57 @@ const unavailable = (action: string) => ({
 
 class WebCaptureBridge {
   private handlers: CaptureBridgeHandlers | null = null;
+  private storedIntent: ClaimIntent | null = null;
+  private cvResultStore: unknown | null = null;
+  private contextSignalsStore: unknown | null = null;
 
   register(handlers: CaptureBridgeHandlers) {
     this.handlers = handlers;
     return () => {
       if (this.handlers === handlers) this.handlers = null;
     };
+  }
+
+  /** Store the active claim intent so capture page + Saathi voice share routing. */
+  setIntent(intent: ClaimIntent | null) {
+    this.storedIntent = intent;
+    if (typeof window !== "undefined") {
+      try {
+        if (!intent) sessionStorage.removeItem(INTENT_STORAGE_KEY);
+        else sessionStorage.setItem(INTENT_STORAGE_KEY, JSON.stringify(intent));
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  getIntent(): ClaimIntent | null {
+    if (this.storedIntent) return this.storedIntent;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem(INTENT_STORAGE_KEY);
+        if (raw) this.storedIntent = JSON.parse(raw) as ClaimIntent;
+      } catch {
+        // ignore
+      }
+    }
+    return this.storedIntent;
+  }
+
+  /** Live CV frame result from capture studio — feeds Saathi parallel guidance. */
+  setCvResult(result: unknown) {
+    this.cvResultStore = result;
+  }
+  getCvResult(): unknown {
+    return this.cvResultStore;
+  }
+
+  /** Multi-signal context (IMD/Sentinel/Bhuvan) for the active claim. */
+  setContextSignals(signals: unknown) {
+    this.contextSignalsStore = signals;
+  }
+  getContextSignals(): unknown {
+    return this.contextSignalsStore;
   }
 
   captureCurrentAngle() {

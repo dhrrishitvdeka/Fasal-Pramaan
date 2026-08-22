@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -19,6 +20,7 @@ import {
   ShieldCheck,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Save,
   Send,
   Trash2,
@@ -53,6 +55,8 @@ import {
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { runVoiceShutter, runVoiceSubmitDraft } from "@/lib/voice/capture-actions";
 import { webCaptureBridge } from "@/lib/voice/capture-bridge";
+import { anglesForPeril, normalizePeril, routeForPeril } from "@/lib/claim-routing";
+import { apiFetch } from "@/lib/auth-headers";
 import clsx from "clsx";
 
 function CaptureStudioContent() {
@@ -69,6 +73,7 @@ function CaptureStudioContent() {
     completeMilestone,
     milestones,
     persistError,
+    activeIntent,
   } = useFarmerData();
   const t = getFarmerT(lang);
 
@@ -77,17 +82,26 @@ function CaptureStudioContent() {
   const requestedAnglesParam = searchParams.get("angles");
   const plotIdParam = searchParams.get("plotId");
   const milestoneId = searchParams.get("milestone");
+  const intentIdParam = searchParams.get("intentId");
+  const perilParam = searchParams.get("peril");
   const milestone = milestones.find((item) => item.id === milestoneId);
 
-  // Determine active angles to capture
+  // Determine active angles to capture — peril-aware, recapture-aware, intent-aware
   const isTargetedRecapture = Boolean(recaptureClaimId);
   const targetAngleIds = requestedAnglesParam
     ? requestedAnglesParam.split(",").map((s) => s.trim())
     : [];
+  const requestedPeril = normalizePeril(perilParam || activeIntent?.peril || "normal");
+  const intentAngles = anglesForPeril(requestedPeril);
+  const baseAngleDefs = intentAngles.length ? intentAngles : ANGLE_DEFS;
 
-  const activeAngleDefs = isTargetedRecapture && targetAngleIds.length > 0
-    ? ANGLE_DEFS.filter((a) => targetAngleIds.includes(a.id))
-    : ANGLE_DEFS;
+  const filteredRecaptureAngles = isTargetedRecapture && targetAngleIds.length > 0
+    ? ANGLE_DEFS.filter((a) => targetAngleIds.includes(a.id) && a.id !== "__gps__")
+    : [];
+  const activeAngleDefs = filteredRecaptureAngles.length > 0
+    ? filteredRecaptureAngles
+    : baseAngleDefs;
+  const activeRoute = routeForPeril(requestedPeril);
 
   // Selected plot
   const [selectedPlotId, setSelectedPlotId] = useState<string>(
@@ -103,6 +117,14 @@ function CaptureStudioContent() {
   const [currentAngleIndex, setCurrentAngleIndex] = useState<number>(0);
   const currentAngle = activeAngleDefs[currentAngleIndex] || activeAngleDefs[0];
 
+  // Mobile guidance accordion — collapsed/expanded below the viewfinder; always
+  // open on lg+ (two-column studio). Re-opened when the angle auto-advances so
+  // guidance stays in sync with the viewfinder.
+  const [guidanceOpen, setGuidanceOpen] = useState<boolean>(true);
+  useEffect(() => {
+    setGuidanceOpen(true);
+  }, [currentAngleIndex]);
+
   // Captured images storage keyed by angle id
   const [capturedImages, setCapturedImages] = useState<Record<string, ClaimImageEvidence>>({});
 
@@ -113,6 +135,10 @@ function CaptureStudioContent() {
   const [cameraFacing, setCameraFacing] = useState<"environment" | "user">("environment");
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
+  // Realtime CV guidance
+  const [cvResult, setCvResult] = useState<import("@/lib/vision/realtime-cv").CvFrameResult | null>(null);
+  // MobileNet warmup indicator (fed by cv-worker "model_status" messages)
+  const [cvModelStatus, setCvModelStatus] = useState<"unknown" | "loading" | "ready" | "unavailable">("unknown");
 
   // GPS state
   const [gpsCoords, setGpsCoords] = useState<{
@@ -259,6 +285,27 @@ function CaptureStudioContent() {
     };
   }, [cameraFacing]);
 
+  // Precache hint: spin up the CV worker on mount so TF.js + MobileNet weights
+  // start downloading (browser HTTP cache handles repeat visits) while the
+  // farmer reads guidance, before the camera even starts. Also subscribes to
+  // the worker's model warmup status for the "CV: AI ready" badge.
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | null = null;
+    void import("@/lib/vision/realtime-cv")
+      .then((m) => {
+        if (!active) return;
+        m.ensureCvWorker();
+        setCvModelStatus(m.getModelStatus());
+        unsubscribe = m.onModelStatus(setCvModelStatus);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
   useEffect(() => {
     const video = videoRef.current;
     const stream = streamRef.current;
@@ -269,6 +316,42 @@ function CaptureStudioContent() {
     }
     void video.play().catch(() => undefined);
   }, [isCameraActive]);
+
+  // Realtime CV polling ~3 fps – off-main-thread via cv-worker
+  useEffect(() => {
+    if (!isCameraActive) {
+      setCvResult(null);
+      return;
+    }
+    let cancelled = false;
+    let timer: number | null = null;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const mod = await import("@/lib/vision/realtime-cv");
+        const video = videoRef.current;
+        if (!video || video.readyState < 2) {
+          timer = window.setTimeout(tick, 400);
+          return;
+        }
+        // Delegates to Worker (64x64 sampling off main thread) with sync fallback
+        const res = await mod.analyzeVideoFrameAsync(video, currentAngle?.id);
+        // bbox from worker is contour-derived (min/max green → normalized); rendering handled below
+        if (!cancelled && res) {
+          setCvResult(res);
+          webCaptureBridge.setCvResult(res);
+        }
+      } catch {
+        // ignore – fallback to sync path handled inside analyzeVideoFrameAsync
+      }
+      timer = window.setTimeout(tick, 333);
+    };
+    timer = window.setTimeout(tick, 500);
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [isCameraActive, currentAngle?.id]);
 
   useEffect(() => {
     if (!("geolocation" in navigator)) {
@@ -357,6 +440,12 @@ function CaptureStudioContent() {
   };
 
   const capturePhotoFromCamera = async () => {
+    // CV crop hint — alert farmer if frame needs alignment, but do not hard-lock shutter on mature/dry crops
+    const isDryOrCharredPeril = requestedPeril === "fire_burn" || requestedPeril === "drought";
+    if (cvResult?.shouldBlockShutter && !isDryOrCharredPeril && (cvResult.hintCode === "too_dark" || cvResult.hintCode === "too_bright")) {
+      showToast(lang === "hi" ? cvResult.hintHi : cvResult.hintEn);
+      return { ok: false as const, message: lang === "hi" ? cvResult.hintHi : cvResult.hintEn };
+    }
     const result = await runVoiceShutter({
       cameraActive: isCameraActive,
       grabFrame: grabCameraFrame,
@@ -422,6 +511,54 @@ function CaptureStudioContent() {
         ? `${currentAngle.nameHi} कैप्चर हो गया!`
         : `${currentAngle.name} captured successfully!`
     );
+
+    // Parallel LLM gate + crop-only check — runs in background, feeds Saathi guidance
+    void (async () => {
+      try {
+        const res = await apiFetch("/api/vision/gate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageDataUrl: imageUrl,
+            angleType: currentAngle.id,
+            expectedCrop: selectedPlot?.cropType || activeIntent?.crop || undefined,
+            peril: requestedPeril,
+          }),
+        });
+        const gate = (await res.json().catch(() => null)) as { usable?: boolean; reason?: string; crop_detected?: string | null; warnings?: string[] } | null;
+        if (gate && gate.usable === false) {
+          const reason = String(gate.reason || "unusable");
+          const warn =
+            reason === "wrong_crop"
+              ? lang === "hi"
+                ? `फसल मेल नहीं खाती (${gate.crop_detected || "अज्ञात"}) — सही फसल की फोटो लें।`
+                : `Crop mismatch (${gate.crop_detected || "unknown"}) — retake with correct crop in frame.`
+              : reason === "ai_generated"
+                ? lang === "hi"
+                  ? "AI-निर्मित/नकली लग रही है — मूल फोटो लें।"
+                  : "Looks AI-generated — please capture original photo."
+                : lang === "hi"
+                  ? `फोटो उपयोगी नहीं (${reason}) — दोबारा लें।`
+                  : `Photo not usable (${reason}) — please retake.`;
+          showToast(warn);
+          // mark qualityPassed false so coverage logic reflects gate failure
+          setCapturedImages((prev) => {
+            const cur = prev[currentAngle.id];
+            if (!cur || cur.imageUrl !== imageUrl) return prev;
+            return { ...prev, [currentAngle.id]: { ...cur, qualityPassed: false } };
+          });
+        } else if (gate?.usable && gate.crop_detected) {
+          // soft hint: crop detected ok
+        }
+        // also run local CV on still for second opinion (crop-only)
+        const cv = await import("@/lib/vision/realtime-cv").then((m) => m.analyzeDataUrl(imageUrl, currentAngle.id));
+        if (cv && !cv.cropDetected && requestedPeril !== "fire_burn") {
+          showToast(lang === "hi" ? cv.hintHi : cv.hintEn);
+        }
+      } catch {
+        // ignore gate errors — not blocking
+      }
+    })();
 
     // Automatically advance to next missing angle if available
     if (currentAngleIndex < activeAngleDefs.length - 1) {
@@ -501,16 +638,21 @@ function CaptureStudioContent() {
             return { id };
           }
           const newClaim = await createClaim({
-            plotId: plot?.id || "",
-            plotName: plot?.name || "Unregistered plot",
+            plotId: plot?.id || activeIntent?.plotId || "",
+            plotName: plot?.name || activeIntent?.crop || "Unregistered plot",
             plotNameHi: plot?.nameHi || "",
             khasraNumber: plot?.khasraNumber || "",
-            cropType: plot?.cropType || "",
+            cropType: plot?.cropType || activeIntent?.crop || "",
             cropTypeHi: plot?.cropTypeHi || "",
             cropVariety: plot?.cropVariety || "",
             status: "submitted",
-            farmerObservations: observations,
+            farmerObservations: observations || activeIntent?.farmerNote || "",
+            peril: requestedPeril,
+            intentId: activeIntent?.id || intentIdParam || undefined,
             images: imagesList,
+            plotLat: plot?.lat ?? null,
+            plotLon: plot?.lon ?? null,
+            sowingDate: plot?.sowingDate || activeIntent?.sowingDate || null,
             evidenceTrust: {
               qualityScore: 0,
               coverageScore: 0,
@@ -545,12 +687,13 @@ function CaptureStudioContent() {
   useEffect(() => {
     const total = activeAngleDefs.length;
     const captured = activeAngleDefs.filter((angle) => Boolean(capturedImages[angle.id])).length;
+    const cvHint = cvResult ? `${cvResult.hintEn} (green ${cvResult.greenPct}%, luma ${cvResult.luma ?? "?"})` : "";
     return webCaptureBridge.register({
       captureCurrentAngle: () => capturePhotoFromCamera(),
       readGuidance: async () => ({
         ok: true,
         message: currentAngle
-          ? `${currentAngle.name}: ${currentAngle.instructions}`
+          ? `${currentAngle.name}: ${currentAngle.instructions}${cvHint ? ` | Live CV: ${cvHint}` : ""}${activeIntent ? ` | Peril: ${activeIntent.peril}` : ""}`
           : "No capture angle is selected.",
         angle: currentAngle?.id,
       }),
@@ -569,7 +712,7 @@ function CaptureStudioContent() {
       },
       submitDraft: () => handleSubmitClaim(),
     });
-  }, [isCameraActive, currentAngle, isAllCaptured, handleSubmitClaim, capturedImages, activeAngleDefs]);
+  }, [isCameraActive, currentAngle, isAllCaptured, handleSubmitClaim, capturedImages, activeAngleDefs, cvResult, activeIntent]);
 
   const getAngleIcon = (iconName: string) => {
     switch (iconName) {
@@ -638,6 +781,24 @@ function CaptureStudioContent() {
                   : `Photograph ${milestone.stageName} for the growth timeline. This is not a damage claim.`
                 : t.studioSub}
           </p>
+          {activeIntent && !isTargetedRecapture && !milestone && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 font-semibold text-emerald-800">
+                <ShieldCheck className="h-3 w-3" />
+                {lang === "hi" ? activeRoute.labelHi : activeRoute.labelEn}
+              </span>
+              <span className="text-slate-600">
+                {activeRoute.requiredAngles.length} {lang === "hi" ? "कोण" : "angles"} · {lang === "hi" ? activeRoute.descriptionHi : activeRoute.descriptionEn}
+              </span>
+              <Link href="/farmer/saathi" className="text-emerald-700 underline underline-offset-2">Change</Link>
+            </div>
+          )}
+          {!activeIntent && !isTargetedRecapture && !milestone && (
+            <div className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
+              {lang === "hi" ? "सुझाव: पहले फसल साथी से बात करें — वह आपके लिए सही कोण तय करेगा।" : "Tip: Talk to Fasal Saathi first — it will pick the right angles for your peril."}{" "}
+              <Link href="/farmer/saathi" className="font-bold underline">Saathi →</Link>
+            </div>
+          )}
         </div>
 
         {!isTargetedRecapture && (
@@ -676,8 +837,18 @@ function CaptureStudioContent() {
           </span>
         </div>
 
-        {/* Progress pill bar */}
-        <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+        {/* Progress pill bar — horizontal scroll-snap on phone, grid on sm+ */}
+        <div
+          className={`flex snap-x gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:gap-2 sm:overflow-visible sm:pb-0 ${
+            requiredCount <= 2
+              ? "sm:grid-cols-2"
+              : requiredCount === 3
+                ? "sm:grid-cols-3"
+                : requiredCount === 4
+                  ? "sm:grid-cols-4"
+                  : "sm:grid-cols-5"
+          }`}
+        >
           {activeAngleDefs.map((angle, idx) => {
             const isCaptured = Boolean(capturedImages[angle.id]);
             const isCurrent = idx === currentAngleIndex;
@@ -687,10 +858,11 @@ function CaptureStudioContent() {
                 key={angle.id}
                 type="button"
                 onClick={() => setCurrentAngleIndex(idx)}
+                aria-current={isCurrent ? "step" : undefined}
                 className={clsx(
-                  "flex min-w-0 flex-col items-center justify-center rounded-lg p-1.5 text-center transition-all border sm:p-2",
+                  "flex min-w-[38%] shrink-0 snap-start flex-col items-center justify-center rounded-lg border p-1.5 text-center transition-all sm:min-w-0 sm:p-2",
                   isCurrent
-                    ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)]"
+                    ? "scale-[1.03] border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)]"
                     : isCaptured
                     ? "border-[var(--ink)] bg-[var(--accent-soft)] text-[var(--ink)]"
                     : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)]"
@@ -703,7 +875,7 @@ function CaptureStudioContent() {
                     <span className="text-xs font-mono font-bold">{idx + 1}</span>
                   )}
                 </div>
-                <span className="mt-1 text-[10px] sm:text-xs font-semibold truncate w-full">
+                <span className="mt-1 w-full truncate text-[10px] font-semibold sm:text-xs">
                   {lang === "hi" ? angle.nameHi.split(". ")[1] : angle.name.split(". ")[1]}
                 </span>
               </button>
@@ -770,16 +942,56 @@ function CaptureStudioContent() {
               <div className="border-r border-white/20" />
               <div />
             </div>
+            {/* CV bbox overlay */}
+            {cvResult?.bbox && isCameraActive && !capturedImages[currentAngle.id] && (
+              <div
+                className="pointer-events-none absolute border-2 border-emerald-400 bg-emerald-400/10"
+                style={{
+                  left: `${cvResult.bbox.x * 100}%`,
+                  top: `${cvResult.bbox.y * 100}%`,
+                  width: `${cvResult.bbox.w * 100}%`,
+                  height: `${cvResult.bbox.h * 100}%`,
+                }}
+              />
+            )}
+            {/* CV model warmup badge + hint chip */}
+            {isCameraActive && !capturedImages[currentAngle.id] && (cvResult || cvModelStatus === "loading" || cvModelStatus === "ready") && (
+              <div className="pointer-events-none absolute bottom-14 left-2 right-2 flex flex-col items-center gap-1.5 sm:bottom-16">
+                {(cvModelStatus === "ready" || cvModelStatus === "loading") && (
+                  <span
+                    className={clsx(
+                      "rounded-full px-3 py-1 text-xs font-bold shadow",
+                      cvModelStatus === "ready" ? "bg-emerald-600 text-white" : "animate-pulse bg-slate-700/90 text-white",
+                    )}
+                  >
+                    {cvModelStatus === "ready"
+                      ? lang === "hi"
+                        ? "CV: AI तैयार"
+                        : "CV: AI ready"
+                      : lang === "hi"
+                        ? "CV: मॉडल लोड हो रहा…"
+                        : "CV: loading model…"}
+                  </span>
+                )}
+                {cvResult && (
+                  <span
+                    className={`max-w-full rounded-full px-3 py-1 text-xs font-bold shadow ${cvResult.hintCode === "ok" ? "bg-emerald-600 text-white" : "bg-amber-400 text-slate-900"}`}
+                  >
+                    {lang === "hi" ? cvResult.hintHi : cvResult.hintEn} · {cvResult.greenPct}% green · {cvResult.luma ?? "?"} luma
+                  </span>
+                )}
+              </div>
+            )}
 
-            {/* Top Overlay: Active Angle Badge & GPS Meter */}
-            <div className="pointer-events-none absolute left-2 right-2 top-2 flex flex-wrap items-start justify-between gap-1.5 sm:left-3 sm:right-3 sm:top-3">
-              <span className="flex max-w-full items-center gap-1.5 rounded-md border border-white/20 bg-black/75 px-2 py-1 text-[11px] font-bold text-white sm:text-xs">
+            {/* Top Overlay: Active Angle Badge & GPS Meter — stack on narrow phones */}
+            <div className="pointer-events-none absolute left-2 right-2 top-2 flex flex-wrap items-start justify-between gap-1 sm:left-3 sm:right-3 sm:top-3 max-[400px]:flex-col">
+              <span className="flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-white/20 bg-black/75 px-2 py-1 text-[11px] font-bold text-white sm:text-xs">
                 {getAngleIcon(currentAngle.illustrationIcon)}
                 <span className="truncate">{lang === "hi" ? currentAngle.nameHi : currentAngle.name}</span>
               </span>
 
               {/* GPS accuracy badge */}
-              <span className="flex max-w-full items-center gap-1.5 rounded-md border border-white/20 bg-black/75 px-2 py-1 font-mono text-[10px] text-white sm:text-[11px]">
+              <span className="flex max-w-full shrink-0 items-center gap-1.5 self-end rounded-md border border-white/20 bg-black/75 px-2 py-1 font-mono text-[10px] text-white sm:self-auto sm:text-[11px]">
                 <Compass className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">
                   {gpsCoords.status === "unavailable" || gpsCoords.lat == null
@@ -810,14 +1022,17 @@ function CaptureStudioContent() {
             )}
           </div>
 
-          {/* Primary Viewport Action Buttons */}
-          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+          {/* Primary Viewport Action Buttons — thumb-zone sticky bar on phone,
+              back to normal flow inside the lg+ two-column studio */}
+          <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 -mx-3 border-t border-slate-200 bg-white/90 px-3 py-2 shadow-[0_-4px_12px_rgba(28,25,21,0.08)] backdrop-blur-md sm:-mx-4 sm:px-4 md:bottom-0 md:-mx-6 md:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:shadow-none lg:backdrop-blur-none">
+            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
             {/* Flip camera */}
             <button
               type="button"
               onClick={() =>
                 setCameraFacing((prev) => (prev === "environment" ? "user" : "environment"))
               }
+              aria-label={t.switchCamera}
               className="inline-flex min-h-11 items-center gap-1.5 border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:px-3"
             >
               <RefreshCw className="h-3.5 w-3.5" />
@@ -845,6 +1060,7 @@ function CaptureStudioContent() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
+              aria-label={t.uploadFallback}
               className="inline-flex min-h-11 items-center gap-1.5 border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:px-3"
               title="Upload existing photo"
             >
@@ -852,23 +1068,41 @@ function CaptureStudioContent() {
               <span className="hidden sm:inline">{t.uploadFallback}</span>
               <span className="sm:hidden">{lang === "hi" ? "अपलोड" : "Upload"}</span>
             </button>
+            </div>
           </div>
         </div>
 
         {/* Right Column (5 cols): Step Guidance, Voice Notes & Submission */}
         <div className="lg:col-span-5 space-y-4">
-          {/* Canonical Angle Guidance Card */}
+          {/* Canonical Angle Guidance — collapsible accordion below the viewfinder
+              on phone so the camera stays near thumb zone; always open on lg+ */}
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
+            <button
+              type="button"
+              onClick={() => setGuidanceOpen((open) => !open)}
+              aria-expanded={guidanceOpen}
+              aria-controls="capture-angle-guidance"
+              className="-m-1 flex w-full items-center justify-between gap-2 rounded border-b border-slate-100 p-1 pb-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] lg:pointer-events-none"
+            >
+              <span className="flex min-w-0 items-center gap-2 font-bold text-sm text-slate-900">
                 {getAngleIcon(currentAngle.illustrationIcon)}
-                <span>{lang === "hi" ? currentAngle.nameHi : currentAngle.name}</span>
-              </div>
-              <span className="fp-badge-neutral font-mono text-[10px]">
-                {currentAngle.id}
+                <span className="min-w-0 truncate">{lang === "hi" ? currentAngle.nameHi : currentAngle.name}</span>
               </span>
-            </div>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="fp-badge-neutral font-mono text-[10px]">
+                  {currentAngle.id}
+                </span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className={clsx("h-4 w-4 text-slate-500 transition-transform lg:hidden", guidanceOpen && "rotate-180")}
+                />
+              </span>
+            </button>
 
+            <div
+              id="capture-angle-guidance"
+              className={clsx(!guidanceOpen && "hidden lg:block")}
+            >
             <p className="mt-3 text-xs text-slate-700 leading-relaxed font-medium">
               {lang === "hi" ? currentAngle.instructionsHi : currentAngle.instructions}
             </p>
@@ -894,7 +1128,7 @@ function CaptureStudioContent() {
                 type="button"
                 disabled={currentAngleIndex === 0}
                 onClick={() => setCurrentAngleIndex(currentAngleIndex - 1)}
-                className="flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 lg:min-h-0"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
                 <span>{lang === "hi" ? "पिछला" : "Previous"}</span>
@@ -904,18 +1138,22 @@ function CaptureStudioContent() {
                 type="button"
                 disabled={currentAngleIndex === activeAngleDefs.length - 1}
                 onClick={() => setCurrentAngleIndex(currentAngleIndex + 1)}
-                className="flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 lg:min-h-0"
               >
                 <span>{lang === "hi" ? "अगला" : "Next"}</span>
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
+            </div>
           </div>
 
           {/* Farmer Observation Notes with Voice Dictation */}
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <label
+                htmlFor="farmer-observations"
+                className="text-xs font-bold text-slate-900 flex items-center gap-1.5"
+              >
                 <Mic className="h-3.5 w-3.5 text-emerald-800" />
                 <span>{t.farmerObservationsLabel}</span>
               </label>
@@ -924,8 +1162,13 @@ function CaptureStudioContent() {
               <button
                 type="button"
                 onClick={toggleVoiceDictation}
+                aria-label={
+                  isListening
+                    ? t.voiceDictationListening
+                    : t.voiceDictationStart
+                }
                 className={clsx(
-                  "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition-all",
+                  "inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-all",
                   isListening
                     ? "bg-red-600 text-white animate-pulse shadow-md"
                     : "bg-[var(--accent-soft)] text-[var(--ink)]"
@@ -937,12 +1180,22 @@ function CaptureStudioContent() {
             </div>
 
             <textarea
+              id="farmer-observations"
               rows={3}
+              maxLength={500}
               value={observations}
               onChange={(e) => setObservations(e.target.value)}
               placeholder={t.farmerObservationsPlaceholder}
-              className="fp-input w-full text-xs"
+              aria-describedby="farmer-observations-counter"
+              className="fp-input mt-0 w-full text-xs"
             />
+            <div
+              id="farmer-observations-counter"
+              aria-live="polite"
+              className="mt-1 text-right font-mono text-[10px] text-[var(--ink-muted)]"
+            >
+              {lang === "hi" ? `${observations.length}/500 अक्षर` : `${observations.length}/500 characters`}
+            </div>
           </div>
 
           {/* Action Submission Card */}
@@ -981,7 +1234,8 @@ function CaptureStudioContent() {
                 type="button"
                 disabled={!isAllCaptured || isSubmitting}
                 onClick={handleSubmitClaim}
-                className="fp-btn-primary flex-1 gap-2 px-4 py-2.5 text-xs sm:flex-[1.4] sm:text-sm"
+                aria-describedby={isAllCaptured ? undefined : "submit-blocked-reason"}
+                className="fp-btn-primary min-h-11 flex-1 gap-2 px-4 py-2.5 text-xs sm:flex-[1.4] sm:text-sm"
               >
                 {isSubmitting ? (
                   <>
@@ -996,6 +1250,26 @@ function CaptureStudioContent() {
                 )}
               </button>
             </div>
+
+            {/* Inline reason when submission is blocked */}
+            {!isAllCaptured && !isSubmitting && (
+              <p
+                id="submit-blocked-reason"
+                role="status"
+                className="flex items-start gap-1.5 text-xs font-semibold text-amber-800"
+              >
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>
+                  {requiredCount - capturedCount === 1
+                    ? lang === "hi"
+                      ? "जमा करने से पहले 1 कोण और कैप्चर करें।"
+                      : "Capture 1 more angle before submitting."
+                    : lang === "hi"
+                      ? `जमा करने से पहले ${requiredCount - capturedCount} कोण और कैप्चर करें।`
+                      : `Capture ${requiredCount - capturedCount} more angles before submitting.`}
+                </span>
+              </p>
+            )}
           </div>
         </div>
       </div>

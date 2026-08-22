@@ -29,13 +29,15 @@ import {
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
 import { safeDisplayUrl } from "@/lib/media";
+import { DetailSkeleton } from "@/components/LoadingAnimation";
+import ErrorMessage from "@/components/ErrorMessage";
 import clsx from "clsx";
 
 export default function FarmerClaimDetailPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { lang, getClaimById, farmerProfile } = useFarmerData();
+  const { lang, getClaimById, farmerProfile, isLoading } = useFarmerData();
   const t = getFarmerT(lang);
 
   const claimId = (params?.id as string) || "";
@@ -45,25 +47,23 @@ export default function FarmerClaimDetailPage() {
 
   const [selectedImage, setSelectedImage] = useState<ClaimImageEvidence | null>(null);
 
+  if (isLoading) {
+    return <DetailSkeleton className="py-6" />;
+  }
+
   if (!claim) {
     return (
-      <div className="py-12 text-center">
-        <AlertCircle className="mx-auto h-12 w-12 text-slate-400 mb-3" />
-        <h2 className="text-lg font-bold text-slate-800">
-          {lang === "hi" ? "दावा नहीं मिला" : "Claim Record Not Found"}
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
-          {lang === "hi"
-            ? `आईडी ${claimId} के साथ कोई दावा मौजूद नहीं है।`
-            : `No claim found with ID ${claimId}.`}
-        </p>
-        <Link
-          href="/farmer/claims"
-          className="fp-btn-primary mt-4 gap-2 text-xs"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>{t.backToClaims}</span>
-        </Link>
+      <div className="py-8">
+        <ErrorMessage
+          title={lang === "hi" ? "दावा नहीं मिला" : "Claim Record Not Found"}
+          message={
+            lang === "hi"
+              ? `आईडी ${claimId} के साथ कोई दावा मौजूद नहीं है।`
+              : `No claim found with ID ${claimId}. It may have been archived or removed.`
+          }
+          actionHref="/farmer/claims"
+          actionLabel={t.backToClaims}
+        />
       </div>
     );
   }
@@ -71,6 +71,18 @@ export default function FarmerClaimDetailPage() {
   const isRecapture = claim.status === "needs_recapture";
   const isVerified = claim.status === "verified";
   const isUnderReview = claim.status === "under_review" || claim.status === "submitted";
+
+  // Adaptive recapture result: confidence change vs previous stored evaluation
+  const adaptiveStored = (claim.adaptive_result ?? null) as {
+    confidence_delta?: unknown;
+    previousConfidence?: unknown;
+  } | null;
+  const storedDelta =
+    typeof adaptiveStored?.confidence_delta === "number" ? (adaptiveStored.confidence_delta as number) : null;
+  const storedPrev =
+    typeof adaptiveStored?.previousConfidence === "number"
+      ? (adaptiveStored.previousConfidence as number)
+      : null;
 
   const missingAnglesStr = claim.missingAngles?.join(",") || "closeup_damage,mid_canopy";
 
@@ -265,9 +277,37 @@ export default function FarmerClaimDetailPage() {
                 {t.evidenceTrustScore}
               </h2>
             </div>
-            <span className="fp-badge-neutral font-mono text-sm">
-              {claim.evidenceTrust.overallConfidence}%
-            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="fp-badge-neutral font-mono text-sm">
+                {claim.evidenceTrust.overallConfidence}%
+              </span>
+              {storedDelta != null && storedDelta !== 0 && (
+                <span
+                  className={clsx(
+                    "rounded border px-1.5 py-0.5 text-[10px] font-bold",
+                    storedDelta > 0
+                      ? "border-emerald-300 bg-emerald-100 text-emerald-800"
+                      : "border-amber-300 bg-amber-100 text-amber-800",
+                  )}
+                  title={
+                    lang === "hi"
+                      ? "पुनः फोटो के बाद विश्वास स्तर में बदलाव"
+                      : "Confidence change after recapture"
+                  }
+                >
+                  {storedDelta > 0
+                    ? lang === "hi"
+                      ? `▲ +${storedDelta.toFixed(1)} पुनः कैप्चर के बाद`
+                      : `▲ +${storedDelta.toFixed(1)} after recapture`
+                    : `▼ ${storedDelta.toFixed(1)}`}
+                  {storedPrev != null && (
+                    <span className="ml-1 font-normal">
+                      ({lang === "hi" ? "पहले" : "prev"} {storedPrev})
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -371,7 +411,9 @@ export default function FarmerClaimDetailPage() {
                 {t.aiPredictionTitle}
               </h2>
             </div>
-            <span className="fp-badge-neutral text-[10px]">Assistive screen</span>
+            <span className="fp-badge-neutral text-[10px]">
+              {lang === "hi" ? "सहायक स्क्रीन" : "Assistive screen"}
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-xs">
@@ -379,7 +421,8 @@ export default function FarmerClaimDetailPage() {
               <div className="text-[11px] text-slate-500 font-medium">{t.cropIdentified}</div>
               <div className="mt-1 font-bold text-slate-900">{claim.aiPrediction.cropIdentified}</div>
               <div className="text-[10px] text-slate-400 font-mono">
-                {claim.aiPrediction.cropConfidence}% confidence
+                {claim.aiPrediction.cropConfidence}%{" "}
+                {lang === "hi" ? "विश्वास" : "confidence"}
               </div>
             </div>
 
@@ -391,7 +434,8 @@ export default function FarmerClaimDetailPage() {
                   : claim.aiPrediction.diseaseDetected}
               </div>
               <div className="text-[10px] text-slate-400 font-mono">
-                {claim.aiPrediction.modelConfidence}% confidence
+                {claim.aiPrediction.modelConfidence}%{" "}
+                {lang === "hi" ? "विश्वास" : "confidence"}
               </div>
             </div>
 
@@ -401,7 +445,8 @@ export default function FarmerClaimDetailPage() {
                 {claim.aiPrediction.severityPercentage}%
               </div>
               <div className="text-[10px] text-slate-500">
-                Grade: {claim.aiPrediction.severityGrade}
+                {lang === "hi" ? "ग्रेड: " : "Grade: "}
+                {claim.aiPrediction.severityGrade}
               </div>
             </div>
 
@@ -411,7 +456,7 @@ export default function FarmerClaimDetailPage() {
                 {claim.aiPrediction.affectedAreaHectares} Ha
               </div>
               <div className="text-[10px] text-slate-500">
-                Plot Khasra: {claim.khasraNumber}
+                {t.khasra}: {claim.khasraNumber}
               </div>
             </div>
           </div>
@@ -422,7 +467,10 @@ export default function FarmerClaimDetailPage() {
               {lang === "hi" ? "किसान का मूल विवरण:" : "Farmer Observation Notes:"}
             </div>
             <p className="text-slate-700 italic">
-              "{claim.farmerObservations || "No notes provided."}"
+              "
+              {claim.farmerObservations ||
+                (lang === "hi" ? "कोई टिप्पणी नहीं।" : "No notes provided.")}
+              "
             </p>
           </div>
         </div>
@@ -443,17 +491,19 @@ export default function FarmerClaimDetailPage() {
         </div>
 
         {/* 5-Angle Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
           {claim.images.map((img, idx) => {
             const isAngleMissing =
               claim.missingAngles && claim.missingAngles.includes(img.angleType);
 
             return (
-              <div
+              <button
                 key={idx}
+                type="button"
                 onClick={() => setSelectedImage(img)}
+                aria-label={`${lang === "hi" ? "फोटो बड़ी देखें" : "View photo"}: ${img.angleType.replaceAll("_", " ")}`}
                 className={clsx(
-                  "cursor-pointer rounded-lg border overflow-hidden bg-slate-50 transition-all hover:shadow-md group",
+                  "block w-full cursor-pointer rounded-lg border overflow-hidden bg-slate-50 text-left transition-all hover:shadow-md group focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]",
                   isAngleMissing ? "border-amber-400 ring-2 ring-amber-300" : "border-slate-200"
                 )}
               >
@@ -462,6 +512,7 @@ export default function FarmerClaimDetailPage() {
                     <img
                       src={safeDisplayUrl(img.imageUrl)}
                       alt={img.angleType}
+                      loading="lazy"
                       className="h-full w-full object-cover group-hover:scale-105 transition-transform"
                     />
                   ) : null}
@@ -481,18 +532,20 @@ export default function FarmerClaimDetailPage() {
                     {img.angleType.replace("_", " ")}
                   </div>
                   <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                    <MapPin className="h-2.5 w-2.5" />
+                    <MapPin className="h-2.5 w-2.5 shrink-0" aria-hidden="true" />
                     <span>
                       {img.lat != null && img.lon != null
                         ? `${img.lat.toFixed(4)}, ${img.lon.toFixed(4)} (±${img.accuracyM ?? "?"}m)`
-                        : "GPS unavailable"}
+                        : lang === "hi"
+                          ? "GPS उपलब्ध नहीं"
+                          : "GPS unavailable"}
                     </span>
                   </div>
                   <div className="text-[9px] text-slate-400 font-mono truncate">
-                    SHA: {img.sha256 ? `${img.sha256.substring(0, 16)}…` : "unavailable"}
+                    SHA: {img.sha256 ? `${img.sha256.substring(0, 16)}…` : lang === "hi" ? "उपलब्ध नहीं" : "unavailable"}
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -506,6 +559,9 @@ export default function FarmerClaimDetailPage() {
         >
           <div
             className="relative w-full max-w-3xl overflow-hidden rounded-t-xl bg-white shadow-2xl sm:rounded-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label={lang === "hi" ? "फोटो पूर्वावलोकन" : "Photo preview"}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="relative aspect-16/10 bg-black">
@@ -519,9 +575,10 @@ export default function FarmerClaimDetailPage() {
               <button
                 type="button"
                 onClick={() => setSelectedImage(null)}
-                className="absolute top-3 right-3 rounded-full bg-black/60 p-2 text-white hover:bg-black"
+                aria-label={lang === "hi" ? "बंद करें" : "Close photo preview"}
+                className="absolute top-3 right-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               >
-                <X className="h-5 w-5" />
+                <X className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
             <div className="p-4 bg-white text-xs space-y-2">
@@ -534,18 +591,24 @@ export default function FarmerClaimDetailPage() {
                 </span>
               </div>
               <div className="font-mono text-slate-600 break-all bg-slate-50 p-2 rounded border border-slate-200">
-                <strong>SHA-256 Digest:</strong> {selectedImage.sha256 || "unavailable"}
+                <strong>{lang === "hi" ? "SHA-256 डाइजेस्ट:" : "SHA-256 Digest:"}</strong>{" "}
+                {selectedImage.sha256 ||
+                  (lang === "hi" ? "उपलब्ध नहीं" : "unavailable")}
               </div>
-              <div className="flex items-center gap-4 text-slate-500 font-mono">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-500 font-mono">
                 <span>
-                  <strong>Lat:</strong> {selectedImage.lat ?? "—"}
+                  <strong>{lang === "hi" ? "अक्षांश:" : "Lat:"}</strong> {selectedImage.lat ?? "—"}
                 </span>
                 <span>
-                  <strong>Lon:</strong> {selectedImage.lon ?? "—"}
+                  <strong>{lang === "hi" ? "देशांतर:" : "Lon:"}</strong> {selectedImage.lon ?? "—"}
                 </span>
                 <span>
-                  <strong>GPS Accuracy:</strong>{" "}
-                  {selectedImage.accuracyM != null ? `±${selectedImage.accuracyM}m` : "unavailable"}
+                  <strong>{lang === "hi" ? "GPS सटीकता:" : "GPS Accuracy:"}</strong>{" "}
+                  {selectedImage.accuracyM != null
+                    ? `±${selectedImage.accuracyM}m`
+                    : lang === "hi"
+                      ? "उपलब्ध नहीं"
+                      : "unavailable"}
                 </span>
               </div>
             </div>

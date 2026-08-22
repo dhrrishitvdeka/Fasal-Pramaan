@@ -13,23 +13,27 @@ Fasal-Pramaan maintains an automated, verifiable time-series record of crop grow
 
 ---
 
-## 2. Background Scheduling & Delivery Architecture
+## 2. Scheduling & Delivery Architecture
 
 ```mermaid
 flowchart LR
-  Beat["Celery Beat Engine\n(fp-beat)\nRuns Scan Every 6 Hours"] --> Scan["Query Due Reminder Plans\n(evidence_reminder_plans table)"]
-  Scan --> Enqueue["Enqueue Notification Task\n(Redis Queue)"]
-  Enqueue --> Worker["Celery Worker\n(fp-worker)"]
-  Worker --> InApp["Write In-App Notification\n(Deduplicated per Cycle)"]
-  Worker --> SSE["Broadcast Real-Time Event\n(FastAPI Gateway)"]
-  InApp --> App["Farmer Mobile App\n(Deep-Links to Guided Capture)"]
+  Plan["Reminder Plan\n(web_milestones row,\ncadence 14-90 days)"] --> Scan["Due-Date Check on Farmer Dashboard Load"]
+  Scan --> Due["Milestone Due / Overdue"]
+  Due --> InApp["In-App Reminder Card\n(Deduplicated per Cycle)"]
+  InApp --> App["Farmer Web App\n(Deep-Links to Guided Capture)"]
 ```
+
+Scheduling is computed in-request by the webapp (`GET /api/farmer/state`, `PATCH /api/milestones/{id}`) against Supabase Postgres — no background worker queue is required.
+
+### 2.1 In-App Recapture Notification Path
+
+Alongside scheduled milestone reminders, the webapp now delivers **adaptive recapture notifications** through `src/lib/farmer-notifications.ts`: claims that land in `needs_recapture` (auto-created by the adaptive engine) are diffed against localStorage-seen IDs (`fp_seen_recapture_notices_v1`) on farmer-dashboard load via `diffNewRecaptures()`. Unseen notices render as **amber toast panels** on `/farmer` with the bilingual recapture reason, missing angles, a **Capture-now deep link** into guided capture, and **Dismiss**; `markSeen()` records dismissal and the farmer nav shows a badge dot while any notice is unseen.
 
 ---
 
 ## 3. Farmer Controls & Voice Management
 
-Farmers can manage their reminder schedules directly via the mobile app interface or hands-free via the **Fasal Saathi** voice assistant:
+Farmers can manage their reminder schedules directly via the farmer web app interface or hands-free via the **Fasal Saathi** voice assistant:
 
 1. **Start Scheduled Capture**: Tapping a reminder notification opens guided capture pre-configured for the specific plot and crop cycle.
 2. **Adjust Cadence**: Modify the reminder interval (e.g., set to 14 days during critical monsoon flowering periods).
@@ -37,3 +41,118 @@ Farmers can manage their reminder schedules directly via the mobile app interfac
 4. **Pause / Resume**: Temporarily suspend reminder notifications during post-harvest fallow periods.
 
 All plan modifications are cryptographically signed with the farmer's Bearer JWT and recorded in the system audit log.
+
+---
+
+## 4. Webapp Evidence Authenticity Flow (Per-Reminder Capture)
+
+Each scheduled reminder now opens the **PDF-driven webapp guided capture** which enforces authenticity **at capture time** before due-date advancement, rather than only at backend review.
+
+### 4.1 4-Pillar Formula With Adaptive Thresholds
+
+The same canonical evidence confidence formula applies to reminder submissions:
+
+```
+C_final = 0.4·S_Quality + 0.3·S_Coverage + 0.2·S_Context + 0.1·S_Integrity
+  // apps/dashboard/src/lib/evidence.ts:149-151, apps/dashboard/src/components/EvidenceConfidenceSection.tsx:78-80
+threshold = ROUTE_CONFIG[peril].minConfidence
+  // apps/dashboard/src/lib/claim-routing.ts:47-160, apps/dashboard/src/lib/context/adaptive-engine.ts:26
+```
+
+| Peril | Threshold | Reminder Note |
+|---|---|---|
+| normal, pest_disease | 85 | Default healthy growth baseline; full 5 angles |
+| drought | 80 | Wilting canopy + soil cracks; IMD dry spell |
+| animal_damage, flood, hailstorm, lodging | 75 | GPS/water/hail context needed |
+| fire_burn | 70 | Charred low-green allowed; satellite pending |
+
+Only submissions achieving `adaptiveConfidence().level==="high"` (`proceed`) count toward due-date advancement; `Medium` keeps reminder open with targeted delta request, `Low` forces retake, preventing empty or unusable history.
+
+### 4.2 Realtime CV Heuristic (64×64 Pre-Shutter)
+
+**Source:** `apps/dashboard/src/lib/vision/realtime-cv.ts:1-182` — `src/lib/vision/realtime-cv.ts:56`
+
+During scheduled capture the viewfinder samples a **64×64 canvas at 2-4 fps**:
+
+* `luma = round(mean(R+G+B)/3 /255*100)` — `realtime-cv.ts:88` ; `greenPct = count(g>60 && g>r+10 && g>b+10)/total*100` — `realtime-cv.ts:86` ; `blurScore = clamp(variance/40*10,0,100)` — `realtime-cv.ts:90-92`
+* `hintFor()` (`realtime-cv.ts:35-50`): `luma<12→too_dark (block)`, `blur<35→hold_steady`, `greenPct<14 (8 if closeup_damage)→crop_not_detected (block)`, `>78→too_close` → bilingual EN/HI via `cvResultToSaathiHint()` (`realtime-cv.ts:179-182`)
+* `cropDetected = greenPct≥threshold && luma≥12` (`realtime-cv.ts:94`), `shouldBlockShutter = hint.block && !isFire` (`realtime-cv.ts:98-100`) — fire_burn allows low green charred fields.
+* Hints are bridged to **Fasal Saathi** voice (`apps/dashboard/src/lib/voice/capture-bridge.ts:22-62`) so farmers hear “फसल फ्रेम में नहीं — पास जाएँ” hands-free while positioning camera for the reminder.
+* Still-image re-check `analyzeDataUrl(dataUrl, angleId)` at 256 px stride 16 (`realtime-cv.ts:122-177`) populates `blur_score`/`lighting_score` → `qualityPassed` (`apps/dashboard/src/lib/evidence.ts:108-118`) which feeds `S_Quality`.
+
+Without this, historical reminders could drift with dark/duplicate frames; now a `crop_not_detected` reminder frame is blocked **before** shutter and never counts as a 5-angle completion.
+
+### 4.3 Gemini Authenticity Gate (Post-Capture)
+
+**Source:** `apps/dashboard/src/app/api/vision/gate/route.ts:1-121` — `src/app/api/vision/gate/route.ts`
+
+Each reminder frame is POSTed to:
+
+```
+POST /api/vision/gate { imageDataUrl, angleType, expectedCrop, peril } →
+  { usable, reason: ok|wrong_crop|ai_generated|too_dark|too_blurry|no_field|unusable, crop_detected, confidence }
+```
+
+* **Gemini 2.0-flash path** (`route.ts:26-93`): if `GEMINI_API_KEY` present, parses base64 (`route.ts:28-32`), builds PMFBY prompt (`route.ts:37-45`) — “Expected crop is ${expectedCrop}. If different crop, mark not_usable. Fire may show charred little green — do not reject for low green. Reject AI-generated/screenshot/meme/no_field/wrong angle. Return ONLY JSON … Angle / Peril”, calls `generateContent` with `inlineData` + `temperature 0.1, maxOutputTokens 512, responseMimeType application/json` (`route.ts:48-63`), 8 s timeout, enforces `wrong_crop` override unless `peril==="fire_burn"` (`route.ts:76-82`).
+* **Heuristic fallback** (`route.ts:13-23`): `!data:image/→not_image(0)`, `<8000B→too_small_or_blank(0.1)`, `fire_burn→ok 0.7`, `expectedCrop→ok 0.62`, else `ok 0.6 + fallback:true`; 18 MB limit (`route.ts:111`).
+* **Integration:** `usable:false` → `image.qualityPassed=false` → excluded from `usable = images.filter(i=>i.qualityPassed)` → `coverageScore = usable.length/5*100` (`evidence.ts:127-128`) and `overallConfidence` drop; `adaptiveConfidence(gateFailed=true)` forces `Low→retake` (`adaptive-engine.ts:40-44`), so a reminder tainted by AI/screenshot never advances the schedule — farmer is re-prompted for that specific angle.
+
+### 4.4 Adaptive Routing & Recapture During Reminders
+
+**Source:** `apps/dashboard/src/lib/context/adaptive-engine.ts:15-91`, `apps/dashboard/src/lib/claim-routing.ts:47-225`
+
+Reminder evidence is evaluated with `adaptiveConfidence({quality,coverage,context,integrity,overall,peril,signals,gateFailed})`:
+
+* **High→proceed** (`overall≥threshold && coverage≥60 && quality≥40`): reminder marked complete, `due_date = now + cadence`.
+* **Medium→request_missing** (`overall≥threshold-20 && coverage≥40`): preserves valid frames, re-opens guided capture with `required_angles = missing/blurry` (see `docs/adaptive-recapture.md §6`).
+* **Low→retake** (`coverage<40 || quality<30` or gateFailed) or **Low→escalate_to_human** (`integrity<50` or fire without Sentinel and `overall<threshold`).
+
+Special guards directly affect reminders:
+
+* **Fire needs Sentinel:** `peril==="fire_burn" && sentinel.status!=="available"` → Medium if `overall≥threshold` else escalate (`adaptive-engine.ts:52-57`); reminder stays open pending `SENTINEL_TOKEN`/`dataspace.copernicus.eu` satellite.
+* **Animal needs GPS:** `animal_damage && gps.status!=="available"` → Medium at `overall≥70` requesting trail (`adaptive-engine.ts:59-63`).
+
+### 4.5 Multi-Signal Context Schema (Assembled Per Reminder)
+
+**Source:** `apps/dashboard/src/app/api/context/assemble/route.ts:1-208`, `apps/dashboard/src/lib/context/types.ts:1-34`
+
+Every reminder view (and post-capture) calls `POST /api/context/assemble {lat,lon,peril,sowingDate}` (`assemble/route.ts:5`):
+
+```ts
+// types.ts:4-14
+type ContextSource = "imd"|"sentinel"|"bhuvan"|"wildlife"|"nearby"|"gps";
+type ContextStatus = "pending"|"available"|"unavailable"|"error";
+interface ContextSignal { source, status, labelEn/labelHi, summaryEn/summaryHi, confidence?:0-100, meta?, checkedAt }
+interface AssembledContext { signals: ContextSignal[], overall:{status:"strong"|"mixed"|"weak"|"pending"}, sentinelThumbnailUrl?, imdRainfallMm? }
+```
+
+| Signal | How Assembled | Status & Code |
+|---|---|---|
+| **Sentinel-2** | fire_burn + `SENTINEL_TOKEN` → `pending 55` (2.5 s probe `dataspace.copernicus.eu`; real `POST sh.dataspace…/process`), non-fire→`unavailable` | `route.ts:23-78` |
+| **IMD (open-meteo 7d rain)** | `GET open-meteo.com/v1/forecast?lat&lon&past_days=7&daily=precipitation_sum` 3 s → sum `rainfall_7d_mm`; `available 70` else `pending`; notes `flood>60mm, drought<5mm` | `route.ts:82-137` `meta: rainfall_7d_mm,daily,proxy:"open-meteo"` |
+| **Bhuvan** | lat/lon→`available` deep link `bhuvan.nrsc.gov.in/...?lat&lon` | `route.ts:140-162` |
+| **Wildlife** | only animal_damage→`pending` forest edge | `route.ts:165-175` |
+| **Nearby** | always `pending` anomaly queue | `route.ts:176-184` |
+| **GPS** | lat/lon→`available` else `unavailable` | `route.ts:187-195` |
+
+`contextOverall()` (`types.ts:27-34`): `pending&&available===0→pending`, `available≥2→strong`, `1→mixed`, else `weak`. Rendered in reminder detail as “Multi-signal Context” (`EvidenceConfidenceSection.tsx:398-422`) and fed to adaptive routing; historical time-series thus accumulates not just photos but verified IMD rainfall + Sentinel/Bhuvan context for later underwriting.
+
+---
+
+## 5. Updated Delivery Flow (With Authenticity)
+
+```mermaid
+flowchart LR
+  Due["Reminder Due\n(cadence reached)"] --> Notify["Reminder Notification"]
+  Notify --> Guided["Scheduled Guided Capture\n(filtered by peril)"]
+  Guided --> RT["Realtime CV 64x64\nrealtime-cv.ts:56\n(green%, luma, blur)"]
+  RT -->|ok| Gate["POST /api/vision/gate\nGemini 2.0-flash or heuristic\nroute.ts:96"]
+  RT -->|crop_not_detected| Saathi["Saathi Voice Hint\nwebCaptureBridge\ncapture-bridge.ts:22"]
+  Saathi --> Guided
+  Gate -->|usable:?| Ev["Evidence Preview\n0.4Q+0.3C+0.2X+0.1I\nevidence.ts:149"]
+  Ev --> Ctx["POST /api/context/assemble\nIMD/Sentinel/Bhuvan/GPS\nassemble/route.ts:5"]
+  Ctx --> Ad["adaptiveConfidence\nadaptive-engine.ts:15"]
+  Ad -->|High| Advance["Advance due_date\n Mark reminder complete"]
+  Ad -->|Medium| Delta["Targeted delta request\nKeep valid frames"]
+  Ad -->|Low| Retake["Force retake / Escalate"]
+```

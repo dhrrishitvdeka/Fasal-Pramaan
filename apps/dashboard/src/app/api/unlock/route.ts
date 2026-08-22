@@ -16,6 +16,16 @@ function cookieOptions() {
   };
 }
 
+/** Constant-time string compare (mirrors site-lock.ts isValidSiteLockToken). */
+function timingSafeEqualStrings(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
 export async function POST(request: Request) {
   if (!isSiteLockActive()) {
     return NextResponse.json({ ok: true, locked: false });
@@ -25,7 +35,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Site lock is not configured" }, { status: 503 });
   }
   const body = (await request.json().catch(() => ({}))) as { password?: string };
-  if (String(body.password || "") !== expected) {
+  if (!timingSafeEqualStrings(String(body.password || ""), expected)) {
     return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
   }
   const response = NextResponse.json({ ok: true });

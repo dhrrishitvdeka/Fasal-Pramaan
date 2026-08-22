@@ -12,32 +12,35 @@ Thank you for contributing to Fasal-Pramaan. We welcome community contributions,
    - `fix/bug-description` (Bug or defect fix)
    - `docs/doc-update` (Documentation improvements)
    - `perf/optimization` (Performance enhancements)
-3. **Security Standards**: Never commit `.env`, private keys, secrets, or real personal data.
+3. **Security Standards**: Never commit `.env`, `.env.local`, private keys, secrets, or real personal data. Server-only keys must never be named `NEXT_PUBLIC_*`.
+
+The webapp lives in `apps/dashboard` — that is the single deployable (Vercel Root Directory = `apps/dashboard`). Keep all app changes inside it.
 
 ---
 
 ## 2. Automated Quality Assurance Checks
 
-All pull requests must pass the complete automated verification suite:
+All pull requests must pass the automated verification suite (CI runs the same steps on Node 22 with a working directory of `apps/dashboard`):
 
-```powershell
-# 1. API & Evidence Engine Unit Tests
-docker compose exec api pytest -v
-
-# 2. AI Model Inference Tests
-docker compose exec ai pytest -v
-
-# 3. Next.js Dashboard Build, Lint & Typecheck
+```bash
 cd apps/dashboard
-npm.cmd run lint
-npm.cmd run typecheck
-npm.cmd test
-npm.cmd run build
-cd ../..
-
-# 4. Flutter Mobile Static Analysis & Tests
-docker build --target tester -t fasalpramaan-mobile-test apps/mobile
+npm ci
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```
+
+Or equivalently from the repository root (scripts proxy via `--prefix apps/dashboard`):
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+If your change touches Supabase schema or RLS, update the SQL in `scripts/` (`setup_supabase.sql`, `setup_web_schema.sql`, `setup_web_schema_peril.sql`, `lock_web_rls.sql`) rather than editing tables ad hoc, and document the migration path in the PR.
 
 ---
 
@@ -46,3 +49,24 @@ docker build --target tester -t fasalpramaan-mobile-test apps/mobile
 - **Clear Description**: Summarize the architectural motivation, changes made, and verification steps executed.
 - **Atomic Commits**: Keep unrelated refactors separate from functional feature commits.
 - **Code of Conduct**: All contributors are expected to uphold our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+---
+
+## 4. Local E2E Tests
+
+Playwright specs live in `apps/dashboard/e2e` and target `http://localhost:3000`. The dev webServer is **not** booted by default (so a plain `npm run e2e` against an already-running server never spawns a second Next.js process). To run the full suite with an auto-started server:
+
+```bash
+cd apps/dashboard
+PLAYWRIGHT_E2E=1 npm run e2e
+```
+
+Use `npm run e2e:headed` instead of `npm run e2e` to watch the browsers while tests run (same env vars).
+
+Requirements:
+
+- **`PLAYWRIGHT_E2E=1`** — explicitly opts into booting the dev webServer via Playwright's `webServer` config (`playwright.config.ts`). Without it, tests assume something is already serving port 3000.
+- **`E2E_SUPABASE_URL`** — optional but recommended. When set (optionally with `E2E_SUPABASE_ANON_KEY`, defaulting to `e2e-anon-key`), the spawned server points at that Supabase URL so pages exercise the "Supabase configured" code paths; all network calls are mocked via `page.route` in the specs themselves.
+- First run needs browsers installed: `npx playwright install chromium`.
+
+PowerShell users: `$env:PLAYWRIGHT_E2E="1"; npm run e2e`.

@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useState } from "react";
 import Link from "next/link";
 import {
   Camera,
@@ -9,15 +10,40 @@ import {
   Clock,
   ArrowRight,
   Layers,
+  RefreshCw,
 } from "lucide-react";
 import { useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
 import { isMilestoneOverdue, milestoneCaptureHref } from "@/lib/farmer-timeline";
+import FarmerLoading from "./loading";
+import { InlineError } from "@/components/ErrorMessage";
 import clsx from "clsx";
 
 export default function FarmerHomePage() {
-  const { lang, plots, claims, milestones, farmerProfile, isLoading, persistError } = useFarmerData();
+  const {
+    lang,
+    plots,
+    claims,
+    milestones,
+    farmerProfile,
+    isLoading,
+    persistError,
+    newRecaptureNotices,
+    dismissNotice,
+    refresh,
+  } = useFarmerData();
   const t = getFarmerT(lang);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const recaptureClaims = claims.filter((c) => c.status === "needs_recapture");
   const verifiedCount = claims.filter((c) => c.status === "verified").length;
@@ -26,8 +52,13 @@ export default function FarmerHomePage() {
     .sort((a, b) => Number(isMilestoneOverdue(b)) - Number(isMilestoneOverdue(a)) || a.dueDate.localeCompare(b.dueDate))
     .slice(0, 3);
 
+  if (isLoading) {
+    return <FarmerLoading />;
+  }
+
   return (
     <div className="space-y-4">
+      {/* Greeting row + manual refresh */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-lg font-bold text-slate-900 sm:text-2xl">
@@ -36,31 +67,141 @@ export default function FarmerHomePage() {
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-slate-600">{t.dashboardSub}</p>
         </div>
-        <Link href="/farmer/capture" className="fp-btn-primary w-full gap-2 sm:w-auto">
-          <Camera className="h-4 w-4" />
-          <span>{t.quickActionNewClaim}</span>
-        </Link>
+        <button
+          type="button"
+          onClick={() => void handleRefresh()}
+          disabled={isRefreshing}
+          aria-label={isRefreshing ? t.refreshing : t.refresh}
+          className={clsx(
+            "inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)]",
+            isRefreshing && "cursor-wait opacity-70",
+          )}
+        >
+          <RefreshCw className={clsx("h-4 w-4", isRefreshing && "animate-spin")} aria-hidden="true" />
+        </button>
       </div>
 
       {persistError && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950">
-          {persistError}
+        <InlineError
+          message={persistError}
+          onRetry={() => void handleRefresh()}
+          className="my-2"
+        />
+      )}
+
+      {/* Notification toasts */}
+      {newRecaptureNotices.length > 0 && (
+        <div className="space-y-2" role="status" aria-live="polite">
+          {newRecaptureNotices.map((notice) => {
+            const reason =
+              (lang === "hi" ? notice.reasonHi || notice.reason : notice.reason) ||
+              (lang === "hi" ? "साक्ष्य की दोबारा समीक्षा आवश्यक है" : "Evidence needs another look");
+            return (
+              <div
+                key={notice.claimId}
+                className="rounded-lg border border-amber-300 bg-amber-50 p-3 shadow-sm sm:p-4"
+              >
+                <div className="flex items-start gap-2">
+                  <span aria-hidden="true">🔔</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-amber-950">
+                      {lang === "hi"
+                        ? `🔔 नया पुनः फोटो अनुरोध — ${reason}`
+                        : `🔔 New recapture request — ${reason}`}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {(notice.missingAngles.length > 0
+                        ? notice.missingAngles
+                        : ["closeup_damage", "mid_canopy"]
+                      ).map((angle) => (
+                        <span
+                          key={angle}
+                          className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900"
+                        >
+                          {angle.replaceAll("_", " ")}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Link
+                    href={`/farmer/capture?recapture=${notice.claimId}&angles=${notice.missingAngles.join(",") || "closeup_damage,mid_canopy"}`}
+                    onClick={() => dismissNotice(notice.claimId)}
+                    className="fp-btn-primary min-h-11 w-full gap-1.5 px-3 py-1.5 text-xs sm:min-h-0 sm:w-auto"
+                  >
+                    <Camera className="h-3.5 w-3.5" />
+                    {lang === "hi" ? "अभी कैप्चर करें" : "Capture now"}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => dismissNotice(notice.claimId)}
+                    className="min-h-11 w-full rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-bold text-amber-900 hover:bg-amber-100/60 sm:min-h-0 sm:w-auto"
+                  >
+                    {lang === "hi" ? "हटाएँ" : "Dismiss"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 sm:gap-3">
-        {[
-          { label: t.statPlots, value: plots.length },
-          { label: t.statClaims, value: claims.length },
-          { label: t.statVerified, value: verifiedCount },
-          { label: t.statPendingAction, value: recaptureClaims.length },
-        ].map((stat) => (
-          <div key={stat.label} className="fp-panel p-3 sm:p-4">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-[11px]">{stat.label}</div>
-            <div className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{isLoading ? "—" : stat.value}</div>
-          </div>
-        ))}
-      </div>
+      {/* Quick actions: big Saathi claim card + secondary links */}
+      <section aria-label={t.quickActionNewClaim}>
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <Link
+            href="/farmer/saathi"
+            className="col-span-2 flex min-h-11 flex-col justify-between gap-3 rounded-xl border border-[var(--ink)] bg-[var(--ink)] p-4 text-[var(--surface)] transition-colors hover:bg-[var(--accent)] sm:flex-row sm:items-center"
+          >
+            <span className="flex min-w-0 items-start gap-3">
+              <Camera className="h-6 w-6 shrink-0" aria-hidden="true" />
+              <span className="min-w-0">
+                <span className="block text-base font-bold leading-snug sm:text-lg">{t.quickActionNewClaim}</span>
+                <span className="mt-0.5 block text-xs opacity-80">{t.quickActionNewClaimSub}</span>
+              </span>
+            </span>
+            <ArrowRight className="h-5 w-5 shrink-0 self-end sm:self-center" aria-hidden="true" />
+          </Link>
+
+          <Link
+            href="/farmer/claims"
+            className="fp-panel flex min-h-11 items-center gap-2 p-3 text-sm font-bold text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)]"
+          >
+            <FileText className="h-4 w-4 shrink-0 text-[var(--accent)]" aria-hidden="true" />
+            <span className="min-w-0 truncate">{t.claims}</span>
+            <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-[var(--ink-muted)]" aria-hidden="true" />
+          </Link>
+
+          <Link
+            href="/farmer/reminders"
+            className="fp-panel flex min-h-11 items-center gap-2 p-3 text-sm font-bold text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)]"
+          >
+            <Clock className="h-4 w-4 shrink-0 text-[var(--accent)]" aria-hidden="true" />
+            <span className="min-w-0 truncate">{t.reminders}</span>
+            <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-[var(--ink-muted)]" aria-hidden="true" />
+          </Link>
+        </div>
+      </section>
+
+      {/* Stats: horizontal snap scroll on phone, 4-up grid on sm+ */}
+      <section aria-label={t.statClaims}>
+        <div className="-mx-3 flex snap-x snap-mandatory gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-3 sm:overflow-visible sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden">
+          {[
+            { label: t.statPlots, value: plots.length },
+            { label: t.statClaims, value: claims.length },
+            { label: t.statVerified, value: verifiedCount },
+            { label: t.statPendingAction, value: recaptureClaims.length },
+          ].map((stat) => (
+            <div key={stat.label} className="fp-panel min-w-[46%] shrink-0 snap-start p-3 sm:min-w-0 sm:shrink sm:p-4">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-[11px]">{stat.label}</div>
+              <div className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{isLoading ? "—" : stat.value}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Recapture banner */}
 
       {recaptureClaims.length > 0 && (
         <div className="fp-panel space-y-3 border-[var(--ink)] p-3 sm:p-5">
@@ -83,7 +224,7 @@ export default function FarmerHomePage() {
                 </div>
                 <Link
                   href={`/farmer/capture?recapture=${claim.id}&angles=${(claim.missingAngles || []).join(",")}`}
-                  className="fp-btn-primary w-full gap-1.5 px-3 py-1.5 text-xs sm:w-auto"
+                  className="fp-btn-primary min-h-11 w-full gap-1.5 px-3 py-1.5 text-xs sm:min-h-0 sm:w-auto"
                 >
                   <Camera className="h-3.5 w-3.5" />
                   {t.startRecaptureNow}
@@ -103,7 +244,7 @@ export default function FarmerHomePage() {
             </h2>
           </div>
           {isLoading ? (
-            <p className="text-xs text-slate-500">Loading plots…</p>
+            <p className="text-xs text-slate-500">{t.loadingPlots}</p>
           ) : plots.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center">
               <p className="text-sm font-semibold text-slate-700">{lang === "hi" ? "कोई पंजीकृत भूखंड नहीं" : "No registered plots"}</p>
@@ -133,7 +274,7 @@ export default function FarmerHomePage() {
                       )}
                     </div>
                     <Link
-                      href={`/farmer/capture?plotId=${plot.id}`}
+                      href={`/farmer/saathi?plotId=${plot.id}`}
                       className="shrink-0 text-xs font-bold text-[var(--accent)] hover:underline"
                     >
                       {t.reportDamageOnPlot}
@@ -156,12 +297,12 @@ export default function FarmerHomePage() {
             </Link>
           </div>
           {isLoading ? (
-            <p className="text-xs text-slate-500">Loading claims…</p>
+            <p className="text-xs text-slate-500">{t.loadingClaims}</p>
           ) : claims.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center">
               <p className="text-sm font-semibold text-slate-700">{t.noClaimsFound}</p>
               <Link
-                href="/farmer/capture"
+                href="/farmer/saathi"
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800"
               >
                 {t.quickActionNewClaim}
@@ -174,7 +315,7 @@ export default function FarmerHomePage() {
                 <Link
                   key={claim.id}
                   href={`/farmer/claims/${claim.id}`}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 hover:bg-slate-50"
+                  className="flex min-h-11 items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 hover:bg-slate-50"
                 >
                   <div className="min-w-0">
                     <div className="text-xs font-mono font-bold text-slate-800 truncate">{claim.id}</div>
