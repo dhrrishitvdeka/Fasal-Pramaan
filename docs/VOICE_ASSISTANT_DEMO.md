@@ -135,27 +135,33 @@ Vercel: set the same vars in Project → Settings → Environment Variables (Pro
 | **Query Farms** | *"मेरे खेत बताओ"* | *"List my registered farms."* | Reads list of farms and associated acreage. |
 | **Query Cycles** | *"मेरे फसल चक्र बताओ"* | *"Show my active crop cycles."* | Lists active crops (e.g., Kharif Paddy 2026). |
 | **Start Capture** | *"धान के लिए कैप्चर शुरू करो"* | *"Start capture for my paddy crop."* | Deep-links directly into peril-aware guided capture. |
-| **Capture Shutter** | *"फोटो खींचो"* | *"Take the photo."* | Triggers camera shutter for active canonical angle. |
+| **Capture Shutter** | *"फोटो खींचो"* | *"Take the photo."* | Triggers camera shutter for active canonical angle with full metadata. |
+| **Switch Camera** | *"कैमरा बदलो"* | *"Switch camera."* | Toggles between front and back environment cameras. |
+| **Select Angle** | *"नजदीकी फोटो दिखाओ"* | *"Select closeup damage angle."* | Switches the active capture angle in the viewfinder. |
+| **Retake Angle** | *"यह फोटो दोबारा लो"* | *"Retake this angle."* | Clears the current frame and prompts immediate recapture. |
+| **Check Quality** | *"फोटो की क्वालिटी जांचो"* | *"Check evidence quality."* | Inspects realtime CV metrics (canopy %, blur, luma) and gives voice feedback. |
 | **Add Observation** | *"ऑब्जर्वेशन लिखो: पत्तों पर भूरे धब्बे हैं"* | *"Note observation: brown leaf spots visible."* | Records spoken observation into the draft container. |
-| **Submit Claim** | *"क्लेम सबमिट करो"* | *"Submit my claim."* | Requests spoken confirmation before submitting via `/api/claims`. |
+| **Submit Claim** | *"क्लेम सबमिट करो"* | *"Submit my claim."* | Requests spoken confirmation before submitting via sequential Gemini-HF pipeline. |
 
 ---
 
 ## 6. Tool Allowlist & Confirmation Security
 
-### Immediate Operations (Read-Only & Navigation)
-- Switch application interface language between Hindi and English.
+### Immediate Operations (Read-Only, Optics & Navigation)
+- Switch application interface language across 15 Indian languages.
 - Query registered farms, plots, crop cycles, growth stages, and past submissions.
-- Navigate to specific farmer application routes.
-- Trigger camera shutter during an active guided capture session.
-- Record spoken text into the farmer observation field.
+- Navigate to specific farmer application routes (`home`, `capture`, `claims`, `reminders`).
+- Trigger camera shutter (`take_photo` / `capture_current_angle`) with full metadata bundling.
+- Switch camera facing mode (`switch_camera`).
+- Select and navigate capture angles (`select_angle` / `select_capture_angle`).
+- Retake capture angles (`retake_angle` / `retake_capture_angle`).
+- Realtime CV quality inspections (`check_evidence_quality`).
+- Record spoken text into the farmer observation field (`set_observation` / `set_capture_observation`).
 
 ### Confirmation-Gated Operations (State-Mutating)
-- Submit a completed guided-capture claim to the server.
-- Finalize an uploaded evidence submission for review triage.
-- Create a new farm, plot, or crop cycle.
-- Update or snooze recurring evidence reminder plans.
-- Mark critical notifications as read.
+- Submit a completed guided-capture claim to the server (`submit_claim` / `prepare_submit_claim`).
+- Update or snooze recurring evidence reminder plans (`prepare_snooze_evidence_reminder`).
+- Mark milestone reminders complete (`prepare_complete_reminder`).
 
 *Security Gate Implementation: The action broker requires a prepare turn, an unexpired pending action, and an explicit spoken affirmative ("हाँ", "Yes", "Confirm"). Rejection ("नहीं", "Cancel") immediately clears the pending action from memory.*
 
