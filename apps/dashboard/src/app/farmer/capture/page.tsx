@@ -207,7 +207,29 @@ function CaptureStudioContent() {
       setCameraError(null);
       setIsCameraActive(false);
       let lastError: unknown;
-      const ladder = cameraConstraintLadder(cameraFacing);
+
+      // Single-prompt clean constraint ladder for requested facing mode
+      const ladder: MediaStreamConstraints[] = [
+        {
+          audio: false,
+          video: {
+            facingMode: { ideal: cameraFacing },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        },
+        {
+          audio: false,
+          video: {
+            facingMode: { ideal: cameraFacing },
+          },
+        },
+        {
+          audio: false,
+          video: true,
+        },
+      ];
+
       for (let step = 0; step < ladder.length; step += 1) {
         const constraints = ladder[step];
         if (gen !== cameraGenRef.current) return;
@@ -227,7 +249,7 @@ function CaptureStudioContent() {
             }
           }
           if (!video) {
-            // Permission already granted — keep the stream; do not tear it down.
+            // Permission already granted — keep the stream
             setIsCameraActive(true);
             return;
           }
@@ -237,26 +259,9 @@ function CaptureStudioContent() {
             stopMediaStream(stream);
             return;
           }
-          const luma = gotFrame ? sampleVideoMeanLuma(video) : null;
-          const blankSensor =
-            luma != null && luma < BLANK_SENSOR_LUMA_MAX && step < ladder.length - 1;
-          if (blankSensor) {
-            stopMediaStream(stream);
-            if (streamRef.current === stream) streamRef.current = null;
-            if (video.srcObject === stream) video.srcObject = null;
-            continue;
-          }
-          // getUserMedia success = camera is on. A late first frame is not fatal.
+          // Successfully acquired and attached camera stream
           setIsCameraActive(true);
-          if (!gotFrame) {
-            setCameraError(
-              lang === "hi"
-                ? "कैमरा खुला है, फ़्रेम आने में देर हो रही है।"
-                : "Camera is open. Waiting for the first frame…",
-            );
-          } else {
-            setCameraError(null);
-          }
+          setCameraError(null);
           return;
         } catch (err) {
           lastError = err;
@@ -271,9 +276,10 @@ function CaptureStudioContent() {
 
   useEffect(() => {
     let cancelled = false;
+    // 200ms hardware cooldown allows mobile OS camera daemon to release sensor when flipping
     const timer = window.setTimeout(() => {
       if (!cancelled) void startCamera();
-    }, 60);
+    }, 200);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);

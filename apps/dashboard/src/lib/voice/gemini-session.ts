@@ -23,7 +23,7 @@ export type VoiceSessionErr = {
 export type VoiceSessionResult = VoiceSessionOk | VoiceSessionErr;
 
 export function geminiApiKey(): string {
-  return (process.env.GEMINI_API_KEY || "").trim();
+  return (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim();
 }
 
 export function geminiLiveModel(): string {

@@ -3,7 +3,22 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mic, MicOff, Send, Sprout, Loader2, ArrowRight, ShieldCheck, Camera, Volume2 } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Send,
+  Sprout,
+  Loader2,
+  ArrowRight,
+  ShieldCheck,
+  Camera,
+  Volume2,
+  Flame,
+  Waves,
+  Bug,
+  CloudHail,
+  PawPrint,
+} from "lucide-react";
 import { useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
 import { normalizePeril, routeForPeril } from "@/lib/claim-routing";
@@ -77,7 +92,6 @@ export default function SaathiIntakePage() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
-  const speechRecRef = useRef<any>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -98,23 +112,14 @@ export default function SaathiIntakePage() {
   slotsRef.current = slots;
   langRef.current = lang;
 
-  const speakAloud = (text: string, currentLang: string) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = currentLang === "hi" ? "hi-IN" : "en-IN";
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      window.speechSynthesis.speak(utterance);
-    } catch (err) {
-      console.warn("speechSynthesis error:", err);
-    }
-  };
-
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setVoiceSupported("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
+      setVoiceSupported(
+        Boolean(
+          typeof navigator?.mediaDevices?.getUserMedia === "function" &&
+            (window.AudioContext || (window as any).webkitAudioContext),
+        ),
+      );
     }
   }, []);
 
@@ -146,11 +151,8 @@ export default function SaathiIntakePage() {
     setMessages((m) => [...m, msg]);
     return msg;
   };
-  const pushSaathi = (msg: SaathiMessage, shouldSpeak = false) => {
+  const pushSaathi = (msg: SaathiMessage) => {
     setMessages((m) => [...m, msg]);
-    if (shouldSpeak || voiceMode || listening) {
-      speakAloud(msg.text, langRef.current);
-    }
   };
   const pushSystemNote = (text: string) =>
     setMessages((m) => [...m, { id: `sys-${Date.now()}-${Math.random().toString(16).slice(2)}`, role: "saathi", text, at: new Date().toISOString() }]);
@@ -450,11 +452,15 @@ export default function SaathiIntakePage() {
 
   const handlersRef = useRef({ handleTools, processFinalSpokenTurn, failVoice });
   handlersRef.current = { handleTools, processFinalSpokenTurn, failVoice };
+
   const scheduleReconnect = () => {
     if (!mountedRef.current) return;
     if (retryCountRef.current >= 2) {
-      console.warn("Retries exhausted, falling back to Web Speech mode");
-      startWebSpeechMode();
+      failVoice(
+        langRef.current === "hi"
+          ? "Gemini Live सत्र पुनः कनेक्ट नहीं हो सका। दोबारा माइक दबाएँ।"
+          : "Gemini Live session could not reconnect. Tap mic to restart.",
+      );
       return;
     }
     retryCountRef.current += 1;
@@ -466,80 +472,6 @@ export default function SaathiIntakePage() {
     reconnectTimerRef.current = window.setTimeout(() => {
       void startVoiceCore();
     }, 1200 * retryCountRef.current);
-  };
-
-  const startWebSpeechMode = () => {
-    if (typeof window === "undefined") return;
-    if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
-      failVoice(
-        langRef.current === "hi"
-          ? "यह ब्राउज़र लाइव वॉइस इनपुट सपोर्ट नहीं करता। कृपया टेक्स्ट का उपयोग करें।"
-          : "Live voice input is not supported on this browser. Please type your message.",
-      );
-      return;
-    }
-    try {
-      const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const rec = new SpeechRec();
-      rec.lang = langRef.current === "hi" ? "hi-IN" : "en-IN";
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.maxAlternatives = 1;
-      rec.onstart = () => {
-        setLiveStatus("live");
-        setListening(true);
-        connectingRef.current = false;
-        pushSystemNote(
-          langRef.current === "hi"
-            ? "साथी सुन रहा है — अपनी फसल की समस्या बोलें।"
-            : "Saathi is listening — speak your crop issue naturally.",
-        );
-      };
-      rec.onresult = (e: any) => {
-        let interim = "";
-        for (let i = e.resultIndex; i < e.results.length; ++i) {
-          if (e.results[i].isFinal) {
-            const finalTranscript = (e.results[i][0]?.transcript || "").trim();
-            if (finalTranscript) {
-              upsertTranscript("farmer", finalTranscript);
-              void handleTextAutonomous(finalTranscript, "voice");
-            }
-          } else {
-            interim += e.results[i][0]?.transcript || "";
-          }
-        }
-        if (interim) {
-          upsertTranscript("farmer", interim);
-        }
-      };
-      rec.onerror = (e: any) => {
-        console.warn("Web Speech error:", e?.error);
-        if (e?.error === "not-allowed") {
-          failVoice(
-            langRef.current === "hi"
-              ? "माइक्रोफ़ोन अनुमति अस्वीकृत। ब्राउज़र में Allow दबाएँ।"
-              : "Microphone permission denied. Allow the mic in browser.",
-          );
-        }
-      };
-      rec.onend = () => {
-        if (voiceMode && mountedRef.current && !intentionalCloseRef.current) {
-          try {
-            rec.start();
-          } catch {
-            setListening(false);
-            setLiveStatus("idle");
-          }
-        } else {
-          setListening(false);
-          setLiveStatus("idle");
-        }
-      };
-      speechRecRef.current = rec;
-      rec.start();
-    } catch (err) {
-      failVoice(err instanceof Error ? err.message : "Speech recognition failed");
-    }
   };
 
   const startVoiceCore = async () => {
@@ -565,8 +497,12 @@ export default function SaathiIntakePage() {
         expiresAt?: string;
       };
       if (!minted.ok || !body.token || !body.websocketUrl) {
-        console.warn("Gemini Live session unavailable, falling back to Web Speech:", body.error);
-        startWebSpeechMode();
+        failVoice(
+          body.error ||
+            (langRef.current === "hi"
+              ? "Gemini Live सत्र उपलब्ध नहीं है। कृपया GEMINI_API_KEY जांचें।"
+              : "Gemini Live session unavailable. Please check GEMINI_API_KEY."),
+        );
         return;
       }
 
@@ -584,11 +520,6 @@ export default function SaathiIntakePage() {
             JSON.stringify({
               setup: {
                 model: `models/${body.model}`,
-                tools: [{ functionDeclarations: SAATHI_FUNCTION_DECLARATIONS }],
-                systemInstruction: { parts: [{ text: systemInstruction }] },
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } },
-                inputAudioTranscription: {},
-                outputAudioTranscription: {},
               },
             }),
           );
@@ -710,8 +641,7 @@ export default function SaathiIntakePage() {
       setLiveStatus("live");
     } catch (err) {
       connectingRef.current = false;
-      console.warn("Live audio WebSocket unavailable, falling back to Web Speech:", err);
-      startWebSpeechMode();
+      failVoice(err instanceof Error ? err.message : "Gemini Live connection failed");
     }
   };
 
@@ -732,34 +662,6 @@ export default function SaathiIntakePage() {
     void startVoiceCore();
   };
 
-  const toggleVoice = () => {
-    if (listening) {
-      setListening(false);
-      return;
-    }
-    if (liveStatus !== "idle") return; // duplex voice owns the microphone
-    if (typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
-      try {
-        const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const rec = new SpeechRec();
-        rec.lang = lang === "hi" ? "hi-IN" : "en-IN";
-        rec.interimResults = false;
-        rec.maxAlternatives = 1;
-        rec.onstart = () => setListening(true);
-        rec.onresult = (e: any) => {
-          const transcript = e.results[0][0].transcript as string;
-          setListening(false);
-          void handleTextAutonomous(transcript, "voice");
-        };
-        rec.onerror = () => setListening(false);
-        rec.onend = () => setListening(false);
-        rec.start();
-      } catch {
-        setListening(false);
-      }
-    }
-  };
-
   const canProceed = Boolean(slots.peril);
   const intentPreview = canProceed ? slotsToIntent(slots) : null;
   const route = slots.peril ? routeForPeril(slots.peril) : null;
@@ -774,50 +676,87 @@ export default function SaathiIntakePage() {
     router.push(`/farmer/capture?${params.toString()}`);
   };
 
-  const quickPerils: Array<{ peril: any; label: string; emoji: string; phrase: string }> = [
-    { peril: "fire_burn", label: lang === "hi" ? "खेत में आग" : "Fire in Field", emoji: "🔥", phrase: lang === "hi" ? "खेत में आग लग गई है" : "There is a fire in my field" },
-    { peril: "animal_damage", label: lang === "hi" ? "जंगली जानवर" : "Wild Animals", emoji: "🐗", phrase: lang === "hi" ? "जंगली जानवर ने फसल नुकसान किया" : "Wild animals damaged my crop" },
-    { peril: "flood", label: lang === "hi" ? "बाढ़ / जलभराव" : "Flood / Waterlogging", emoji: "🌊", phrase: lang === "hi" ? "बाढ़ का पानी खेत में भर गया है" : "Flood water is logged in the field" },
-    { peril: "pest_disease", label: lang === "hi" ? "कीट / रोग" : "Pest & Disease", emoji: "🐛", phrase: lang === "hi" ? "फसल पर कीट और रोग लगा है" : "Pest and disease on my crop" },
-    { peril: "hailstorm", label: lang === "hi" ? "ओलावृष्टि" : "Hailstorm", emoji: "🧊", phrase: lang === "hi" ? "ओले गिरने से फसल बर्बाद हुई" : "Hailstorm damaged the field" },
-    { peril: "normal", label: lang === "hi" ? "अन्य नुकसान" : "General Loss", emoji: "🌾", phrase: lang === "hi" ? "फसल का नुकसान हुआ है" : "I have general crop loss" },
+  const quickPerils = [
+    {
+      peril: "fire_burn",
+      label: lang === "hi" ? "खेत में आग" : "Fire in Field",
+      icon: Flame,
+      phrase: lang === "hi" ? "खेत में आग लग गई है" : "There is a fire in my field",
+    },
+    {
+      peril: "animal_damage",
+      label: lang === "hi" ? "जंगली जानवर" : "Wild Animals",
+      icon: PawPrint,
+      phrase: lang === "hi" ? "जंगली जानवर ने फसल नुकसान किया" : "Wild animals damaged my crop",
+    },
+    {
+      peril: "flood",
+      label: lang === "hi" ? "बाढ़ / जलभराव" : "Flood & Waterlogging",
+      icon: Waves,
+      phrase: lang === "hi" ? "बाढ़ का पानी खेत में भर गया है" : "Flood water is logged in the field",
+    },
+    {
+      peril: "pest_disease",
+      label: lang === "hi" ? "कीट व रोग" : "Pest & Disease",
+      icon: Bug,
+      phrase: lang === "hi" ? "फसल पर कीट और रोग लगा है" : "Pest and disease on my crop",
+    },
+    {
+      peril: "hailstorm",
+      label: lang === "hi" ? "ओलावृष्टि" : "Hailstorm",
+      icon: CloudHail,
+      phrase: lang === "hi" ? "ओले गिरने से फसल बर्बाद हुई" : "Hailstorm damaged the field",
+    },
+    {
+      peril: "normal",
+      label: lang === "hi" ? "अन्य नुकसान" : "General Loss",
+      icon: Sprout,
+      phrase: lang === "hi" ? "फसल का नुकसान हुआ है" : "I have general crop loss",
+    },
   ];
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 py-2">
       {/* Header Banner */}
-      <div className="fp-panel p-4 text-center sm:p-5">
-        <div className="mx-auto flex items-center justify-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ink)] text-[var(--surface)]">
-            <Sprout className="h-4 w-4 text-emerald-400" />
-          </span>
-          <h1 className="text-base font-bold text-slate-900 sm:text-lg">
-            {lang === "hi" ? "फ़सल साथी — स्वायत्त आवाज़ सहायक" : "Fasal Saathi — Autonomous Voice Agent"}
-          </h1>
-          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
-            <ShieldCheck className="h-3 w-3" />
-            {lang === "hi" ? "लाइव आवाज़" : "Voice AI"}
+      <div className="fp-panel rounded-2xl p-4 sm:p-5 border border-stone-200/90 bg-[#fffdf9] shadow-2xs">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--ink)] text-emerald-400 shadow-2xs">
+              <Sprout className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base font-bold text-slate-900 sm:text-lg leading-tight truncate">
+                {lang === "hi" ? "फसल साथी" : "Fasal Saathi"}
+              </h1>
+              <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                {lang === "hi" ? "आवाज़ से फसल नुकसान दर्ज करें" : "Field Voice Intake Assistant"}
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 whitespace-nowrap">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-700" />
+            <span>{lang === "hi" ? "सहायता पोर्टल" : "PMFBY Intake"}</span>
           </span>
         </div>
-        <p className="mt-1 text-xs text-slate-600">
+        <p className="mt-3 text-xs text-slate-600 leading-relaxed border-t border-stone-100 pt-2.5">
           {lang === "hi"
-            ? "माइक दबाएँ और अपनी भाषा में बताएँ — साथी समस्या समझकर कैमरा तैयार करेगा।"
-            : "Tap the mic and speak naturally — Saathi will extract the disaster protocol and set up camera capture."}
+            ? "माइक दबाकर अपनी फसल समस्या बोलें — साथी आवश्यक फोटो और नियम तैयार करेगा।"
+            : "Tap the microphone below and describe your crop issue — Saathi sets up the damage protocol and camera angles."}
         </p>
       </div>
 
       {/* Hero Voice Orb Hub */}
-      <div className="fp-panel flex flex-col items-center justify-center p-6 text-center sm:p-8">
+      <div className="fp-panel rounded-2xl p-6 text-center sm:p-7 border border-stone-200/90 bg-[#fffdf9] shadow-2xs">
         <div className="relative mb-4 flex items-center justify-center">
           {/* Animated pulse wave rings when live */}
           {liveStatus === "live" && (
             <>
-              <span className="absolute h-36 w-36 animate-ping rounded-full bg-red-400/20" />
-              <span className="absolute h-28 w-28 animate-pulse rounded-full bg-emerald-400/30" />
+              <span className="absolute h-32 w-32 animate-ping rounded-full bg-rose-400/20" />
+              <span className="absolute h-28 w-28 animate-pulse rounded-full bg-emerald-400/25" />
             </>
           )}
           {liveStatus === "connecting" && (
-            <span className="absolute h-32 w-32 animate-pulse rounded-full bg-amber-400/30" />
+            <span className="absolute h-28 w-28 animate-pulse rounded-full bg-amber-400/25" />
           )}
 
           <button
@@ -825,89 +764,105 @@ export default function SaathiIntakePage() {
             onClick={toggleVoiceMode}
             aria-label={liveStatus === "live" ? "Stop Voice" : "Start Voice"}
             className={clsx(
-              "relative z-10 flex h-24 w-24 items-center justify-center rounded-full text-white shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 sm:h-28 sm:w-28",
+              "relative z-10 flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full text-white shadow-md transition-all duration-200 hover:scale-105 active:scale-95",
               liveStatus === "live"
-                ? "bg-red-600 ring-4 ring-red-200 ring-offset-2"
+                ? "bg-rose-700 ring-4 ring-rose-200/80"
                 : liveStatus === "connecting"
-                  ? "bg-amber-500 ring-4 ring-amber-200 ring-offset-2"
-                  : "bg-emerald-600 ring-4 ring-emerald-100 hover:bg-emerald-700",
+                  ? "bg-amber-600 ring-4 ring-amber-200/80"
+                  : "bg-[var(--ink)] text-emerald-400 border-2 border-emerald-500/30 hover:border-emerald-400",
             )}
           >
             {liveStatus === "connecting" ? (
-              <Loader2 className="h-10 w-10 animate-spin text-white" />
+              <Loader2 className="h-8 w-8 animate-spin text-white" />
             ) : liveStatus === "live" ? (
-              <Mic className="h-10 w-10 animate-pulse text-white" />
+              <Mic className="h-8 w-8 animate-pulse text-white" />
             ) : (
-              <Mic className="h-10 w-10 text-white" />
+              <Mic className="h-8 w-8 text-emerald-400" />
             )}
           </button>
         </div>
 
         {/* Live status label */}
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold">
+        <div className="space-y-1 select-none cursor-default">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 py-1 text-xs font-semibold shadow-2xs select-none cursor-default">
             {liveStatus === "live" ? (
               <>
-                <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
-                <span className="text-red-700">{lang === "hi" ? "साथी सुन रहा है (बोलें)…" : "Saathi is listening (speak now)…"}</span>
+                <span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" />
+                <span className="text-rose-700">{lang === "hi" ? "साथी सुन रहा है (बोलें)…" : "Listening (speak now)…"}</span>
               </>
             ) : liveStatus === "connecting" ? (
               <>
                 <span className="h-2 w-2 animate-spin rounded-full bg-amber-500" />
-                <span className="text-amber-700">{lang === "hi" ? "जेमिनी लाइव से जुड़ रहा है…" : "Connecting to Gemini Live…"}</span>
+                <span className="text-amber-700">{lang === "hi" ? "जुड़ रहा है…" : "Connecting voice stream…"}</span>
               </>
             ) : (
               <>
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="text-slate-700">{lang === "hi" ? "बोलने के लिए माइक दबाएँ" : "Tap mic to speak with Saathi"}</span>
+                <span className="text-slate-700">{lang === "hi" ? "बोलने के लिए माइक दबाएँ" : "Tap microphone to speak"}</span>
               </>
             )}
           </div>
-          <p className="text-[11px] text-slate-500">
-            {lang === "hi" ? "15 भारतीय भाषाएँ समर्थित · पूर्ण द्विमार्गी ऑडियो" : "15 Indian languages supported · Full duplex audio"}
+          <p className="text-[11px] text-slate-500 select-none cursor-default">
+            {lang === "hi" ? "15 भारतीय भाषाएँ और क्षेत्रीय बोलियाँ समर्थित" : "15 Indian languages & regional dialects supported"}
           </p>
         </div>
 
         {/* Quick Voice Phrase Chips */}
-        <div className="mt-6 w-full">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-            {lang === "hi" ? "त्वरित आवाज़ विषय (टैप या बोलें)" : "Quick Voice Starters (tap or speak)"}
+        <div className="mt-6 w-full pt-4 border-t border-stone-100">
+          <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 select-none cursor-default">
+            {lang === "hi" ? "सामान्य फसल समस्याएँ (टैप या बोलें)" : "Common Crop Issues (tap or speak)"}
           </p>
-          <div className="flex flex-wrap justify-center gap-1.5">
-            {quickPerils.map((q) => (
-              <button
-                key={q.peril}
-                type="button"
-                onClick={() => {
-                  void handleTextAutonomous(q.phrase, "voice");
-                  if (liveStatus === "idle") {
-                    void startVoiceCore();
-                  }
-                }}
-                className={clsx(
-                  "inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-slate-100",
-                  slots.peril === q.peril
-                    ? "border-[var(--ink)] bg-[var(--ink)] text-white"
-                    : "border-slate-200 bg-white text-slate-700",
-                )}
-              >
-                <span>{q.emoji}</span>
-                <span>{q.label}</span>
-              </button>
-            ))}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 max-w-lg mx-auto">
+            {quickPerils.map((q) => {
+              const Icon = q.icon;
+              const isSelected = slots.peril === q.peril;
+              return (
+                <button
+                  key={q.peril}
+                  type="button"
+                  onClick={() => {
+                    void handleTextAutonomous(q.phrase, "voice");
+                    if (liveStatus === "idle") {
+                      void startVoiceCore();
+                    }
+                  }}
+                  className={clsx(
+                    "flex items-center gap-2 rounded-xl border p-2.5 text-xs font-semibold transition-all text-left shadow-2xs",
+                    isSelected
+                      ? "border-[var(--ink)] bg-[var(--ink)] text-white"
+                      : "border-stone-200 bg-white text-stone-700 hover:bg-stone-50 hover:border-emerald-300",
+                  )}
+                >
+                  <span
+                    className={clsx(
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs",
+                      isSelected ? "bg-white/20 text-white" : "bg-stone-100 text-stone-600",
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="truncate">{q.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
 
       {/* Live Transcript / Response Feed */}
-      <div className="fp-panel p-3 sm:p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
-            {lang === "hi" ? "साथी संवाद" : "Saathi Conversation"}
-          </span>
+      <div className="fp-panel rounded-2xl p-4 sm:p-5 border border-stone-200/90 bg-[#fffdf9] shadow-2xs">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-100 text-emerald-800 text-xs font-bold">
+              <Sprout className="h-3 w-3" />
+            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              {lang === "hi" ? "साथी संवाद" : "Assessment Conversation"}
+            </span>
+          </div>
           {isAnalyzing && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-              <Loader2 className="h-3 w-3 animate-spin text-[var(--accent)]" />
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--accent)]">
+              <Loader2 className="h-3 w-3 animate-spin" />
               {lang === "hi" ? "विश्लेषण…" : "Analyzing…"}
             </span>
           )}
@@ -915,16 +870,21 @@ export default function SaathiIntakePage() {
 
         <div
           ref={scrollRef}
-          className="max-h-[32vh] min-h-[14vh] space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3"
+          className="max-h-[36vh] min-h-[16vh] space-y-2.5 overflow-y-auto rounded-xl border border-stone-200/80 bg-stone-50/70 p-3.5"
         >
           {messages.map((m) => (
-            <div key={m.id} className={clsx("flex", m.role === "farmer" ? "justify-end" : "justify-start")}>
+            <div key={m.id} className={clsx("flex", m.role === "farmer" ? "justify-end" : "justify-start gap-2.5")}>
+              {m.role !== "farmer" && (
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 text-[10px] font-bold mt-0.5">
+                  <Sprout className="h-3.5 w-3.5" />
+                </div>
+              )}
               <div
                 className={clsx(
-                  "max-w-[90%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed sm:text-sm",
+                  "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed sm:text-sm shadow-2xs",
                   m.role === "farmer"
-                    ? "bg-[var(--ink)] text-white rounded-br-sm"
-                    : "border border-slate-200 bg-white text-slate-800 rounded-bl-sm",
+                    ? "bg-[var(--ink)] text-white rounded-tr-xs"
+                    : "border border-stone-200/90 bg-white text-slate-800 rounded-tl-xs",
                 )}
               >
                 {m.text}
@@ -932,44 +892,86 @@ export default function SaathiIntakePage() {
             </div>
           ))}
         </div>
+
+        {/* Manual Input Fallback */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!input.trim()) return;
+            void handleTextAutonomous(input, "text");
+            setInput("");
+          }}
+          className="mt-3 flex gap-2"
+        >
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={
+              lang === "hi"
+                ? "यहाँ अपनी फसल समस्या लिखें..."
+                : "Type your crop issue or reply here..."
+            }
+            className="fp-input flex-1 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs sm:text-sm"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim()}
+            className="fp-btn-primary rounded-xl px-4 py-2 text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5"
+          >
+            <Send className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{lang === "hi" ? "भेजें" : "Send"}</span>
+          </button>
+        </form>
       </div>
 
       {/* Autonomous Route Resolution Card */}
       {route && (
-        <div className="fp-panel border-emerald-300 bg-emerald-50/40 p-4 sm:p-5">
+        <div className="fp-panel rounded-2xl border-emerald-300 bg-emerald-50/50 p-4 sm:p-5 shadow-2xs">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white">
-                <Camera className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-700 text-white">
+                <Camera className="h-4 w-4" />
               </span>
-              <h2 className="text-sm font-bold text-slate-900">
-                {lang === "hi" ? route.labelHi : route.labelEn}
-              </h2>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  {lang === "hi" ? route.labelHi : route.labelEn}
+                </h2>
+                <p className="text-[11px] text-emerald-800 font-medium">
+                  {route.requiredAngles.length} {lang === "hi" ? "फोटो कोण आवश्यक" : "Photo angles required"}
+                </p>
+              </div>
             </div>
             <span className="rounded-full bg-emerald-700 px-2.5 py-0.5 text-xs font-bold text-white">
-              {route.requiredAngles.length} {lang === "hi" ? "फोटो आवश्यक" : "Angles Required"}
+              {lang === "hi" ? "प्रोटोकॉल तैयार" : "Protocol Set"}
             </span>
           </div>
 
-          <p className="mt-1.5 text-xs text-slate-600">
+          <p className="mt-2 text-xs text-slate-600 leading-relaxed">
             {lang === "hi" ? route.descriptionHi : route.descriptionEn}
           </p>
 
           <div className="mt-3 flex flex-wrap gap-1.5">
             {route.requiredAngles.map((a) => (
-              <span key={a} className="rounded border border-emerald-200 bg-white px-2 py-0.5 font-mono text-xs font-medium text-emerald-900">
+              <span
+                key={a}
+                className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1 font-mono text-xs font-medium text-emerald-900 shadow-2xs"
+              >
                 {a}
               </span>
             ))}
             {route.contextChecks.length > 0 && (
-              <span className="ml-1 text-xs text-slate-500 self-center">+ {route.contextChecks.join(", ")}</span>
+              <span className="ml-1 text-xs text-slate-500 self-center">
+                + {route.contextChecks.join(", ")}
+              </span>
             )}
           </div>
 
           {route.needsSatellite && (
-            <p className="mt-2 flex items-center gap-1 text-xs font-medium text-amber-800">
-              <Volume2 className="h-3.5 w-3.5" />
-              {lang === "hi" ? "सैटेलाइट जाँच (Sentinel-2 L2A) इस दावे में स्वतः जुड़ेगी।" : "Sentinel-2 satellite burn scar check attached."}
+            <p className="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-amber-900 bg-amber-50 border border-amber-200/80 rounded-xl p-2.5">
+              <Volume2 className="h-3.5 w-3.5 text-amber-700 shrink-0" />
+              <span>{lang === "hi" ? "सैटेलाइट जाँच (Sentinel-2 L2A) इस दावे में स्वतः जुड़ेगी।" : "Sentinel-2 satellite burn scar verification attached."}</span>
             </p>
           )}
 
@@ -978,13 +980,13 @@ export default function SaathiIntakePage() {
               type="button"
               onClick={proceedToCapture}
               disabled={!canProceed}
-              className="fp-btn-primary flex-1 justify-center gap-2 py-2.5 text-sm font-semibold disabled:opacity-40"
+              className="fp-btn-primary flex-1 justify-center gap-2 py-2.5 text-sm font-semibold disabled:opacity-40 rounded-xl"
             >
               <Camera className="h-4 w-4" />
-              {lang === "hi" ? "कैमरा खोलें — फोटो लें" : "Open Camera Studio"}
+              <span>{lang === "hi" ? "कैमरा खोलें — फोटो लें" : "Open Camera Studio"}</span>
               <ArrowRight className="h-4 w-4" />
             </button>
-            <Link href="/farmer/capture" className="fp-btn-secondary py-2.5 text-xs">
+            <Link href="/farmer/capture" className="fp-btn-secondary py-2.5 text-xs rounded-xl">
               {lang === "hi" ? "स्किप" : "Skip"}
             </Link>
           </div>
