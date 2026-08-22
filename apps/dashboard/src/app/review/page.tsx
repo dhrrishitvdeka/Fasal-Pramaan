@@ -159,7 +159,7 @@ function ReviewQueuePage() {
       uncertainty_type: ev.uncertainty.type || "",
       integrity_score: ev.integrity.score,
       model_confidence: s.latest_prediction?.overall_confidence ?? "",
-      created_at: s.latest_evaluation?.created_at ?? "",
+      created_at: (s as any).created_at || s.latest_evaluation?.created_at || "",
       recommended_action: ev.uncertainty.recommended_action || "",
       adaptive_level:
         (s as unknown as { adaptive_result?: { level?: string } }).adaptive_result?.level ?? "",

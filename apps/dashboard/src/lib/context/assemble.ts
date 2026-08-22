@@ -165,6 +165,19 @@ function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number)
  * registered plot center, and is it within maxMeters? Returns nulls when either
  * coordinate is missing/non-finite.
  */
+export function isValidCoordinate(
+  lat: number | null | undefined,
+  lon: number | null | undefined,
+): boolean {
+  if (lat == null || lon == null) return false;
+  const nLat = Number(lat);
+  const nLon = Number(lon);
+  if (!Number.isFinite(nLat) || !Number.isFinite(nLon)) return false;
+  if (nLat < -90 || nLat > 90 || nLon < -180 || nLon > 180) return false;
+  if (Math.abs(nLat) < 0.00001 && Math.abs(nLon) < 0.00001) return false;
+  return true;
+}
+
 export function plotContainment(
   captureLat: number | null | undefined,
   captureLon: number | null | undefined,
@@ -172,9 +185,7 @@ export function plotContainment(
   plotLon: number | null | undefined,
   maxMeters = 200,
 ): { distanceM: number | null; within: boolean | null } {
-  const ok = (v: number | null | undefined): v is number =>
-    v != null && Number.isFinite(Number(v));
-  if (!ok(captureLat) || !ok(captureLon) || !ok(plotLat) || !ok(plotLon)) {
+  if (!isValidCoordinate(captureLat, captureLon) || !isValidCoordinate(plotLat, plotLon)) {
     return { distanceM: null, within: null };
   }
   const distanceM = haversineMeters(
@@ -187,8 +198,11 @@ export function plotContainment(
 }
 
 export async function assembleContext(input: AssembleInput): Promise<AssembledContext & { peril: string; sowingDate?: string }> {
-  const lat = input.lat != null ? Number(input.lat) : input.captureLat != null ? Number(input.captureLat) : null;
-  const lon = input.lon != null ? Number(input.lon) : input.captureLon != null ? Number(input.captureLon) : null;
+  const rawLat = input.lat != null ? Number(input.lat) : input.captureLat != null ? Number(input.captureLat) : null;
+  const rawLon = input.lon != null ? Number(input.lon) : input.captureLon != null ? Number(input.captureLon) : null;
+  const hasGpsCoords = isValidCoordinate(rawLat, rawLon);
+  const lat = hasGpsCoords ? rawLat : null;
+  const lon = hasGpsCoords ? rawLon : null;
   const peril = String(input.peril || "normal").toLowerCase();
   const sowingDate = input.sowingDate ? String(input.sowingDate) : undefined;
   const signals: ContextSignal[] = [];
@@ -467,7 +481,7 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
               const startIso = new Date(Math.max(sowingMs, Date.now() - 180 * 86400000))
                 .toISOString()
                 .slice(0, 10);
-              const endIso = new Date().toISOString().slice(0, 10);
+              const endIso = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
               const archUrl =
                 `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}` +
                 `&start_date=${startIso}&end_date=${endIso}&daily=precipitation_sum&timezone=auto`;

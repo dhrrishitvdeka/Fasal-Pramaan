@@ -346,8 +346,14 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
               </span>
             </div>
             {evaluation.confidence_delta != null && (
-              <div className="mt-1.5 text-xs text-emerald-700 font-semibold flex items-center gap-1">
-                <span>Δ +{evaluation.confidence_delta}</span>
+              <div
+                className={`mt-1.5 text-xs font-semibold flex items-center gap-1 ${
+                  evaluation.confidence_delta >= 0 ? "text-emerald-700" : "text-rose-700"
+                }`}
+              >
+                <span>
+                  Δ {evaluation.confidence_delta > 0 ? `+${evaluation.confidence_delta}` : evaluation.confidence_delta}
+                </span>
                 <span className="text-[10px] text-slate-500">(Prev: {evaluation.previous_confidence})</span>
               </div>
             )}

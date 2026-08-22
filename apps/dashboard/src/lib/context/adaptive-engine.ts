@@ -57,14 +57,19 @@ export function adaptiveConfidence(opts: {
   if (peril === "fire_burn" && !sentinelOk) {
     reasons.push("Fire claim needs satellite burn-scar confirmation — keeping as medium until Sentinel available");
     reasonsHi.push("आग के दावे को सैटेलाइट पुष्टि चाहिए — मध्यम पर रखा");
-    if (opts.overall >= threshold) return { level: "medium", nextStep: "request_missing", threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: capturedMissing };
+    if (opts.overall >= threshold) {
+      const nextStep = capturedMissing.length > 0 ? "request_missing" : "proceed";
+      return { level: "medium", nextStep, threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: capturedMissing };
+    }
     return { level: "low", nextStep: "escalate_to_human", threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: capturedMissing };
   }
 
   if (peril === "animal_damage" && gps?.status !== "available") {
     reasons.push("Animal damage benefits from GPS trail — request location");
     reasonsHi.push("जानवर क्षति के लिए जीपीएस ट्रेल सहायक — स्थान माँगें");
-    if (opts.overall >= 70) return { level: "medium", nextStep: "request_missing", threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: ["__gps__"] };
+    if (opts.overall >= 70) {
+      return { level: "medium", nextStep: "request_missing", threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: capturedMissing };
+    }
   }
 
   if (opts.overall >= threshold && opts.coverage >= 60 && opts.quality >= 40) {

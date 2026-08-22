@@ -11,6 +11,7 @@ import AccessGate from "@/components/AccessGate";
 import { AiConfidenceBreakdown } from "@/components/AiConfidenceBreakdown";
 import { ReviewKeyboardShortcuts } from "@/components/ReviewKeyboardShortcuts";
 import { EvidenceConfidenceSection, resolveEvidenceEvaluation } from "@/components/EvidenceConfidenceSection";
+import { SatelliteCrossCheckCard } from "@/components/SatelliteCrossCheckCard";
 import ModalShell from "@/components/ModalShell";
 import { predictionIsAcceptable } from "@/lib/review-accept";
 import { normalizePeril } from "@/lib/claim-routing";
@@ -26,30 +27,6 @@ const ALL_ANGLES = [
   { key: "right_context", label: "Right Context" },
   { key: "closeup_damage", label: "Closeup Damage" },
 ];
-
-/** Bhuvan WMS tile with graceful hide on load failure (service is often unreachable). */
-function BhuvanTileImage({ url }: { url: string }) {
-  const [failed, setFailed] = useState(false);
-  if (!url || failed) {
-    return (
-      <div className="flex h-[256px] items-center justify-center rounded border border-slate-200 bg-slate-100 text-xs text-slate-400">
-        Bhuvan land-use tile unavailable
-      </div>
-    );
-  }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={url}
-      alt="Bhuvan land-use overlay"
-      width={256}
-      height={256}
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-      className="h-[256px] w-full rounded border border-slate-200 bg-white object-cover"
-    />
-  );
-}
 
 /** Fetch a stored photo and encode as base64 data URL (chunked btoa, ≤15MB guard). */
 async function fetchAsImageDataUrl(url: string): Promise<string> {
@@ -118,12 +95,9 @@ export default function ReviewDetailPage() {
   }, [history]);
 
   // Resolve evidence evaluation & safety
-  const evaluation = useMemo(() => {
-    return data ? resolveEvidenceEvaluation(data) : null;
-  }, [data]);
+  const evaluation = useMemo(() => (data ? resolveEvidenceEvaluation(data) : null), [data]);
 
-  // Determine if integrity checks have failed
-  const integrityFailed = useMemo(() => {
+  const hasIntegrityFailure = useMemo(() => {
     if (!evaluation) return false;
     const iScore = evaluation.integrity?.score ?? 100;
     const iDetails = evaluation.integrity?.details;
@@ -158,6 +132,8 @@ export default function ReviewDetailPage() {
       qc.invalidateQueries({ queryKey: ["overview"] });
       qc.invalidateQueries({ queryKey: ["map-markers"] });
       qc.invalidateQueries({ queryKey: ["audit-logs"] });
+      qc.invalidateQueries({ queryKey: ["reviewer-stats"] });
+      qc.invalidateQueries({ queryKey: ["claims"] });
       setMessage("Decision recorded. Audit trail and metrics updated.");
       setRecaptureModalOpen(false);
     },
@@ -268,7 +244,7 @@ export default function ReviewDetailPage() {
   }
   const pred = data.latest_prediction;
 
-  const canAccept = predictionIsAcceptable(pred, integrityFailed);
+  const canAccept = predictionIsAcceptable(pred, hasIntegrityFailure);
 
   const handleAccept = () => {
     if (canAccept) {
@@ -517,44 +493,11 @@ export default function ReviewDetailPage() {
           <p className="pt-1 text-xs text-slate-500">No persisted context signals for this case.</p>
         )}
 
-        {(wideFieldImage || bhuvanThumbnailUrl) && (
-          <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Field (wide_field)
-              </p>
-              {wideFieldImage?.download_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={wideFieldImage.download_url}
-                  alt={wideFieldImage.angle_type}
-                  className="h-[256px] w-full rounded border border-slate-200 bg-white object-cover"
-                />
-              ) : (
-                <div className="flex h-[256px] items-center justify-center rounded border border-slate-200 bg-slate-100 text-xs text-slate-400">
-                  No wide_field photo uploaded
-                </div>
-              )}
-            </div>
-            <div>
-              <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Field vs Land-use overlay (Bhuvan)
-              </p>
-              <BhuvanTileImage url={bhuvanThumbnailUrl || ""} />
-            </div>
-          </div>
-        )}
-
-        {burnMapUrl && (
-          <a
-            href={burnMapUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 pt-1 text-xs font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900"
-          >
-            Open Sentinel-2 in Copernicus Browser ↗
-          </a>
-        )}
+        <SatelliteCrossCheckCard
+          wideFieldImageUrl={wideFieldImage?.download_url}
+          bhuvanTileUrl={bhuvanThumbnailUrl}
+          burnMapUrl={burnMapUrl}
+        />
       </section>
         </div>
 
@@ -816,7 +759,7 @@ export default function ReviewDetailPage() {
             className="fp-btn-primary flex min-h-12 w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 px-6 py-3 text-base font-semibold sm:w-auto"
             disabled={action.isPending || !canAccept}
             onClick={handleAccept}
-            title={integrityFailed ? "Acceptance disabled due to failed integrity checks" : "Accept AI result (A)"}
+            title={hasIntegrityFailure ? "Acceptance disabled due to failed integrity checks" : "Accept AI result (A)"}
           >
             <span>Accept AI result</span>
             <kbd className="hidden rounded bg-[var(--ink)] px-1 font-mono text-[10px] text-[var(--surface)] sm:inline">A</kbd>
