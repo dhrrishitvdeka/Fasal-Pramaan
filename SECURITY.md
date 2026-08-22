@@ -4,6 +4,8 @@
 
 Security updates and vulnerability patches are actively maintained and applied to the default `main` branch.
 
+The security scope of this repository is the **webapp only**: the Next.js dashboard (`apps/dashboard`, deployed on Vercel), its Supabase backend (Auth, Postgres `web_*` tables, storage bucket), the Hugging Face inference Space (`spaces/fasal-pramaan-api`), and outbound calls to Gemini and external context signals.
+
 ---
 
 ## 2. Reporting a Vulnerability
@@ -14,7 +16,7 @@ If you discover a potential security vulnerability within Fasal-Pramaan, please 
 2. **Private Email Disclosure**: If private GitHub reporting is unavailable, contact the project maintainers via the contact details listed on their GitHub profile.
 
 Please include:
-- Affected component, endpoint, or module.
+- Affected page, API route, or module (e.g., `/api/claims`, `/api/vision/gate`, Supabase RLS).
 - Step-by-step reproduction instructions or proof-of-concept.
 - Potential impact and suggested remediation if known.
 
@@ -24,8 +26,11 @@ Please include:
 
 ## 3. Security Guidelines & Best Practices
 
-- **Never Commit Secrets**: Ensure `.env` and sensitive API keys are excluded from version control.
-- **Server-Side Credentials**: High-privilege tokens (`SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `GEMINI_API_KEY`) must reside exclusively on the server and never be named `NEXT_PUBLIC_*`.
+- **Never Commit Secrets**: Ensure `.env` / `.env.local` and sensitive API keys are excluded from version control. Copy `apps/dashboard/.env.example` locally only.
+- **Server-Only Credentials**: High-privilege tokens (`SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `GEMINI_API_KEY`, `SENTINEL_TOKEN`, `IMD_API_KEY`) must reside exclusively on the server (Next.js API routes) and never be named `NEXT_PUBLIC_*`. Only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are browser-safe.
+- **Row Level Security**: All `web_*` tables are locked down with RLS policies. Apply [`scripts/lock_web_rls.sql`](scripts/lock_web_rls.sql) in the Supabase SQL editor after `setup_supabase.sql`, `setup_web_schema.sql`, and `setup_web_schema_peril.sql`. Evidence photos live in a private storage bucket; uploads go through server routes using the service role.
+- **Role Separation**: Users whose email appears in `REVIEWER_EMAILS` can access reviewer routes; everyone else is a farmer. Server-side API routes verify the Supabase JWT before any read or write — no client-trusted roles.
+- **Site Lock**: On Vercel, setting `SITE_LOCK_PASSWORD` gates the entire deployment behind a password check (`/api/unlock`). Leave it empty for local development only.
 - **Immediate Credential Rotation**: If credentials or keys are inadvertently exposed, revoke and rotate them immediately across all environments.
 
 For complete architectural security specifications, see [Security Architecture](docs/security.md).

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   EvidenceEvaluation,
   Submission,
@@ -9,6 +9,10 @@ import {
   EvidenceContextDetails,
   EvidenceIntegrityDetails,
 } from "@/lib/api";
+import { normalizePeril } from "../lib/claim-routing";
+import { apiFetch } from "../lib/auth-headers";
+import { adaptiveConfidence } from "../lib/context/adaptive-engine";
+import type { ContextSignal } from "../lib/context/types";
 
 const ALL_ANGLES = [
   { key: "wide_field", label: "Wide Field" },
@@ -199,8 +203,76 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
   const evaluation = resolveEvidenceEvaluation(submission);
   const { quality, coverage, context, integrity, confidence, uncertainty, request } = evaluation;
 
+  // Adaptive recapture result: confidence delta vs. previous stored confidence
+  const adaptiveStored = (submission.adaptive_result ?? null) as {
+    confidence_delta?: unknown;
+    previousConfidence?: unknown;
+  } | null;
+  const storedDelta =
+    typeof adaptiveStored?.confidence_delta === "number" ? (adaptiveStored.confidence_delta as number) : null;
+  const storedPrev =
+    typeof adaptiveStored?.previousConfidence === "number"
+      ? (adaptiveStored.previousConfidence as number)
+      : null;
+
   const finalScore = confidence?.final ?? 0;
-  const threshold = confidence?.threshold ?? 85;
+  const baseThreshold = confidence?.threshold ?? 85;
+  const peril = normalizePeril((submission as any).peril || (submission as any).claim_type || "normal");
+  const [signals, setSignals] = useState<ContextSignal[] | null>(null);
+  const [signalsLoading, setSignalsLoading] = useState(false);
+  useEffect(() => {
+    // Prefer persisted signals if already present on submission (no extra fetch)
+    const persisted = (submission as any).context_signals ?? (submission as any).contextSignals ?? null;
+    if (Array.isArray(persisted) && persisted.length > 0) {
+      setSignals(persisted as ContextSignal[]);
+      setSignalsLoading(false);
+      return;
+    }
+    // also handle case where persisted is stored as JSON string
+    if (typeof persisted === "string") {
+      try {
+        const parsed = JSON.parse(persisted);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSignals(parsed as ContextSignal[]);
+          setSignalsLoading(false);
+          return;
+        }
+      } catch {
+        // fall through to fetch
+      }
+    }
+    const lat = (submission as any).capture_lat ?? (submission as any).captureLat;
+    const lon = (submission as any).capture_lon ?? (submission as any).captureLon;
+    if (lat == null || lon == null) return;
+    let cancelled = false;
+    setSignalsLoading(true);
+    apiFetch("/api/context/assemble", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lat, lon, peril, sowingDate: (submission as any).sowingDate }),
+    })
+      .then((r) => r.json().catch(() => null))
+      .then((j: any) => {
+        if (!cancelled && Array.isArray(j?.signals)) setSignals(j.signals as ContextSignal[]);
+      })
+      .finally(() => {
+        if (!cancelled) setSignalsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [submission.id, peril, (submission as any).context_signals, (submission as any).contextSignals]);
+  const adaptive = adaptiveConfidence({
+    quality: quality.score,
+    coverage: coverage.score,
+    context: context.score,
+    integrity: integrity.score,
+    overall: finalScore,
+    peril,
+    signals: signals || undefined,
+    gateFailed: integrity.score < 10,
+  });
+  const threshold = adaptive.threshold;
   const isAboveThreshold = finalScore >= threshold;
 
   const [activeTab, setActiveTab] = useState<"all" | "quality" | "coverage" | "context" | "integrity">("all");
@@ -340,6 +412,60 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
                 )}
               </div>
             )}
+
+            {/* Adaptive Engine Result */}
+            <div className={`rounded border p-2.5 text-xs ${adaptive.level === "high" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : adaptive.level === "medium" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-rose-200 bg-rose-50 text-rose-900"}`}>
+              <div className="flex items-center gap-2">
+                <span className="font-bold uppercase tracking-wider">
+                  Adaptive: {adaptive.level} · {adaptive.nextStep.replaceAll("_", " ")}
+                </span>
+                {storedDelta != null && storedDelta !== 0 && (
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                      storedDelta > 0 ? "bg-emerald-200 text-emerald-900" : "bg-amber-200 text-amber-900"
+                    }`}
+                    title="Confidence change after recapture"
+                  >
+                    {storedDelta > 0
+                      ? `▲ +${storedDelta.toFixed(1)} after recapture`
+                      : `▼ ${storedDelta.toFixed(1)}`}
+                    {storedPrev != null && <span className="ml-1 font-normal">(prev {storedPrev})</span>}
+                  </span>
+                )}
+                <span className="ml-auto font-mono text-[11px]">threshold {adaptive.threshold}</span>
+                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${adaptive.level === "high" ? "bg-emerald-200" : adaptive.level === "medium" ? "bg-amber-200" : "bg-rose-200"}`}>
+                  {peril}
+                </span>
+              </div>
+              {adaptive.reasons.length > 0 && <p className="mt-1">{adaptive.reasons[0]}</p>}
+            </div>
+
+            {/* Multi-signal Context Strip */}
+            <div className="rounded border border-slate-200 bg-white p-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Multi-signal Context</span>
+                {signalsLoading && <span className="text-[11px] text-slate-500">Loading…</span>}
+              </div>
+              {signals && signals.length > 0 ? (
+                <div className="mt-1.5 grid grid-cols-1 gap-1">
+                  {signals.map((s) => (
+                    <div key={s.source} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-semibold capitalize text-slate-700">{s.labelEn}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${s.status === "available" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : s.status === "pending" ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-slate-100 text-slate-600"}`}>
+                        {s.status}
+                      </span>
+                    </div>
+                  ))}
+                  {signals.map((s) => (
+                    <p key={`${s.source}-sum`} className="text-[11px] text-slate-600">
+                      <span className="font-semibold">{s.labelEn}:</span> {s.summaryEn}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-1 text-xs text-slate-500">{signalsLoading ? "Fetching IMD / Sentinel / Bhuvan…" : "No GPS — external checks need location."}</p>
+              )}
+            </div>
           </div>
         </div>
       </div>

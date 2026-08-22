@@ -28,13 +28,19 @@ export async function GET(request: Request) {
     .from("web_claims")
     .select("*")
     .order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("reviewer claims query failed:", error.message);
+    return NextResponse.json({ error: "Request failed" }, { status: 500 });
+  }
   const claims = (claimRows || []) as WebClaimRow[];
   const ids = claims.map((claim) => claim.id);
   const imageRows: WebClaimImageRow[] = [];
   if (ids.length) {
     const imagesRes = await supabase.from("web_claim_images").select("*").in("claim_id", ids);
-    if (imagesRes.error) return NextResponse.json({ error: imagesRes.error.message }, { status: 500 });
+    if (imagesRes.error) {
+      console.error("reviewer images query failed:", imagesRes.error.message);
+      return NextResponse.json({ error: "Request failed" }, { status: 500 });
+    }
     imageRows.push(...((imagesRes.data || []) as WebClaimImageRow[]));
   }
   const grouped = new Map<string, ReturnType<typeof imageFromRow>[]>();
@@ -50,7 +56,10 @@ export async function GET(request: Request) {
     .select("*")
     .order("created_at", { ascending: false })
     .limit(200);
-  if (actionError) return NextResponse.json({ error: actionError.message }, { status: 500 });
+  if (actionError) {
+    console.error("reviewer actions query failed:", actionError.message);
+    return NextResponse.json({ error: "Request failed" }, { status: 500 });
+  }
   return NextResponse.json({
     overview: overviewFromClaims(mapped),
     markers: markersFromClaims(mapped),

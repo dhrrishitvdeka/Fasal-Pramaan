@@ -24,10 +24,12 @@ import {
 import { useFarmerData, ClaimStatus } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
 import { safeDisplayUrl } from "@/lib/media";
+import { CardSkeleton } from "@/components/LoadingAnimation";
+import ErrorMessage, { InlineError } from "@/components/ErrorMessage";
 import clsx from "clsx";
 
 export default function FarmerClaimsPage() {
-  const { lang, claims } = useFarmerData();
+  const { lang, claims, isLoading, persistError } = useFarmerData();
   const t = getFarmerT(lang);
 
   const [activeFilter, setActiveFilter] = useState<"all" | "under_review" | "needs_recapture" | "verified" | "draft">("all");
@@ -107,10 +109,29 @@ export default function FarmerClaimsPage() {
         </Link>
       </div>
 
-      {/* Search & Filter Controls */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        {/* Filter Tabs */}
-        <div className="fp-chip-row rounded-lg border border-slate-200 bg-slate-200/70 p-1">
+      {/* Search & Filter Controls — search full-width above chips, chips scroll horizontally on phone */}
+      <div className="space-y-3">
+        {/* Search Box */}
+        <div className="relative w-full md:max-w-md">
+          <label htmlFor="claims-search" className="sr-only">
+            {t.searchClaims}
+          </label>
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+            aria-hidden="true"
+          />
+          <input
+            id="claims-search"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t.searchClaims}
+            className="fp-input mt-0 min-h-11 w-full pl-9 text-xs"
+          />
+        </div>
+
+        {/* Filter chips — edge-to-edge horizontal scroll on phone, counts never squeeze labels */}
+        <div className="fp-chip-row -mx-3 w-auto gap-1.5 px-3 sm:-mx-4 sm:px-4 md:-mx-6 md:px-6">
           {filterTabs.map((tab) => {
             const isActive = activeFilter === tab.key;
             return (
@@ -118,22 +139,23 @@ export default function FarmerClaimsPage() {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveFilter(tab.key)}
+                aria-pressed={isActive}
                 className={clsx(
-                  "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold transition-all",
+                  "inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 text-xs font-bold transition-all md:min-h-0",
                   isActive
-                    ? "bg-white text-emerald-950 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)] shadow-xs"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900",
                 )}
               >
                 <span>{tab.label}</span>
                 <span
                   className={clsx(
-                    "rounded-full px-1.5 py-0.2 text-[10px] font-mono",
+                    "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-mono leading-none",
                     isActive
-                      ? "fp-badge-ok font-bold"
+                      ? "bg-white/25 text-inherit"
                       : tab.alert && tab.count > 0
                       ? "fp-badge-alert"
-                      : "bg-slate-300 text-slate-700"
+                      : "bg-slate-200 text-slate-700",
                   )}
                 >
                   {tab.count}
@@ -142,22 +164,16 @@ export default function FarmerClaimsPage() {
             );
           })}
         </div>
-
-        {/* Search Box */}
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t.searchClaims}
-            className="fp-input mt-0 w-full pl-9 text-xs"
-          />
-        </div>
       </div>
 
+      {persistError && (
+        <InlineError message={persistError} className="my-2" />
+      )}
+
       {/* Claims List Grid */}
-      {filteredClaims.length === 0 ? (
+      {isLoading ? (
+        <CardSkeleton count={3} className="space-y-4 !grid-cols-1" />
+      ) : filteredClaims.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center sm:p-12">
           <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
           <h3 className="text-sm font-bold text-slate-700">{t.noClaimsFound}</h3>
@@ -181,6 +197,11 @@ export default function FarmerClaimsPage() {
             const isVerified = claim.status === "verified";
             const isUnderReview = claim.status === "under_review" || claim.status === "submitted";
 
+            // Phone thumbnail anchor: first image with a display-safe URL
+            const firstImage =
+              claim.images.find((img) => Boolean(safeDisplayUrl(img.imageUrl))) ?? null;
+            const firstThumbUrl = firstImage ? safeDisplayUrl(firstImage.imageUrl) : null;
+
             return (
               <div
                 key={claim.id}
@@ -194,11 +215,40 @@ export default function FarmerClaimsPage() {
                 )}
               >
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  {/* Left info */}
-                  <div className="space-y-2 flex-1">
+                  <div className="flex min-w-0 gap-3 lg:contents">
+                  {/* First-image thumbnail — 64px phone anchor (desktop keeps the strip on the right) */}
+                  <div
+                    className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 lg:hidden"
+                    aria-hidden="true"
+                  >
+                    {firstThumbUrl ? (
+                      <img
+                        src={firstThumbUrl}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center text-slate-300">
+                        <Camera className="h-6 w-6" />
+                      </span>
+                    )}
+                    {firstImage && !firstImage.qualityPassed ? (
+                      <div className="absolute inset-0 flex items-center justify-center bg-red-900/60">
+                        <AlertCircle className="h-4 w-4 text-white" />
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* Left info — stacked meta */}
+                  <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="max-w-full truncate font-mono text-sm font-bold text-slate-900">
                         {claim.id}
+                      </span>
+                      {/* Peril Badge */}
+                      <span className="rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                        {String((claim as any).peril || "normal").replaceAll("_", " ")}
                       </span>
                       {/* Status Badge */}
                       <span
@@ -282,6 +332,7 @@ export default function FarmerClaimsPage() {
                         </span>
                       </div>
                     )}
+                  </div>
                   </div>
 
                   {/* Right side: 5-Angle Photo Thumbnails & Action Buttons */}

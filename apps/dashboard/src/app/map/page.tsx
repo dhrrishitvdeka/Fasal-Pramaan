@@ -4,10 +4,13 @@ import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import { mapMarkers, MapMarker } from "@/lib/api";
 import { useState } from "react";
+import { useRequireRole } from "@/lib/use-require-role";
+import AccessGate from "@/components/AccessGate";
 
 const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 
 export default function MapPage() {
+  const gate = useRequireRole(["reviewer", "administrator"]);
   const [status, setStatus] = useState("");
   const [severity, setSeverity] = useState("");
   const [crop, setCrop] = useState("");
@@ -30,7 +33,10 @@ export default function MapPage() {
       return mapMarkers(params);
     },
     refetchInterval: 15_000,
+    enabled: gate.status === "ok",
   });
+
+  if (gate.status !== "ok") return <AccessGate status={gate.status} />;
 
   return (
     <div className="space-y-4">

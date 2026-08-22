@@ -1,33 +1,26 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Camera, FileText, Calendar } from "lucide-react";
+import { Home, Camera, FileText, Calendar, Sprout } from "lucide-react";
 import { FarmerProvider, useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
+import { useOnlineStatus } from "@/lib/use-online-status";
 import FasalSaathiOverlay from "@/components/FasalSaathiOverlay";
+import OfflineBanner from "@/components/offline-banner";
 import { LanguageSelect } from "@/components/LanguageSelect";
+import { GitHubStarsBadge } from "@/components/GitHubStarsBadge";
 import clsx from "clsx";
 
 function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { lang, setLang, farmerProfile, claims } = useFarmerData();
+  const { lang, setLang, farmerProfile, claims, newRecaptureNotices } = useFarmerData();
   const t = getFarmerT(lang);
-  const [isOnline, setIsOnline] = useState(true);
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
+  const isOnline = useOnlineStatus();
 
   const pendingRecaptures = claims.filter((c) => c.status === "needs_recapture").length;
+  const hasNewRecaptureNotices = newRecaptureNotices.length > 0;
 
   const navItems = [
     {
@@ -37,16 +30,22 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
       icon: Home,
     },
     {
+      href: "/farmer/saathi",
+      label: lang === "hi" ? "साथी" : "Saathi",
+      icon: Sprout,
+      highlight: true,
+    },
+    {
       href: "/farmer/capture",
       label: t.newClaim,
       icon: Camera,
-      highlight: true,
     },
     {
       href: "/farmer/claims",
       label: t.claims,
       icon: FileText,
       badge: pendingRecaptures > 0 ? pendingRecaptures : undefined,
+      dot: hasNewRecaptureNotices,
     },
     {
       href: "/farmer/reminders",
@@ -57,6 +56,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
+      <OfflineBanner />
       <div className="border-b border-[var(--line)] bg-[var(--ink)] px-3 py-1 text-[11px] text-[var(--surface)] sm:px-4 sm:text-xs">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-2">
           <span className="min-w-0 truncate">
@@ -74,7 +74,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--surface)]">
+      <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--surface)]/95 backdrop-blur-md shadow-2xs">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-2 sm:px-4 sm:py-2.5 md:px-6">
           <Link href="/farmer" className="min-w-0">
             <div className="truncate text-sm tracking-tight text-[var(--ink)]">
@@ -108,7 +108,18 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
                   <Icon className="h-4 w-4" />
                   <span>{item.label}</span>
                   {item.badge ? (
-                    <span className="fp-badge-alert">{item.badge}</span>
+                    <span
+                      className={clsx(
+                        "relative fp-badge-alert",
+                        item.dot &&
+                          "ring-2 ring-amber-300 ring-offset-1",
+                      )}
+                    >
+                      {item.badge}
+                      {item.dot ? (
+                        <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
+                      ) : null}
+                    </span>
                   ) : null}
                 </Link>
               );
@@ -116,6 +127,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="fp-ui flex shrink-0 items-center gap-2">
+            <GitHubStarsBadge />
             <Link href="/farmer/help" className="hidden text-xs text-[var(--ink-muted)] hover:text-[var(--ink)] sm:inline">
               {t.help}
             </Link>
@@ -132,31 +144,58 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
       </main>
 
       <nav
-        className="fp-ui fixed bottom-0 left-0 right-0 z-40 grid grid-cols-4 border-t border-[var(--line)] bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fp-ui fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--line)] bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] md:hidden"
         aria-label="Farmer navigation"
       >
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = item.exact
-            ? pathname === item.href
-            : pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={clsx(
-                "relative flex min-h-12 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] leading-tight",
-                isActive ? "text-[var(--ink)]" : "text-[var(--ink-muted)]",
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              <span className="max-w-full truncate px-1">{item.label}</span>
-              {item.badge ? (
-                <span className="absolute right-2 top-1 fp-badge-alert">{item.badge}</span>
-              ) : null}
-            </Link>
-          );
-        })}
+        <div className="grid grid-cols-5 gap-0.5 px-1 pt-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = item.exact
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? "page" : undefined}
+                aria-label={
+                  item.highlight && lang === "hi" ? `${item.label} — AI सहायक` : undefined
+                }
+                className={clsx(
+                  "relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[10px] leading-tight transition-colors",
+                  isActive
+                    ? "bg-[var(--ink)] text-[var(--surface)]"
+                    : "text-[var(--ink-muted)] hover:text-[var(--ink)]",
+                )}
+              >
+                <span className="relative inline-flex">
+                  <Icon className="h-4 w-4" />
+                  {item.highlight ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-500 ring-2 ring-[var(--surface)]"
+                    />
+                  ) : null}
+                </span>
+                <span className="max-w-full truncate px-0.5">{item.label}</span>
+                {item.badge ? (
+                  <span
+                    className={clsx(
+                      "absolute right-1 top-1 fp-badge-alert",
+                      isActive && "bg-amber-400 text-slate-900 ring-2 ring-[var(--surface)]",
+                      !isActive && item.dot && "ring-2 ring-amber-300 ring-offset-1",
+                    )}
+                  >
+                    {item.badge}
+                    {item.dot && !isActive ? (
+                      <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
+                    ) : null}
+                  </span>
+                ) : null}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
       <FasalSaathiOverlay />

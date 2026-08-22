@@ -22,11 +22,6 @@ export type VoiceSessionErr = {
 
 export type VoiceSessionResult = VoiceSessionOk | VoiceSessionErr;
 
-export function voiceAssistantEnabled(): boolean {
-  const flag = (process.env.VOICE_ASSISTANT_ENABLED || "").trim().toLowerCase();
-  return flag === "true" || flag === "1" || flag === "yes";
-}
-
 export function geminiApiKey(): string {
   return (process.env.GEMINI_API_KEY || "").trim();
 }
@@ -81,13 +76,6 @@ export function buildAuthTokenRequest(now = new Date()): {
       },
     },
   };
-}
-
-export function redactVoiceError(text: string): string {
-  return text
-    .replace(/GEMINI_API_KEY\s*=\s*\S+/gi, "GEMINI_API_KEY=[redacted]")
-    .replace(/SITE_LOCK_PASSWORD\s*=\s*\S+/gi, "SITE_LOCK_PASSWORD=[redacted]")
-    .replace(/AIza[0-9A-Za-z_\-]{20,}/g, "[redacted-key]");
 }
 
 export async function mintVoiceSession(input: {

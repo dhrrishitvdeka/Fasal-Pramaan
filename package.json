@@ -1,10 +1,13 @@
 {
   "name": "fasal-pramaan",
   "private": true,
-  "description": "Monorepo. The Next.js app is apps/dashboard. Set the Vercel Root Directory to apps/dashboard.",
+  "description": "Fasal-Pramaan webapp. The Next.js app lives in apps/dashboard — keep the Vercel Root Directory set to apps/dashboard.",
   "scripts": {
     "dev": "npm run dev --prefix apps/dashboard",
     "build": "npm ci --prefix apps/dashboard && npm run build --prefix apps/dashboard",
-    "start": "npm run start --prefix apps/dashboard"
+    "start": "npm run start --prefix apps/dashboard",
+    "lint": "npm run lint --prefix apps/dashboard",
+    "typecheck": "npm run typecheck --prefix apps/dashboard",
+    "test": "npm test --prefix apps/dashboard"
   }
 }

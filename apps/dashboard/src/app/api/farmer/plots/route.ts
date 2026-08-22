@@ -46,7 +46,10 @@ export async function POST(request: Request) {
     created_by: auth.actor.userId,
   };
   const inserted = await supabase.from("web_plots").insert(row).select("*").single();
-  if (inserted.error) return NextResponse.json({ error: inserted.error.message }, { status: 500 });
+  if (inserted.error) {
+    console.error("plot insert failed:", inserted.error.message);
+    return NextResponse.json({ error: "Request failed" }, { status: 500 });
+  }
 
   const milestones = buildDefaultMilestones({
     plotId,
@@ -56,7 +59,10 @@ export async function POST(request: Request) {
     createdBy: auth.actor.userId,
   });
   const seeded = await supabase.from("web_milestones").insert(milestones);
-  if (seeded.error) return NextResponse.json({ error: seeded.error.message }, { status: 500 });
+  if (seeded.error) {
+    console.error("milestone seed failed:", seeded.error.message);
+    return NextResponse.json({ error: "Request failed" }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, plotId, milestoneCount: milestones.length });
 }

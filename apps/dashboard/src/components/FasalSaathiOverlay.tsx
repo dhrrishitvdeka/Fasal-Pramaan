@@ -229,6 +229,11 @@ export default function FasalSaathiOverlay() {
         if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
         return a.dueDate.localeCompare(b.dueDate);
       })[0];
+    const intent = webCaptureBridge.getIntent();
+    const cv = webCaptureBridge.getCvResult() as
+      | { hintCode?: string; hintEn?: string; hintHi?: string; greenPct?: number; luma?: number | null }
+      | null;
+    const signals = webCaptureBridge.getContextSignals() as Array<{ source: string; status: string; labelEn: string; summaryEn: string }> | null;
     const payload = {
       type: "portal_context",
       reason,
@@ -246,6 +251,19 @@ export default function FasalSaathiOverlay() {
             due: nextReminder.dueDate,
             overdue: nextReminder.isOverdue,
           }
+        : null,
+      active_intent: intent
+        ? {
+            id: intent.id,
+            peril: intent.peril,
+            crop: intent.crop || null,
+            village: intent.village || null,
+            required_angles_note: "see request_evidence_angles tool",
+          }
+        : null,
+      live_cv: cv ? { hint_code: cv.hintCode, hint_en: cv.hintEn, green_pct: cv.greenPct, luma: cv.luma } : null,
+      context_signals: signals
+        ? signals.map((s) => ({ source: s.source, status: s.status, label: s.labelEn }))
         : null,
     };
     const text = `PORTAL CONTEXT (internal; do not read aloud unless asked):\n${JSON.stringify(payload)}`;
@@ -403,6 +421,11 @@ export default function FasalSaathiOverlay() {
                   return copy;
                 });
               }
+              if (item.type === "interrupted") {
+                if (audioCtxRef.current) {
+                  playTimeRef.current = audioCtxRef.current.currentTime;
+                }
+              }
               if (item.type === "audio") playPcm24k(item.bytesBase64);
               if (item.type === "toolCalls") void handleTools(item.calls);
               if (item.type === "turnComplete") {
@@ -473,7 +496,9 @@ export default function FasalSaathiOverlay() {
         });
         socket.send(
           JSON.stringify({
-            realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: btoa(binary) } },
+            realtimeInput: {
+              mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: btoa(binary) }],
+            },
           }),
         );
       };

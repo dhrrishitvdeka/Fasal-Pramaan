@@ -2,9 +2,7 @@ import axios from "axios";
 import { apiFetch } from "./auth-headers";
 import { resolveClaimClientPath } from "./claim-routes";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
-import { emptyOverview, type ReviewActionPayload } from "./web-db";
-
-export { resolveClaimClientPath } from "./claim-routes";
+import { emptyOverview, type PerilAnalytics, type ReviewActionPayload } from "./web-db";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/backend";
 
@@ -147,6 +145,10 @@ export type Overview = {
   recapture_rate?: number;
   evidence_resolution_rate?: number;
   avg_confidence_improvement?: number;
+  most_affected_peril?: string | null;
+  peril_counts?: Record<string, number>;
+  authenticity_rejects?: number;
+  analytics_by_peril?: PerilAnalytics[];
 };
 
 export type MapMarker = {
@@ -299,6 +301,12 @@ export type Submission = {
   severity?: string | null;
   final_severity?: string | null;
   final_assessment_notes?: string | null;
+  peril?: string | null;
+  intent_id?: string | null;
+  gate_result?: unknown;
+  context_signals?: unknown;
+  contextSignals?: unknown;
+  adaptive_result?: unknown;
   images: Array<{
     id: string;
     angle_type: string;
@@ -408,6 +416,11 @@ export async function submitWebClaim(input: {
   captureLon?: number | null;
   captureAccuracyM?: number | null;
   gpsStatus?: string | null;
+  peril?: string;
+  intentId?: string;
+  plotLat?: number | null;
+  plotLon?: number | null;
+  sowingDate?: string | null;
   images: Array<{
     angleType: string;
     imageDataUrl: string;
@@ -418,7 +431,7 @@ export async function submitWebClaim(input: {
     lightingScore?: number | null;
     qualityPassed?: boolean | null;
   }>;
-}): Promise<{ claimId: string }> {
+}): Promise<{ claimId: string; gate?: unknown; context?: unknown }> {
   if (!isSupabaseConfigured()) {
     throw new Error("Supabase is not configured");
   }
@@ -454,6 +467,7 @@ async function reviewerStats(): Promise<{
     byCategory: Array<{ category: string; count: number }>;
     bySeverity: Array<{ severity: string; count: number }>;
     byCrop: Array<{ crop_name: string; count: number }>;
+    byPeril?: PerilAnalytics[];
   };
   actions: Array<{
     id: string;
@@ -473,7 +487,8 @@ async function reviewerStats(): Promise<{
 export async function overviewStats(): Promise<Overview> {
   if (isSupabaseConfigured()) {
     const stats = await reviewerStats();
-    return stats?.overview || emptyOverview();
+    if (!stats?.overview) return emptyOverview();
+    return { ...stats.overview, analytics_by_peril: stats.analytics?.byPeril };
   }
   if (hasRealApiSession()) {
     return (await api.get<Overview>("/dashboard/overview")).data;
