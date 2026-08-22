@@ -2,6 +2,38 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] — 2026-08-22
+
+### Computer Vision & Real-Time Evidence
+- **Pure Real-Time Camera Capture Enforcement**:
+  - Completely removed file upload fallbacks (`<input type="file" />`) from the Capture Studio to ensure anti-spoofing and anti-tamper compliance.
+  - All agricultural damage evidence photos must be captured strictly in real-time through the live camera stream with authentic GPS coordinates and timestamping.
+- **Upgraded Multi-Spectral Open CV & Usability Model**:
+  - **Multi-Spectral Canopy Segmentation**: Implemented Excess Green Index ($ExG = 2g - r - b$) for lush vegetative foliage, Excess Red / Golden Crop Index for ripe wheat and mature crops, and charred matter detection for fire damage.
+  - **2D Spatial Gradient & Laplacian Blur Filter**: Computes horizontal and vertical luminance gradient variance across adjacent pixels to detect motion blur and out-of-focus capture.
+  - **Photometric Exposure Validation**: Evaluates true luminance to detect underexposed environments (`too_dark`, blocking shutter) and extreme solar glare (`too_bright`).
+  - Off-thread Web Worker processing (`cv-worker.ts`) with real-time contour bounding box overlays.
+
+### Voice & Multimodal AI
+- **Resilient Dual-Engine Voice Architecture**:
+  - **Primary Engine**: Google Gemini Live 2.0 with 16kHz PCM duplex bidirectional audio streaming over WebSockets and autonomous function calling.
+  - **Fallback Engine**: Seamless transition to Web Speech Recognition (`SpeechRecognition` / `webkitSpeechRecognition`) with server-side Gemini 2.0 Flash peril intelligence (`classify_claim`) and Web SpeechSynthesis TTS audio playback.
+  - Model resolution defaulted to `gemini-2.0-flash-exp` for universal Google AI Studio API key compatibility.
+
+### Reviewer Operations & System Health
+- **Live Multi-Service Telemetry Dashboard (`/health`)**:
+  - Upgraded `/api/health` with concurrent, live roundtrip latency measurements (`latencyMs`) across Next.js Gateway, Supabase Postgres & Storage, Hugging Face ML Inference Space (DINOv2), Gemini Multimodal AI, IMD Open-Meteo weather telemetry, and Copernicus Sentinel-2 satellite engine.
+  - Redesigned `/health` reviewer UI with operational status badges, "Ping All Services" trigger, configurable auto-refresh, KPI metric cards, and collapsible raw JSON diagnostics logs.
+
+### UI / UX
+- **Farmer Portal Desktop Navbar Redesign**:
+  - Expanded layout width to `max-w-7xl` with responsive padding (`px-4 sm:px-6 lg:px-8`).
+  - Unified segmented tab pills with `whitespace-nowrap` text wrapping protection.
+  - Integrated branding badge, `HelpCircle` button, and farmer avatar chip.
+  - Isolated GitHub star badge strictly to the landing page.
+
+---
+
 ## [2.1.0] — 2026-08-22
 
 ### Core Engine & Architecture
