@@ -11,9 +11,19 @@ export default function PwaRegister() {
     if (process.env.NODE_ENV !== "production") return;
     if (!("serviceWorker" in navigator)) return;
     const register = () => {
-      navigator.serviceWorker.register("/sw.js").catch((error) => {
-        console.warn("[pwa] service worker registration failed:", error);
-      });
+      try {
+        navigator.serviceWorker.register("/sw.js").catch((error) => {
+          // Gracefully suppress SecurityError / insecure DOMException thrown in private browsing or restricted browser contexts
+          const msg = error instanceof Error ? error.message : String(error);
+          const name = (error as { name?: string })?.name;
+          if (name === "SecurityError" || /insecure|security/i.test(msg)) {
+            return;
+          }
+          console.warn("[pwa] service worker registration failed:", error);
+        });
+      } catch {
+        // Suppress synchronous browser security access errors
+      }
     };
     if (document.readyState === "complete") {
       register();
