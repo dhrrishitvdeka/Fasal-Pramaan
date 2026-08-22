@@ -9,6 +9,8 @@ import { buildRecaptureSubmitInput, computeEvidencePreview } from "./claim-pipel
 import { diffNewRecaptures, markSeen, type RecaptureNotice } from "./farmer-notifications";
 import { isSupabaseConfigured } from "./supabase";
 import { EMPTY_FARMER_PROFILE } from "./web-db";
+import { buildDefaultMilestones } from "./growth-stages";
+import { sanitizeMojibake } from "./name-sanitizer";
 import type { ClaimIntent, Peril } from "./claim-routing";
 import { INTENT_STORAGE_KEY } from "./claim-routing";
 
@@ -17,7 +19,13 @@ export interface FarmerPlot {
   name: string;
   nameHi: string;
   khasraNumber: string;
+  khataNumber?: string;
+  hissaNumber?: string;
+  tehsil?: string;
+  ownershipType?: "owner" | "tenant" | "sharecropper" | string;
+  season?: "Kharif" | "Rabi" | "Zaid" | string;
   areaHectares: number;
+  areaKattha?: number;
   cropType: string;
   cropTypeHi: string;
   cropVariety: string;
@@ -282,12 +290,30 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<FarmerLang>(() => {
     if (typeof window === "undefined") return "hi";
     try {
-      return persistAppLang(localStorage.getItem(STORAGE_KEY_LANG), "hi");
+      const stored = localStorage.getItem("fasal_lang") || localStorage.getItem(STORAGE_KEY_LANG);
+      return persistAppLang(stored, "hi");
     } catch {
       // ignore
     }
     return "hi";
   });
+
+  useEffect(() => {
+    const handleSync = (e: Event) => {
+      const custom = e as CustomEvent<string>;
+      const next = parseAppLang(custom.detail || localStorage.getItem("fasal_lang") || localStorage.getItem(STORAGE_KEY_LANG));
+      if (next && next !== lang) {
+        setLangState(next);
+      }
+    };
+
+    window.addEventListener("fasal:lang-change", handleSync);
+    window.addEventListener("storage", handleSync);
+    return () => {
+      window.removeEventListener("fasal:lang-change", handleSync);
+      window.removeEventListener("storage", handleSync);
+    };
+  }, [lang]);
   const [plots, setPlots] = useState<FarmerPlot[]>([]);
   const [claims, setClaims] = useState<FarmerClaim[]>([]);
   const [milestones, setMilestones] = useState<GrowthTimelineMilestone[]>([]);
@@ -313,14 +339,24 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         setPlots(body.plots || []);
         setClaims(body.claims || []);
         setMilestones(body.milestones || []);
-        setFarmerProfile(body.profile || { ...EMPTY_FARMER_PROFILE });
+        const rawProf = body.profile || { ...EMPTY_FARMER_PROFILE };
+        setFarmerProfile({
+          ...EMPTY_FARMER_PROFILE,
+          ...rawProf,
+          name: sanitizeMojibake(rawProf.name, "Farmer"),
+          nameHi: sanitizeMojibake(rawProf.nameHi, ""),
+        });
       } else {
-        const items = await listWebClaims();
+        const items = await listWebClaims().catch(() => []);
         setClaims(items.map(submissionToClaim));
       }
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load claims");
+      if (!isSupabaseConfigured()) {
+        setError(null);
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to load claims");
+      }
     } finally {
       setLoading(false);
     }
@@ -346,6 +382,8 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     setLangState(next);
     try {
       localStorage.setItem(STORAGE_KEY_LANG, next);
+      localStorage.setItem("fasal_lang", next);
+      window.dispatchEvent(new CustomEvent("fasal:lang-change", { detail: next }));
     } catch {
       // ignore
     }
@@ -353,6 +391,28 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
 
   const addPlot = (plot: FarmerPlot) => {
     setPlots((prev) => [plot, ...prev.filter((p) => p.id !== plot.id)]);
+    setMilestones((prev) => {
+      if (prev.some((m) => m.plotId === plot.id)) return prev;
+      const defaults = buildDefaultMilestones({
+        plotId: plot.id,
+        cropName: plot.cropType,
+        cropNameHi: plot.cropTypeHi || plot.cropType,
+        sowingDate: plot.sowingDate,
+        createdBy: "local",
+      }).map((m) => ({
+        id: m.id,
+        plotId: m.plot_id,
+        cropName: m.crop_name,
+        cropNameHi: m.crop_name_hi,
+        stageName: m.stage_name,
+        stageNameHi: m.stage_name_hi,
+        dayNumber: m.day_number,
+        dueDate: m.due_date,
+        completed: m.completed,
+        isOverdue: m.is_overdue,
+      }));
+      return [...prev, ...defaults];
+    });
   };
 
   const setActiveIntent = (intent: ClaimIntent | null) => {

@@ -1,4 +1,4 @@
-﻿import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "./supabase";
 import { isRealSha256 } from "./evidence";
 import { HF_MODEL_ID } from "./hf-model";
@@ -24,6 +24,11 @@ export interface WebPlotRow {
   name: string | null;
   name_hi: string | null;
   khasra_number: string | null;
+  khata_number?: string | null;
+  hissa_number?: string | null;
+  tehsil?: string | null;
+  ownership_type?: string | null;
+  season?: string | null;
   area_hectares: number | null;
   crop_type: string | null;
   crop_type_hi: string | null;
@@ -163,7 +168,7 @@ export const EMPTY_AI_PREDICTION: ClaimAiPrediction = {
 
 export const EMPTY_FARMER_PROFILE = {
   name: "Farmer",
-  nameHi: "à¤•à¤¿à¤¸à¤¾à¤¨",
+  nameHi: "",
   kisanId: "",
   phone: "",
   village: "",
@@ -199,12 +204,20 @@ function asSeverityGrade(value: string | null | undefined): ClaimAiPrediction["s
 }
 
 export function plotFromRow(row: WebPlotRow): FarmerPlot {
+  const hectares = row.area_hectares ?? 0;
+  const kattha = Number((hectares / 0.01265).toFixed(2));
   return {
     id: row.id,
     name: row.name || "",
     nameHi: row.name_hi || "",
     khasraNumber: row.khasra_number || "",
-    areaHectares: row.area_hectares ?? 0,
+    khataNumber: row.khata_number || "",
+    hissaNumber: row.hissa_number || "",
+    tehsil: row.tehsil || "",
+    ownershipType: row.ownership_type || "owner",
+    season: row.season || "Rabi",
+    areaHectares: hectares,
+    areaKattha: kattha,
     cropType: row.crop_type || "",
     cropTypeHi: row.crop_type_hi || "",
     cropVariety: row.crop_variety || "",
