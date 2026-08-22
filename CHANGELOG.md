@@ -2,6 +2,28 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] — 2026-08-22
+
+### Autonomous Fasal Saathi Agent & Agentic Webapp Control
+- **Full Autonomous Agent Tool Suite**:
+  - Implemented complete agentic function calling for Fasal Saathi: `take_photo`, `switch_camera`, `select_angle`, `retake_angle`, `set_observation`, `submit_claim`, `check_evidence_quality`, `read_capture_guidance`, and `read_capture_progress`.
+  - Unified `WebCaptureBridge` and `WebVoiceBroker` with bidirectional event synchronization, allowing full hands-free voice orchestration in 15 Indian languages.
+
+### Comprehensive Image & Environmental Metadata Bundling
+- **Rich Sensory & Agronomic Evidence Capture**:
+  - Automatically captures and binds high-precision GPS (`lat`, `lon`, `accuracyM`), camera facing mode (`environment` vs `user`), image resolution (`width x height`), ISO 8601 timestamps, edge agronomic scores (ExG/GLI/ExR canopy %, luma, 2D Laplacian sharpness), and client-side SHA-256 cryptographic hashes on every shutter click.
+  - Passes complete metadata payloads across the client, backend API routes (`/api/vision/gate`, `/api/claims`), and database persistence.
+
+### Sequential Verification Pipeline (Gemini Multimodal Gate → Hugging Face Model)
+- **Stage 1 (Gemini Multimodal & Context Gate)**:
+  - Multimodal verification prompt evaluates raw image bytes + comprehensive metadata + spatial/environmental context.
+  - Cross-verifies peril congruence (e.g. fire charred ash, flood inundation, hailstorm shredding, lodging flattening, drought chlorosis), rejects AI-generated images, screen captures, printed photos, and non-field artifacts.
+- **Stage 2 (Hugging Face DINOv2 Foundation Model)**:
+  - Strict sequential pipeline ensures only verified authentic evidence is dispatched to the Hugging Face Space (`dhrrishitvdeka/fasal-pramaan-api`, DINOv2 ViT-S/14).
+  - Unverified / fraudulent photos are rejected early, preventing quota waste and generating clear farmer guidance.
+
+---
+
 ## [2.3.0] — 2026-08-22
 
 ### Multi-Spectral Agricultural Computer Vision & Viewfinder
