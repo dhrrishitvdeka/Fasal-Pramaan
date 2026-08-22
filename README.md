@@ -179,26 +179,7 @@ Locally the app runs at `http://localhost:3000`. On Vercel it runs at your proje
 
 **Repository architecture:** one deployable Next.js webapp (`apps/dashboard`) + Supabase backend + HF Space — see [docs/architecture.md](docs/architecture.md) for the full system architecture, boundary models, and component contracts.
 
-## Quickstart Guide
-
-### Option A — Local development
-
-```bash
-git clone https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
-cd Fasal-Pramaan/apps/dashboard
-npm install
-cp .env.example .env.local   # fill in your Supabase URL/keys
-npm run dev                  # http://localhost:3000
-```
-
-(From the repository root you can also use `npm run dev`, which proxies into `apps/dashboard`.)
-
-### Option B — Vercel deploy
-
-1. Push this repo to GitHub and import it into Vercel.
-2. Framework preset: **Next.js**. Set **Root Directory** to `apps/dashboard` (Settings → General). That is what makes Vercel find `next` in `apps/dashboard/package.json`.
-3. Add environment variables (see table below). Never commit their values.
-4. Deploy. Apply the Supabase SQL scripts from `scripts/` in your project's SQL editor first so the `web_*` tables, storage bucket, and RLS policies exist.
+---
 
 ## Environment Variables
 
