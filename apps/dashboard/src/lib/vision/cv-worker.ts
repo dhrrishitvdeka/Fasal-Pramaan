@@ -40,55 +40,59 @@ function clamp(n: number, lo: number, hi: number): number {
 }
 
 function hintFor(
-  scores: { greenPct: number; luma: number | null; blur: number | null },
+  scores: { totalCropPct: number; greenPct: number; luma: number | null; blur: number | null },
   angleId?: string,
 ): { code: CvHintCode; en: string; hi: string; block: boolean } {
-  const { greenPct, luma, blur } = scores;
-  if (luma != null && luma < 12)
+  const { totalCropPct, luma, blur } = scores;
+  if (luma != null && luma < 14)
     return {
       code: "too_dark",
       en: "Too dark — move to brighter light or turn on torch",
-      hi: "बहुत अँधेरा — तेज़ रोशनी में जाएँ",
+      hi: "बहुत अँधेरा — तेज़ रोशनी में जाएँ या टॉर्च चालू करें",
       block: true,
     };
   if (luma != null && luma > 92)
     return {
       code: "too_bright",
       en: "Too bright — avoid direct sun glare",
-      hi: "बहुत तेज़ रोशनी — धूप की चमक हटाएँ",
+      hi: "बहुत तेज़ रोशनी — सीधी धूप की चमक हटाएँ",
       block: false,
     };
-  if (blur != null && blur < 35)
-    return {
-      code: "hold_steady",
-      en: "Hold steady — image looks blurry",
-      hi: "स्थिर रखें — धुंधली लग रही है",
-      block: false,
-    };
-  // fire_burn peril relax – charred field may have low green; use relaxed threshold 8 vs 14
+  // fire_burn peril relax – charred field may have low green; use relaxed threshold 8 vs 12
   const isCloseup = angleId === "closeup_damage";
-  const isFireRelax = angleId === "fire_burn" || angleId === "wide_field" || (angleId != null && angleId.includes("fire"));
-  const greenThreshold = isCloseup || isFireRelax ? 8 : 14;
-  if (greenPct < greenThreshold) {
+  const isFireRelax =
+    angleId === "fire_burn" ||
+    angleId === "wide_field" ||
+    (angleId != null && angleId.includes("fire"));
+  const cropThreshold = isCloseup || isFireRelax ? 8 : 12;
+  if (totalCropPct < cropThreshold) {
     return {
       code: "crop_not_detected",
-      en: "Crop not in frame — move closer and center the crop",
-      hi: "फसल फ्रेम में नहीं — पास जाएँ और बीच में रखें",
+      en: "No crop in frame — center the crop or point directly at foliage",
+      hi: "फसल फ्रेम में नहीं — फसल को बीच में रखें या कैमरे को सीधे पत्तियों पर लाएँ",
       block: true,
     };
   }
-  if (greenPct > 78 && !isCloseup) {
+  if (blur != null && blur > 0 && blur < 20) {
+    return {
+      code: "hold_steady",
+      en: "Hold steady — camera is moving or blurry",
+      hi: "कैमरा स्थिर रखें — तस्वीर धुंधली आ रही है",
+      block: false,
+    };
+  }
+  if (totalCropPct > 88 && !isCloseup) {
     return {
       code: "too_close",
-      en: "Too close — step back to include field border",
-      hi: "बहुत पास — सीमा दिखाने को पीछे हटें",
+      en: "Too close — step back slightly to capture full area",
+      hi: "बहुत पास — सीमा दिखाने के लिए थोड़ा पीछे हटें",
       block: false,
     };
   }
   return {
     code: "ok",
-    en: "Good framing — ready to capture",
-    hi: "सही फ्रेम — कैप्चर के लिए तैयार",
+    en: "Good framing & focus — ready to capture",
+    hi: "सही फ्रेम और फोकस — कैप्चर के लिए तैयार",
     block: false,
   };
 }
@@ -432,17 +436,24 @@ function analyzeHeuristic(
 ): CvFrameResult {
   let sumLuma = 0;
   let greenPixels = 0;
+  let ripePixels = 0;
+  let charredPixels = 0;
   let total = 0;
-  let sum = 0;
-  let sumSq = 0;
   let minX = width;
   let minY = height;
   let maxX = -1;
   let maxY = -1;
+  let gradientSum = 0;
+  let gradientSumSq = 0;
+  let gradientCount = 0;
+
+  const isFireRelax =
+    angleId === "fire_burn" ||
+    angleId === "wide_field" ||
+    (angleId != null && angleId.includes("fire"));
 
   // data is RGBA flat; width*height pixels
   const pixelCount = width * height;
-  // Defensive: if data length mismatched, clamp total
   const len = Math.min(data.length, pixelCount * 4);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -451,40 +462,84 @@ function analyzeHeuristic(
       const r = data[idx];
       const g = data[idx + 1];
       const b = data[idx + 2];
-      const luma = (r + g + b) / 3;
+      const luma = 0.299 * r + 0.587 * g + 0.114 * b;
       sumLuma += luma;
-      sum += luma;
-      sumSq += luma * luma;
       total += 1;
-      const isGreen = g > 60 && g > r + 10 && g > b + 10;
-      if (isGreen) {
-        greenPixels += 1;
+
+      // 1. Green vegetative foliage (ExG / chromatic excess green)
+      const isGreen = g > 45 && (2 * g > r + b + 10 || (g > r + 6 && g > b + 6));
+      // 2. Ripe / golden / dry mature crop canopy (wheat heads, mustard, ripe paddy, dry straw)
+      const isRipe =
+        r > 75 && g > 65 && b < 140 && r >= g - 20 && r <= g + 70 && r + g > 2 * b + 15;
+      // 3. Charred / burn scar field matter (fire peril)
+      const isCharred =
+        isFireRelax &&
+        luma >= 8 &&
+        luma <= 45 &&
+        Math.abs(r - g) < 18 &&
+        Math.abs(g - b) < 18 &&
+        r < 75 &&
+        g < 75 &&
+        b < 75;
+
+      if (isGreen) greenPixels += 1;
+      if (isRipe) ripePixels += 1;
+      if (isCharred) charredPixels += 1;
+
+      if (isGreen || isRipe || isCharred) {
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
+      }
+
+      // 2D Spatial Edge Gradient for true Laplacian-like sharpness/blur estimation
+      if (x > 0 && y > 0 && x < width - 1 && y < height - 1) {
+        const rightLuma =
+          0.299 * data[idx + 4] + 0.587 * data[idx + 5] + 0.114 * data[idx + 6];
+        const downLuma =
+          0.299 * data[idx + width * 4] +
+          0.587 * data[idx + width * 4 + 1] +
+          0.114 * data[idx + width * 4 + 2];
+        const grad = Math.abs(rightLuma - luma) + Math.abs(downLuma - luma);
+        gradientSum += grad;
+        gradientSumSq += grad * grad;
+        gradientCount += 1;
       }
     }
   }
 
   const luma = total ? Math.round((sumLuma / total / 255) * 100) : null;
   const greenPct = forcedGreenPct != null ? forcedGreenPct : total ? Math.round((greenPixels / total) * 100) : 0;
-  const variance = total ? sumSq / total - (sum / total) * (sum / total) : 0;
-  // map variance 0..4000 to 0..100 – same as main thread: clamp(Math.round((variance / 40) * 10), 0, 100)
-  const blurScore = clamp(Math.round((variance / 40) * 10), 0, 100);
-  const hint = hintFor({ greenPct, luma, blur: blurScore }, angleId);
+  const ripePct = total ? Math.round((ripePixels / total) * 100) : 0;
+  const charredPct = total ? Math.round((charredPixels / total) * 100) : 0;
+
+  // Total canopy coverage: green + golden mature + charred
+  const totalCropPct = clamp(
+    Math.round(greenPct + ripePct * 0.85 + (isFireRelax ? charredPct : 0)),
+    0,
+    100,
+  );
+
+  const gradVar =
+    gradientCount > 0
+      ? gradientSumSq / gradientCount - Math.pow(gradientSum / gradientCount, 2)
+      : 0;
+  const blurScore = clamp(Math.round((Math.sqrt(Math.max(0, gradVar)) / 25) * 100), 0, 100);
+
+  const hint = hintFor({ totalCropPct, greenPct, luma, blur: blurScore }, angleId);
   const isCloseup = angleId === "closeup_damage";
-  const isFireRelax = angleId === "fire_burn" || angleId === "wide_field" || (angleId != null && angleId.includes("fire"));
-  const greenThreshold = isCloseup || isFireRelax ? 8 : 14;
-  // Union of signals: heuristic green OR pretrained MobileNet plant class
-  const heuristicGreenOk = greenPct >= greenThreshold && luma != null && luma >= 12;
+  const cropThreshold = isCloseup || isFireRelax ? 8 : 12;
+
+  // Union of signals: multi-spectral canopy coverage OR pretrained MobileNet plant class
+  const heuristicCanopyOk = totalCropPct >= cropThreshold && luma != null && luma >= 14;
   const modelSaysPlant = !!modelVerdict?.saysPlant;
-  const cropDetected = heuristicGreenOk || modelSaysPlant;
+  const cropDetected = heuristicCanopyOk || modelSaysPlant;
 
   let bbox: { x: number; y: number; w: number; h: number } | null = null;
   if (cropDetected) {
-    if (greenPixels > 0 && maxX >= 0) {
-      // contour of greenPixels → normalized bbox
+    if ((greenPixels > 0 || ripePixels > 0 || charredPixels > 0) && maxX >= minX) {
+      // contour of cropPixels → normalized bbox
       const x = minX / width;
       const y = minY / height;
       const w = (maxX - minX + 1) / width;
@@ -493,39 +548,20 @@ function analyzeHeuristic(
       bbox = {
         x: clamp(x, 0, 1),
         y: clamp(y, 0, 1),
-        w: clamp(w, 0, 1 - clamp(x, 0, 1)),
-        h: clamp(h, 0, 1 - clamp(y, 0, 1)),
+        w: clamp(w, 0.15, 1 - clamp(x, 0, 1)),
+        h: clamp(h, 0.15, 1 - clamp(y, 0, 1)),
       };
-      // tiny bbox (single pixel) may be noise – expand minimally to 0.08 if too small
-      if (bbox.w < 0.06 || bbox.h < 0.06) {
-        const cx = bbox.x + bbox.w / 2;
-        const cy = bbox.y + bbox.h / 2;
-        const expW = Math.max(bbox.w, 0.18);
-        const expH = Math.max(bbox.h, 0.18);
-        bbox = {
-          x: clamp(cx - expW / 2, 0, 1),
-          y: clamp(cy - expH / 2, 0, 1),
-          w: expW,
-          h: expH,
-        };
-        // re-clamp w/h to stay in bounds
-        bbox.w = clamp(bbox.w, 0, 1 - bbox.x);
-        bbox.h = clamp(bbox.h, 0, 1 - bbox.y);
-      }
     } else {
-      // Fallback centered 60% box if no green contour but still detected (rare)
+      // Fallback centered 60% box if no contour but still detected (rare)
       bbox = { x: 0.2, y: 0.2, w: 0.6, h: 0.6 };
     }
   }
 
-  // fire_burn peril relax – same placeholder as main: wide_field with low green still not blocks shutter
-  const isFire = angleId === "wide_field" && greenPct < 8;
-  // Union rule: never block the shutter if either signal says a crop is present
-  const shouldBlockShutter = hint.block && !isFire && !cropDetected;
+  const shouldBlockShutter = hint.block && !isFireRelax && !cropDetected;
 
   return {
     cropDetected,
-    greenPct,
+    greenPct: totalCropPct,
     luma,
     blurScore,
     hintCode: hint.code,
