@@ -262,15 +262,16 @@ export default function FarmerHomePage() {
       )}
 
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
-        <section className="fp-panel rounded-2xl p-4 sm:p-6 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Layers className="h-4 w-4 text-[var(--accent)]" />
-              {t.registeredPlots}
+        {/* Registered Farm Plots */}
+        <section className="fp-panel rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-4">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 min-w-0">
+              <Layers className="h-4 w-4 text-[var(--accent)] shrink-0" />
+              <span className="truncate">{t.registeredPlots}</span>
             </h2>
             <Link
               href="/farmer/reminders#register-plot"
-              className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 hover:underline"
+              className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-emerald-800 hover:underline"
             >
               <PlusCircle className="h-3.5 w-3.5" />
               <span>{lang === "hi" ? "नया खेत जोड़ें" : "+ Register Plot"}</span>
@@ -279,18 +280,18 @@ export default function FarmerHomePage() {
           {isLoading ? (
             <p className="text-xs text-slate-500">{t.loadingPlots}</p>
           ) : plots.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 p-6 sm:p-8 text-center">
+            <div className="rounded-xl border border-dashed border-slate-200 p-5 sm:p-8 text-center">
               <p className="text-sm font-semibold text-slate-700">{lang === "hi" ? "कोई पंजीकृत भूखंड नहीं" : "No registered plots"}</p>
-              <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+              <p className="mt-1.5 text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
                 {lang === "hi"
                   ? "आप बिना भूखंड रिकॉर्ड के भी नया दावा जमा कर सकते हैं।"
                   : "You can still file a claim without a stored plot record."}
               </p>
               <Link
                 href="/farmer/reminders#register-plot"
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 hover:underline"
+                className="mt-3.5 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 hover:underline"
               >
-                <PlusCircle className="h-3.5 w-3.5" />
+                <PlusCircle className="h-3.5 w-3.5 shrink-0" />
                 <span>{lang === "hi" ? "पहला भूखंड (कट्ठा) पंजीकृत करें" : "Register First Plot (in Kattha)"}</span>
               </Link>
             </div>
@@ -299,12 +300,12 @@ export default function FarmerHomePage() {
               {plots.map((plot) => {
                 const areaInfo = formatAreaDisplay(plot.areaHectares, true, lang);
                 return (
-                  <div key={plot.id} className="rounded-xl border border-slate-100 bg-slate-50/80 p-3.5 transition-all hover:bg-slate-100/70">
-                    <div className="flex flex-col items-start justify-between gap-2.5 sm:flex-row">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-slate-900">{lang === "hi" ? plot.nameHi || plot.name : plot.name}</span>
-                          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-900">
+                  <div key={plot.id} className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-3.5 transition-all hover:bg-slate-100/70 overflow-hidden">
+                    <div className="flex flex-col items-start justify-between gap-2.5 sm:flex-row sm:items-center">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-bold text-slate-900 truncate">{lang === "hi" ? plot.nameHi || plot.name : plot.name}</span>
+                          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-900 shrink-0">
                             {areaInfo.primary}
                           </span>
                         </div>
@@ -313,13 +314,13 @@ export default function FarmerHomePage() {
                           <span>{t.khasra}: <strong>{plot.khasraNumber || "—"}</strong></span>
                           <span>{lang === "hi" ? plot.cropTypeHi || plot.cropType : plot.cropType}</span>
                         </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
+                        <div className="text-[11px] text-slate-500 mt-0.5 truncate">
                           {areaInfo.secondary}
                         </div>
                         {(plot.village || plot.district || plot.tehsil) && (
-                          <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {[plot.village, plot.tehsil, plot.district, plot.state].filter(Boolean).join(", ")}
+                          <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1 truncate">
+                            <MapPin className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{[plot.village, plot.tehsil, plot.district, plot.state].filter(Boolean).join(", ")}</span>
                           </div>
                         )}
                       </div>
@@ -337,20 +338,21 @@ export default function FarmerHomePage() {
           )}
         </section>
 
-        <section className="fp-panel rounded-2xl p-4 sm:p-6 shadow-2xs">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <FileText className="h-4 w-4 text-[var(--accent)]" />
-              {t.activeClaims}
+        {/* Active Insurance Claims */}
+        <section className="fp-panel rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-4">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 min-w-0">
+              <FileText className="h-4 w-4 text-[var(--accent)] shrink-0" />
+              <span className="truncate">{t.activeClaims}</span>
             </h2>
-            <Link href="/farmer/claims" className="fp-link text-xs font-medium">
+            <Link href="/farmer/claims" className="fp-link text-xs font-semibold shrink-0">
               {t.viewAllClaims}
             </Link>
           </div>
           {isLoading ? (
             <p className="text-xs text-slate-500">{t.loadingClaims}</p>
           ) : claims.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 p-6 sm:p-8 text-center">
+            <div className="rounded-xl border border-dashed border-slate-200 p-5 sm:p-8 text-center">
               <p className="text-sm font-semibold text-slate-700">{t.noClaimsFound}</p>
               <Link
                 href="/farmer/saathi"
@@ -362,42 +364,76 @@ export default function FarmerHomePage() {
             </div>
           ) : (
             <div className="space-y-2.5">
-              {claims.slice(0, 5).map((claim) => (
-                <Link
-                  key={claim.id}
-                  href={`/farmer/claims/${claim.id}`}
-                  className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white/70 px-3.5 py-2.5 hover:bg-slate-50 shadow-2xs transition-all"
-                >
-                  <div className="min-w-0">
-                    <div className="text-xs font-mono font-bold text-slate-800 truncate">{claim.id}</div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
-                      {lang === "hi" ? claim.cropTypeHi || claim.cropType : claim.cropType} · {claim.status}
-                    </div>
-                  </div>
-                  <span
-                    className={clsx(
-                      "shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase",
-                      claim.status === "verified" && "fp-badge-ok",
-                      claim.status === "needs_recapture" && "bg-amber-100 text-amber-900",
-                      (claim.status === "under_review" || claim.status === "submitted") && "bg-blue-100 text-blue-800"
-                    )}
+              {claims.slice(0, 5).map((claim) => {
+                const isRecapture = claim.status === "needs_recapture";
+                const isVerified = claim.status === "verified";
+                const isUnderReview = claim.status === "under_review" || claim.status === "submitted";
+                const cropLabel =
+                  (lang === "hi" ? claim.cropTypeHi || claim.cropType : claim.cropType) ||
+                  (lang === "hi" ? "फसल दावा" : "Crop Claim");
+                const plotLabel = claim.plotName ? `${lang === "hi" ? claim.plotNameHi || claim.plotName : claim.plotName} · ` : "";
+                const dateLabel = claim.createdAt
+                  ? new Date(claim.createdAt).toLocaleDateString(lang === "hi" ? "hi-IN" : "en-IN", {
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : "";
+
+                const statusLabel = isVerified
+                  ? (lang === "hi" ? "सत्यापित" : "Verified")
+                  : isRecapture
+                    ? (lang === "hi" ? "पुनः फोटो" : "Recapture")
+                    : isUnderReview
+                      ? (lang === "hi" ? "समीक्षा जारी" : "Under Review")
+                      : (claim.status || "submitted").replaceAll("_", " ");
+
+                return (
+                  <Link
+                    key={claim.id}
+                    href={`/farmer/claims/${claim.id}`}
+                    className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white/90 px-3.5 py-2.5 hover:border-slate-300 hover:bg-slate-50 shadow-2xs transition-all overflow-hidden"
                   >
-                    {claim.status.replaceAll("_", " ")}
-                  </span>
-                </Link>
-              ))}
+                    <div className="min-w-0 flex-1 pr-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-mono font-bold text-slate-800 truncate" title={claim.id}>
+                          {claim.id.startsWith("claim-")
+                            ? `Claim #${claim.id.slice(6, 14)}`
+                            : claim.id.length > 18
+                              ? `${claim.id.slice(0, 16)}…`
+                              : claim.id}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                        {plotLabel}{cropLabel}{dateLabel ? ` · ${dateLabel}` : ""}
+                      </div>
+                    </div>
+                    <span
+                      className={clsx(
+                        "shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap",
+                        isVerified && "border border-emerald-300 bg-emerald-50 text-emerald-800",
+                        isRecapture && "border border-amber-300 bg-amber-50 text-amber-900",
+                        isUnderReview && "border border-blue-200 bg-blue-50 text-blue-800",
+                        claim.status === "draft" && "border border-slate-200 bg-slate-100 text-slate-700"
+                      )}
+                    >
+                      {statusLabel}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </section>
       </div>
 
-      <section className="fp-panel rounded-2xl p-4 sm:p-6 shadow-2xs">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-[var(--accent)]" />
-            {t.upcomingReminders}
+      {/* 30-Day Growth Reminders */}
+      <section className="fp-panel rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-4">
+          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 min-w-0">
+            <Clock className="h-4 w-4 text-[var(--accent)] shrink-0" />
+            <span className="truncate">{t.upcomingReminders}</span>
           </h2>
-          <Link href="/farmer/reminders" className="fp-link text-xs font-medium">
+          <Link href="/farmer/reminders" className="fp-link text-xs font-semibold shrink-0">
             {t.viewTimeline}
           </Link>
         </div>
@@ -408,8 +444,8 @@ export default function FarmerHomePage() {
         ) : (
           <ul className="space-y-2.5">
             {upcoming.map((m) => (
-              <li key={m.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50/80 px-3 py-2 text-xs">
-                <span className="min-w-0 font-medium text-slate-800">
+              <li key={m.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50/80 px-3 py-2 text-xs overflow-hidden">
+                <span className="min-w-0 flex-1 truncate font-medium text-slate-800">
                   {lang === "hi" ? m.stageNameHi || m.stageName : m.stageName}
                   {isMilestoneOverdue(m) ? (
                     <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">{t.overdueBadge}</span>
