@@ -77,6 +77,7 @@ export default function SaathiIntakePage() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
+  const speechRecRef = useRef<any>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -96,6 +97,20 @@ export default function SaathiIntakePage() {
 
   slotsRef.current = slots;
   langRef.current = lang;
+
+  const speakAloud = (text: string, currentLang: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = currentLang === "hi" ? "hi-IN" : "en-IN";
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn("speechSynthesis error:", err);
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -131,7 +146,12 @@ export default function SaathiIntakePage() {
     setMessages((m) => [...m, msg]);
     return msg;
   };
-  const pushSaathi = (msg: SaathiMessage) => setMessages((m) => [...m, msg]);
+  const pushSaathi = (msg: SaathiMessage, shouldSpeak = false) => {
+    setMessages((m) => [...m, msg]);
+    if (shouldSpeak || voiceMode || listening) {
+      speakAloud(msg.text, langRef.current);
+    }
+  };
   const pushSystemNote = (text: string) =>
     setMessages((m) => [...m, { id: `sys-${Date.now()}-${Math.random().toString(16).slice(2)}`, role: "saathi", text, at: new Date().toISOString() }]);
 
@@ -430,15 +450,11 @@ export default function SaathiIntakePage() {
 
   const handlersRef = useRef({ handleTools, processFinalSpokenTurn, failVoice });
   handlersRef.current = { handleTools, processFinalSpokenTurn, failVoice };
-
   const scheduleReconnect = () => {
     if (!mountedRef.current) return;
     if (retryCountRef.current >= 2) {
-      failVoice(
-        langRef.current === "hi"
-          ? "आवाज़ कनेक्शन बार-बार टूटा — टेक्स्ट मोड चालू है।"
-          : "Voice connection kept dropping — switched back to text.",
-      );
+      console.warn("Retries exhausted, falling back to Web Speech mode");
+      startWebSpeechMode();
       return;
     }
     retryCountRef.current += 1;
@@ -450,6 +466,80 @@ export default function SaathiIntakePage() {
     reconnectTimerRef.current = window.setTimeout(() => {
       void startVoiceCore();
     }, 1200 * retryCountRef.current);
+  };
+
+  const startWebSpeechMode = () => {
+    if (typeof window === "undefined") return;
+    if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
+      failVoice(
+        langRef.current === "hi"
+          ? "यह ब्राउज़र लाइव वॉइस इनपुट सपोर्ट नहीं करता। कृपया टेक्स्ट का उपयोग करें।"
+          : "Live voice input is not supported on this browser. Please type your message.",
+      );
+      return;
+    }
+    try {
+      const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const rec = new SpeechRec();
+      rec.lang = langRef.current === "hi" ? "hi-IN" : "en-IN";
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.maxAlternatives = 1;
+      rec.onstart = () => {
+        setLiveStatus("live");
+        setListening(true);
+        connectingRef.current = false;
+        pushSystemNote(
+          langRef.current === "hi"
+            ? "साथी सुन रहा है — अपनी फसल की समस्या बोलें।"
+            : "Saathi is listening — speak your crop issue naturally.",
+        );
+      };
+      rec.onresult = (e: any) => {
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
+          if (e.results[i].isFinal) {
+            const finalTranscript = (e.results[i][0]?.transcript || "").trim();
+            if (finalTranscript) {
+              upsertTranscript("farmer", finalTranscript);
+              void handleTextAutonomous(finalTranscript, "voice");
+            }
+          } else {
+            interim += e.results[i][0]?.transcript || "";
+          }
+        }
+        if (interim) {
+          upsertTranscript("farmer", interim);
+        }
+      };
+      rec.onerror = (e: any) => {
+        console.warn("Web Speech error:", e?.error);
+        if (e?.error === "not-allowed") {
+          failVoice(
+            langRef.current === "hi"
+              ? "माइक्रोफ़ोन अनुमति अस्वीकृत। ब्राउज़र में Allow दबाएँ।"
+              : "Microphone permission denied. Allow the mic in browser.",
+          );
+        }
+      };
+      rec.onend = () => {
+        if (voiceMode && mountedRef.current && !intentionalCloseRef.current) {
+          try {
+            rec.start();
+          } catch {
+            setListening(false);
+            setLiveStatus("idle");
+          }
+        } else {
+          setListening(false);
+          setLiveStatus("idle");
+        }
+      };
+      speechRecRef.current = rec;
+      rec.start();
+    } catch (err) {
+      failVoice(err instanceof Error ? err.message : "Speech recognition failed");
+    }
   };
 
   const startVoiceCore = async () => {
@@ -475,7 +565,9 @@ export default function SaathiIntakePage() {
         expiresAt?: string;
       };
       if (!minted.ok || !body.token || !body.websocketUrl) {
-        throw new Error(body.error || (minted.status === 401 ? "Sign in required for Voice Mode." : "Could not start voice session."));
+        console.warn("Gemini Live session unavailable, falling back to Web Speech:", body.error);
+        startWebSpeechMode();
+        return;
       }
 
       // Contextual injection before opening the Live session.
@@ -485,7 +577,7 @@ export default function SaathiIntakePage() {
       socketRef.current = socket;
 
       await new Promise<void>((resolve, reject) => {
-        const timer = window.setTimeout(() => reject(new Error("Voice connection timed out")), 30000);
+        const timer = window.setTimeout(() => reject(new Error("Voice connection timed out")), 15000);
         socket.onopen = () => {
           window.clearTimeout(timer);
           socket.send(
@@ -618,7 +710,8 @@ export default function SaathiIntakePage() {
       setLiveStatus("live");
     } catch (err) {
       connectingRef.current = false;
-      handlersRef.current.failVoice(err instanceof Error ? err.message : "Could not start Fasal Saathi voice.");
+      console.warn("Live audio WebSocket unavailable, falling back to Web Speech:", err);
+      startWebSpeechMode();
     }
   };
 

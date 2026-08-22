@@ -27,7 +27,7 @@ export function geminiApiKey(): string {
 }
 
 export function geminiLiveModel(): string {
-  return (process.env.GEMINI_LIVE_MODEL || "gemini-3.1-flash-live-preview").replace(
+  return (process.env.GEMINI_LIVE_MODEL || "gemini-2.0-flash-exp").replace(
     /^models\//,
     "",
   );
@@ -110,6 +110,8 @@ export async function mintVoiceSession(input: {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    console.error("Gemini Live auth_tokens failed:", response.status, errorText);
     return {
       ok: false,
       status: 503,
