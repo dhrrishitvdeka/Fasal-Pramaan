@@ -10,6 +10,7 @@ import { useOnlineStatus } from "@/lib/use-online-status";
 import FasalSaathiOverlay from "@/components/FasalSaathiOverlay";
 import OfflineBanner from "@/components/offline-banner";
 import { LanguageSelect } from "@/components/LanguageSelect";
+import { getFarmerNavLabel } from "@/lib/name-sanitizer";
 import clsx from "clsx";
 
 function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
@@ -108,7 +109,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className={clsx(
-                    "relative flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-150",
+                    "relative flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors duration-150 select-none",
                     isActive
                       ? "bg-[var(--ink)] text-white shadow-xs"
                       : item.highlight
@@ -144,18 +145,21 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
               <span>{t.help}</span>
             </Link>
 
-            <Link
-              href="/farmer/profile"
-              className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-colors shadow-2xs max-w-[13rem]"
-              title={farmerProfile.name}
-            >
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                {farmerProfile.name ? farmerProfile.name.charAt(0).toUpperCase() : "K"}
-              </div>
-              <span className="truncate">
-                {lang === "hi" ? farmerProfile.nameHi || farmerProfile.name : farmerProfile.name}
-              </span>
-            </Link>
+            {(() => {
+              const navLabel = getFarmerNavLabel(farmerProfile, lang);
+              return (
+                <Link
+                  href="/farmer/profile"
+                  className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-colors shadow-2xs max-w-[13rem]"
+                  title={navLabel.name}
+                >
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                    {navLabel.initial}
+                  </div>
+                  <span className="truncate">{navLabel.name}</span>
+                </Link>
+              );
+            })()}
 
             <LanguageSelect value={lang} onChange={setLang} />
           </div>

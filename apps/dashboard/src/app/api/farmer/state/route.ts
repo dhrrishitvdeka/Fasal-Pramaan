@@ -14,6 +14,7 @@ import {
   type WebProfileRow,
   EMPTY_FARMER_PROFILE,
 } from "@/lib/web-db";
+import { sanitizeMojibake } from "@/lib/name-sanitizer";
 
 export async function GET(request: Request) {
   const auth = await requireWebActor(request);
@@ -77,20 +78,25 @@ export async function GET(request: Request) {
   }
 
   const profile = profileRes.data as WebProfileRow | null;
+  const rawName = sanitizeMojibake(profile?.name || profile?.full_name || auth.actor.email || EMPTY_FARMER_PROFILE.name, "Farmer");
+  const isEmail = rawName.includes("@");
+  let rawNameHi = sanitizeMojibake(profile?.name_hi || profile?.full_name_hi || "", "");
+  if (isEmail || rawNameHi === "किसान") {
+    rawNameHi = "";
+  }
+
   return NextResponse.json({
     plots: ((plotsRes.data || []) as WebPlotRow[]).map(plotFromRow),
     claims: claims.map((row) => claimFromRow(row, grouped.get(row.id) || [])),
     milestones: ((milestonesRes.data || []) as WebMilestoneRow[]).map(milestoneFromRow),
-    profile: profile
-      ? {
-          name: profile.name || profile.full_name || EMPTY_FARMER_PROFILE.name,
-          nameHi: profile.name_hi || profile.full_name_hi || EMPTY_FARMER_PROFILE.nameHi,
-          kisanId: profile.kisan_id || "",
-          phone: profile.phone || "",
-          village: profile.village || "",
-          district: profile.district || "",
-          state: profile.state || "",
-        }
-      : { ...EMPTY_FARMER_PROFILE },
+    profile: {
+      name: rawName,
+      nameHi: rawNameHi,
+      kisanId: profile?.kisan_id || "",
+      phone: profile?.phone || "",
+      village: profile?.village || "",
+      district: profile?.district || "",
+      state: profile?.state || "",
+    },
   });
 }
