@@ -430,6 +430,11 @@ export async function submitWebClaim(input: {
     accuracyM?: number | null;
     lightingScore?: number | null;
     qualityPassed?: boolean | null;
+    blurScore?: number | null;
+    greenPct?: number | null;
+    facing?: string | null;
+    dimensions?: { width: number; height: number } | null;
+    capturedAt?: string | null;
   }>;
 }): Promise<{ claimId: string; gate?: unknown; context?: unknown }> {
   if (!isSupabaseConfigured()) {

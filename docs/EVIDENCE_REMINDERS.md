@@ -68,17 +68,17 @@ threshold = ROUTE_CONFIG[peril].minConfidence
 
 Only submissions achieving `adaptiveConfidence().level==="high"` (`proceed`) count toward due-date advancement; `Medium` keeps reminder open with targeted delta request, `Low` forces retake, preventing empty or unusable history.
 
-### 4.2 Realtime CV Heuristic (64×64 Pre-Shutter)
+### 4.2 Multi-Spectral Realtime CV & Usability Guidance
 
-**Source:** `apps/dashboard/src/lib/vision/realtime-cv.ts:1-182` — `src/lib/vision/realtime-cv.ts:56`
+**Source:** `apps/dashboard/src/lib/vision/realtime-cv.ts` and `apps/dashboard/src/lib/vision/cv-worker.ts`
 
-During scheduled capture the viewfinder samples a **64×64 canvas at 2-4 fps**:
+During scheduled capture the viewfinder samples frames in a Web Worker at 3-4 fps:
 
-* `luma = round(mean(R+G+B)/3 /255*100)` — `realtime-cv.ts:88` ; `greenPct = count(g>60 && g>r+10 && g>b+10)/total*100` — `realtime-cv.ts:86` ; `blurScore = clamp(variance/40*10,0,100)` — `realtime-cv.ts:90-92`
-* `hintFor()` (`realtime-cv.ts:35-50`): `luma<12→too_dark (block)`, `blur<35→hold_steady`, `greenPct<14 (8 if closeup_damage)→crop_not_detected (block)`, `>78→too_close` → bilingual EN/HI via `cvResultToSaathiHint()` (`realtime-cv.ts:179-182`)
-* `cropDetected = greenPct≥threshold && luma≥12` (`realtime-cv.ts:94`), `shouldBlockShutter = hint.block && !isFire` (`realtime-cv.ts:98-100`) — fire_burn allows low green charred fields.
-* Hints are bridged to **Fasal Saathi** voice (`apps/dashboard/src/lib/voice/capture-bridge.ts:22-62`) so farmers hear “फसल फ्रेम में नहीं — पास जाएँ” hands-free while positioning camera for the reminder.
-* Still-image re-check `analyzeDataUrl(dataUrl, angleId)` at 256 px stride 16 (`realtime-cv.ts:122-177`) populates `blur_score`/`lighting_score` → `qualityPassed` (`apps/dashboard/src/lib/evidence.ts:108-118`) which feeds `S_Quality`.
+* **Agronomic Chromatic Indices**: Computes Excess Green ($ExG = 2g_n - r_n - b_n$), Green Leaf Index (GLI), and Excess Red ($ExR = 1.4r_n - g_n$) across biological HSV bands to classify lush vegetative foliage, ripe golden grains (wheat/paddy), bright yellow blooms (mustard/canola), drought scorch, and fire burn scars.
+* **Organic Micro-Texture & Anti-Spoofing**: Evaluates 2D spatial Laplacian variance to reject flat synthetic surfaces (green plastic tarps, clothes, painted walls) with near-zero texture. Automatically filters atmospheric sky, asphalt/concrete, and human skin tones.
+* **Sensor-Only Field GPS Geo-Tagging**: Field coordinates are locked strictly to device hardware sensors (`navigator.geolocation`) without manual text overrides, ensuring authentic geo-spatial baseline tracking compliant with PMFBY regulations.
+* **Dynamic Camera Reticles & Glassmorphism HUD**: Renders autofocus corner reticles with color transitions (emerald when ready, amber when adjusting) and a floating translucent glass HUD chip with live pulse dot indicator and localized guidance.
+* Hints are bridged to **Fasal Saathi** voice (`apps/dashboard/src/lib/voice/capture-bridge.ts`) so farmers hear actionable voice guidance hands-free while positioning the camera for the reminder.
 
 Without this, historical reminders could drift with dark/duplicate frames; now a `crop_not_detected` reminder frame is blocked **before** shutter and never counts as a 5-angle completion.
 

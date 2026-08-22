@@ -1,13 +1,12 @@
 /**
- * CV Worker – off-main-thread 64x64 sampling + heuristic analysis.
- * Tries to load TF.js from CDN plus @tensorflow-models/mobilenet v2.1.1
- * (MobileNet v2, alpha 0.5 – weights auto-downloaded free from tfhub /
- * storage.googleapis.com) for real pretrained plant/crop classification;
- * falls back cleanly to heuristic-only if TF.js/model unavailable (offline,
- * CSP block, load failure) – never throws, logs at most once.
- * Returns the same CvFrameResult shape as realtime-cv.ts but computes bbox
- * via contour of greenPixels (min/max x/y of green pixels → normalized bbox).
- * Variance → blurScore mapping matches main thread.
+ * CV Worker – Off-main-thread Multi-Spectral Agricultural Vision & Usability Analyzer.
+ *
+ * Implements:
+ * 1. Multi-spectral agronomic color indices (ExG, GLI, VARI, ExR, HSV biological bands).
+ * 2. Organic micro-texture & spatial gradient analysis to reject synthetic green plastics, clothes, and walls.
+ * 3. 2D Modified Laplacian sharpness / blur assessment.
+ * 4. Pretrained MobileNet v2 classification on offscreen canvas.
+ * 5. Bounding box computation from canopy contour.
  */
 
 export type CvHintCode =
@@ -39,33 +38,78 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
+/**
+ * Fast RGB to HSV normalized conversion.
+ */
+function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  const v = max / 255;
+  const s = max === 0 ? 0 : d / max;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) {
+      h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+    } else if (max === g) {
+      h = ((b - r) / d + 2) * 60;
+    } else {
+      h = ((r - g) / d + 4) * 60;
+    }
+  }
+  return [h, s, v];
+}
+
 function hintFor(
-  scores: { totalCropPct: number; greenPct: number; luma: number | null; blur: number | null },
+  scores: {
+    totalCanopyPct: number;
+    vegetativePct: number;
+    luma: number | null;
+    blur: number | null;
+    glareRatio: number;
+    syntheticRatio: number;
+  },
   angleId?: string,
 ): { code: CvHintCode; en: string; hi: string; block: boolean } {
-  const { totalCropPct, luma, blur } = scores;
-  if (luma != null && luma < 14)
+  const { totalCanopyPct, luma, blur, glareRatio, syntheticRatio } = scores;
+
+  if (luma != null && luma < 14) {
     return {
       code: "too_dark",
-      en: "Too dark — move to brighter light or turn on torch",
+      en: "Too dark — move into brighter light or turn on torch",
       hi: "बहुत अँधेरा — तेज़ रोशनी में जाएँ या टॉर्च चालू करें",
       block: true,
     };
-  if (luma != null && luma > 92)
+  }
+
+  if ((luma != null && luma > 90) || glareRatio > 0.28) {
     return {
       code: "too_bright",
-      en: "Too bright — avoid direct sun glare",
-      hi: "बहुत तेज़ रोशनी — सीधी धूप की चमक हटाएँ",
+      en: "Too bright — avoid direct solar glare and lens reflection",
+      hi: "बहुत तेज़ रोशनी — सीधी धूप की चमक और लेंस रिफ्लेक्शन से बचें",
       block: false,
     };
-  // fire_burn peril relax – charred field may have low green; use relaxed threshold 8 vs 12
+  }
+
   const isCloseup = angleId === "closeup_damage";
   const isFireRelax =
     angleId === "fire_burn" ||
     angleId === "wide_field" ||
     (angleId != null && angleId.includes("fire"));
-  const cropThreshold = isCloseup || isFireRelax ? 8 : 12;
-  if (totalCropPct < cropThreshold) {
+
+  const minCanopyThreshold = isCloseup ? 15 : isFireRelax ? 8 : 12;
+
+  // Synthetic surface rejection
+  if (syntheticRatio > 0.40 && totalCanopyPct < 25) {
+    return {
+      code: "crop_not_detected",
+      en: "Non-crop surface detected — aim directly at natural field crops",
+      hi: "फसल नहीं पहचानी गई — कैमरे को प्राकृतिक फसल व पत्तियों पर लाएँ",
+      block: true,
+    };
+  }
+
+  if (totalCanopyPct < minCanopyThreshold) {
     return {
       code: "crop_not_detected",
       en: "No crop in frame — center the crop or point directly at foliage",
@@ -73,22 +117,34 @@ function hintFor(
       block: true,
     };
   }
-  if (blur != null && blur > 0 && blur < 20) {
+
+  if (blur != null && blur > 0 && blur < 18) {
     return {
       code: "hold_steady",
-      en: "Hold steady — camera is moving or blurry",
+      en: "Hold steady — camera is moving or out of focus",
       hi: "कैमरा स्थिर रखें — तस्वीर धुंधली आ रही है",
       block: false,
     };
   }
-  if (totalCropPct > 88 && !isCloseup) {
+
+  if (totalCanopyPct > 92 && !isCloseup) {
     return {
       code: "too_close",
-      en: "Too close — step back slightly to capture full area",
-      hi: "बहुत पास — सीमा दिखाने के लिए थोड़ा पीछे हटें",
+      en: "Too close — step back slightly to capture plot boundary",
+      hi: "बहुत पास — खेत की सीमा दिखाने के लिए थोड़ा पीछे हटें",
       block: false,
     };
   }
+
+  if (isCloseup && totalCanopyPct < 22) {
+    return {
+      code: "too_far",
+      en: "Move closer to capture damaged plant organs in detail",
+      hi: "पौधे के प्रभावित हिस्से को स्पष्ट दिखाने के लिए पास जाएँ",
+      block: false,
+    };
+  }
+
   return {
     code: "ok",
     en: "Good framing & focus — ready to capture",
@@ -97,8 +153,140 @@ function hintFor(
   };
 }
 
+/**
+ * Classifies an RGB pixel into agricultural canopy categories.
+ */
+function classifyPixel(
+  r: number,
+  g: number,
+  b: number,
+  luma: number,
+  isFirePeril: boolean = false,
+): {
+  isCanopy: boolean;
+  type: "vegetative" | "mature_golden" | "bloom_yellow" | "scorch" | "charred" | "none";
+  isSyntheticCandidate: boolean;
+} {
+  const sum = r + g + b;
+  if (sum === 0) return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+
+  const rn = r / sum;
+  const gn = g / sum;
+  const bn = b / sum;
+
+  const exg = 2 * gn - rn - bn;
+  const exr = 1.4 * rn - gn;
+  const gli = (2 * g - r - b) / (2 * g + r + b);
+
+  const [h, s, v] = rgbToHsv(r, g, b);
+
+  // Background suppressions:
+  // Sky
+  if (b > r + 24 && b > g - 4 && luma > 60 && h >= 185 && h <= 250) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  }
+
+  // Neutral Gray Asphalt/Concrete
+  const maxDiff = Math.max(r, g, b) - Math.min(r, g, b);
+  if (maxDiff < 14 && luma >= 35 && luma <= 210) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  }
+
+  // Skin tone
+  if (r > g && g > b && r - g > 12 && r - g < 95 && g - b > 5 && s > 0.15 && s < 0.65 && h < 38) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  }
+
+  // Synthetic hyper-saturation
+  const isHyperSaturatedSynthetic = (g > 200 && (r < 45 || b < 45)) || (s > 0.93 && h >= 70 && h <= 165);
+
+  // Vegetative
+  const isVegetative =
+    (exg > 0.06 || (gli > 0.04 && g > r && g > b)) &&
+    h >= 68 &&
+    h <= 165 &&
+    s >= 0.16 &&
+    v >= 0.14 &&
+    v <= 0.96;
+
+  if (isVegetative) {
+    return {
+      isCanopy: !isHyperSaturatedSynthetic,
+      type: isHyperSaturatedSynthetic ? "none" : "vegetative",
+      isSyntheticCandidate: isHyperSaturatedSynthetic,
+    };
+  }
+
+  if (isHyperSaturatedSynthetic) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: true };
+  }
+
+  // Bloom Yellow
+  const isBloomYellow =
+    h >= 42 &&
+    h <= 64 &&
+    s >= 0.38 &&
+    v >= 0.50 &&
+    r > 140 &&
+    g > 130 &&
+    b < 120 &&
+    Math.abs(r - g) <= 22;
+
+  if (isBloomYellow) {
+    return { isCanopy: true, type: "bloom_yellow", isSyntheticCandidate: false };
+  }
+
+  // Drought Scorch
+  const isScorch =
+    h >= 16 &&
+    h <= 40 &&
+    s >= 0.18 &&
+    s <= 0.85 &&
+    v >= 0.16 &&
+    v <= 0.85 &&
+    r > g + 25 &&
+    r > b + 25;
+
+  if (isScorch) {
+    return { isCanopy: true, type: "scorch", isSyntheticCandidate: false };
+  }
+
+  // Mature Golden Grain
+  const isMatureGolden =
+    (exr > 0.03 || (r > b + 25 && g > b + 15)) &&
+    h >= 30 &&
+    h <= 68 &&
+    s >= 0.18 &&
+    s <= 0.90 &&
+    v >= 0.22 &&
+    v <= 0.95 &&
+    r >= g - 25 &&
+    r <= g + 45;
+
+  if (isMatureGolden) {
+    return { isCanopy: true, type: "mature_golden", isSyntheticCandidate: false };
+  }
+
+  // Charred Fire
+  const isCharred =
+    isFirePeril &&
+    luma >= 6 &&
+    luma <= 48 &&
+    maxDiff < 18 &&
+    r < 80 &&
+    g < 80 &&
+    b < 80 &&
+    s <= 0.30;
+
+  if (isCharred) {
+    return { isCanopy: true, type: "charred", isSyntheticCandidate: false };
+  }
+
+  return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+}
+
 // ---------------------------------------------------------------------------
-// TF.js micro model setup – try CDN, fallback to heuristic
+// TF.js micro model setup
 // ---------------------------------------------------------------------------
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let tf: any = null;
@@ -112,54 +300,41 @@ function ensureTf(): Promise<unknown> {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const g: any = typeof self !== "undefined" ? self : globalThis;
       if (typeof g.importScripts === "function") {
-        // Try to load TF.js micro bundle from CDN
         g.importScripts("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4/dist/tf.min.js");
         const maybeTf = g.tf;
         if (maybeTf) {
           try {
             await maybeTf.ready();
           } catch {
-            // ignore ready failure
+            // ignore
           }
           tf = maybeTf;
           return tf;
         }
-      } else {
-        // In non-worker contexts importScripts not available; try dynamic import fallback (no-op if fails)
-        try {
-          // @ts-expect-error – optional CDN ESM import, may fail offline
-          const mod = await import("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4/dist/tf.min.js");
-          tf = (mod as unknown as { tf?: unknown }).tf ?? mod;
-          if (tf && typeof tf.ready === "function") await tf.ready();
-          return tf;
-        } catch {
-          return null;
-        }
       }
     } catch {
-      // network or CSP failure – fallback to heuristic
+      // ignore
     }
     return null;
   })();
   return tfLoadPromise;
 }
 
-// Kick off load (non-blocking) in worker context
 if (typeof self !== "undefined") {
   void ensureTf();
 }
 
 // ---------------------------------------------------------------------------
-// MobileNet v2 plant/crop classifier – CDN model, clean heuristic degradation
+// MobileNet v2 plant/crop classifier
 // ---------------------------------------------------------------------------
 
 const MOBILENET_CDN =
   "https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js";
 const PLANT_CLASS_RE =
-  /plant|leaf|crop|grass|tree|flower|produce|vegetable|field|agricultur|maize|wheat|rice|paddy|corn/i;
+  /plant|leaf|crop|grass|tree|flower|produce|vegetable|field|agricultur|maize|wheat|rice|paddy|corn|grain|barley|sorghum|mustard|rapeseed|sunflower|soybean|cotton|legume|chickpea|lentil/i;
 const CLASSIFY_INTERVAL_MS = 500;
 const CLASSIFY_INPUT = 224;
-const CLASSIFY_PROB_MIN = 0.18;
+const CLASSIFY_PROB_MIN = 0.16;
 const CLASSIFY_MAX_FAILURES = 3;
 
 export type ModelVerdict = { label: string | null; prob: number | null; saysPlant: boolean };
@@ -180,7 +355,6 @@ function warnOnce(msg: string): void {
 
 export type CvModelLoadStatus = "loading" | "ready" | "unavailable";
 
-/** True only inside a real Worker global (no DOM document on main thread). */
 function inWorkerContext(): boolean {
   try {
     return (
@@ -195,7 +369,6 @@ function inWorkerContext(): boolean {
 
 let lastPostedModelStatus: CvModelLoadStatus | null = null;
 
-/** Fire-and-forget status transition to the main thread; dedupes repeats. Never throws. */
 function postModelStatus(status: CvModelLoadStatus, label?: string): void {
   if (!inWorkerContext()) return;
   if (lastPostedModelStatus === status) return;
@@ -207,7 +380,7 @@ function postModelStatus(status: CvModelLoadStatus, label?: string): void {
       ...(label ? { label } : {}),
     });
   } catch {
-    // ignore – status signal is best-effort
+    // ignore
   }
 }
 
@@ -226,17 +399,6 @@ function ensureMobilenet(): Promise<unknown> {
         if (typeof g.importScripts === "function") {
           g.importScripts(MOBILENET_CDN);
           api = g.mobilenet;
-        } else {
-          try {
-            // @ts-expect-error – optional CDN ESM import, may fail offline
-            const mod = await import("https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js");
-            api =
-              ((mod as unknown as { mobilenet?: unknown }).mobilenet as unknown) ??
-              ((mod as unknown as { default?: unknown }).default as unknown) ??
-              mod;
-          } catch {
-            // network or CSP failure – fallback to heuristic
-          }
         }
       }
       if (!api || typeof api.load !== "function") throw new Error("mobilenet global missing");
@@ -254,17 +416,10 @@ function ensureMobilenet(): Promise<unknown> {
   return mobilenetLoadPromise;
 }
 
-// Kick off load immediately on worker start (fire-and-forget) – weights download
-// begins while the farmer reads guidance, status transitions posted to main thread.
 if (inWorkerContext()) {
   void ensureMobilenet();
 }
 
-/**
- * Build a 224x224 canvas by upscaling the sampled frame (e.g. 64x64) –
- * MobileNet needs ≥~128px input. Returns null if OffscreenCanvas/2d ctx
- * unavailable; caller degrades to cached verdict (heuristic-only).
- */
 function buildClassifyCanvas(
   data: Uint8ClampedArray,
   width: number,
@@ -292,10 +447,6 @@ function buildClassifyCanvas(
   }
 }
 
-/**
- * Classify at most once per 500ms; intermediate frames reuse the cached
- * verdict with fresh luma/green numbers computed by callers. Never throws.
- */
 async function classifySample(
   data: Uint8ClampedArray,
   width: number,
@@ -303,7 +454,7 @@ async function classifySample(
 ): Promise<ModelVerdict | null> {
   if (classifyFailures >= CLASSIFY_MAX_FAILURES) return lastVerdict;
   if (!mobilenet) {
-    void ensureMobilenet(); // background prewarm – never block a frame on weights download
+    void ensureMobilenet();
     return lastVerdict;
   }
   const now = Date.now();
@@ -316,7 +467,6 @@ async function classifySample(
     try {
       preds = await mobilenet.classify(canvas, 3);
     } catch {
-      // OffscreenCanvas not accepted by this tfjs backend build → ImageData fallback
       const ctx = canvas.getContext("2d") as unknown as CanvasRenderingContext2D | null;
       const imageData = ctx ? ctx.getImageData(0, 0, CLASSIFY_INPUT, CLASSIFY_INPUT) : null;
       if (!imageData) throw new Error("classify input unavailable");
@@ -358,24 +508,9 @@ async function classifySample(
 }
 
 // ---------------------------------------------------------------------------
-// Core analysis – exported for main-thread fallback / testing
+// Core Worker Analysis
 // ---------------------------------------------------------------------------
 
-/**
- * Analyze a sampled frame buffer (already at sampled resolution, typically 64x64)
- * using heuristic green detection. If TF.js loaded, attempts TF-based
- * segmentation first, otherwise uses heuristic. Returns CvFrameResult with
- * bbox computed via contour of green pixels (min/max x/y → normalized).
- *
- * `modelVerdict` is the (throttled/cached) MobileNet classification for this
- * frame; final cropDetected = heuristicGreenOK || modelSaysPlant (union).
- *
- * @param data - RGBA flat buffer (Uint8ClampedArray) at width×height
- * @param width - sampled width
- * @param height - sampled height
- * @param angleId - canonical angle id for fire_burn relax thresholds
- * @param modelVerdict - cached MobileNet plant verdict (null when unavailable)
- */
 export function analyzeInWorker(
   data: Uint8ClampedArray,
   width: number,
@@ -383,78 +518,32 @@ export function analyzeInWorker(
   angleId?: string,
   modelVerdict?: ModelVerdict | null,
 ): CvFrameResult {
-  // Try TF.js path if available – green vegetation segmentation via tensor ops
-  // If TF fails for any reason, fall through to heuristic
-  if (tf) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const t: any = tf;
-      // Create tensor from rgba data: we only need RGB channels
-      // Use tf.tidy to avoid leaks
-      const greenPctTf = t.tidy(() => {
-        // Convert flat Uint8 to tensor of shape [h*w,4] then slice RGB
-        // This is a lightweight segmentation fallback: g > 60 && g > r+10 && g > b+10
-        // Done via tf ops to leverage possible GPU/WASM backend if available
-        const flat = t.tensor(data, [width * height * 4], "int32");
-        const reshaped = flat.reshape([height, width, 4]);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rgb = (reshaped as any).slice([0, 0, 0], [height, width, 3]) as any;
-        const r = rgb.slice([0, 0, 0], [height, width, 1]);
-        const g = rgb.slice([0, 0, 1], [height, width, 1]);
-        const b = rgb.slice([0, 0, 2], [height, width, 1]);
-        const gGt60 = g.greater(60);
-        const gGtR = g.greater(r.add(10));
-        const gGtB = g.greater(b.add(10));
-        const mask = gGt60.logicalAnd(gGtR).logicalAnd(gGtB);
-        const count = mask.sum().dataSync()[0] as number;
-        const total = width * height;
-        return total ? Math.round((count / total) * 100) : 0;
-      });
-      // If TF path succeeded, we still need luma/blur/bbox via heuristic loop
-      // so we store the TF greenPct and continue to compute rest heuristically below
-      // To avoid double computation, we will use greenPctTf as greenPct and skip recount
-      // Mark success by returning early with TF-derived greenPct (still compute bbox heuristically)
-      // If we reach here without throwing, proceed to heuristic but inject Tf greenPct
-      // We'll compute full result below but override greenPct
-      const heuristic = analyzeHeuristic(data, width, height, angleId, greenPctTf, modelVerdict);
-      return heuristic;
-    } catch {
-      // TF segmentation failed – fallback to pure heuristic
-    }
-  }
-
-  return analyzeHeuristic(data, width, height, angleId, undefined, modelVerdict);
-}
-
-function analyzeHeuristic(
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-  angleId?: string,
-  forcedGreenPct?: number,
-  modelVerdict?: ModelVerdict | null,
-): CvFrameResult {
   let sumLuma = 0;
-  let greenPixels = 0;
-  let ripePixels = 0;
-  let charredPixels = 0;
+  let vegetativeCount = 0;
+  let matureGoldenCount = 0;
+  let bloomYellowCount = 0;
+  let scorchCount = 0;
+  let charredCount = 0;
+  let syntheticCount = 0;
+  let glareCount = 0;
   let total = 0;
+
   let minX = width;
   let minY = height;
   let maxX = -1;
   let maxY = -1;
-  let gradientSum = 0;
-  let gradientSumSq = 0;
-  let gradientCount = 0;
+
+  let laplacianSum = 0;
+  let laplacianCount = 0;
 
   const isFireRelax =
     angleId === "fire_burn" ||
     angleId === "wide_field" ||
     (angleId != null && angleId.includes("fire"));
 
-  // data is RGBA flat; width*height pixels
   const pixelCount = width * height;
   const len = Math.min(data.length, pixelCount * 4);
+
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const idx = (y * width + x) * 4;
@@ -466,102 +555,111 @@ function analyzeHeuristic(
       sumLuma += luma;
       total += 1;
 
-      // 1. Green vegetative foliage (ExG / chromatic excess green)
-      const isGreen = g > 45 && (2 * g > r + b + 10 || (g > r + 6 && g > b + 6));
-      // 2. Ripe / golden / dry mature crop canopy (wheat heads, mustard, ripe paddy, dry straw)
-      const isRipe =
-        r > 75 && g > 65 && b < 140 && r >= g - 20 && r <= g + 70 && r + g > 2 * b + 15;
-      // 3. Charred / burn scar field matter (fire peril)
-      const isCharred =
-        isFireRelax &&
-        luma >= 8 &&
-        luma <= 45 &&
-        Math.abs(r - g) < 18 &&
-        Math.abs(g - b) < 18 &&
-        r < 75 &&
-        g < 75 &&
-        b < 75;
+      if (r > 248 && g > 248 && b > 248) {
+        glareCount += 1;
+      }
 
-      if (isGreen) greenPixels += 1;
-      if (isRipe) ripePixels += 1;
-      if (isCharred) charredPixels += 1;
+      const classification = classifyPixel(r, g, b, luma, isFireRelax);
 
-      if (isGreen || isRipe || isCharred) {
+      if (classification.isCanopy) {
+        if (classification.type === "vegetative") vegetativeCount += 1;
+        else if (classification.type === "mature_golden") matureGoldenCount += 1;
+        else if (classification.type === "bloom_yellow") bloomYellowCount += 1;
+        else if (classification.type === "scorch") scorchCount += 1;
+        else if (classification.type === "charred") charredCount += 1;
+
+        if (classification.isSyntheticCandidate) {
+          syntheticCount += 1;
+        }
+
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
+      } else if (classification.isSyntheticCandidate) {
+        syntheticCount += 1;
       }
 
-      // 2D Spatial Edge Gradient for true Laplacian-like sharpness/blur estimation
+      // 2D 4-point Laplacian convolution
       if (x > 0 && y > 0 && x < width - 1 && y < height - 1) {
-        const rightLuma =
-          0.299 * data[idx + 4] + 0.587 * data[idx + 5] + 0.114 * data[idx + 6];
-        const downLuma =
-          0.299 * data[idx + width * 4] +
-          0.587 * data[idx + width * 4 + 1] +
-          0.114 * data[idx + width * 4 + 2];
-        const grad = Math.abs(rightLuma - luma) + Math.abs(downLuma - luma);
-        gradientSum += grad;
-        gradientSumSq += grad * grad;
-        gradientCount += 1;
+        const lumaCenter = luma;
+        const lumaLeft = 0.299 * data[idx - 4] + 0.587 * data[idx - 3] + 0.114 * data[idx - 2];
+        const lumaRight = 0.299 * data[idx + 4] + 0.587 * data[idx + 5] + 0.114 * data[idx + 6];
+        const lumaUp =
+          0.299 * data[idx - width * 4] + 0.587 * data[idx - width * 4 + 1] + 0.114 * data[idx - width * 4 + 2];
+        const lumaDown =
+          0.299 * data[idx + width * 4] + 0.587 * data[idx + width * 4 + 1] + 0.114 * data[idx + width * 4 + 2];
+
+        const lap = Math.abs(4 * lumaCenter - (lumaLeft + lumaRight + lumaUp + lumaDown));
+        laplacianSum += lap;
+        laplacianCount += 1;
       }
     }
   }
 
   const luma = total ? Math.round((sumLuma / total / 255) * 100) : null;
-  const greenPct = forcedGreenPct != null ? forcedGreenPct : total ? Math.round((greenPixels / total) * 100) : 0;
-  const ripePct = total ? Math.round((ripePixels / total) * 100) : 0;
-  const charredPct = total ? Math.round((charredPixels / total) * 100) : 0;
+  const vegetativePct = total ? Math.round((vegetativeCount / total) * 100) : 0;
+  const matureGoldenPct = total ? Math.round((matureGoldenCount / total) * 100) : 0;
+  const bloomYellowPct = total ? Math.round((bloomYellowCount / total) * 100) : 0;
+  const scorchPct = total ? Math.round((scorchCount / total) * 100) : 0;
+  const charredPct = total ? Math.round((charredCount / total) * 100) : 0;
+  const glareRatio = total ? glareCount / total : 0;
+  const syntheticRatio = total ? syntheticCount / total : 0;
 
-  // Total canopy coverage: green + golden mature + charred
-  const totalCropPct = clamp(
-    Math.round(greenPct + ripePct * 0.85 + (isFireRelax ? charredPct : 0)),
-    0,
-    100,
+  // Organic Micro-Texture Penalty for uniform flat artificial surfaces
+  const meanLaplacian = laplacianCount > 0 ? laplacianSum / laplacianCount : 0;
+  const isFlatArtificialSurface = (vegetativePct > 20 || syntheticCount > 15) && meanLaplacian < 1.8 && syntheticRatio > 0.35;
+
+  const rawCanopyPct =
+    vegetativePct * (isFlatArtificialSurface ? 0.1 : 1.0) +
+    matureGoldenPct * 0.90 +
+    bloomYellowPct * 0.90 +
+    scorchPct * 0.75 +
+    (isFireRelax ? charredPct : 0);
+
+  const totalCanopyPct = clamp(Math.round(rawCanopyPct), 0, 100);
+  const blurScore = clamp(Math.round((meanLaplacian / 12) * 100), 0, 100);
+
+  const hint = hintFor(
+    {
+      totalCanopyPct,
+      vegetativePct,
+      luma,
+      blur: blurScore,
+      glareRatio,
+      syntheticRatio,
+    },
+    angleId,
   );
 
-  const gradVar =
-    gradientCount > 0
-      ? gradientSumSq / gradientCount - Math.pow(gradientSum / gradientCount, 2)
-      : 0;
-  const blurScore = clamp(Math.round((Math.sqrt(Math.max(0, gradVar)) / 25) * 100), 0, 100);
-
-  const hint = hintFor({ totalCropPct, greenPct, luma, blur: blurScore }, angleId);
   const isCloseup = angleId === "closeup_damage";
-  const cropThreshold = isCloseup || isFireRelax ? 8 : 12;
+  const minCanopyThreshold = isCloseup ? 15 : isFireRelax ? 8 : 12;
 
-  // Union of signals: multi-spectral canopy coverage OR pretrained MobileNet plant class
-  const heuristicCanopyOk = totalCropPct >= cropThreshold && luma != null && luma >= 14;
+  const heuristicCanopyOk = totalCanopyPct >= minCanopyThreshold && luma != null && luma >= 14 && !isFlatArtificialSurface;
   const modelSaysPlant = !!modelVerdict?.saysPlant;
   const cropDetected = heuristicCanopyOk || modelSaysPlant;
 
   let bbox: { x: number; y: number; w: number; h: number } | null = null;
-  if (cropDetected) {
-    if ((greenPixels > 0 || ripePixels > 0 || charredPixels > 0) && maxX >= minX) {
-      // contour of cropPixels → normalized bbox
-      const x = minX / width;
-      const y = minY / height;
-      const w = (maxX - minX + 1) / width;
-      const h = (maxY - minY + 1) / height;
-      // clamp to [0,1]
-      bbox = {
-        x: clamp(x, 0, 1),
-        y: clamp(y, 0, 1),
-        w: clamp(w, 0.15, 1 - clamp(x, 0, 1)),
-        h: clamp(h, 0.15, 1 - clamp(y, 0, 1)),
-      };
-    } else {
-      // Fallback centered 60% box if no contour but still detected (rare)
-      bbox = { x: 0.2, y: 0.2, w: 0.6, h: 0.6 };
-    }
+  if (cropDetected && maxX >= minX && maxY >= minY) {
+    const bx = minX / width;
+    const by = minY / height;
+    const bw = (maxX - minX + 1) / width;
+    const bh = (maxY - minY + 1) / height;
+    bbox = {
+      x: clamp(bx, 0, 1),
+      y: clamp(by, 0, 1),
+      w: clamp(bw, 0.15, 1 - clamp(bx, 0, 1)),
+      h: clamp(bh, 0.15, 1 - clamp(by, 0, 1)),
+    };
+  } else if (cropDetected) {
+    bbox = { x: 0.2, y: 0.2, w: 0.6, h: 0.6 };
   }
 
   const shouldBlockShutter = hint.block && !isFireRelax && !cropDetected;
 
   return {
     cropDetected,
-    greenPct: totalCropPct,
+    greenPct: totalCanopyPct,
     luma,
     blurScore,
     hintCode: hint.code,
@@ -576,7 +674,7 @@ function analyzeHeuristic(
 }
 
 // ---------------------------------------------------------------------------
-// Worker message handling – does 64x64 sampling off main thread when given ImageBitmap
+// Worker message loop
 // ---------------------------------------------------------------------------
 
 type WorkerRequest =
@@ -589,13 +687,11 @@ type WorkerResponse = {
   error?: string;
 };
 
-// Only register handler in worker context (not during SSR / main-thread import)
 if (
   typeof self !== "undefined" &&
   typeof (self as unknown as { postMessage?: unknown }).postMessage === "function" &&
   typeof (self as unknown as { importScripts?: unknown }).importScripts === "function"
 ) {
-  // Worker global – install onmessage
   (self as unknown as { onmessage: (e: MessageEvent<WorkerRequest>) => void }).onmessage = async (
     e: MessageEvent<WorkerRequest>,
   ) => {
@@ -608,12 +704,10 @@ if (
       if ((req as { bitmap?: unknown }).bitmap) {
         const bitmap = (req as { bitmap: ImageBitmap }).bitmap;
         const angleId = (req as { angleId?: string }).angleId;
-        // 64x64 sampling off main thread via OffscreenCanvas
         const w = 64;
         const h = 64;
         let data: Uint8ClampedArray | null = null;
         try {
-          // OffscreenCanvas is available in workers
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const OffscreenCanvasCtor: any = (self as unknown as { OffscreenCanvas?: unknown }).OffscreenCanvas;
           if (OffscreenCanvasCtor) {
@@ -626,10 +720,8 @@ if (
             }
           }
         } catch {
-          // fallback to createImageData path
+          // ignore
         }
-        // Fallback if OffscreenCanvas not available – try to use bitmap width/height 64 sample via heuristic on raw bitmap?
-        // If still no data, return heuristic with empty
         try {
           bitmap.close();
         } catch {
@@ -638,15 +730,15 @@ if (
         if (data) {
           const verdict = await classifySample(data, w, h);
           result = analyzeInWorker(data, w, h, angleId, verdict);
-        } else {
-          // No OffscreenCanvas – return null to trigger main-thread fallback
-          result = null;
         }
       } else if ((req as { buffer?: unknown }).buffer) {
-        const { width, height, buffer, angleId } = req as { width: number; height: number; buffer: ArrayBuffer; angleId?: string };
+        const { width, height, buffer, angleId } = req as {
+          width: number;
+          height: number;
+          buffer: ArrayBuffer;
+          angleId?: string;
+        };
         const clamped = new Uint8ClampedArray(buffer);
-        // If buffer is larger than 64x64, we treat it as already sampled; but if caller sends larger, we could downsample
-        // For correctness, if width*height*4 === clamped.length we analyze directly
         const verdict = await classifySample(clamped, width, height);
         result = analyzeInWorker(clamped, width, height, angleId, verdict);
       }
@@ -659,5 +751,3 @@ if (
     }
   };
 }
-
-

@@ -92,17 +92,24 @@ flowchart TD
 
 ## Key Pillars
 
-### 1. Fasal Saathi Autonomous Intake
+### 1. Fasal Saathi Autonomous Intake & Webapp Controller
 `/farmer/saathi` is the first-line entry point. Farmers describe the problem by text or voice (Hindi/English); `src/lib/saathi-agent.ts` classifies one of **8 perils** via `classifyPerilHeuristic`, extracts slots (crop, village, plot), builds a `ClaimIntent`, and stores it in `farmerStore.activeIntent` before routing to the peril-aware capture studio.
 
-A **Voice Mode mic toggle** upgrades the chat to a full-duplex Gemini Live session (`POST /api/voice/session` mints an ephemeral token; audio streams over WebSocket while text stays available as fallback). The Live model calls the `SAATHI_FUNCTION_DECLARATIONS` tools — `request_evidence_angles`, `call_context_signal`, `guide_capture`, `classify_claim` — and every tool call is executed **server-side** through auth-gated, rate-limited `POST /api/saathi/tool`, so `GEMINI_API_KEY` (and LLM peril classification) never reaches the browser bundle.
+A **Voice Mode mic toggle** upgrades the chat to a full-duplex Gemini Live session (`POST /api/voice/session` mints an ephemeral token; audio streams over WebSocket while text stays available as fallback). The Live model calls the full suite of `SAATHI_FUNCTION_DECLARATIONS` tools:
+- **Intake & Routing**: `request_evidence_angles`, `call_context_signal`, `guide_capture`, `classify_claim`
+- **Agentic Webapp Control**: `take_photo`, `switch_camera`, `select_angle`, `retake_angle`, `set_observation`, `submit_claim`, `check_evidence_quality`
+
+Every tool call is executed **server-side** through auth-gated, rate-limited `POST /api/saathi/tool` with client synchronization via `webCaptureBridge` and `web-voice-broker.ts`, so `GEMINI_API_KEY` never reaches the browser bundle.
 
 ### 2. Variable Claims Routing per Peril
 `src/lib/claim-routing.ts` defines `ROUTE_CONFIG`: required/optional capture angles, context checks, `minConfidence` (70–85), and `needsSatellite` per peril — e.g., `fire_burn` needs only `wide_field` + `closeup_damage` plus a Sentinel check, while `normal` requires the full 5-angle protocol.
 
-### 3. Evidence Quality & Authenticity Filter
-- **Realtime CV on-device with a real model** — `src/lib/vision/realtime-cv.ts` (running in `src/lib/vision/cv-worker.ts`) samples viewfinder frames at 2–4 fps in a Web Worker. The worker loads **TF.js + MobileNet v2 (`@tensorflow-models/mobilenet`, version 2, alpha 0.5) from the jsdelivr CDN** and classifies frames against plant/crop labels (plant, leaf, crop, grass, maize, wheat, rice/paddy, …) with a ≥0.18 probability floor, throttled to one inference per 500 ms. `cropDetected` is the **union of the green-pixel heuristic and the MobileNet plant verdict**; offline or blocked CDN degrades gracefully to heuristic-only mode without ever throwing. The capture page spins up the worker on mount so TF.js/MobileNet weights prefetch while the farmer reads guidance, and a bilingual **"CV: AI ready/loading…"** badge mirrors the worker's `model_status` (`loading`/`ready`/`unavailable`) — hidden when the model is unavailable.
-- **Gemini vision gate** — `POST /api/vision/gate` (`src/app/api/vision/gate/route.ts`, auth-gated) calls Gemini vision with `inlineData` when `GEMINI_API_KEY` is set and returns `{ usable, reason, crop_detected, warnings, confidence }`; without a key it falls back to a size/type heuristic. Rejects AI-generated screenshots and wrong-crop images. Verdicts persist per image to `web_claim_images.gate_result`. Reviewers can also **re-run the gate** on already-stored photos from the review detail Authenticity card (client downloads images → data URLs → sequential authed `/api/vision/gate` calls → audited `correct` action "Gate re-run recorded: X/Y usable").
+### 3. Sequential Evidence Verification & Metadata Bundling
+- **Comprehensive Image & Environmental Metadata Bundling**: Every shutter click in the capture studio bundles high-precision GPS (`lat`, `lon`, `accuracyM`), camera facing mode (`environment` vs `user`), video resolution (`width x height`), ISO 8601 timestamps, live agronomic indices (**ExG**, **GLI**, **ExR** canopy %), luma, 2D Laplacian sharpness score, MobileNet v2 classification tags, and client-side SHA-256 cryptographic hashes.
+- **Stage 1 (Gemini Multimodal Vision & Environmental Gate)**: `POST /api/vision/gate` (`src/app/api/vision/gate/route.ts`, auth-gated) and server-side `gateSingleImage` evaluate raw image bytes + comprehensive metadata + spatial context. Cross-verifies peril congruence (fire charred ash, flood standing water, hailstorm shredding, lodging flattening, drought chlorosis) and rejects AI fakes, screen captures, printed photos, and non-field artifacts.
+- **Stage 2 (Hugging Face DINOv2 Foundation Model)**: Only verified authentic outdoor crop evidence is dispatched to the Hugging Face Space (`dhrrishitvdeka/fasal-pramaan-api`, DINOv2 ViT-S/14) for deep neural crop screening and foliar damage grading ($A/B/C/U$). Fraudulent or unusable images bypass HF inference early, conserving compute quota and prompting targeted recapture.
+- **Multi-Spectral Realtime Computer Vision & False Positive Rejection**: `src/lib/vision/realtime-cv.ts` (running in `src/lib/vision/cv-worker.ts`) samples viewfinder frames at 3–4 fps in a Web Worker using normalized agronomic chromatic indices (**ExG**, **GLI**, **ExR**), 2D spatial Laplacian variance (organic micro-texture filter), and **TF.js + MobileNet v2** plant taxonomy classification.
+- **Seamless Camera Viewfinder UX**: Overlays dynamic autofocus corner reticles with color transitions (emerald glow when ready, amber when adjusting), a translucent glassmorphism HUD chip with live pulse dot indicator, and an interactive shutter ring that confirms optimal framing.
 
 ### 4. Multi-Signal Context Validation
 `POST /api/context/assemble` assembles `ContextSignal[]` from **live free-tier sources**:

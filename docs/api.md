@@ -149,8 +149,26 @@ Parallel LLM usability check run after each shutter (capture page `void fetch("/
 {
   "imageDataUrl": "data:image/jpeg;base64,/9j/...",
   "angleType": "closeup_damage",
-  "expectedCrop": "Paddy",
-  "peril": "fire_burn"
+  "expectedCrop": "Wheat",
+  "peril": "pest_disease",
+  "metadata": {
+    "lat": 28.6139,
+    "lon": 77.2090,
+    "accuracyM": 3.8,
+    "capturedAt": "2026-08-22T17:30:00.000Z",
+    "facing": "environment",
+    "dimensions": { "width": 1920, "height": 1080 },
+    "cvAnalysis": {
+      "greenPct": 68,
+      "luma": 135,
+      "blurScore": 142,
+      "hintCode": "ok",
+      "modelLabel": "corn ear, spike, ear",
+      "modelProb": 0.82
+    },
+    "sha256": "4b68e987c2fa...",
+    "farmerObservation": "Yellow rust lesions on upper leaf canopy"
+  }
 }
 ```
 
@@ -158,16 +176,20 @@ Parallel LLM usability check run after each shutter (capture page `void fetch("/
 
 ```json
 {
-  "usable": false,
-  "reason": "wrong_crop",
+  "usable": true,
+  "reason": "ok",
   "crop_detected": "Wheat",
-  "warnings": ["wrong_crop"],
-  "confidence": 0.4,
-  "fallback": true
+  "peril_match": true,
+  "metadata_verified": true,
+  "authenticity_score": 0.95,
+  "confidence": 0.92,
+  "visual_reason": "Clear outdoor wheat canopy showing localized fungal foliar rust lesions.",
+  "warnings": [],
+  "recommendations": ["Framing is optimal for neural loss screening"]
 }
 ```
 
-`usable` / `reason`: `ok|not_crop|wrong_crop|ai_generated|too_dark|too_blurry|no_field|unusable|too_small_or_blank`. `fire_burn` relaxes crop check (charred field). Local `analyzeDataUrl` second opinion for `crop_not_detected`.
+`usable` / `reason`: `ok|not_crop|wrong_crop|ai_generated|too_dark|too_blurry|no_field|unusable|too_small_or_blank`. `fire_burn` relaxes crop check (charred field). Only verified authentic evidence passes to the Hugging Face DINOv2 model.
 
 **Gate re-run (reviewer):** re-running the authenticity gate on already-stored claim photos is **client-orchestrated — there is no dedicated endpoint**. The review detail page downloads each stored image, converts it to a data URL, and issues sequential authed `POST /api/vision/gate` calls (same contract as above); it then records the outcome as an audited `correct` action on `POST /api/claims/{id}/action` with notes `"Gate re-run recorded: <usable>/<total> usable"`.
 
@@ -314,3 +336,28 @@ Log-only client error sink fed by `initTelemetry()` (`src/lib/telemetry.ts`). **
 **Response 200:** `{ "ok": true }`. Errors: `400` invalid JSON / missing message, `401` unauthenticated, `429` over quota.
 
 The client side keeps a 50-entry ring buffer plus `[telemetry]` console output regardless of session state; `NEXT_PUBLIC_SENTRY_DSN` is a documented env slot for a future `Sentry.init` (see [environment-variables.md](./environment-variables.md)).
+
+---
+
+## 10. Public Utility Endpoints
+
+### 10.1 Real-Time GitHub Stars — `GET /api/github/stars` (`apps/dashboard/src/app/api/github/stars/route.ts`)
+
+Fetches and caches the repository stargazers count to render real-time GitHub social proof badges without triggering client-side GitHub REST API rate limits.
+
+**Request:** `GET /api/github/stars`  
+**Query Parameters (optional):** `?repo=owner/repo` (defaults to `NEXT_PUBLIC_GITHUB_REPO` or `dhrrishitvdeka/Fasal-Pramaan`).
+
+**Response 200:**
+```json
+{
+  "stars": 42,
+  "formatted": "42",
+  "source": "api.github.com",
+  "cached": false
+}
+```
+
+- Features a server-side 5-minute sliding TTL memory cache.
+- Falls back transparently to `img.shields.io` SVG metadata extraction when the GitHub REST API quota is exceeded.
+
