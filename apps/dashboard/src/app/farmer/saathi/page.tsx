@@ -96,6 +96,7 @@ export default function SaathiIntakePage() {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const activeAudioNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const playTimeRef = useRef(0);
   const inputBufRef = useRef("");
   const outputBufRef = useRef("");
@@ -304,6 +305,13 @@ export default function SaathiIntakePage() {
   // ---------------------------------------------------------------------------
 
   const stopAudio = () => {
+    activeAudioNodesRef.current.forEach((node) => {
+      try {
+        node.stop();
+        node.disconnect();
+      } catch {}
+    });
+    activeAudioNodesRef.current.clear();
     processorRef.current?.disconnect();
     sourceRef.current?.disconnect();
     processorRef.current = null;
@@ -336,6 +344,10 @@ export default function SaathiIntakePage() {
     const node = ctx.createBufferSource();
     node.buffer = buffer;
     node.connect(ctx.destination);
+    activeAudioNodesRef.current.add(node);
+    node.onended = () => {
+      activeAudioNodesRef.current.delete(node);
+    };
     const startAt = Math.max(ctx.currentTime, playTimeRef.current);
     node.start(startAt);
     playTimeRef.current = startAt + buffer.duration;
@@ -560,6 +572,13 @@ export default function SaathiIntakePage() {
               if (item.type === "audio") playPcm24k(item.bytesBase64);
               if (item.type === "interrupted") {
                 // Drop queued playback so the farmer can barge-in immediately.
+                activeAudioNodesRef.current.forEach((node) => {
+                  try {
+                    node.stop();
+                    node.disconnect();
+                  } catch {}
+                });
+                activeAudioNodesRef.current.clear();
                 playTimeRef.current = audioCtxRef.current?.currentTime ?? playTimeRef.current;
               }
               if (item.type === "toolCalls") void handlersRef.current.handleTools(item.calls);

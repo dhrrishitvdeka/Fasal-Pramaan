@@ -74,6 +74,7 @@ export default function FasalSaathiOverlay() {
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const playTimeRef = useRef(0);
+  const activeAudioNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const speakingTimerRef = useRef<number | null>(null);
   const userTurnRef = useRef(1);
   const inputBufRef = useRef("");
@@ -159,6 +160,13 @@ export default function FasalSaathiOverlay() {
       speakingTimerRef.current = null;
     }
     setIsSpeaking(false);
+    activeAudioNodesRef.current.forEach((node) => {
+      try {
+        node.stop();
+        node.disconnect();
+      } catch {}
+    });
+    activeAudioNodesRef.current.clear();
     processorRef.current?.disconnect();
     sourceRef.current?.disconnect();
     processorRef.current = null;
@@ -169,10 +177,14 @@ export default function FasalSaathiOverlay() {
     audioCtxRef.current = null;
   }, []);
 
-  const clearExpiryTimer = useCallback(() => {
+  const clearTimers = useCallback(() => {
     if (expiryTimerRef.current != null) {
       window.clearTimeout(expiryTimerRef.current);
       expiryTimerRef.current = null;
+    }
+    if (speakingTimerRef.current != null) {
+      window.clearTimeout(speakingTimerRef.current);
+      speakingTimerRef.current = null;
     }
   }, []);
 
@@ -181,12 +193,12 @@ export default function FasalSaathiOverlay() {
     connectingRef.current = false;
     setupCompleteRef.current = false;
     lastContextRef.current = "";
-    clearExpiryTimer();
+    clearTimers();
     socketRef.current?.close();
     socketRef.current = null;
     stopAudio();
     setStatus("idle");
-  }, [clearExpiryTimer, stopAudio]);
+  }, [clearTimers, stopAudio]);
 
   const failSession = useCallback(
     (message: string) => {
@@ -194,14 +206,14 @@ export default function FasalSaathiOverlay() {
       connectingRef.current = false;
       setupCompleteRef.current = false;
       lastContextRef.current = "";
-      clearExpiryTimer();
+      clearTimers();
       socketRef.current?.close();
       socketRef.current = null;
       stopAudio();
       setStatus("error");
       setError(message);
     },
-    [clearExpiryTimer, stopAudio],
+    [clearTimers, stopAudio],
   );
 
   useEffect(() => () => disconnect(), [disconnect]);
@@ -223,6 +235,10 @@ export default function FasalSaathiOverlay() {
     const node = ctx.createBufferSource();
     node.buffer = buffer;
     node.connect(ctx.destination);
+    activeAudioNodesRef.current.add(node);
+    node.onended = () => {
+      activeAudioNodesRef.current.delete(node);
+    };
     const startAt = Math.max(ctx.currentTime, playTimeRef.current);
     node.start(startAt);
     playTimeRef.current = startAt + buffer.duration;
@@ -446,6 +462,13 @@ export default function FasalSaathiOverlay() {
                   speakingTimerRef.current = null;
                 }
                 setIsSpeaking(false);
+                activeAudioNodesRef.current.forEach((node) => {
+                  try {
+                    node.stop();
+                    node.disconnect();
+                  } catch {}
+                });
+                activeAudioNodesRef.current.clear();
                 if (audioCtxRef.current) {
                   playTimeRef.current = audioCtxRef.current.currentTime;
                 }

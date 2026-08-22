@@ -53,7 +53,7 @@ export async function classifyPerilWithLLM(
   }
 
   const model = getGeminiModel();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   const allowedPerils = PERIL_OPTIONS.map((o) => o.value);
   const systemPrompt = buildSystemPrompt(options?.intent ?? null, lang);
@@ -103,7 +103,10 @@ export async function classifyPerilWithLLM(
 
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       body: JSON.stringify(body),
       signal: controller as unknown as AbortSignal | undefined,
     });

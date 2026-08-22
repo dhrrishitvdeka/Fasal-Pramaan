@@ -161,6 +161,9 @@ export type MapMarker = {
   primary_damage?: string | null;
   confidence?: number | null;
   created_at?: string | null;
+  district?: string | null;
+  village?: string | null;
+  state?: string | null;
 };
 
 export interface EvidenceQualityDetails {
@@ -505,11 +508,22 @@ export async function mapMarkers(params?: Record<string, string>): Promise<MapMa
   if (isSupabaseConfigured()) {
     const stats = await reviewerStats();
     let markers = stats?.markers || [];
-    if (params?.status) markers = markers.filter((m) => m.status === params.status);
+    if (params?.status) {
+      if (params.status === "pending_review") {
+        markers = markers.filter(
+          (m) => m.status === "under_review" || m.status === "submitted" || m.status === "pending_review",
+        );
+      } else {
+        markers = markers.filter((m) => m.status === params.status);
+      }
+    }
     if (params?.severity) markers = markers.filter((m) => m.severity === params.severity);
     if (params?.crop) markers = markers.filter((m) => (m.crop_code || "").toLowerCase().includes(params.crop.toLowerCase()));
     if (params?.damage) {
       markers = markers.filter((m) => (m.primary_damage || "").toLowerCase().includes(params.damage.toLowerCase()));
+    }
+    if (params?.district) {
+      markers = markers.filter((m) => (m.district || "").toLowerCase().includes(params.district.toLowerCase()));
     }
     if (params?.date_from) markers = markers.filter((m) => (m.created_at || "") >= params.date_from);
     if (params?.date_to) markers = markers.filter((m) => (m.created_at || "") <= params.date_to);
@@ -617,7 +631,7 @@ export async function currentSessionRoles(): Promise<string[] | null> {
       }
     }
     const response = await api.get<{ roles: string[] }>("/auth/me").catch(() => null);
-    return response?.data?.roles || ["reviewer", "administrator"];
+    return response?.data?.roles || ["farmer"];
   }
   return null;
 }
