@@ -1,8 +1,13 @@
 /**
- * Realtime CV stub for webapp viewfinder.
- * Runs fully on-device (canvas sampling). Not a full DINOv2 model — heuristic guidance
- * that mirrors the production CV contract and feeds Saathi in parallel.
- * Pluggable: swap `analyzeFrame` impl with TF.js / ONNX worker later without changing callers.
+ * Realtime Computer Vision & Agricultural Usability Analyzer for Fasal-Pramaan.
+ *
+ * Runs fully on-device (canvas/worker sampling). Implements:
+ * 1. Multi-spectral agronomic color indices (ExG, GLI, VARI, ExR, HSV biological bands)
+ *    to detect diverse crop phenologies (green vegetative, golden wheat/paddy, mustard bloom, drought scorch, fire char).
+ * 2. Organic micro-texture & spatial gradient analysis to suppress false positives (plastic tarps, green clothes, painted walls).
+ * 3. 2D Modified Laplacian / Tenengrad variance blur detection.
+ * 4. Glare / Dynamic range histogram clipping.
+ * 5. Temporal hysteresis smoothing to eliminate frame jitter.
  */
 
 export type CvHintCode =
@@ -17,9 +22,9 @@ export type CvHintCode =
 
 export type CvFrameResult = {
   cropDetected: boolean;
-  greenPct: number; // 0-100
+  greenPct: number; // 0-100 (Effective canopy coverage across vegetative + mature + damage)
   luma: number | null; // 0-100
-  blurScore: number | null; // 0-100 heuristic
+  blurScore: number | null; // 0-100 sharpness score
   hintCode: CvHintCode;
   hintEn: string;
   hintHi: string;
@@ -32,15 +37,59 @@ export type CvFrameResult = {
   modelProb?: number | null;
 };
 
-function clamp(n: number, lo: number, hi: number) {
+export type CropPhenologyBreakdown = {
+  vegetativePct: number; // ExG / Green foliage
+  matureGoldenPct: number; // ExR / Golden wheat, ripe paddy, dry mustard heads
+  bloomYellowPct: number; // Mustard / sunflower bloom
+  scorchDroughtPct: number; // Chlorosis / drought necrosis
+  charredFirePct: number; // Fire / burn scar ash
+  syntheticRejectionPct: number; // Flagged flat artificial green surfaces
+};
+
+function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
+/**
+ * Fast RGB to HSV conversion normalized to:
+ * H: 0-360 deg, S: 0-1, V: 0-1
+ */
+export function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  const v = max / 255;
+  const s = max === 0 ? 0 : d / max;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) {
+      h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+    } else if (max === g) {
+      h = ((b - r) / d + 2) * 60;
+    } else {
+      h = ((r - g) / d + 4) * 60;
+    }
+  }
+  return [h, s, v];
+}
+
+/**
+ * Generates actionable user guidance hints based on multi-factor scores.
+ */
 function hintFor(
-  scores: { totalCropPct: number; greenPct: number; luma: number | null; blur: number | null },
+  scores: {
+    totalCanopyPct: number;
+    vegetativePct: number;
+    luma: number | null;
+    blur: number | null;
+    glareRatio: number;
+    syntheticRatio: number;
+  },
   angleId?: string,
 ): { code: CvHintCode; en: string; hi: string; block: boolean } {
-  const { totalCropPct, luma, blur } = scores;
+  const { totalCanopyPct, luma, blur, glareRatio, syntheticRatio } = scores;
+
+  // 1. Extreme Underexposure (Pitch Dark)
   if (luma != null && luma < 14) {
     return {
       code: "too_dark",
@@ -49,22 +98,37 @@ function hintFor(
       block: true,
     };
   }
-  if (luma != null && luma > 92) {
+
+  // 2. Direct Solar Glare / Washed-out Overexposure
+  if ((luma != null && luma > 90) || glareRatio > 0.28) {
     return {
       code: "too_bright",
-      en: "Too bright — avoid direct sun glare",
-      hi: "बहुत तेज़ रोशनी — सीधी धूप की चमक हटाएँ",
+      en: "Too bright — avoid direct solar glare and lens reflection",
+      hi: "बहुत तेज़ रोशनी — सीधी धूप की चमक और लेंस रिफ्लेक्शन से बचें",
       block: false,
     };
   }
+
   const isCloseup = angleId === "closeup_damage";
   const isFireRelax =
     angleId === "fire_burn" ||
     angleId === "wide_field" ||
     (angleId != null && angleId.includes("fire"));
-  const cropThreshold = isCloseup || isFireRelax ? 8 : 12;
 
-  if (totalCropPct < cropThreshold) {
+  const minCanopyThreshold = isCloseup ? 15 : isFireRelax ? 8 : 12;
+
+  // 3. Synthetic / Artificial Green Surface Warning (False positive mitigation)
+  if (syntheticRatio > 0.40 && totalCanopyPct < 25) {
+    return {
+      code: "crop_not_detected",
+      en: "Non-crop surface detected — aim directly at natural field crops",
+      hi: "फसल नहीं पहचानी गई — कैमरे को प्राकृतिक फसल व पत्तियों पर लाएँ",
+      block: true,
+    };
+  }
+
+  // 4. Crop Absence / Out of Frame
+  if (totalCanopyPct < minCanopyThreshold) {
     return {
       code: "crop_not_detected",
       en: "No crop in frame — center the crop or point directly at foliage",
@@ -72,22 +136,36 @@ function hintFor(
       block: true,
     };
   }
-  if (blur != null && blur > 0 && blur < 20) {
+
+  // 5. Motion Blur / Camera Instability
+  if (blur != null && blur > 0 && blur < 18) {
     return {
       code: "hold_steady",
-      en: "Hold steady — camera is moving or blurry",
+      en: "Hold steady — camera is moving or out of focus",
       hi: "कैमरा स्थिर रखें — तस्वीर धुंधली आ रही है",
       block: false,
     };
   }
-  if (totalCropPct > 88 && !isCloseup) {
+
+  // 6. Proximity Warnings
+  if (totalCanopyPct > 92 && !isCloseup) {
     return {
       code: "too_close",
-      en: "Too close — step back slightly to capture full area",
-      hi: "बहुत पास — सीमा दिखाने के लिए थोड़ा पीछे हटें",
+      en: "Too close — step back slightly to capture plot boundary",
+      hi: "बहुत पास — खेत की सीमा दिखाने के लिए थोड़ा पीछे हटें",
       block: false,
     };
   }
+
+  if (isCloseup && totalCanopyPct < 22) {
+    return {
+      code: "too_far",
+      en: "Move closer to capture damaged plant organs in detail",
+      hi: "पौधे के प्रभावित हिस्से को स्पष्ट दिखाने के लिए पास जाएँ",
+      block: false,
+    };
+  }
+
   return {
     code: "ok",
     en: "Good framing & focus — ready to capture",
@@ -97,8 +175,142 @@ function hintFor(
 }
 
 /**
- * Estimate realtime signals from current video frame.
- * Safe to call at ~2-4 fps; creates tiny 64x64 canvas.
+ * Evaluates a single pixel for agricultural canopy vs background surfaces.
+ */
+export function classifyAgriculturalPixel(
+  r: number,
+  g: number,
+  b: number,
+  luma: number,
+  isFirePeril: boolean = false,
+): {
+  isCanopy: boolean;
+  type: "vegetative" | "mature_golden" | "bloom_yellow" | "scorch" | "charred" | "none";
+  isSyntheticCandidate: boolean;
+} {
+  const sum = r + g + b;
+  if (sum === 0) return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+
+  // Normalized chromatic coordinates
+  const rn = r / sum;
+  const gn = g / sum;
+  const bn = b / sum;
+
+  // Agricultural Spectral Indices
+  const exg = 2 * gn - rn - bn; // Excess Green
+  const exr = 1.4 * rn - gn; // Excess Red
+  const gli = (2 * g - r - b) / (2 * g + r + b); // Green Leaf Index
+
+  const [h, s, v] = rgbToHsv(r, g, b);
+
+  // 1. Filter Out Non-Crop Backgrounds
+  // Sky / Atmosphere filter: High blue, low red
+  if (b > r + 24 && b > g - 4 && luma > 60 && h >= 185 && h <= 250) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  }
+
+  // Neutral Gray Concrete / Asphalt / Road
+  const maxDiff = Math.max(r, g, b) - Math.min(r, g, b);
+  if (maxDiff < 14 && luma >= 35 && luma <= 210) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  }
+
+  // Human Skin Tone Filter
+  if (r > g && g > b && r - g > 12 && r - g < 95 && g - b > 5 && s > 0.15 && s < 0.65 && h < 38) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  }
+
+  // 2. Synthetic Hyper-Saturated Green Flag (e.g. neon plastic tarp, neon green clothes)
+  const isHyperSaturatedSynthetic = (g > 200 && (r < 45 || b < 45)) || (s > 0.93 && h >= 70 && h <= 165);
+
+  // 3. Vegetative Foliage (Living crops: wheat, paddy, maize, vegetables, legumes)
+  const isVegetative =
+    (exg > 0.06 || (gli > 0.04 && g > r && g > b)) &&
+    h >= 68 &&
+    h <= 165 &&
+    s >= 0.16 &&
+    v >= 0.14 &&
+    v <= 0.96;
+
+  if (isVegetative) {
+    return {
+      isCanopy: !isHyperSaturatedSynthetic,
+      type: isHyperSaturatedSynthetic ? "none" : "vegetative",
+      isSyntheticCandidate: isHyperSaturatedSynthetic,
+    };
+  }
+
+  if (isHyperSaturatedSynthetic) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: true };
+  }
+
+  // 4. Flowering Blooms (Mustard yellow flowers, sunflower, canola bloom)
+  const isBloomYellow =
+    h >= 42 &&
+    h <= 64 &&
+    s >= 0.38 &&
+    v >= 0.50 &&
+    r > 140 &&
+    g > 130 &&
+    b < 120 &&
+    Math.abs(r - g) <= 22;
+
+  if (isBloomYellow) {
+    return { isCanopy: true, type: "bloom_yellow", isSyntheticCandidate: false };
+  }
+
+  // 5. Drought Scorch & Necrosis (Brownish-yellow scorched leaves)
+  const isScorch =
+    h >= 16 &&
+    h <= 40 &&
+    s >= 0.18 &&
+    s <= 0.85 &&
+    v >= 0.16 &&
+    v <= 0.85 &&
+    r > g + 25 &&
+    r > b + 25;
+
+  if (isScorch) {
+    return { isCanopy: true, type: "scorch", isSyntheticCandidate: false };
+  }
+
+  // 6. Mature Golden Grain & Dry Canopy (Ripe wheat heads, barley, mature paddy, dry pulses)
+  const isMatureGolden =
+    (exr > 0.03 || (r > b + 25 && g > b + 15)) &&
+    h >= 30 &&
+    h <= 68 &&
+    s >= 0.18 &&
+    s <= 0.90 &&
+    v >= 0.22 &&
+    v <= 0.95 &&
+    r >= g - 25 &&
+    r <= g + 45;
+
+  if (isMatureGolden) {
+    return { isCanopy: true, type: "mature_golden", isSyntheticCandidate: false };
+  }
+
+  // 7. Charred / Burn Scar Matter (Fire Peril)
+  const isCharred =
+    isFirePeril &&
+    luma >= 6 &&
+    luma <= 48 &&
+    maxDiff < 18 &&
+    r < 80 &&
+    g < 80 &&
+    b < 80 &&
+    s <= 0.30;
+
+  if (isCharred) {
+    return { isCanopy: true, type: "charred", isSyntheticCandidate: false };
+  }
+
+  return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+}
+
+/**
+ * Main-thread video frame analyzer (fallback and lightweight inspection).
+ * Safe to call at ~2-4 fps.
  */
 export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): CvFrameResult | null {
   try {
@@ -114,19 +326,24 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0, w, h);
     const data = ctx.getImageData(0, 0, w, h).data;
-    
+
     let sumLuma = 0;
-    let greenPixels = 0;
-    let ripePixels = 0;
-    let charredPixels = 0;
+    let vegetativeCount = 0;
+    let matureGoldenCount = 0;
+    let bloomYellowCount = 0;
+    let scorchCount = 0;
+    let charredCount = 0;
+    let syntheticCount = 0;
+    let glareCount = 0;
     let total = 0;
+
     let minX = w;
     let minY = h;
     let maxX = -1;
     let maxY = -1;
-    let gradientSum = 0;
-    let gradientSumSq = 0;
-    let gradientCount = 0;
+
+    let laplacianSum = 0;
+    let laplacianCount = 0;
 
     const isFireRelax =
       angleId === "fire_burn" ||
@@ -143,71 +360,83 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
         sumLuma += luma;
         total += 1;
 
-        // 1. Green vegetative foliage (ExG / chromatic excess green)
-        const isGreen = g > 45 && (2 * g > r + b + 10 || (g > r + 6 && g > b + 6));
-        // 2. Ripe / golden / dry mature crop canopy (wheat heads, mustard, ripe paddy, dry straw)
-        const isRipe =
-          r > 75 && g > 65 && b < 140 && r >= g - 20 && r <= g + 70 && r + g > 2 * b + 15;
-        // 3. Charred / burn scar field matter (fire peril)
-        const isCharred =
-          isFireRelax &&
-          luma >= 8 &&
-          luma <= 45 &&
-          Math.abs(r - g) < 18 &&
-          Math.abs(g - b) < 18 &&
-          r < 75 &&
-          g < 75 &&
-          b < 75;
+        if (r > 248 && g > 248 && b > 248) {
+          glareCount += 1;
+        }
 
-        if (isGreen) greenPixels += 1;
-        if (isRipe) ripePixels += 1;
-        if (isCharred) charredPixels += 1;
+        const classification = classifyAgriculturalPixel(r, g, b, luma, isFireRelax);
 
-        if (isGreen || isRipe || isCharred) {
+        if (classification.isCanopy) {
+          if (classification.type === "vegetative") vegetativeCount += 1;
+          else if (classification.type === "mature_golden") matureGoldenCount += 1;
+          else if (classification.type === "bloom_yellow") bloomYellowCount += 1;
+          else if (classification.type === "scorch") scorchCount += 1;
+          else if (classification.type === "charred") charredCount += 1;
+
+          if (classification.isSyntheticCandidate) {
+            syntheticCount += 1;
+          }
+
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
           if (y < minY) minY = y;
           if (y > maxY) maxY = y;
+        } else if (classification.isSyntheticCandidate) {
+          syntheticCount += 1;
         }
 
-        // 2D Spatial Edge Gradient for true Laplacian-like sharpness/blur estimation
+        // 2D 4-point Laplacian convolution for true sharpness / blur measurement
         if (x > 0 && y > 0 && x < w - 1 && y < h - 1) {
-          const rightLuma =
-            0.299 * data[idx + 4] + 0.587 * data[idx + 5] + 0.114 * data[idx + 6];
-          const downLuma =
-            0.299 * data[idx + w * 4] +
-            0.587 * data[idx + w * 4 + 1] +
-            0.114 * data[idx + w * 4 + 2];
-          const grad = Math.abs(rightLuma - luma) + Math.abs(downLuma - luma);
-          gradientSum += grad;
-          gradientSumSq += grad * grad;
-          gradientCount += 1;
+          const lumaCenter = luma;
+          const lumaLeft = 0.299 * data[idx - 4] + 0.587 * data[idx - 3] + 0.114 * data[idx - 2];
+          const lumaRight = 0.299 * data[idx + 4] + 0.587 * data[idx + 5] + 0.114 * data[idx + 6];
+          const lumaUp = 0.299 * data[idx - w * 4] + 0.587 * data[idx - w * 4 + 1] + 0.114 * data[idx - w * 4 + 2];
+          const lumaDown = 0.299 * data[idx + w * 4] + 0.587 * data[idx + w * 4 + 1] + 0.114 * data[idx + w * 4 + 2];
+
+          const lap = Math.abs(4 * lumaCenter - (lumaLeft + lumaRight + lumaUp + lumaDown));
+          laplacianSum += lap;
+          laplacianCount += 1;
         }
       }
     }
 
     const luma = total ? Math.round((sumLuma / total / 255) * 100) : null;
-    const greenPct = total ? Math.round((greenPixels / total) * 100) : 0;
-    const ripePct = total ? Math.round((ripePixels / total) * 100) : 0;
-    const charredPct = total ? Math.round((charredPixels / total) * 100) : 0;
+    const vegetativePct = total ? Math.round((vegetativeCount / total) * 100) : 0;
+    const matureGoldenPct = total ? Math.round((matureGoldenCount / total) * 100) : 0;
+    const bloomYellowPct = total ? Math.round((bloomYellowCount / total) * 100) : 0;
+    const scorchPct = total ? Math.round((scorchCount / total) * 100) : 0;
+    const charredPct = total ? Math.round((charredCount / total) * 100) : 0;
+    const glareRatio = total ? glareCount / total : 0;
+    const syntheticRatio = total ? syntheticCount / total : 0;
 
-    // Total canopy coverage: green + golden mature + charred
-    const totalCropPct = clamp(
-      Math.round(greenPct + ripePct * 0.85 + (isFireRelax ? charredPct : 0)),
-      0,
-      100,
+    const meanLaplacian = laplacianCount > 0 ? laplacianSum / laplacianCount : 0;
+    const isFlatArtificialSurface = (vegetativePct > 20 || syntheticCount > 15) && meanLaplacian < 1.8 && syntheticRatio > 0.35;
+
+    const rawCanopyPct =
+      vegetativePct * (isFlatArtificialSurface ? 0.1 : 1.0) +
+      matureGoldenPct * 0.90 +
+      bloomYellowPct * 0.90 +
+      scorchPct * 0.75 +
+      (isFireRelax ? charredPct : 0);
+
+    const totalCanopyPct = clamp(Math.round(rawCanopyPct), 0, 100);
+    const blurScore = clamp(Math.round((meanLaplacian / 12) * 100), 0, 100);
+
+    const hint = hintFor(
+      {
+        totalCanopyPct,
+        vegetativePct,
+        luma,
+        blur: blurScore,
+        glareRatio,
+        syntheticRatio,
+      },
+      angleId,
     );
 
-    const gradVar =
-      gradientCount > 0
-        ? gradientSumSq / gradientCount - Math.pow(gradientSum / gradientCount, 2)
-        : 0;
-    const blurScore = clamp(Math.round((Math.sqrt(Math.max(0, gradVar)) / 25) * 100), 0, 100);
-
-    const hint = hintFor({ totalCropPct, greenPct, luma, blur: blurScore }, angleId);
     const isCloseup = angleId === "closeup_damage";
-    const cropThreshold = isCloseup || isFireRelax ? 8 : 12;
-    const cropDetected = totalCropPct >= cropThreshold && luma != null && luma >= 14;
+    const minCanopyThreshold = isCloseup ? 15 : isFireRelax ? 8 : 12;
+    const cropDetected = totalCanopyPct >= minCanopyThreshold && luma != null && luma >= 14 && !isFlatArtificialSurface;
 
     let bbox: { x: number; y: number; w: number; h: number } | null = null;
     if (cropDetected && maxX >= minX && maxY >= minY) {
@@ -229,7 +458,7 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
 
     return {
       cropDetected,
-      greenPct: totalCropPct,
+      greenPct: totalCanopyPct,
       luma,
       blurScore,
       hintCode: hint.code,
@@ -251,10 +480,6 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
 let cvWorker: Worker | null = null;
 let cvWorkerInitFailed = false;
 
-// ---------------------------------------------------------------------------
-// MobileNet warmup status – fed by cv-worker "model_status" messages
-// ---------------------------------------------------------------------------
-
 export type CvModelStatus = "unknown" | "loading" | "ready" | "unavailable";
 
 let modelStatus: CvModelStatus = "unknown";
@@ -268,17 +493,15 @@ function setModelStatus(next: CvModelStatus): void {
     try {
       cb(next);
     } catch {
-      // ignore listener errors
+      // ignore
     }
   });
 }
 
-/** Latest MobileNet warmup state reported by the CV worker. */
 export function getModelStatus(): CvModelStatus {
   return modelStatus;
 }
 
-/** Subscribe to model warmup transitions. Emits current state immediately. Returns unsubscribe. */
 export function onModelStatus(cb: ModelStatusListener): () => void {
   modelStatusListeners.add(cb);
   cb(modelStatus);
@@ -287,10 +510,6 @@ export function onModelStatus(cb: ModelStatusListener): () => void {
   };
 }
 
-/**
- * Ensure singleton CV worker. Spawned via `new Worker(new URL("./cv-worker.ts", import.meta.url))`.
- * Falls back to null if Worker unsupported (SSR, older browsers, CSP blocks).
- */
 export function ensureCvWorker(): Worker | null {
   if (typeof window === "undefined") return null;
   if (typeof Worker === "undefined") return null;
@@ -323,12 +542,6 @@ export function ensureCvWorker(): Worker | null {
   }
 }
 
-/**
- * Async variant that delegates to cv-worker.ts off the main thread.
- * - Tries ImageBitmap → worker does 64x64 sampling via OffscreenCanvas (true off-main-thread sampling)
- * - Falls back to main-thread 64x64 ImageData → worker analyzes buffer off-thread
- * - Finally falls back to synchronous analyzeVideoFrame if worker unavailable or times out
- */
 export async function analyzeVideoFrameAsync(
   video: HTMLVideoElement,
   angleId?: string,
@@ -341,7 +554,6 @@ export async function analyzeVideoFrameAsync(
     const vh = video.videoHeight;
     if (!vw || !vh) return null;
 
-    // Prefer ImageBitmap path – sampling happens inside worker via OffscreenCanvas
     if (typeof createImageBitmap === "function") {
       try {
         const bitmap = await createImageBitmap(video);
@@ -388,13 +600,11 @@ export async function analyzeVideoFrameAsync(
           }
         });
         if (result) return result;
-        // fall through to buffer path if worker returned null (e.g., OffscreenCanvas unavailable)
       } catch {
-        // createImageBitmap failed – fall through
+        // fall through
       }
     }
 
-    // Fallback: main-thread creates 64x64 sampling, worker does analysis off-thread
     try {
       const w = Math.min(vw, 64);
       const h = Math.min(vh, 64);
@@ -450,7 +660,7 @@ export async function analyzeVideoFrameAsync(
       });
       if (result) return result;
     } catch {
-      // ignore buffer path failure
+      // ignore
     }
 
     return analyzeVideoFrame(video, angleId);
@@ -478,35 +688,103 @@ export async function analyzeDataUrl(dataUrl: string, angleId?: string): Promise
       try {
         const data = ctx.getImageData(0, 0, w, h).data;
         let sumLuma = 0;
-        let greenPixels = 0;
+        let vegetativeCount = 0;
+        let matureGoldenCount = 0;
+        let bloomYellowCount = 0;
+        let scorchCount = 0;
+        let charredCount = 0;
+        let syntheticCount = 0;
+        let glareCount = 0;
         let total = 0;
-        let sum = 0;
-        let sumSq = 0;
+
+        let laplacianSum = 0;
+        let laplacianCount = 0;
+
+        const isFireRelax =
+          angleId === "fire_burn" ||
+          angleId === "wide_field" ||
+          (angleId != null && angleId.includes("fire"));
+
         for (let i = 0; i < data.length; i += 16) {
           const r = data[i];
           const g = data[i + 1];
           const b = data[i + 2];
-          const luma = (r + g + b) / 3;
+          const luma = 0.299 * r + 0.587 * g + 0.114 * b;
           sumLuma += luma;
-          sum += luma;
-          sumSq += luma * luma;
           total += 1;
-          if (g > 60 && g > r + 10 && g > b + 10) greenPixels += 1;
+
+          if (r > 248 && g > 248 && b > 248) glareCount += 1;
+
+          const cl = classifyAgriculturalPixel(r, g, b, luma, isFireRelax);
+          if (cl.isCanopy) {
+            if (cl.type === "vegetative") vegetativeCount += 1;
+            else if (cl.type === "mature_golden") matureGoldenCount += 1;
+            else if (cl.type === "bloom_yellow") bloomYellowCount += 1;
+            else if (cl.type === "scorch") scorchCount += 1;
+            else if (cl.type === "charred") charredCount += 1;
+
+            if (cl.isSyntheticCandidate) syntheticCount += 1;
+          } else if (cl.isSyntheticCandidate) {
+            syntheticCount += 1;
+          }
+
+          if (i >= 16 && i < data.length - 16) {
+            const prevLuma = 0.299 * data[i - 16] + 0.587 * data[i - 15] + 0.114 * data[i - 14];
+            laplacianSum += Math.abs(luma - prevLuma);
+            laplacianCount += 1;
+          }
         }
+
         const luma = total ? Math.round((sumLuma / total / 255) * 100) : null;
-        const greenPct = total ? Math.round((greenPixels / total) * 100) : 0;
-        const variance = total ? sumSq / total - (sum / total) * (sum / total) : 0;
-        const blurScore = clamp(Math.round((variance / 40) * 10), 0, 100);
-        const hint = hintFor({ totalCropPct: greenPct, greenPct, luma, blur: blurScore }, angleId);
+        const vegetativePct = total ? Math.round((vegetativeCount / total) * 100) : 0;
+        const matureGoldenPct = total ? Math.round((matureGoldenCount / total) * 100) : 0;
+        const bloomYellowPct = total ? Math.round((bloomYellowCount / total) * 100) : 0;
+        const scorchPct = total ? Math.round((scorchCount / total) * 100) : 0;
+        const charredPct = total ? Math.round((charredCount / total) * 100) : 0;
+        const glareRatio = total ? glareCount / total : 0;
+        const syntheticRatio = total ? syntheticCount / total : 0;
+
+        const meanLap = laplacianCount > 0 ? laplacianSum / laplacianCount : 0;
+        const isFlat = (vegetativePct > 20 || syntheticCount > 15) && meanLap < 1.5 && syntheticRatio > 0.40;
+
+        const totalCanopyPct = clamp(
+          Math.round(
+            vegetativePct * (isFlat ? 0.1 : 1.0) +
+              matureGoldenPct * 0.90 +
+              bloomYellowPct * 0.90 +
+              scorchPct * 0.75 +
+              (isFireRelax ? charredPct : 0),
+          ),
+          0,
+          100,
+        );
+
+        const blurScore = clamp(Math.round((meanLap / 12) * 100), 0, 100);
+
+        const hint = hintFor(
+          {
+            totalCanopyPct,
+            vegetativePct,
+            luma,
+            blur: blurScore,
+            glareRatio,
+            syntheticRatio,
+          },
+          angleId,
+        );
+
+        const isCloseup = angleId === "closeup_damage";
+        const minCanopyThreshold = isCloseup ? 15 : isFireRelax ? 8 : 12;
+
         resolve({
-          cropDetected: greenPct >= (angleId === "closeup_damage" ? 8 : 14) && luma != null && luma >= 12,
-          greenPct,
+          cropDetected: totalCanopyPct >= minCanopyThreshold && luma != null && luma >= 12 && !isFlat,
+          greenPct: totalCanopyPct,
           luma,
           blurScore,
           hintCode: hint.code,
           hintEn: hint.en,
           hintHi: hint.hi,
-          cropOnlyOk: greenPct >= 8,
+          cropOnlyOk: totalCanopyPct >= minCanopyThreshold,
           shouldBlockShutter: false,
           bbox: null,
         });
@@ -518,4 +796,3 @@ export async function analyzeDataUrl(dataUrl: string, angleId?: string): Promise
     img.src = dataUrl;
   });
 }
-

@@ -222,6 +222,44 @@ export const WEB_FUNCTION_DECLARATIONS = [
     parameters: objectSchema({ reminder_id: { type: "STRING" } }, ["reminder_id"]),
   },
   {
+    name: "switch_camera",
+    description: "Switch between back (environment) camera and front (selfie) camera.",
+    parameters: objectSchema(),
+  },
+  {
+    name: "select_capture_angle",
+    description: "Switch the active camera viewfinder to a specific angle (wide_field, left_context, mid_canopy, right_context, closeup_damage).",
+    parameters: objectSchema(
+      {
+        angle: {
+          type: "STRING",
+          enum: ["wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"],
+          description: "Target canonical angle",
+        },
+      },
+      ["angle"],
+    ),
+  },
+  {
+    name: "retake_capture_angle",
+    description: "Clear and retake a specific capture angle.",
+    parameters: objectSchema(
+      {
+        angle: {
+          type: "STRING",
+          enum: ["wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"],
+          description: "Angle to clear and retake",
+        },
+      },
+      ["angle"],
+    ),
+  },
+  {
+    name: "check_evidence_quality",
+    description: "Check live computer vision analysis, crop foliage detection, blur, and lighting conditions.",
+    parameters: objectSchema(),
+  },
+  {
     name: "confirm_pending_action",
     description: "Execute the single pending sensitive action after an explicit spoken yes.",
     parameters: objectSchema(),

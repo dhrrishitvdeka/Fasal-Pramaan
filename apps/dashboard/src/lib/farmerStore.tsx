@@ -56,6 +56,10 @@ export interface ClaimImageEvidence {
   qualityPassed: boolean;
   blurScore?: number;
   lightingScore?: number;
+  greenPct?: number | null;
+  facing?: string | null;
+  dimensions?: { width: number; height: number } | null;
+  farmerObservation?: string | null;
 }
 
 export interface ClaimEvidenceTrust {
@@ -468,6 +472,11 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         accuracyM: img.accuracyM,
         lightingScore: img.lightingScore,
         qualityPassed: img.qualityPassed,
+        blurScore: img.blurScore,
+        greenPct: img.greenPct,
+        facing: img.facing,
+        dimensions: img.dimensions,
+        capturedAt: img.timestamp || undefined,
       })),
     });
     const persisted = await getWebClaim(result.claimId);

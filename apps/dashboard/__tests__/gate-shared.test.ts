@@ -43,13 +43,32 @@ describe("vision authenticity gate (heuristic, no network)", () => {
     expect(withCrop.crop_detected).toBe("Wheat");
   });
 
-  it("passes expected-crop frames via fallback confidence ~0.62", () => {
+  it("passes expected-crop frames via fallback confidence ~0.65", () => {
     const res = heuristicGate(bigJpegDataUrl(), "Wheat");
     expect(res.usable).toBe(true);
     expect(res.reason).toBe("ok");
     expect(res.crop_detected).toBe("Wheat");
-    expect(res.confidence).toBeCloseTo(0.62, 5);
+    expect(res.confidence).toBeCloseTo(0.65, 5);
     expect(res.fallback).toBe(true);
+  });
+
+  it("verifies full metadata and rejects excessively dark images via metadata cv analysis", () => {
+    const darkRes = heuristicGate(bigJpegDataUrl(), "Wheat", "normal", {
+      cvAnalysis: { luma: 5, greenPct: 2 },
+    });
+    expect(darkRes.usable).toBe(false);
+    expect(darkRes.reason).toBe("too_dark");
+
+    const validMetaRes = heuristicGate(bigJpegDataUrl(), "Wheat", "normal", {
+      lat: 28.6139,
+      lon: 77.209,
+      accuracyM: 4.2,
+      cvAnalysis: { luma: 140, greenPct: 65, blurScore: 120 },
+      farmerObservation: "Yellow rust lesions on upper wheat foliage",
+    });
+    expect(validMetaRes.usable).toBe(true);
+    expect(validMetaRes.metadata_verified).toBe(true);
+    expect(validMetaRes.peril_match).toBe(true);
   });
 
   it("geminiGate is a no-op returning null when no API key is configured", async () => {
