@@ -16,7 +16,9 @@ import { predictionIsAcceptable } from "../src/lib/review-accept";
 import { resolveClaimClientPath } from "../src/lib/claim-routes";
 
 function jpegLikeBytes(): Uint8Array {
-  return new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  const bytes = new Uint8Array(8192);
+  bytes.set([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1]);
+  return bytes;
 }
 
 const spaceSuccess = {

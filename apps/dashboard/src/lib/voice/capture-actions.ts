@@ -13,6 +13,7 @@ export async function runVoiceShutter(input: {
   grabFrame: () => Promise<{ dataUrl: string; lightingScore?: number } | null>;
   saveFrame: (dataUrl: string, extras?: { lightingScore?: number }) => Promise<void>;
   angleId?: string;
+  peril?: string;
 }): Promise<VoiceActionResult> {
   if (!input.cameraActive) {
     return { ok: false, message: "Camera is not active. Open capture first." };
@@ -21,7 +22,7 @@ export async function runVoiceShutter(input: {
   if (!frame?.dataUrl) {
     return { ok: false, message: "Could not capture a photo." };
   }
-  if (isUnusableLighting(frame.lightingScore)) {
+  if (input.peril !== "fire_burn" && isUnusableLighting(frame.lightingScore)) {
     return {
       ok: false,
       message: "Frame is too dark. Point the camera at the crop, or use Upload.",

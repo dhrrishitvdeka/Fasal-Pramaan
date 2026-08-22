@@ -25,4 +25,19 @@ describe("toCsv", () => {
   it("renders null/undefined as empty cells", () => {
     expect(toCsv([{ a: null, b: undefined, c: 0 }])).toBe("a,b,c\r\n,,0");
   });
+
+  it("neutralizes formula injection characters (=, +, -, @, tab, cr)", () => {
+    const csv = toCsv([
+      { val: "=cmd|' /C calc'!A0" },
+      { val: "+12345" },
+      { val: "-100" },
+      { val: "@SUM(1,2)" },
+      { val: "\ttabbed" },
+    ]);
+    expect(csv).toContain("'=cmd");
+    expect(csv).toContain("'+12345");
+    expect(csv).toContain("'-100");
+    expect(csv).toContain("'@SUM(1,2)");
+    expect(csv).toContain("'\ttabbed");
+  });
 });

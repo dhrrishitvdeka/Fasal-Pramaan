@@ -15,8 +15,8 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA extensions TO postgres, anon, authentic
 -- 3. Create a PRIVATE Storage Bucket for Evidence Photos
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
-    'fasalpramaan-evidence',
-    'fasalpramaan-evidence',
+    'fasal-web-evidence',
+    'fasal-web-evidence',
     false,
     15728640, -- 15 MB
     ARRAY['image/jpeg', 'image/png', 'image/webp']
@@ -34,12 +34,12 @@ DROP POLICY IF EXISTS "Authenticated User Upload Access" ON storage.objects;
 CREATE POLICY "Service Role Upload Access"
 ON storage.objects FOR INSERT
 TO service_role
-WITH CHECK (bucket_id = 'fasalpramaan-evidence');
+WITH CHECK (bucket_id = 'fasal-web-evidence');
 
 CREATE POLICY "Authenticated User Upload Access"
 ON storage.objects FOR INSERT
 TO authenticated
-WITH CHECK (bucket_id = 'fasalpramaan-evidence');
+WITH CHECK (bucket_id = 'fasal-web-evidence');
 
 -- ============================================================================
 -- Completed! Next step: Run Alembic migrations against this database:

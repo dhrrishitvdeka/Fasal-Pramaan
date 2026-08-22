@@ -161,6 +161,13 @@ export async function geminiGate(
       ? "Peril is 'Drought Stress'. Look for wilting leaves, severe yellowing/chlorosis, or parched soil."
       : "Verify authentic outdoor agricultural field conditions.";
 
+  const safeObservation = metadata?.farmerObservation
+    ? String(metadata.farmerObservation)
+        .replace(/["`\r\n]/g, " ")
+        .trim()
+        .slice(0, 200)
+    : "";
+
   const metaContextLines = metadata
     ? `
 Capture Metadata Context:
@@ -169,7 +176,7 @@ Capture Metadata Context:
 - Camera Facing: ${metadata.facing ?? "environment"}
 - Dimensions: ${metadata.dimensions ? `${metadata.dimensions.width}x${metadata.dimensions.height}` : "N/A"}
 - Realtime Edge CV: ${metadata.cvAnalysis?.greenPct ?? "N/A"}% canopy coverage, Luma ${metadata.cvAnalysis?.luma ?? "N/A"}, Blur score ${metadata.cvAnalysis?.blurScore ?? "N/A"}
-- Farmer Observation: "${metadata.farmerObservation || "(none)"}"
+- UNTRUSTED USER CLAIM: """${safeObservation || "(none)"}"""
 `
     : "";
 
@@ -204,12 +211,15 @@ Angle: ${angleType}, Peril: ${peril || "normal"}`;
 
   const model =
     process.env.GEMINI_VISION_MODEL || process.env.GEMINI_LIVE_MODEL || "gemini-2.0-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       body: JSON.stringify({
         contents: [
           {
