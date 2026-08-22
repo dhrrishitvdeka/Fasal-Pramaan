@@ -641,16 +641,15 @@ export function analyzeInWorker(
 
   let bbox: { x: number; y: number; w: number; h: number } | null = null;
   if (cropDetected && maxX >= minX && maxY >= minY) {
-    const bx = minX / width;
-    const by = minY / height;
-    const bw = (maxX - minX + 1) / width;
-    const bh = (maxY - minY + 1) / height;
-    bbox = {
-      x: clamp(bx, 0, 1),
-      y: clamp(by, 0, 1),
-      w: clamp(bw, 0.15, 1 - clamp(bx, 0, 1)),
-      h: clamp(bh, 0.15, 1 - clamp(by, 0, 1)),
-    };
+    const rawX = minX / width;
+    const rawY = minY / height;
+    const x = clamp(rawX, 0, 0.85);
+    const y = clamp(rawY, 0, 0.85);
+    const rawW = (maxX - minX + 1) / width;
+    const rawH = (maxY - minY + 1) / height;
+    const bw = clamp(rawW, 0.15, 1 - x);
+    const bh = clamp(rawH, 0.15, 1 - y);
+    bbox = { x, y, w: bw, h: bh };
   } else if (cropDetected) {
     bbox = { x: 0.2, y: 0.2, w: 0.6, h: 0.6 };
   }
@@ -703,33 +702,36 @@ if (
 
       if ((req as { bitmap?: unknown }).bitmap) {
         const bitmap = (req as { bitmap: ImageBitmap }).bitmap;
-        const angleId = (req as { angleId?: string }).angleId;
-        const w = 64;
-        const h = 64;
-        let data: Uint8ClampedArray | null = null;
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const OffscreenCanvasCtor: any = (self as unknown as { OffscreenCanvas?: unknown }).OffscreenCanvas;
-          if (OffscreenCanvasCtor) {
-            const off = new OffscreenCanvasCtor(w, h) as OffscreenCanvas;
-            const ctx = off.getContext("2d") as unknown as CanvasRenderingContext2D | null;
-            if (ctx) {
-              ctx.drawImage(bitmap as unknown as CanvasImageSource, 0, 0, w, h);
-              const imageData = ctx.getImageData(0, 0, w, h);
-              data = imageData.data;
+          const angleId = (req as { angleId?: string }).angleId;
+          const w = 64;
+          const h = 64;
+          let data: Uint8ClampedArray | null = null;
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const OffscreenCanvasCtor: any = (self as unknown as { OffscreenCanvas?: unknown }).OffscreenCanvas;
+            if (OffscreenCanvasCtor) {
+              const off = new OffscreenCanvasCtor(w, h) as OffscreenCanvas;
+              const ctx = off.getContext("2d") as unknown as CanvasRenderingContext2D | null;
+              if (ctx) {
+                ctx.drawImage(bitmap as unknown as CanvasImageSource, 0, 0, w, h);
+                const imageData = ctx.getImageData(0, 0, w, h);
+                data = imageData.data;
+              }
             }
+          } catch {
+            // ignore
           }
-        } catch {
-          // ignore
-        }
-        try {
-          bitmap.close();
-        } catch {
-          // ignore
-        }
-        if (data) {
-          const verdict = await classifySample(data, w, h);
-          result = analyzeInWorker(data, w, h, angleId, verdict);
+          if (data) {
+            const verdict = await classifySample(data, w, h);
+            result = analyzeInWorker(data, w, h, angleId, verdict);
+          }
+        } finally {
+          try {
+            bitmap.close();
+          } catch {
+            // ignore
+          }
         }
       } else if ((req as { buffer?: unknown }).buffer) {
         const { width, height, buffer, angleId } = req as {

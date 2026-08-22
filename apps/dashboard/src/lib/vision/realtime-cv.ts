@@ -440,16 +440,15 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
 
     let bbox: { x: number; y: number; w: number; h: number } | null = null;
     if (cropDetected && maxX >= minX && maxY >= minY) {
-      const bx = minX / w;
-      const by = minY / h;
-      const bw = (maxX - minX + 1) / w;
-      const bh = (maxY - minY + 1) / h;
-      bbox = {
-        x: clamp(bx, 0, 1),
-        y: clamp(by, 0, 1),
-        w: clamp(bw, 0.15, 1 - clamp(bx, 0, 1)),
-        h: clamp(bh, 0.15, 1 - clamp(by, 0, 1)),
-      };
+      const rawX = minX / w;
+      const rawY = minY / h;
+      const x = clamp(rawX, 0, 0.85);
+      const y = clamp(rawY, 0, 0.85);
+      const rawW = (maxX - minX + 1) / w;
+      const rawH = (maxY - minY + 1) / h;
+      const bw = clamp(rawW, 0.15, 1 - x);
+      const bh = clamp(rawH, 0.15, 1 - y);
+      bbox = { x, y, w: bw, h: bh };
     } else if (cropDetected) {
       bbox = { x: 0.2, y: 0.2, w: 0.6, h: 0.6 };
     }
@@ -479,6 +478,23 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
 
 let cvWorker: Worker | null = null;
 let cvWorkerInitFailed = false;
+
+let scratchCanvas: HTMLCanvasElement | null = null;
+let scratchCtx: CanvasRenderingContext2D | null = null;
+
+function getScratchCanvas(w: number, h: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+  if (typeof document === "undefined") return null;
+  if (!scratchCanvas) {
+    scratchCanvas = document.createElement("canvas");
+  }
+  if (scratchCanvas.width !== w) scratchCanvas.width = w;
+  if (scratchCanvas.height !== h) scratchCanvas.height = h;
+  if (!scratchCtx) {
+    scratchCtx = scratchCanvas.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D | null;
+  }
+  if (!scratchCtx) return null;
+  return { canvas: scratchCanvas, ctx: scratchCtx };
+}
 
 export type CvModelStatus = "unknown" | "loading" | "ready" | "unavailable";
 
@@ -592,6 +608,9 @@ export async function analyzeVideoFrameAsync(
           try {
             worker.postMessage({ id, bitmap, angleId }, [bitmap as unknown as Transferable]);
           } catch {
+            try {
+              bitmap.close();
+            } catch {}
             if (!settled) {
               settled = true;
               cleanup();
@@ -608,13 +627,10 @@ export async function analyzeVideoFrameAsync(
     try {
       const w = Math.min(vw, 64);
       const h = Math.min(vh, 64);
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return analyzeVideoFrame(video, angleId);
-      ctx.drawImage(video, 0, 0, w, h);
-      const imageData = ctx.getImageData(0, 0, w, h);
+      const scratch = getScratchCanvas(w, h);
+      if (!scratch) return analyzeVideoFrame(video, angleId);
+      scratch.ctx.drawImage(video, 0, 0, w, h);
+      const imageData = scratch.ctx.getImageData(0, 0, w, h);
       const buffer = imageData.data.buffer.slice(0) as ArrayBuffer;
       const id = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
       const result = await new Promise<CvFrameResult | null>((resolve) => {

@@ -154,8 +154,8 @@ export async function gateImagesGate(
     perImage.push({ ...res, angleType: img.angleType });
   }
 
-  const blocking = perImage.find((r) => !r.usable && GATE_BLOCK_REASONS.has(r.reason));
-  const gateFailed = Boolean(blocking);
+  const blocking = perImage.find((r) => !r.usable);
+  const gateFailed = perImage.some((r) => !r.usable);
   const blockingReason = blocking?.reason;
 
   const gateResult = {
@@ -476,10 +476,18 @@ export function sanitizeHfPrediction(prediction: HfPrediction): HfPrediction {
 export function computeEvidencePreview(images: PersistedImageInput[], peril?: string | null) {
   const reqAngles: readonly string[] =
     (peril && ROUTE_CONFIG[peril as Peril]?.requiredAngles) || REQUIRED_ANGLES;
-  const present = new Set(images.map((img) => img.angleType));
-  const usable = images.filter(imageIsPresent);
-  const coverage = Math.min(100, Math.round((usable.length / Math.max(1, reqAngles.length)) * 100));
-  const missing = reqAngles.filter((angle) => !present.has(angle));
+  const reqAnglesSet = new Set(reqAngles);
+  const presentUsableAngles = new Set(
+    images
+      .filter(imageIsPresent)
+      .map((img) => img.angleType)
+      .filter((a) => reqAnglesSet.has(a)),
+  );
+  const coverage = Math.min(
+    100,
+    Math.round((presentUsableAngles.size / Math.max(1, reqAngles.length)) * 100),
+  );
+  const missing = reqAngles.filter((angle) => !presentUsableAngles.has(angle));
   const measuredQuality = images
     .map((img) => img.blurScore)
     .filter((value): value is number => typeof value === "number");
@@ -499,7 +507,7 @@ export function computeEvidencePreview(images: PersistedImageInput[], peril?: st
     overallConfidence: overall,
     missingAngles: missing,
     qualityNotes: measuredQuality.length ? "Measured from capture metadata" : "Quality not measured",
-    coverageNotes: `${usable.length}/${reqAngles.length} required angles present`,
+    coverageNotes: `${presentUsableAngles.size}/${reqAngles.length} required angles present`,
     contextNotes: gpsOk ? "GPS coordinates present on at least one image" : "GPS unavailable",
     integrityNotes: realHashes ? `${realHashes} SHA-256 digest(s) stored` : "No SHA-256 digest stored",
   };
@@ -659,6 +667,7 @@ export async function persistAndInfer(
   const persisted = await persistFarmerSubmission(store, input, gate);
   // Assemble multi-signal context internally (not via HTTP) and persist to claim with context_signals.
   // Best-effort: do not fail pipeline if context fetch errors or column missing.
+  let effectiveSignals: ContextSignal[] = (input.contextSignals || []) as ContextSignal[];
   try {
     if (!input.contextSignals || input.contextSignals.length === 0) {
       const lat = input.captureLat ?? input.images.find((i) => i.lat != null)?.lat ?? null;
@@ -673,6 +682,7 @@ export async function persistAndInfer(
         plotLon: input.plotLon ?? null,
       });
       if (Array.isArray((ctx as any).signals) && (ctx as any).signals.length) {
+        effectiveSignals = (ctx as any).signals as ContextSignal[];
         try {
           await store.updateClaim(persisted.claimId, {
             context_signals: (ctx as any).signals as any,
@@ -689,58 +699,48 @@ export async function persistAndInfer(
     // swallow context assembly errors
   }
   // ----- Vision gate blocking (uses the gate computed early above; cache behavior unchanged) -----
-  // If any image Gate usable==false with reason wrong_crop|ai_generated|too_dark|not_crop,
-  // then set claim's gate_result JSON and return unusablePrediction.
-  try {
-    if (gate && gate.gateFailed) {
-      const reason = gate.blockingReason || "unusable";
-      const gatePayload = gate.gateResult;
-      try {
-        await store.updateClaim(persisted.claimId, {
-          gate_result: gatePayload as any,
-          quality_notes: `Gate rejected: ${reason}`,
-          overall_confidence: 0,
-          updated_at: new Date().toISOString(),
-        } as any);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (!/gate_result/i.test(msg)) throw e;
-      }
-      const prediction = unusablePrediction([reason]);
+  // If any image Gate usable==false, set claim's gate_result JSON and return unusablePrediction terminally.
+  if (gate && gate.gateFailed) {
+    const reason = gate.blockingReason || "unusable";
+    const gatePayload = gate.gateResult;
+    try {
+      await store.updateClaim(persisted.claimId, {
+        gate_result: gatePayload as any,
+        quality_notes: `Gate rejected: ${reason}`,
+        overall_confidence: 0,
+        updated_at: new Date().toISOString(),
+      } as any);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/gate_result/i.test(msg)) throw e;
+    }
+    const prediction = unusablePrediction([reason]);
+    try {
       await attachHfPrediction(store, persisted.claimId, prediction);
       // re-ensure gate_result + overallConfidence 0 after attach (attach overwrites quality_notes)
-      try {
-        await store.updateClaim(persisted.claimId, {
-          gate_result: gatePayload as any,
-          quality_notes: `Gate rejected: ${reason}`,
-          overall_confidence: 0,
-        } as any);
-      } catch {}
-      return { claimId: persisted.claimId, prediction };
+      await store.updateClaim(persisted.claimId, {
+        gate_result: gatePayload as any,
+        quality_notes: `Gate rejected: ${reason}`,
+        overall_confidence: 0,
+      } as any);
+    } catch {}
+    return { claimId: persisted.claimId, prediction };
+  }
+  // Gate passed — persist successful gate_result for audit trail (best-effort)
+  if (gate && gate.perImage.length) {
+    try {
+      await store.updateClaim(persisted.claimId, {
+        gate_result: gate.gateResult as any,
+        updated_at: new Date().toISOString(),
+      } as any);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/gate_result/i.test(msg)) throw e;
     }
-    // Gate passed — persist successful gate_result for audit trail (best-effort)
-    if (gate && gate.perImage.length) {
-      try {
-        await store.updateClaim(persisted.claimId, {
-          gate_result: gate.gateResult as any,
-          updated_at: new Date().toISOString(),
-        } as any);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (!/gate_result/i.test(msg)) throw e;
-      }
-    }
-  } catch {
-    // gate errors should not block inference — fallback to HF infer
   }
   // ----- Adaptive engine: compute level/nextStep and persist for reviewer queue -----
   try {
     const previewForAdaptive = computeEvidencePreview(input.images, input.peril);
-    const storedSignals = (() => {
-      const stored = (persisted.claim as any).context_signals;
-      if (Array.isArray(stored)) return stored as ContextSignal[];
-      return (input.contextSignals || []) as ContextSignal[];
-    })();
     const adaptive: AdaptiveResult = adaptiveConfidence({
       quality: previewForAdaptive.qualityScore,
       coverage: previewForAdaptive.coverageScore,
@@ -748,7 +748,7 @@ export async function persistAndInfer(
       integrity: previewForAdaptive.integrityScore,
       overall: previewForAdaptive.overallConfidence,
       peril: (input.peril as any) || "normal",
-      signals: storedSignals,
+      signals: effectiveSignals,
       missingAngles: previewForAdaptive.missingAngles,
     });
     // Confidence delta vs. the claim as stored before this write (meaningful on re-submission).
@@ -938,42 +938,38 @@ export async function recaptureAndInfer(
   });
 
   // ----- Vision gate blocking for recapture (uses the gate computed early above) -----
-  try {
-    if (gate && gate.gateFailed) {
-      const reason = gate.blockingReason || "unusable";
-      const gatePayload = gate.gateResult;
-      try {
-        await store.updateClaim(input.claimId, {
-          gate_result: gatePayload as any,
-          quality_notes: `Gate rejected: ${reason}`,
-          overall_confidence: 0,
-          updated_at: new Date().toISOString(),
-        } as any);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (!/gate_result/i.test(msg)) throw e;
-      }
-      const prediction = unusablePrediction([reason]);
+  if (gate && gate.gateFailed) {
+    const reason = gate.blockingReason || "unusable";
+    const gatePayload = gate.gateResult;
+    try {
+      await store.updateClaim(input.claimId, {
+        gate_result: gatePayload as any,
+        quality_notes: `Gate rejected: ${reason}`,
+        overall_confidence: 0,
+        updated_at: new Date().toISOString(),
+      } as any);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/gate_result/i.test(msg)) throw e;
+    }
+    const prediction = unusablePrediction([reason]);
+    try {
       await attachHfPrediction(store, input.claimId, prediction);
-      try {
-        await store.updateClaim(input.claimId, {
-          gate_result: gatePayload as any,
-          quality_notes: `Gate rejected: ${reason}`,
-          overall_confidence: 0,
-        } as any);
-      } catch {}
-      return { claimId: input.claimId, prediction };
-    }
-    if (gate && gate.perImage.length) {
-      try {
-        await store.updateClaim(input.claimId, {
-          gate_result: gate.gateResult as any,
-          updated_at: new Date().toISOString(),
-        } as any);
-      } catch {}
-    }
-  } catch {
-    // gate errors should not block inference
+      await store.updateClaim(input.claimId, {
+        gate_result: gatePayload as any,
+        quality_notes: `Gate rejected: ${reason}`,
+        overall_confidence: 0,
+      } as any);
+    } catch {}
+    return { claimId: input.claimId, prediction };
+  }
+  if (gate && gate.perImage.length) {
+    try {
+      await store.updateClaim(input.claimId, {
+        gate_result: gate.gateResult as any,
+        updated_at: new Date().toISOString(),
+      } as any);
+    } catch {}
   }
 
   // ----- Adaptive engine for recapture (same policy as first submission) -----
@@ -1056,7 +1052,7 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
     capture_lon: claim.capture_lon,
     capture_accuracy_m: claim.capture_accuracy_m,
     farmer_observations: claim.farmer_observations,
-    severity: claim.severity_grade,
+    severity: claim.corrected_grade || claim.corrected_severity || claim.severity_grade,
     final_assessment_notes: claim.reviewer_notes,
     peril: (claim as any).peril || null,
     intent_id: (claim as any).intent_id || null,
@@ -1081,7 +1077,10 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
           model_version: claim.model_id || "",
           adapter_type: "crop_health_v4",
           is_production_validated: false,
-          predicted_crop: workflowGrade(claim.severity_grade) === "U" ? "unknown" : claim.crop_identified,
+          predicted_crop:
+            workflowGrade(claim.severity_grade) === "U"
+              ? "unknown"
+              : claim.corrected_crop || claim.crop_identified,
           crop_confidence:
             workflowGrade(claim.severity_grade) === "U" ? 0 : (claim.crop_confidence ?? 0) / 100,
           predicted_grade: workflowGrade(claim.severity_grade),
@@ -1175,6 +1174,24 @@ export async function applyReviewerAction(
   if (!existing) {
     throw new Error("Claim not found");
   }
+
+  if (payload.action === "accept") {
+    const gateResult = (existing as any).gate_result as
+      | { gateFailed?: boolean; overridden?: boolean }
+      | null
+      | undefined;
+    if (gateResult?.gateFailed && !gateResult.overridden) {
+      throw new Error(
+        "Cannot accept claim: authenticity gate verification failed. Override gate or request recapture first.",
+      );
+    }
+    if (existing.integrity_score != null && existing.integrity_score < 50) {
+      throw new Error(
+        "Cannot accept claim: integrity score is below 50. Request physical inspection or recapture.",
+      );
+    }
+  }
+
   let status = existing.status;
   if (payload.action === "request_recapture") status = "needs_recapture";
   else if (payload.action === "accept" || payload.action === "correct") status = "verified";
@@ -1241,6 +1258,31 @@ export async function applyReviewerAction(
     patch.quality_notes = existing.quality_notes
       ? `${existing.quality_notes} (gate overridden)`
       : "(gate overridden)";
+
+    // Recalculate preview from stored images to restore non-zero confidence
+    try {
+      const images = await store.listImages(id);
+      if (images.length > 0) {
+        const preview = computeEvidencePreview(
+          images.map((img) => ({
+            angleType: img.angle_type,
+            lat: img.lat ?? undefined,
+            lon: img.lon ?? undefined,
+            sha256: img.sha256 ?? undefined,
+            blurScore: img.blur_score ?? undefined,
+            lightingScore: img.lighting_score ?? undefined,
+            qualityPassed: true, // overridden by reviewer
+          })),
+          (existing as any).peril,
+        );
+        patch.quality_score = preview.qualityScore;
+        patch.coverage_score = preview.coverageScore;
+        patch.context_score = preview.contextScore;
+        patch.integrity_score = preview.integrityScore;
+        patch.overall_confidence = preview.overallConfidence;
+        patch.missing_angles = preview.missingAngles;
+      }
+    } catch {}
   }
 
   try {
