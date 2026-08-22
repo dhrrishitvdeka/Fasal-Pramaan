@@ -24,6 +24,11 @@ private/
 .codex/
 .grok/
 .commandcode/
+.gemini/
+.antigravity/
+.cursor/
+.claude/
+.windsurf/
 apps/dashboard/AGENTS.md
 apps/dashboard/CLAUDE.md
 
@@ -31,12 +36,18 @@ apps/dashboard/CLAUDE.md
 # Node / Next.js / Frontend
 # ------------------------------------------
 node_modules/
+**/node_modules/
 .next/
+**/.next/
 out/
+**/out/
+build/
+dist/
 .turbo/
 .cache/
 .vercel/
 apps/dashboard/.vercel/
+**/.vercel/
 *.orig
 .npm
 *.tsbuildinfo
@@ -53,15 +64,25 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+.nyc_output/
 
 # ------------------------------------------
-# Python (scripts/test_supabase_conn.py only)
+# Python & ML / Machine Learning Models
 # ------------------------------------------
 __pycache__/
+**/__pycache__/
 *.py[cod]
+*$py.class
 .venv/
 venv/
+ENV/
+env/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.onnx
+*.tflite
+*.safetensors
 
 # ------------------------------------------
 # IDE & Text Editors
@@ -88,7 +109,7 @@ desktop.ini
 $RECYCLE.BIN/
 
 # ------------------------------------------
-# Temp & Scratch Folders
+# Temp, Scratch & Nested Artifacts
 # ------------------------------------------
 tmp/
 temp/
@@ -98,3 +119,4 @@ temp/
 .scratch_*
 reports/
 artifacts/
+Fasal-Pramaan-main/

@@ -39,6 +39,22 @@ textarea,
     "Noto Sans", "Noto Sans Devanagari", sans-serif;
 }
 
+button,
+[role="button"],
+a,
+nav,
+.fp-badge,
+.fp-kicker {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+button,
+[role="button"],
+a {
+  cursor: pointer;
+}
+
 .leaflet-container {
   font: inherit;
   z-index: 0;
