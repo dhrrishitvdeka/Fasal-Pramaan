@@ -221,6 +221,56 @@ export const SAATHI_FUNCTION_DECLARATIONS = [
       ["peril", "confidence"],
     ),
   },
+  {
+    name: "take_photo",
+    description: "Trigger the camera shutter to capture a photo for the currently active angle.",
+    parameters: objectSchema({}),
+  },
+  {
+    name: "switch_camera",
+    description: "Switch between back (environment) camera and front camera.",
+    parameters: objectSchema({}),
+  },
+  {
+    name: "select_angle",
+    description: "Switch the active camera viewfinder to a specific canonical angle in the capture studio.",
+    parameters: objectSchema(
+      {
+        angle: { type: "STRING", enum: CANONICAL_ANGLES.map((a) => a.id), description: "Target angle identifier" },
+      },
+      ["angle"],
+    ),
+  },
+  {
+    name: "retake_angle",
+    description: "Clear an existing photo and set the viewfinder to retake that specific angle.",
+    parameters: objectSchema(
+      {
+        angle: { type: "STRING", enum: CANONICAL_ANGLES.map((a) => a.id), description: "Angle identifier to retake" },
+      },
+      ["angle"],
+    ),
+  },
+  {
+    name: "set_observation",
+    description: "Save or update the farmer's verbal observations/damage description on the claim draft.",
+    parameters: objectSchema(
+      {
+        observation: { type: "STRING", description: "Farmer damage description or notes" },
+      },
+      ["observation"],
+    ),
+  },
+  {
+    name: "submit_claim",
+    description: "Submit the drafted evidence claim for neural loss evaluation and verification.",
+    parameters: objectSchema({}),
+  },
+  {
+    name: "check_evidence_quality",
+    description: "Inspect live computer vision metrics, canopy coverage %, exposure, and focus sharpness.",
+    parameters: objectSchema({}),
+  },
 ] as const;
 
 // For Gemini Live bidiGenerateContentSetup.tools you can pass SAATHI_FUNCTION_DECLARATIONS directly.

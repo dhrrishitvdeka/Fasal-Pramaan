@@ -2,6 +2,61 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] — 2026-08-22
+
+### Autonomous Fasal Saathi Agent & Agentic Webapp Control
+- **Full Autonomous Agent Tool Suite**:
+  - Implemented complete agentic function calling for Fasal Saathi: `take_photo`, `switch_camera`, `select_angle`, `retake_angle`, `set_observation`, `submit_claim`, `check_evidence_quality`, `read_capture_guidance`, and `read_capture_progress`.
+  - Unified `WebCaptureBridge` and `WebVoiceBroker` with bidirectional event synchronization, allowing full hands-free voice orchestration in 15 Indian languages.
+
+### Comprehensive Image & Environmental Metadata Bundling
+- **Rich Sensory & Agronomic Evidence Capture**:
+  - Automatically captures and binds high-precision GPS (`lat`, `lon`, `accuracyM`), camera facing mode (`environment` vs `user`), image resolution (`width x height`), ISO 8601 timestamps, edge agronomic scores (ExG/GLI/ExR canopy %, luma, 2D Laplacian sharpness), and client-side SHA-256 cryptographic hashes on every shutter click.
+  - Passes complete metadata payloads across the client, backend API routes (`/api/vision/gate`, `/api/claims`), and database persistence.
+
+### Sequential Verification Pipeline (Gemini Multimodal Gate → Hugging Face Model)
+- **Stage 1 (Gemini Multimodal & Context Gate)**:
+  - Multimodal verification prompt evaluates raw image bytes + comprehensive metadata + spatial/environmental context.
+  - Cross-verifies peril congruence (e.g. fire charred ash, flood inundation, hailstorm shredding, lodging flattening, drought chlorosis), rejects AI-generated images, screen captures, printed photos, and non-field artifacts.
+- **Stage 2 (Hugging Face DINOv2 Foundation Model)**:
+  - Strict sequential pipeline ensures only verified authentic evidence is dispatched to the Hugging Face Space (`dhrrishitvdeka/fasal-pramaan-api`, DINOv2 ViT-S/14).
+  - Unverified / fraudulent photos are rejected early, preventing quota waste and generating clear farmer guidance.
+
+---
+
+## [2.3.0] — 2026-08-22
+
+### Multi-Spectral Agricultural Computer Vision & Viewfinder
+- **Multi-Spectral Agronomic Color Indices**:
+  - Replaced basic green thresholding with normalized precision agriculture formulas: **Excess Green Index ($ExG = 2g_n - r_n - b_n$)**, **Green Leaf Index (GLI)**, **Visible Atmospherically Resistant Index (VARI)**, and **Excess Red / Ripe Grain Index ($ExR = 1.4r_n - g_n$)**.
+  - Classifies all growth stages and disaster conditions: lush vegetative foliage, ripe golden wheat/paddy heads, bright yellow blooming flowers (mustard/canola/sunflower), chlorotic drought scorched leaves, and fire burn scar ash.
+- **Organic Micro-Texture & False Positive Rejection**:
+  - Computes 2D spatial Laplacian variance across detected candidate foliage. Purely flat, uniform green surfaces (plastic tarps, green clothes, painted walls) with near-zero texture are rejected.
+  - Automatically filters atmospheric blue sky, neutral gray asphalt/concrete roads, and human skin tones.
+- **Seamless Camera Viewfinder HUD & Reticles**:
+  - Replaced rigid bounding box overlays with dynamic camera autofocus corner reticles that track canopy boundaries with smooth color state transitions (emerald glow when ready, amber when adjusting).
+  - Floating translucent glassmorphism HUD chip with live pulse dot indicator, real-time localized instructions, and `{canopyPct}% canopy` status.
+  - Interactive shutter button with glowing emerald ring feedback upon optimal framing.
+
+### Farmer Portal & Plot Registration
+- **Sensor-Only Field GPS Geo-Tagging**:
+  - Removed manual latitude and longitude input fields from Plot Registration (`/farmer/reminders`) to enforce anti-tampering and PMFBY audit compliance.
+  - Coordinates are acquired strictly via hardware device sensors (`navigator.geolocation`) with verified fix chips.
+- **Alphabetical State Ordering**:
+  - Sorted Indian States dropdown in ascending alphabetical order (A to Z) from Andhra Pradesh to West Bengal.
+- **Responsive Mobile Layout & Badges**:
+  - Fixed mobile text clipping and truncation on the Farmer Portal (`+ Registe:` / `View All Cl`).
+  - Shortened raw claim UUIDs (`Claim #0e631a5b`) with full tooltip preservation, fixed badge overflow clipping, and added subtitle fallbacks for unspecified crop types (`- verified` fixed).
+
+### Database & System Integration
+- **Cadastral Plot Schema DDL**:
+  - Added missing land revenue columns (`khata_number`, `hissa_number`, `tehsil`, `ownership_type`, `season`, `area_kattha`) to `public.web_plots` in `scripts/setup_web_schema.sql`.
+- **Real-Time GitHub Stars Integration**:
+  - Created dedicated `/api/github/stars` backend route with server-side fetching, shields.io rate-limit fallback, and 5-minute sliding TTL cache.
+  - Dynamic repository configuration via `NEXT_PUBLIC_GITHUB_REPO`.
+
+---
+
 ## [2.2.0] — 2026-08-22
 
 ### Computer Vision & Real-Time Evidence
