@@ -9,6 +9,13 @@ const ALLOWED_TOOLS = new Set([
   "call_context_signal",
   "guide_capture",
   "classify_claim",
+  "take_photo",
+  "switch_camera",
+  "select_angle",
+  "retake_angle",
+  "set_observation",
+  "submit_claim",
+  "check_evidence_quality",
 ]);
 const ANGLE_IDS = new Set(CANONICAL_ANGLES.map((a) => a.id));
 
@@ -61,6 +68,21 @@ function sanitizeArgs(name: string, raw: unknown): Record<string, unknown> | nul
         out.contextNotes = args.contextNotes.trim().slice(0, 2000);
       }
       return out;
+    }
+    case "take_photo":
+    case "switch_camera":
+    case "submit_claim":
+    case "check_evidence_quality": {
+      return {};
+    }
+    case "select_angle":
+    case "retake_angle": {
+      const angle = typeof args.angle === "string" ? args.angle.trim() : "";
+      return { angle: ANGLE_IDS.has(angle) ? angle : "closeup_damage" };
+    }
+    case "set_observation": {
+      const observation = typeof args.observation === "string" ? args.observation.trim().slice(0, 1000) : "";
+      return { observation };
     }
     default:
       return null;

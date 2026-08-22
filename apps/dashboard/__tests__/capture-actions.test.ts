@@ -46,7 +46,7 @@ describe("voice shutter and submit outcomes", () => {
     expect(saved).toEqual(["data:image/jpeg;base64,xx"]);
   });
 
-  it("does not save a black frame", async () => {
+  it("does not save a black frame for normal peril", async () => {
     const saved: string[] = [];
     const result = await runVoiceShutter({
       cameraActive: true,
@@ -59,6 +59,21 @@ describe("voice shutter and submit outcomes", () => {
     expect(result.ok).toBe(false);
     expect(result.message).toMatch(/too dark/i);
     expect(saved).toEqual([]);
+  });
+
+  it("permits dark or charred frames when peril is fire_burn", async () => {
+    const saved: string[] = [];
+    const result = await runVoiceShutter({
+      cameraActive: true,
+      grabFrame: async () => ({ dataUrl: "data:image/jpeg;base64,xx", lightingScore: 0 }),
+      saveFrame: async (dataUrl) => {
+        saved.push(dataUrl);
+      },
+      angleId: "closeup_damage",
+      peril: "fire_burn",
+    });
+    expect(result.ok).toBe(true);
+    expect(saved).toEqual(["data:image/jpeg;base64,xx"]);
   });
 
   it("awaits save before reporting shutter success", async () => {

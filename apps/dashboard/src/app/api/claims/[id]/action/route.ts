@@ -64,9 +64,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
     return NextResponse.json(updated);
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Action failed";
+    const status = message === "Claim not found" ? 404 : message.startsWith("Cannot accept claim") ? 400 : 500;
     return NextResponse.json(
-      { error: error instanceof Error && error.message === "Claim not found" ? "Claim not found" : "Action failed" },
-      { status: error instanceof Error && error.message === "Claim not found" ? 404 : 500 },
+      { error: message },
+      { status },
     );
   }
 }

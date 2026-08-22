@@ -58,28 +58,43 @@ describe("adaptive engine", () => {
     expect(res.reasons.join(" ")).toMatch(/integrity/i);
   });
 
-  it("holds fire_burn at medium/request_missing until Sentinel burn-scar is available", () => {
+  it("holds fire_burn at medium/proceed when photos are complete but Sentinel burn-scar is unavailable", () => {
     const res = adaptiveConfidence({
       ...base,
       overall: 90,
       peril: "fire_burn",
       signals: [sig("sentinel", "unavailable")],
+      missingAngles: [],
     });
     expect(res.level).toBe("medium");
-    expect(res.nextStep).toBe("request_missing");
+    expect(res.nextStep).toBe("proceed");
     expect(res.reasons.join(" ")).toMatch(/satellite/i);
   });
 
-  it("asks animal_damage farmers for a GPS trail when the gps signal is missing", () => {
+  it("requests missing angles for fire_burn when photos are incomplete and Sentinel is unavailable", () => {
+    const res = adaptiveConfidence({
+      ...base,
+      overall: 90,
+      peril: "fire_burn",
+      signals: [sig("sentinel", "unavailable")],
+      missingAngles: ["wide_field"],
+    });
+    expect(res.level).toBe("medium");
+    expect(res.nextStep).toBe("request_missing");
+    expect(res.missingAngles).toEqual(["wide_field"]);
+  });
+
+  it("asks animal_damage farmers for a GPS trail without injecting non-canonical angle IDs", () => {
     const res = adaptiveConfidence({
       ...base,
       overall: 76,
       peril: "animal_damage",
       signals: [sig("imd", "available", { rainfall_7d_mm: 4 })],
+      missingAngles: [],
     });
     expect(res.level).toBe("medium");
     expect(res.nextStep).toBe("request_missing");
-    expect(res.missingAngles).toEqual(["__gps__"]);
+    expect(res.missingAngles).toEqual([]);
   });
 
   it("filters reported missing angles down to the peril's required set only", () => {

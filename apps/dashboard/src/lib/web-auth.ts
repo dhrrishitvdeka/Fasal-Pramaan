@@ -27,12 +27,10 @@ function asRoleList(value: unknown): string[] {
 export function resolveWebRole(input: {
   email?: string | null;
   appRoles?: unknown;
-  userRoles?: unknown;
   profileRole?: string | null;
 }): WebRole {
   const listed = [
     ...asRoleList(input.appRoles),
-    ...asRoleList(input.userRoles),
     String(input.profileRole || "")
       .trim()
       .toLowerCase(),
@@ -91,7 +89,6 @@ export async function requireWebActor(
   const role = resolveWebRole({
     email: user.email,
     appRoles: user.app_metadata?.roles,
-    userRoles: user.user_metadata?.roles,
     profileRole,
   });
   if (server) {

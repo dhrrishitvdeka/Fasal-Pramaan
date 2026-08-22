@@ -1,5 +1,7 @@
 export interface EvidenceImageInput {
   imageUrl?: string;
+  angleId?: string;
+  angleType?: string;
   qualityPassed?: boolean;
   blurScore?: number | null;
   lightingScore?: number | null;
@@ -38,7 +40,7 @@ export async function sha256Hex(data: ArrayBuffer | Uint8Array): Promise<string>
   const source = data instanceof Uint8Array ? data : new Uint8Array(data);
   const copy = new Uint8Array(source.byteLength);
   copy.set(source);
-  const digest = await crypto.subtle.digest("SHA-256", copy);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", copy);
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -124,8 +126,16 @@ function mean(values: number[]): number | null {
 
 /** Honest local evidence preview from captured signals only. Never invents scores. */
 export function computeEvidencePreview(images: EvidenceImageInput[]): EvidencePreview {
-  const usable = images.filter((img) => Boolean(img.imageUrl) && img.qualityPassed);
-  const coverageScore = Math.round((usable.length / REQUIRED_ANGLES.length) * 100);
+  const reqSet = new Set(REQUIRED_ANGLES);
+  const distinctUsableRequired = new Set(
+    images
+      .filter((img) => {
+        const id = img.angleId || img.angleType;
+        return Boolean(img.imageUrl) && img.qualityPassed && id && reqSet.has(id as any);
+      })
+      .map((img) => (img.angleId || img.angleType)!),
+  );
+  const coverageScore = Math.round((distinctUsableRequired.size / REQUIRED_ANGLES.length) * 100);
 
   const qualityParts = images
     .map((img) => {
@@ -159,7 +169,7 @@ export function computeEvidencePreview(images: EvidenceImageInput[]): EvidencePr
     qualityNotes: qualityAvailable
       ? `Quality from measured blur/lighting on ${qualityParts.length} image(s).`
       : "Quality not measured — left at 0 rather than estimated.",
-    coverageNotes: `${usable.length} of ${REQUIRED_ANGLES.length} usable captured angles.`,
+    coverageNotes: `${distinctUsableRequired.size} of ${REQUIRED_ANGLES.length} usable captured angles.`,
     contextNotes:
       gpsOk.length === images.length && images.length > 0
         ? "All frames include a real GPS fix."

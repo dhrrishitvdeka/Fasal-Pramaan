@@ -75,6 +75,11 @@ CREATE TABLE IF NOT EXISTS public.web_claims (
   capture_lon double precision,
   capture_accuracy_m double precision,
   gps_status text,
+  peril text DEFAULT 'normal',
+  intent_id text,
+  gate_result jsonb,
+  context_signals jsonb,
+  adaptive_result jsonb,
   created_by text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -93,7 +98,8 @@ CREATE TABLE IF NOT EXISTS public.web_claim_images (
   sha256 text,
   quality_passed boolean,
   blur_score double precision,
-  lighting_score double precision
+  lighting_score double precision,
+  gate_result jsonb
 );
 
 CREATE TABLE IF NOT EXISTS public.web_milestones (
@@ -150,6 +156,12 @@ ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_severity text;
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_damage_codes text[];
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_affected_area_pct double precision;
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_growth_stage text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS peril text DEFAULT 'normal';
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS intent_id text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS gate_result jsonb;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS context_signals jsonb;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS adaptive_result jsonb;
+ALTER TABLE public.web_claim_images ADD COLUMN IF NOT EXISTS gate_result jsonb;
 
 DROP POLICY IF EXISTS web_plots_anon_all ON public.web_plots;
 DROP POLICY IF EXISTS web_claims_anon_all ON public.web_claims;

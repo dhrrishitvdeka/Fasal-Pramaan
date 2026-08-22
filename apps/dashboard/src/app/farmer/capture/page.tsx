@@ -453,6 +453,7 @@ function CaptureStudioContent() {
       grabFrame: grabCameraFrame,
       saveFrame: (dataUrl, extras) => saveEvidenceImage(dataUrl, extras),
       angleId: currentAngle?.id,
+      peril: requestedPeril,
     });
     if (!result.ok) showToast(result.message);
     return result;
@@ -694,45 +695,63 @@ function CaptureStudioContent() {
     return result;
   };
 
-  useEffect(() => {
-    const total = activeAngleDefs.length;
-    const captured = activeAngleDefs.filter((angle) => Boolean(capturedImages[angle.id])).length;
-    const missingAngles = activeAngleDefs
-      .filter((angle) => !capturedImages[angle.id])
-      .map((a) => a.id);
-    const cvHint = cvResult
-      ? `${lang === "hi" ? cvResult.hintHi : cvResult.hintEn} (${cvResult.greenPct}% canopy, luma ${cvResult.luma ?? "?"})`
-      : "";
+  // Stabilize voice bridge with refs so continuous realtime CV frames do not teardown/re-register handlers
+  const cvResultRef = useRef(cvResult);
+  cvResultRef.current = cvResult;
+  const cameraFacingRef = useRef(cameraFacing);
+  cameraFacingRef.current = cameraFacing;
+  const currentAngleRef = useRef(currentAngle);
+  currentAngleRef.current = currentAngle;
+  const currentAngleIndexRef = useRef(currentAngleIndex);
+  currentAngleIndexRef.current = currentAngleIndex;
+  const activeAngleDefsRef = useRef(activeAngleDefs);
+  activeAngleDefsRef.current = activeAngleDefs;
+  const capturedImagesRef = useRef(capturedImages);
+  capturedImagesRef.current = capturedImages;
+  const langRef = useRef(lang);
+  langRef.current = lang;
+  const activeIntentRef = useRef(activeIntent);
+  activeIntentRef.current = activeIntent;
+  const capturePhotoRef = useRef(capturePhotoFromCamera);
+  capturePhotoRef.current = capturePhotoFromCamera;
+  const handleSubmitClaimRef = useRef(handleSubmitClaim);
+  handleSubmitClaimRef.current = handleSubmitClaim;
 
+  useEffect(() => {
     return webCaptureBridge.register({
-      captureCurrentAngle: () => capturePhotoFromCamera(),
+      captureCurrentAngle: () => capturePhotoRef.current(),
       switchCamera: async () => {
-        setCameraFacing((prev) => (prev === "environment" ? "user" : "environment"));
+        const nextFacing = cameraFacingRef.current === "environment" ? "user" : "environment";
+        setCameraFacing(nextFacing);
         return {
           ok: true,
           message:
-            cameraFacing === "environment"
+            cameraFacingRef.current === "environment"
               ? "Switched to front camera."
               : "Switched to back environment camera.",
-          facing: cameraFacing === "environment" ? "user" : "environment",
+          facing: nextFacing,
         };
       },
       selectAngle: async (angleId: string) => {
-        const idx = activeAngleDefs.findIndex((a) => a.id === angleId);
+        const defs = activeAngleDefsRef.current;
+        const idx = defs.findIndex((a) => a.id === angleId);
         if (idx !== -1) {
           setCurrentAngleIndex(idx);
-          return { ok: true, message: `Switched to angle: ${activeAngleDefs[idx].name}`, angleId };
+          return { ok: true, message: `Switched to angle: ${defs[idx].name}`, angleId };
         }
         return { ok: false, message: `Angle ${angleId} not found in current capture route.` };
       },
       retakeAngle: async (angleId: string) => {
         deleteCapturedAngle(angleId);
-        const idx = activeAngleDefs.findIndex((a) => a.id === angleId);
+        const defs = activeAngleDefsRef.current;
+        const idx = defs.findIndex((a) => a.id === angleId);
         if (idx !== -1) setCurrentAngleIndex(idx);
         return { ok: true, message: `Cleared angle ${angleId} for recapture.`, angleId };
       },
       checkEvidenceQuality: async () => {
-        if (!cvResult) {
+        const cv = cvResultRef.current;
+        const currentLang = langRef.current;
+        if (!cv) {
           return {
             ok: true,
             message: "Camera active, analyzing live crop frame…",
@@ -741,49 +760,54 @@ function CaptureStudioContent() {
         }
         return {
           ok: true,
-          message: lang === "hi" ? cvResult.hintHi : cvResult.hintEn,
-          canopyPct: cvResult.greenPct,
-          blurScore: cvResult.blurScore ?? undefined,
-          hintCode: cvResult.hintCode,
-          shutterReady: !cvResult.shouldBlockShutter,
+          message: currentLang === "hi" ? cv.hintHi : cv.hintEn,
+          canopyPct: cv.greenPct,
+          blurScore: cv.blurScore ?? undefined,
+          hintCode: cv.hintCode,
+          shutterReady: !cv.shouldBlockShutter,
         };
       },
-      readGuidance: async () => ({
-        ok: true,
-        message: currentAngle
-          ? `${currentAngle.name}: ${currentAngle.instructions}${cvHint ? ` | Live CV: ${cvHint}` : ""}${activeIntent ? ` | Peril: ${activeIntent.peril}` : ""}`
-          : "No capture angle is selected.",
-        angle: currentAngle?.id,
-      }),
-      readProgress: async () => ({
-        ok: true,
-        message: currentAngle
-          ? `Captured ${captured} of ${total} angles. Current: ${currentAngle.id}.${missingAngles.length ? ` Missing: ${missingAngles.join(", ")}` : ""}`
-          : `Captured ${captured} of ${total} angles.`,
-        captured,
-        total,
-        currentAngle: currentAngle?.id,
-        missingAngles,
-      }),
+      readGuidance: async () => {
+        const angle = currentAngleRef.current;
+        const cv = cvResultRef.current;
+        const currentLang = langRef.current;
+        const intent = activeIntentRef.current;
+        const cvHint = cv
+          ? `${currentLang === "hi" ? cv.hintHi : cv.hintEn} (${cv.greenPct}% canopy, luma ${cv.luma ?? "?"})`
+          : "";
+        return {
+          ok: true,
+          message: angle
+            ? `${angle.name}: ${angle.instructions}${cvHint ? ` | Live CV: ${cvHint}` : ""}${intent ? ` | Peril: ${intent.peril}` : ""}`
+            : "No capture angle is selected.",
+          angle: angle?.id,
+        };
+      },
+      readProgress: async () => {
+        const angle = currentAngleRef.current;
+        const defs = activeAngleDefsRef.current;
+        const images = capturedImagesRef.current;
+        const total = defs.length;
+        const captured = defs.filter((a) => Boolean(images[a.id])).length;
+        const missingAngles = defs.filter((a) => !images[a.id]).map((a) => a.id);
+        return {
+          ok: true,
+          message: angle
+            ? `Captured ${captured} of ${total} angles. Current: ${angle.id}.${missingAngles.length ? ` Missing: ${missingAngles.join(", ")}` : ""}`
+            : `Captured ${captured} of ${total} angles.`,
+          captured,
+          total,
+          currentAngle: angle?.id,
+          missingAngles,
+        };
+      },
       setObservation: async (observation) => {
         setObservations(observation);
         return { ok: true, message: "Observation stored on the capture draft." };
       },
-      submitDraft: () => handleSubmitClaim(),
+      submitDraft: () => handleSubmitClaimRef.current(),
     });
-  }, [
-    isCameraActive,
-    cameraFacing,
-    currentAngle,
-    currentAngleIndex,
-    isAllCaptured,
-    handleSubmitClaim,
-    capturedImages,
-    activeAngleDefs,
-    cvResult,
-    activeIntent,
-    lang,
-  ]);
+  }, []);
 
   const getAngleIcon = (iconName: string) => {
     switch (iconName) {
