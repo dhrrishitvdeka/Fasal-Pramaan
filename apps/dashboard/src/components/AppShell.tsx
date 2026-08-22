@@ -159,7 +159,6 @@ function ReviewerNav({
       </nav>
 
       <div className="fp-ui space-y-2 border-t border-[var(--line)] p-3">
-        <GitHubStarsBadge className="w-full justify-center" />
         <LanguageSelect value={lang} onChange={setLang} className="w-full max-w-none" />
         <Link href="/" onClick={onNavigate} className="fp-btn-secondary w-full text-xs">
           {t("portalShowcase")}
@@ -377,16 +376,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[var(--line)] bg-[var(--surface)] px-2 py-1.5 md:hidden">
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[var(--line)] bg-[var(--surface)] px-3 py-2 md:hidden">
           <button
             type="button"
-            className="p-2 text-[var(--ink)]"
+            className="p-1.5 text-[var(--ink)]"
             aria-label="Open menu"
             onClick={() => setNavOpen(true)}
           >
             <Menu className="h-5 w-5" />
           </button>
-          <GitHubStarsBadge />
+          <span className="text-xs font-semibold text-[var(--ink)]">{t("portalReviewer")}</span>
         </header>
         <div className="min-w-0 flex-1 px-3 py-3 sm:px-4 md:px-6 md:py-5">{children}</div>
       </main>

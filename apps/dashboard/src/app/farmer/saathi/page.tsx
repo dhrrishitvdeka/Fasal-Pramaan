@@ -606,7 +606,7 @@ export default function SaathiIntakePage() {
         });
         socket.send(
           JSON.stringify({
-            realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: btoa(binary) } },
+            realtimeInput: { mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: btoa(binary) }] },
           }),
         );
       };
@@ -681,227 +681,227 @@ export default function SaathiIntakePage() {
     router.push(`/farmer/capture?${params.toString()}`);
   };
 
-  const quickPerils: Array<{ peril: any; label: string; emoji: string }> = [
-    { peril: "normal", label: lang === "hi" ? "सामान्य" : "General", emoji: "🌾" },
-    { peril: "fire_burn", label: lang === "hi" ? "आग" : "Fire", emoji: "🔥" },
-    { peril: "animal_damage", label: lang === "hi" ? "जानवर" : "Animal", emoji: "🐗" },
-    { peril: "flood", label: lang === "hi" ? "बाढ़" : "Flood", emoji: "🌊" },
-    { peril: "pest_disease", label: lang === "hi" ? "कीट/रोग" : "Pest", emoji: "🐛" },
-    { peril: "hailstorm", label: lang === "hi" ? "ओला" : "Hail", emoji: "🧊" },
+  const quickPerils: Array<{ peril: any; label: string; emoji: string; phrase: string }> = [
+    { peril: "fire_burn", label: lang === "hi" ? "खेत में आग" : "Fire in Field", emoji: "🔥", phrase: lang === "hi" ? "खेत में आग लग गई है" : "There is a fire in my field" },
+    { peril: "animal_damage", label: lang === "hi" ? "जंगली जानवर" : "Wild Animals", emoji: "🐗", phrase: lang === "hi" ? "जंगली जानवर ने फसल नुकसान किया" : "Wild animals damaged my crop" },
+    { peril: "flood", label: lang === "hi" ? "बाढ़ / जलभराव" : "Flood / Waterlogging", emoji: "🌊", phrase: lang === "hi" ? "बाढ़ का पानी खेत में भर गया है" : "Flood water is logged in the field" },
+    { peril: "pest_disease", label: lang === "hi" ? "कीट / रोग" : "Pest & Disease", emoji: "🐛", phrase: lang === "hi" ? "फसल पर कीट और रोग लगा है" : "Pest and disease on my crop" },
+    { peril: "hailstorm", label: lang === "hi" ? "ओलावृष्टि" : "Hailstorm", emoji: "🧊", phrase: lang === "hi" ? "ओले गिरने से फसल बर्बाद हुई" : "Hailstorm damaged the field" },
+    { peril: "normal", label: lang === "hi" ? "अन्य नुकसान" : "General Loss", emoji: "🌾", phrase: lang === "hi" ? "फसल का नुकसान हुआ है" : "I have general crop loss" },
   ];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div className="fp-panel p-3 sm:p-4">
-        <div className="flex items-center gap-2">
+    <div className="mx-auto max-w-2xl space-y-4 py-2">
+      {/* Header Banner */}
+      <div className="fp-panel p-4 text-center sm:p-5">
+        <div className="mx-auto flex items-center justify-center gap-2">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ink)] text-[var(--surface)]">
             <Sprout className="h-4 w-4 text-emerald-400" />
           </span>
-          <div>
-            <h1 className="text-sm font-bold text-slate-900 sm:text-base">
-              {lang === "hi" ? "फसल साथी — पहला संपर्क" : "Fasal Saathi — First Contact"}
-            </h1>
-            <p className="text-xs text-slate-600">
-              {lang === "hi" ? "बताएँ क्या हुआ, साथी आगे का रास्ता तय करेगा।" : "Tell what happened — Saathi will route evidence collection."}
-            </p>
-          </div>
-          {liveStatus !== "idle" && (
-            <span
-              className={clsx(
-                "ml-auto inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold",
-                liveStatus === "live"
-                  ? "animate-pulse border-red-200 bg-red-50 text-red-700"
-                  : "border-amber-200 bg-amber-50 text-amber-800",
-              )}
-            >
-              ● {liveStatus === "live" ? (lang === "hi" ? "लाइव" : "Live") : lang === "hi" ? "जुड़ रहा है…" : "Connecting…"}
-            </span>
-          )}
-          <span
-            className={clsx(
-              "hidden items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 sm:inline-flex",
-              liveStatus === "idle" && "ml-auto",
-            )}
-          >
+          <h1 className="text-base font-bold text-slate-900 sm:text-lg">
+            {lang === "hi" ? "फ़सल साथी — स्वायत्त आवाज़ सहायक" : "Fasal Saathi — Autonomous Voice Agent"}
+          </h1>
+          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
             <ShieldCheck className="h-3 w-3" />
-            {lang === "hi" ? "स्वायत्त एजेंट" : "Autonomous"}
+            {lang === "hi" ? "लाइव आवाज़" : "Voice AI"}
           </span>
         </div>
-        <p className="mt-2 text-xs leading-relaxed text-slate-600">
+        <p className="mt-1 text-xs text-slate-600">
           {lang === "hi"
-            ? "उदाहरण: “खेत में आग लग गई”, “जंगली सूअर ने धान खा लिया”, “बाढ़ से फसल डूबी”, “पत्तियों पर पीले धब्बे”।"
-            : 'Examples: "fire in field", "wild boar grazed paddy", "flood waterlogging", "yellow spots on leaves".'}
+            ? "माइक दबाएँ और अपनी भाषा में बताएँ — साथी समस्या समझकर कैमरा तैयार करेगा।"
+            : "Tap the mic and speak naturally — Saathi will extract the disaster protocol and set up camera capture."}
         </p>
       </div>
 
-      <div className="fp-panel p-2 sm:p-3">
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {quickPerils.map((q) => (
-            <button
-              key={q.peril}
-              type="button"
-              onClick={() => handleText(q.label)}
-              className={clsx(
-                "inline-flex min-h-11 shrink-0 items-center rounded-full border px-3 py-1.5 text-xs font-semibold",
-                slots.peril === q.peril ? "border-[var(--ink)] bg-[var(--ink)] text-white" : "border-slate-200 bg-white hover:bg-slate-50"
-              )}
-            >
-              <span className="mr-1">{q.emoji}</span>
-              {q.label}
-            </button>
-          ))}
-        </div>
+      {/* Hero Voice Orb Hub */}
+      <div className="fp-panel flex flex-col items-center justify-center p-6 text-center sm:p-8">
+        <div className="relative mb-4 flex items-center justify-center">
+          {/* Animated pulse wave rings when live */}
+          {liveStatus === "live" && (
+            <>
+              <span className="absolute h-36 w-36 animate-ping rounded-full bg-red-400/20" />
+              <span className="absolute h-28 w-28 animate-pulse rounded-full bg-emerald-400/30" />
+            </>
+          )}
+          {liveStatus === "connecting" && (
+            <span className="absolute h-32 w-32 animate-pulse rounded-full bg-amber-400/30" />
+          )}
 
-        <div ref={scrollRef} className="max-h-[42vh] min-h-[22vh] overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 sm:max-h-[48vh]">
-          <div className="space-y-2">
-            {messages.map((m) => (
-              <div key={m.id} className={clsx("flex", m.role === "farmer" ? "justify-end" : "justify-start")}>
-                <div
-                  className={clsx(
-                    "max-w-[92%] rounded-2xl px-3 py-2 text-sm leading-relaxed sm:max-w-[85%]",
-                    m.role === "farmer" ? "bg-[var(--ink)] text-white rounded-br-sm" : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"
-                  )}
-                >
-                  {m.text}
-                </div>
-              </div>
-            ))}
-            {isAnalyzing && (
-              <div className="flex justify-start">
-                <div className="inline-flex items-center gap-2 rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3.5 py-2 text-xs text-slate-500 shadow-2xs">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent)]" />
-                  <span className="animate-pulse">
-                    {lang === "hi" ? "साथी विश्लेषण कर रहा है…" : "Saathi is analyzing…"}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {!voiceSupported && (
-          <p className="mt-2 text-xs text-slate-500">
-            {lang === "hi" ? "ब्राउज़र में वॉइस नहीं — टाइप करें।" : "Voice not available in this browser — type instead."}
-          </p>
-        )}
-      </div>
-
-      {/* Docked composer — pinned above the bottom nav / home indicator on phone */}
-      <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 -mx-3 border-t border-slate-200 bg-white/95 px-3 py-2 shadow-[0_-4px_12px_rgba(28,25,21,0.08)] backdrop-blur-md sm:-mx-4 sm:px-4 md:static md:mx-0 md:border-0 md:bg-transparent md:px-0 md:py-0 md:shadow-none md:backdrop-blur-none">
-        <div className="fp-panel flex items-center gap-1.5 p-1.5">
-          <input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const v = input;
-                setInput("");
-                void handleTextAutonomous(v);
-              }
-            }}
-            placeholder={lang === "hi" ? "यहाँ लिखें या बोलें…" : "Type or speak your issue…"}
-            aria-label={lang === "hi" ? "अपनी समस्या लिखें" : "Describe your issue"}
-            className="min-h-11 min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
-          />
           <button
             type="button"
             onClick={toggleVoiceMode}
-            title={lang === "hi" ? "वॉइस मोड (लाइव)" : "Voice Mode (duplex)"}
-            aria-label={lang === "hi" ? "वॉइस मोड (लाइव)" : "Voice Mode (duplex)"}
+            aria-label={liveStatus === "live" ? "Stop Voice" : "Start Voice"}
             className={clsx(
-              "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white transition-colors",
+              "relative z-10 flex h-24 w-24 items-center justify-center rounded-full text-white shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 sm:h-28 sm:w-28",
               liveStatus === "live"
-                ? "animate-pulse bg-red-600"
+                ? "bg-red-600 ring-4 ring-red-200 ring-offset-2"
                 : liveStatus === "connecting"
-                  ? "animate-pulse bg-amber-500"
-                  : "bg-emerald-600 hover:bg-emerald-700",
-              !voiceMode && voiceSupported === false && "opacity-60",
+                  ? "bg-amber-500 ring-4 ring-amber-200 ring-offset-2"
+                  : "bg-emerald-600 ring-4 ring-emerald-100 hover:bg-emerald-700",
             )}
           >
-            <Mic className="h-5 w-5" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={toggleVoice}
-            disabled={liveStatus !== "idle"}
-            className={clsx(
-              "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors",
-              listening ? "bg-red-600 text-white animate-pulse" : "bg-slate-100 text-slate-700",
-              liveStatus !== "idle" && "opacity-40",
+            {liveStatus === "connecting" ? (
+              <Loader2 className="h-10 w-10 animate-spin text-white" />
+            ) : liveStatus === "live" ? (
+              <Mic className="h-10 w-10 animate-pulse text-white" />
+            ) : (
+              <Mic className="h-10 w-10 text-white" />
             )}
-            aria-label={
-              listening
-                ? lang === "hi"
-                  ? "आवाज़ लिखना रोकें"
-                  : "Stop voice dictation"
-                : lang === "hi"
-                  ? "बोलकर लिखवाएँ"
-                  : "Start voice dictation"
-            }
-          >
-            {listening ? <MicOff className="h-5 w-5" aria-hidden="true" /> : <Mic className="h-5 w-5" aria-hidden="true" />}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              const v = input;
-              setInput("");
-              void handleTextAutonomous(v);
-            }}
-            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--ink)] text-white transition-colors hover:bg-[var(--accent)]"
-            aria-label={lang === "hi" ? "भेजें" : "Send message"}
-          >
-            <Send className="h-5 w-5" aria-hidden="true" />
-          </button>
+        </div>
+
+        {/* Live status label */}
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold">
+            {liveStatus === "live" ? (
+              <>
+                <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                <span className="text-red-700">{lang === "hi" ? "साथी सुन रहा है (बोलें)…" : "Saathi is listening (speak now)…"}</span>
+              </>
+            ) : liveStatus === "connecting" ? (
+              <>
+                <span className="h-2 w-2 animate-spin rounded-full bg-amber-500" />
+                <span className="text-amber-700">{lang === "hi" ? "जेमिनी लाइव से जुड़ रहा है…" : "Connecting to Gemini Live…"}</span>
+              </>
+            ) : (
+              <>
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="text-slate-700">{lang === "hi" ? "बोलने के लिए माइक दबाएँ" : "Tap mic to speak with Saathi"}</span>
+              </>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-500">
+            {lang === "hi" ? "15 भारतीय भाषाएँ समर्थित · पूर्ण द्विमार्गी ऑडियो" : "15 Indian languages supported · Full duplex audio"}
+          </p>
+        </div>
+
+        {/* Quick Voice Phrase Chips */}
+        <div className="mt-6 w-full">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            {lang === "hi" ? "त्वरित आवाज़ विषय (टैप या बोलें)" : "Quick Voice Starters (tap or speak)"}
+          </p>
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {quickPerils.map((q) => (
+              <button
+                key={q.peril}
+                type="button"
+                onClick={() => {
+                  void handleTextAutonomous(q.phrase, "voice");
+                  if (liveStatus === "idle") {
+                    void startVoiceCore();
+                  }
+                }}
+                className={clsx(
+                  "inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-slate-100",
+                  slots.peril === q.peril
+                    ? "border-[var(--ink)] bg-[var(--ink)] text-white"
+                    : "border-slate-200 bg-white text-slate-700",
+                )}
+              >
+                <span>{q.emoji}</span>
+                <span>{q.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
+      {/* Live Transcript / Response Feed */}
+      <div className="fp-panel p-3 sm:p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+            {lang === "hi" ? "साथी संवाद" : "Saathi Conversation"}
+          </span>
+          {isAnalyzing && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+              <Loader2 className="h-3 w-3 animate-spin text-[var(--accent)]" />
+              {lang === "hi" ? "विश्लेषण…" : "Analyzing…"}
+            </span>
+          )}
+        </div>
+
+        <div
+          ref={scrollRef}
+          className="max-h-[32vh] min-h-[14vh] space-y-2 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3"
+        >
+          {messages.map((m) => (
+            <div key={m.id} className={clsx("flex", m.role === "farmer" ? "justify-end" : "justify-start")}>
+              <div
+                className={clsx(
+                  "max-w-[90%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed sm:text-sm",
+                  m.role === "farmer"
+                    ? "bg-[var(--ink)] text-white rounded-br-sm"
+                    : "border border-slate-200 bg-white text-slate-800 rounded-bl-sm",
+                )}
+              >
+                {m.text}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Autonomous Route Resolution Card */}
       {route && (
-        <div className="fp-panel p-3 sm:p-4">
+        <div className="fp-panel border-emerald-300 bg-emerald-50/40 p-4 sm:p-5">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600">Route</h2>
-            <span className="rounded bg-slate-900 px-2 py-0.5 text-xs font-bold text-white">{route.requiredAngles.length} angles</span>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white">
+                <Camera className="h-3.5 w-3.5" />
+              </span>
+              <h2 className="text-sm font-bold text-slate-900">
+                {lang === "hi" ? route.labelHi : route.labelEn}
+              </h2>
+            </div>
+            <span className="rounded-full bg-emerald-700 px-2.5 py-0.5 text-xs font-bold text-white">
+              {route.requiredAngles.length} {lang === "hi" ? "फोटो आवश्यक" : "Angles Required"}
+            </span>
           </div>
-          <p className="mt-1 text-sm font-semibold text-slate-900">
-            {lang === "hi" ? route.labelHi : route.labelEn} — {lang === "hi" ? route.descriptionHi : route.descriptionEn}
+
+          <p className="mt-1.5 text-xs text-slate-600">
+            {lang === "hi" ? route.descriptionHi : route.descriptionEn}
           </p>
-          <p className="mt-1 text-xs text-slate-600">{lang === "hi" ? route.guidanceExtraHi : route.guidanceExtraEn}</p>
-          <div className="mt-2 flex flex-wrap gap-1">
+
+          <div className="mt-3 flex flex-wrap gap-1.5">
             {route.requiredAngles.map((a) => (
-              <span key={a} className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs">
+              <span key={a} className="rounded border border-emerald-200 bg-white px-2 py-0.5 font-mono text-xs font-medium text-emerald-900">
                 {a}
               </span>
             ))}
             {route.contextChecks.length > 0 && (
-              <span className="ml-1 text-xs text-slate-500">+ {route.contextChecks.join(", ")}</span>
+              <span className="ml-1 text-xs text-slate-500 self-center">+ {route.contextChecks.join(", ")}</span>
             )}
           </div>
+
           {route.needsSatellite && (
             <p className="mt-2 flex items-center gap-1 text-xs font-medium text-amber-800">
               <Volume2 className="h-3.5 w-3.5" />
-              {lang === "hi" ? "सैटेलाइट जाँच (Sentinel) इस दावे में जुड़ेगी।" : "Satellite check (Sentinel) will be attached for this peril."}
+              {lang === "hi" ? "सैटेलाइट जाँच (Sentinel-2 L2A) इस दावे में स्वतः जुड़ेगी।" : "Sentinel-2 satellite burn scar check attached."}
             </p>
           )}
-          <div className="mt-3 flex gap-2">
-            <button type="button" onClick={proceedToCapture} disabled={!canProceed} className="fp-btn-primary flex-1 gap-2 disabled:opacity-40">
+
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={proceedToCapture}
+              disabled={!canProceed}
+              className="fp-btn-primary flex-1 justify-center gap-2 py-2.5 text-sm font-semibold disabled:opacity-40"
+            >
               <Camera className="h-4 w-4" />
-              {lang === "hi" ? "कैप्चर खोलें" : "Open Capture"}
+              {lang === "hi" ? "कैमरा खोलें — फोटो लें" : "Open Camera Studio"}
               <ArrowRight className="h-4 w-4" />
             </button>
-            <Link href="/farmer/capture" className="fp-btn-secondary">
-              {lang === "hi" ? "सीधे कैप्चर" : "Skip"}
+            <Link href="/farmer/capture" className="fp-btn-secondary py-2.5 text-xs">
+              {lang === "hi" ? "स्किप" : "Skip"}
             </Link>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
-            {lang === "hi" ? "टिप: फोटो के बाद Gemini + CV जाँच होगी, साथी मार्गदर्शन देता रहेगा।" : "Note: After each photo, Gemini + CV will verify usability and Saathi keeps guiding."}
-          </p>
         </div>
       )}
 
-      <div className="flex justify-center">
-        <Link href="/farmer" className="text-xs text-slate-500 underline underline-offset-2">
-          ← {lang === "hi" ? "डैशबोर्ड" : "Back to dashboard"}
+      {/* Return to Dashboard */}
+      <div className="flex justify-center pt-2">
+        <Link href="/farmer" className="text-xs text-slate-500 hover:text-slate-900 underline underline-offset-2">
+          ← {lang === "hi" ? "किसान डैशबोर्ड पर लौटें" : "Back to Farmer Dashboard"}
         </Link>
       </div>
     </div>
