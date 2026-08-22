@@ -214,34 +214,48 @@ The system operates across a coordinated **8-step pipeline** spanning on-device 
 ### 1. Architectural Pipeline Flowchart
 
 ```mermaid
-flowchart TD
-    subgraph Phase1["Phase 1: Field Evidence & Edge Verification"]
-        A["1. Farmer Intake<br/>(Fasal Saathi Voice/Text)"] --> B["2. Peril Routing<br/>(8 Disaster Protocols)"]
-        B --> C["3. Guided Capture Studio<br/>(On-Device MobileNet v2)"]
-        C --> D["4. Authenticity & Tamper Gate<br/>(Gemini Vision + SHA-256)"]
+flowchart LR
+    subgraph P1["<b>PHASE 1: FIELD EVIDENCE & EDGE VERIFICATION</b>"]
+        direction TB
+        A["<b>1. Farmer Intake</b><br/>Fasal Saathi (Voice/Text)"] --> B["<b>2. Peril Routing</b><br/>8 Disaster Protocols"]
+        B --> C["<b>3. Guided Studio</b><br/>Edge MobileNet v2 CV"]
+        C --> D["<b>4. Vision Gate</b><br/>Gemini 2.0 + SHA-256"]
     end
 
-    subgraph Bridge["Handover Bridge"]
-        D --> E["Secure Cloud Ingestion<br/>(POST /api/claims & Supabase)"]
+    subgraph BR["<b>HANDOVER BRIDGE</b>"]
+        direction TB
+        E["<b>Secure Cloud Ingestion</b><br/>POST /api/claims & Supabase"]
     end
 
-    subgraph Phase2["Phase 2: Signal Triangulation & Human Adjudication"]
-        E --> F["5. Multi-Signal Triangulation<br/>(Sentinel-2 + IMD + Bhuvan + Plot GPS)"]
-        F --> G["6. 4-Pillar Adaptive Confidence<br/>(0.4Q + 0.3C + 0.2X + 0.1I)"]
-        G --> H{"Confidence Level"}
-        H -- "High (>= Threshold)" --> I["7. Human Reviewer Command Centre<br/>(GIS Overlay + Satellite Cross-Check)"]
-        H -- "Medium (Coverage Gap)" --> J["8. Targeted Recapture Protocol<br/>(Auto-Request Missing Angles Only)"]
-        H -- "Low / Tamper Flagged" --> K["Mandatory Human Investigation<br/>(Anti-Fraud Escrow)"]
-        J -. "Re-Evaluation (ΔC)" .-> G
-        I --> L["Adjudication Decision<br/>(Verified / Rejected / Audit Trail)"]
+    subgraph P2["<b>PHASE 2: SIGNAL TRIANGULATION & ADJUDICATION</b>"]
+        direction TB
+        F["<b>5. Multi-Signal Triangulation</b><br/>Sentinel-2 • IMD • Bhuvan • GPS"] --> G["<b>6. Adaptive 4-Pillar Trust</b><br/>0.4Q + 0.3C + 0.2X + 0.1I"]
+        G --> H{"<b>Confidence Level</b>"}
+        H -->|"High (≥ Threshold)"| I["<b>7. Reviewer Command Centre</b><br/>GIS Overlay & Satellite Cross-Check"]
+        H -->|"Medium (Gap)"| J["<b>8. Targeted Recapture</b><br/>Auto-Request Missing Views (ΔC)"]
+        H -->|"Low (Flagged)"| K["<b>Anti-Fraud Escrow</b><br/>Mandatory Field Survey"]
+        I --> L["<b>Adjudication Decision</b><br/>Verified & Paid / Audit Log"]
     end
 
-    classDef p1 fill:#e4e8e3,stroke:#2a4033,stroke-width:1.5px,color:#1c1915;
-    classDef p2 fill:#f3efe6,stroke:#1c1915,stroke-width:1.5px,color:#1c1915;
-    classDef bridge fill:#fffcf6,stroke:#5c574e,stroke-dasharray: 4 4,color:#1c1915;
-    class Phase1 p1;
-    class Phase2 p2;
-    class Bridge bridge;
+    D ==> E
+    E ==> F
+
+    style P1 fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style BR fill:#0f172a,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 4 4,color:#f8fafc
+    style P2 fill:#1e293b,stroke:#34d399,stroke-width:2px,color:#f8fafc
+
+    style A fill:#334155,stroke:#64748b,color:#ffffff
+    style B fill:#334155,stroke:#64748b,color:#ffffff
+    style C fill:#334155,stroke:#64748b,color:#ffffff
+    style D fill:#334155,stroke:#64748b,color:#ffffff
+    style E fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#ffffff
+    style F fill:#334155,stroke:#64748b,color:#ffffff
+    style G fill:#334155,stroke:#64748b,color:#ffffff
+    style H fill:#0f172a,stroke:#fbbf24,stroke-width:2px,color:#ffffff
+    style I fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#ffffff
+    style J fill:#78350f,stroke:#f59e0b,stroke-width:2px,color:#ffffff
+    style K fill:#7f1d1d,stroke:#f87171,stroke-width:2px,color:#ffffff
+    style L fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#ffffff
 ```
 
 ### 2. End-to-End Sequence & State Machine
