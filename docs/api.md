@@ -314,3 +314,28 @@ Log-only client error sink fed by `initTelemetry()` (`src/lib/telemetry.ts`). **
 **Response 200:** `{ "ok": true }`. Errors: `400` invalid JSON / missing message, `401` unauthenticated, `429` over quota.
 
 The client side keeps a 50-entry ring buffer plus `[telemetry]` console output regardless of session state; `NEXT_PUBLIC_SENTRY_DSN` is a documented env slot for a future `Sentry.init` (see [environment-variables.md](./environment-variables.md)).
+
+---
+
+## 10. Public Utility Endpoints
+
+### 10.1 Real-Time GitHub Stars — `GET /api/github/stars` (`apps/dashboard/src/app/api/github/stars/route.ts`)
+
+Fetches and caches the repository stargazers count to render real-time GitHub social proof badges without triggering client-side GitHub REST API rate limits.
+
+**Request:** `GET /api/github/stars`  
+**Query Parameters (optional):** `?repo=owner/repo` (defaults to `NEXT_PUBLIC_GITHUB_REPO` or `dhrrishitvdeka/Fasal-Pramaan`).
+
+**Response 200:**
+```json
+{
+  "stars": 42,
+  "formatted": "42",
+  "source": "api.github.com",
+  "cached": false
+}
+```
+
+- Features a server-side 5-minute sliding TTL memory cache.
+- Falls back transparently to `img.shields.io` SVG metadata extraction when the GitHub REST API quota is exceeded.
+
