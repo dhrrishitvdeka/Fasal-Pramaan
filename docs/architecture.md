@@ -189,9 +189,18 @@ overall>=threshold-20 && coverage>=40              → medium / request_missing
 otherwise  (coverage<40||quality<30 → retake else escalate) → low
 ```
 
-**Evidence quality & authenticity filter:**
-- On-device: `analyzeVideoFrame(video, angleId)` (64×64 canvas, green %, luma, blur variance → `hintEn/Hi`, `shouldBlockShutter`) and `analyzeDataUrl(dataUrl)`, with the cv-worker's throttled MobileNet v2 plant verdict unioned into `cropDetected`.
-- Server: `POST /api/vision/gate` (Gemini vision `generateContent` with `inlineData` or heuristic fallback) returns `usable` boolean; verdicts persist per image into `web_claim_images.gate_result`, and reviewers can transparently `override_gate` (stamping `overridden/overriddenBy/overriddenAt`). `EvidenceConfidenceSection` gates into `adaptiveConfidence` via `gateFailed`.
+**Sequential Two-Stage Evidence Verification Pipeline:**
+- **Stage 1 (Gemini Multimodal Vision & Environmental Gate)**:
+  - Triggered at capture (`POST /api/vision/gate`) and validated during claim ingestion (`gateSingleImage` in `claim-pipeline.ts`).
+  - Evaluates raw image bytes along with complete sensory and agronomic metadata: GPS (`lat`, `lon`, `accuracyM`), capture timestamp, camera facing mode, resolution (`width x height`), edge CV scores (ExG/GLI/ExR canopy %, luma, blur), and farmer observations.
+  - Verifies peril congruence (e.g. fire charred ash, flood standing water, hailstorm shredding, lodging flattening, drought chlorosis), rejects screen captures, synthetic AI images, printed photos, and non-agricultural artifacts.
+- **Stage 2 (Hugging Face Foundation Model Inference)**:
+  - Only images that pass the Gemini Multimodal Verification Gate advance to the Hugging Face Space (`dhrrishitvdeka/fasal-pramaan-api`, DINOv2 ViT-S/14) for deep neural crop screening and foliar damage grading ($A/B/C/U$).
+  - If Gemini flags an image as unusable/fraudulent, Hugging Face model inference is bypassed immediately with an explicit `unusablePrediction`, saving compute quota and logging clear guidance for targeted recapture.
+
+**Fasal Saathi Autonomous Agentic Control:**
+- Equipped with a complete agentic tool suite: `take_photo`, `switch_camera`, `select_angle`, `retake_angle`, `set_observation`, `submit_claim`, `check_evidence_quality`, `read_capture_guidance`, and `read_capture_progress`.
+- Operates bidirectionally via `WebCaptureBridge` and `WebVoiceBroker`, enabling farmers to control the entire capture studio hands-free via natural voice in 15 Indian languages.
 
 **Auto-recapture loop:** a Medium result (`request_missing`) no longer waits for a reviewer — the claim is moved directly to `needs_recapture`, the farmer sees bilingual reasons (`recapture_reason` / `recapture_reason_hi`), and only the missing angles are re-requested. Re-evaluation records `previousConfidence` → `confidence_delta` in `adaptive_result`.
 

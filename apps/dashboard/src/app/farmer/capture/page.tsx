@@ -465,16 +465,28 @@ function CaptureStudioContent() {
     const digest = extras?.sha256 ?? (await sha256FromDataUrl(imageUrl));
     const lightingScore = extras?.lightingScore;
     const useGps = gpsCoords.status === "accurate" || gpsCoords.status === "searching";
+    const video = videoRef.current;
+    const dimensions =
+      video && video.videoWidth > 0
+        ? { width: video.videoWidth, height: video.videoHeight }
+        : undefined;
+    const nowIso = new Date().toISOString();
+
     const newEvidence: ClaimImageEvidence = {
       angleType: currentAngle.id,
       imageUrl,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso,
       lat: useGps ? gpsCoords.lat : null,
       lon: useGps ? gpsCoords.lon : null,
       accuracyM: useGps ? gpsCoords.accuracyM : null,
       sha256: digest,
       qualityPassed: qualityPassedFromSignals({ lightingScore }),
       lightingScore,
+      blurScore: cvResult?.blurScore ?? undefined,
+      greenPct: cvResult?.greenPct ?? undefined,
+      facing: cameraFacing,
+      dimensions,
+      farmerObservation: observations || undefined,
     };
 
     setCapturedImages((prev) => ({
@@ -488,9 +500,30 @@ function CaptureStudioContent() {
         : `${currentAngle.name} captured successfully!`
     );
 
-    // Parallel LLM gate + crop-only check — runs in background, feeds Saathi guidance
+    // Parallel LLM gate + crop-only check with comprehensive metadata context
     void (async () => {
       try {
+        const metadata = {
+          lat: useGps ? gpsCoords.lat : null,
+          lon: useGps ? gpsCoords.lon : null,
+          accuracyM: useGps ? gpsCoords.accuracyM : null,
+          capturedAt: nowIso,
+          facing: cameraFacing,
+          dimensions,
+          cvAnalysis: cvResult
+            ? {
+                greenPct: cvResult.greenPct,
+                luma: cvResult.luma,
+                blurScore: cvResult.blurScore,
+                hintCode: cvResult.hintCode,
+                modelLabel: cvResult.modelLabel,
+                modelProb: cvResult.modelProb,
+              }
+            : null,
+          sha256: digest,
+          farmerObservation: observations || undefined,
+        };
+
         const res = await apiFetch("/api/vision/gate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -499,6 +532,7 @@ function CaptureStudioContent() {
             angleType: currentAngle.id,
             expectedCrop: selectedPlot?.cropType || activeIntent?.crop || undefined,
             peril: requestedPeril,
+            metadata,
           }),
         });
         const gate = (await res.json().catch(() => null)) as { usable?: boolean; reason?: string; crop_detected?: string | null; warnings?: string[] } | null;
@@ -663,9 +697,57 @@ function CaptureStudioContent() {
   useEffect(() => {
     const total = activeAngleDefs.length;
     const captured = activeAngleDefs.filter((angle) => Boolean(capturedImages[angle.id])).length;
-    const cvHint = cvResult ? `${cvResult.hintEn} (green ${cvResult.greenPct}%, luma ${cvResult.luma ?? "?"})` : "";
+    const missingAngles = activeAngleDefs
+      .filter((angle) => !capturedImages[angle.id])
+      .map((a) => a.id);
+    const cvHint = cvResult
+      ? `${lang === "hi" ? cvResult.hintHi : cvResult.hintEn} (${cvResult.greenPct}% canopy, luma ${cvResult.luma ?? "?"})`
+      : "";
+
     return webCaptureBridge.register({
       captureCurrentAngle: () => capturePhotoFromCamera(),
+      switchCamera: async () => {
+        setCameraFacing((prev) => (prev === "environment" ? "user" : "environment"));
+        return {
+          ok: true,
+          message:
+            cameraFacing === "environment"
+              ? "Switched to front camera."
+              : "Switched to back environment camera.",
+          facing: cameraFacing === "environment" ? "user" : "environment",
+        };
+      },
+      selectAngle: async (angleId: string) => {
+        const idx = activeAngleDefs.findIndex((a) => a.id === angleId);
+        if (idx !== -1) {
+          setCurrentAngleIndex(idx);
+          return { ok: true, message: `Switched to angle: ${activeAngleDefs[idx].name}`, angleId };
+        }
+        return { ok: false, message: `Angle ${angleId} not found in current capture route.` };
+      },
+      retakeAngle: async (angleId: string) => {
+        deleteCapturedAngle(angleId);
+        const idx = activeAngleDefs.findIndex((a) => a.id === angleId);
+        if (idx !== -1) setCurrentAngleIndex(idx);
+        return { ok: true, message: `Cleared angle ${angleId} for recapture.`, angleId };
+      },
+      checkEvidenceQuality: async () => {
+        if (!cvResult) {
+          return {
+            ok: true,
+            message: "Camera active, analyzing live crop frame…",
+            shutterReady: true,
+          };
+        }
+        return {
+          ok: true,
+          message: lang === "hi" ? cvResult.hintHi : cvResult.hintEn,
+          canopyPct: cvResult.greenPct,
+          blurScore: cvResult.blurScore ?? undefined,
+          hintCode: cvResult.hintCode,
+          shutterReady: !cvResult.shouldBlockShutter,
+        };
+      },
       readGuidance: async () => ({
         ok: true,
         message: currentAngle
@@ -676,11 +758,12 @@ function CaptureStudioContent() {
       readProgress: async () => ({
         ok: true,
         message: currentAngle
-          ? `Captured ${captured} of ${total} angles. Current: ${currentAngle.id}.`
+          ? `Captured ${captured} of ${total} angles. Current: ${currentAngle.id}.${missingAngles.length ? ` Missing: ${missingAngles.join(", ")}` : ""}`
           : `Captured ${captured} of ${total} angles.`,
         captured,
         total,
         currentAngle: currentAngle?.id,
+        missingAngles,
       }),
       setObservation: async (observation) => {
         setObservations(observation);
@@ -688,7 +771,19 @@ function CaptureStudioContent() {
       },
       submitDraft: () => handleSubmitClaim(),
     });
-  }, [isCameraActive, currentAngle, isAllCaptured, handleSubmitClaim, capturedImages, activeAngleDefs, cvResult, activeIntent]);
+  }, [
+    isCameraActive,
+    cameraFacing,
+    currentAngle,
+    currentAngleIndex,
+    isAllCaptured,
+    handleSubmitClaim,
+    capturedImages,
+    activeAngleDefs,
+    cvResult,
+    activeIntent,
+    lang,
+  ]);
 
   const getAngleIcon = (iconName: string) => {
     switch (iconName) {

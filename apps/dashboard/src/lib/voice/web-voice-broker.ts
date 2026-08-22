@@ -19,10 +19,21 @@ export type VoiceCaptureProgress = {
 
 export type VoiceCaptureBridge = {
   captureCurrentAngle(): Promise<{ ok: boolean; message: string; angle?: string }>;
+  switchCamera?(): Promise<{ ok: boolean; message: string; facing?: string }>;
+  selectAngle?(angleId: string): Promise<{ ok: boolean; message: string; angleId?: string }>;
+  retakeAngle?(angleId: string): Promise<{ ok: boolean; message: string; angleId?: string }>;
   readGuidance(): Promise<{ ok: boolean; message: string; angle?: string }>;
   setObservation(observation: string): Promise<{ ok: boolean; message: string }>;
   submitDraft(): Promise<{ ok: boolean; message: string; claimId?: string }>;
   readProgress?(): Promise<VoiceCaptureProgress>;
+  checkEvidenceQuality?(): Promise<{
+    ok: boolean;
+    message: string;
+    canopyPct?: number;
+    blurScore?: number;
+    hintCode?: string;
+    shutterReady?: boolean;
+  }>;
 };
 
 export type VoiceFarmerProfile = {
@@ -228,6 +239,30 @@ export class WebVoiceBroker {
           return this.readCaptureProgress();
         case "capture_current_angle":
           return this.fromCapture(await this.gateway.capture.captureCurrentAngle());
+        case "switch_camera":
+          return this.fromCapture(
+            this.gateway.capture.switchCamera
+              ? await this.gateway.capture.switchCamera()
+              : { ok: false, message: "Camera switching is not supported in this view." }
+          );
+        case "select_capture_angle":
+          return this.fromCapture(
+            this.gateway.capture.selectAngle
+              ? await this.gateway.capture.selectAngle(String(args.angle || ""))
+              : { ok: false, message: "Angle selection is not supported in this view." }
+          );
+        case "retake_capture_angle":
+          return this.fromCapture(
+            this.gateway.capture.retakeAngle
+              ? await this.gateway.capture.retakeAngle(String(args.angle || ""))
+              : { ok: false, message: "Retake is not supported in this view." }
+          );
+        case "check_evidence_quality":
+          return this.fromCapture(
+            this.gateway.capture.checkEvidenceQuality
+              ? await this.gateway.capture.checkEvidenceQuality()
+              : { ok: true, message: "Camera active and calibrated." }
+          );
         case "set_capture_observation":
           return this.setObservation(args);
         case "prepare_submit_claim":

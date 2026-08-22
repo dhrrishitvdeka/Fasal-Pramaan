@@ -43,12 +43,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Image too large" }, { status: 400 });
   }
 
+  const metadata = body.metadata && typeof body.metadata === "object" ? body.metadata : undefined;
+
   try {
-    const gemini = await geminiGate(imageDataUrl, angleType, expectedCrop, peril);
+    const gemini = await geminiGate(imageDataUrl, angleType, expectedCrop, peril, metadata);
     if (gemini) {
       return NextResponse.json(gemini);
     }
-    const fallback = heuristicGate(imageDataUrl, expectedCrop, peril);
+    const fallback = heuristicGate(imageDataUrl, expectedCrop, peril, metadata);
     return NextResponse.json({ ...fallback, fallback: true });
   } catch (err) {
     console.error("vision gate failed:", err instanceof Error ? err.message : err);
