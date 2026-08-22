@@ -414,6 +414,14 @@ python scripts/test_supabase_conn.py
 
 ---
 
+## Future Roadmap & Upcoming Milestones
+
+- 🧠 **Enhance Vision Transformer (ViT) Models**: Continuous fine-tuning of the DINOv2 / ViT-S/14 crop health classifiers across multi-state localized Indian agro-climatic datasets with automated multi-spectral satellite band fusion.
+- 📱 **Redesign & Engineer Dedicated Mobile App**: Build an offline-first native mobile application (Flutter / React Native) with embedded on-device ONNX runtime edge CV inference and sub-100ms conversational audio pipelines.
+- 🐳 **Full Containerization & One-Click Shipping**: Provide complete multi-container Docker compose topologies and Helm charts to effortlessly deploy and ship the full stack across cloud and edge servers.
+
+---
+
 ## Community & Project Links
 
 | | |
