@@ -30,8 +30,20 @@ export interface AssembledContext {
 }
 
 export function contextOverall(signals: ContextSignal[]): AssembledContext["overall"] {
+  const plotMatchSignal = signals.find((s) => s.source === "plot_match");
+  const plotMismatch = plotMatchSignal && plotMatchSignal.meta?.within === false;
+
   const available = signals.filter((s) => s.status === "available").length;
   const pending = signals.filter((s) => s.status === "pending").length;
+
+  if (plotMismatch) {
+    return {
+      status: "mixed",
+      summaryEn: "Location mismatch: capture point is outside registered plot boundary",
+      summaryHi: "स्थान बेमेल: कैप्चर बिंदु पंजीकृत प्लॉट सीमा से बाहर है",
+    };
+  }
+
   if (pending > 0 && available === 0) return { status: "pending", summaryEn: "Context checks pending", summaryHi: "संदर्भ जाँच लंबित" };
   if (available >= 2) return { status: "strong", summaryEn: "Multi-signal context supports the claim", summaryHi: "बहु-संकेत संदर्भ दावे का समर्थन करता है" };
   if (available === 1) return { status: "mixed", summaryEn: "Partial context available — human review recommended", summaryHi: "आंशिक संदर्भ — मानव समीक्षा उचित" };

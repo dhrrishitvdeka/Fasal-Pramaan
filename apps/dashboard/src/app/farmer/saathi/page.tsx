@@ -40,41 +40,11 @@ import {
   parseGeminiLiveMessage,
   type GeminiToolInvocation,
 } from "@/lib/voice/gemini-live-parse";
-import { connectSilentProcessor } from "@/lib/voice/mic-graph";
+import { startLiveAudio, type LiveAudioSession } from "@/lib/voice/live-audio";
 import clsx from "clsx";
 
 type ContextSignalLite = { source: string; status: string; labelEn: string; summaryEn: string };
 type LiveStatus = "idle" | "connecting" | "live";
-
-// --- Gemini Live audio plumbing (mirrors FasalSaathiOverlay) -----------------
-
-function downsampleTo16k(input: Float32Array, inputRate: number): Int16Array {
-  if (inputRate === 16000) {
-    const out = new Int16Array(input.length);
-    for (let i = 0; i < input.length; i += 1) {
-      const sample = Math.max(-1, Math.min(1, input[i]));
-      out[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-    }
-    return out;
-  }
-  const ratio = inputRate / 16000;
-  const length = Math.floor(input.length / ratio);
-  const out = new Int16Array(length);
-  for (let i = 0; i < length; i += 1) {
-    const sample = Math.max(-1, Math.min(1, input[Math.floor(i * ratio)] || 0));
-    out[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-  }
-  return out;
-}
-
-function pcm16FromBase64(b64: string): Int16Array {
-  const raw = atob(b64);
-  const bytes = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
-  return new Int16Array(bytes.buffer);
-}
-
-// -----------------------------------------------------------------------------
 
 export default function SaathiIntakePage() {
   const router = useRouter();
@@ -92,12 +62,7 @@ export default function SaathiIntakePage() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const activeAudioNodesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
-  const playTimeRef = useRef(0);
+  const liveAudioRef = useRef<LiveAudioSession | null>(null);
   const inputBufRef = useRef("");
   const outputBufRef = useRef("");
   const connectingRef = useRef(false);
@@ -305,21 +270,8 @@ export default function SaathiIntakePage() {
   // ---------------------------------------------------------------------------
 
   const stopAudio = () => {
-    activeAudioNodesRef.current.forEach((node) => {
-      try {
-        node.stop();
-        node.disconnect();
-      } catch {}
-    });
-    activeAudioNodesRef.current.clear();
-    processorRef.current?.disconnect();
-    sourceRef.current?.disconnect();
-    processorRef.current = null;
-    sourceRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    void audioCtxRef.current?.close();
-    audioCtxRef.current = null;
+    liveAudioRef.current?.stop();
+    liveAudioRef.current = null;
   };
 
   const clearTimers = () => {
@@ -334,23 +286,7 @@ export default function SaathiIntakePage() {
   };
 
   const playPcm24k = (b64: string) => {
-    const ctx = audioCtxRef.current;
-    if (!ctx) return;
-    const pcm = pcm16FromBase64(b64);
-    const floats = new Float32Array(pcm.length);
-    for (let i = 0; i < pcm.length; i += 1) floats[i] = pcm[i] / 0x8000;
-    const buffer = ctx.createBuffer(1, floats.length, 24000);
-    buffer.getChannelData(0).set(floats);
-    const node = ctx.createBufferSource();
-    node.buffer = buffer;
-    node.connect(ctx.destination);
-    activeAudioNodesRef.current.add(node);
-    node.onended = () => {
-      activeAudioNodesRef.current.delete(node);
-    };
-    const startAt = Math.max(ctx.currentTime, playTimeRef.current);
-    node.start(startAt);
-    playTimeRef.current = startAt + buffer.duration;
+    liveAudioRef.current?.playPcm24k(b64);
   };
 
   const failVoice = (message: string) => {
@@ -572,14 +508,7 @@ export default function SaathiIntakePage() {
               if (item.type === "audio") playPcm24k(item.bytesBase64);
               if (item.type === "interrupted") {
                 // Drop queued playback so the farmer can barge-in immediately.
-                activeAudioNodesRef.current.forEach((node) => {
-                  try {
-                    node.stop();
-                    node.disconnect();
-                  } catch {}
-                });
-                activeAudioNodesRef.current.clear();
-                playTimeRef.current = audioCtxRef.current?.currentTime ?? playTimeRef.current;
+                liveAudioRef.current?.interrupt();
               }
               if (item.type === "toolCalls") void handlersRef.current.handleTools(item.calls);
               if (item.type === "turnComplete") {
@@ -615,45 +544,14 @@ export default function SaathiIntakePage() {
         }
       }
 
-      const ctx = new AudioContext();
-      audioCtxRef.current = ctx;
-      if (ctx.state === "suspended") await ctx.resume();
-      playTimeRef.current = ctx.currentTime;
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
-          video: false,
-        });
-      } catch {
-        throw new Error(
+      const liveAudio = await startLiveAudio({
+        socket,
+        micPermissionMessage:
           langRef.current === "hi"
             ? "माइक्रोफ़ोन अनुमति चाहिए। ब्राउज़र में Allow दबाएँ।"
             : "Microphone permission is required. Allow the mic in the browser prompt.",
-        );
-      }
-      streamRef.current = stream;
-      const source = ctx.createMediaStreamSource(stream);
-      const processor = ctx.createScriptProcessor(4096, 1, 1);
-      sourceRef.current = source;
-      processorRef.current = processor;
-      processor.onaudioprocess = (ev) => {
-        if (socket.readyState !== WebSocket.OPEN) return;
-        const chunk = ev.inputBuffer.getChannelData(0);
-        const pcm = downsampleTo16k(chunk, ev.inputBuffer.sampleRate);
-        const bytes = new Uint8Array(pcm.buffer);
-        let binary = "";
-        bytes.forEach((value) => {
-          binary += String.fromCharCode(value);
-        });
-        socket.send(
-          JSON.stringify({
-            realtimeInput: { mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: btoa(binary) }] },
-          }),
-        );
-      };
-      source.connect(processor);
-      connectSilentProcessor(processor, ctx);
+      });
+      liveAudioRef.current = liveAudio;
 
       connectingRef.current = false;
       retryCountRef.current = 0;

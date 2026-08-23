@@ -126,14 +126,19 @@ export default function ReviewDetailPage() {
   const action = useMutation({
     mutationFn: async (payload: ReviewActionPayload) => applyWebReviewAction(id, payload),
     onSuccess: () => {
+      // Invalidate every live query affected by a review decision. Keys must
+      // match real queries (grep queryKey in src/app): ["map",…] (map page),
+      // ["audit"], ["damage-cat"]/["severity"]/["by-crop"] (analytics),
+      // ["overview"], ["review-queue"]. Prefix keys catch filter variants.
       qc.invalidateQueries({ queryKey: ["submission", id] });
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["review-history", id] });
       qc.invalidateQueries({ queryKey: ["overview"] });
-      qc.invalidateQueries({ queryKey: ["map-markers"] });
-      qc.invalidateQueries({ queryKey: ["audit-logs"] });
-      qc.invalidateQueries({ queryKey: ["reviewer-stats"] });
-      qc.invalidateQueries({ queryKey: ["claims"] });
+      qc.invalidateQueries({ queryKey: ["map"] });
+      qc.invalidateQueries({ queryKey: ["audit"] });
+      qc.invalidateQueries({ queryKey: ["damage-cat"] });
+      qc.invalidateQueries({ queryKey: ["severity"] });
+      qc.invalidateQueries({ queryKey: ["by-crop"] });
       setMessage("Decision recorded. Audit trail and metrics updated.");
       setRecaptureModalOpen(false);
     },
@@ -345,8 +350,8 @@ export default function ReviewDetailPage() {
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["review-history", id] });
       qc.invalidateQueries({ queryKey: ["overview"] });
-      qc.invalidateQueries({ queryKey: ["map-markers"] });
-      qc.invalidateQueries({ queryKey: ["audit-logs"] });
+      qc.invalidateQueries({ queryKey: ["map"] });
+      qc.invalidateQueries({ queryKey: ["audit"] });
       setMessage(`Gate re-run recorded: ${usable}/${total} usable.`);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Gate re-run failed");

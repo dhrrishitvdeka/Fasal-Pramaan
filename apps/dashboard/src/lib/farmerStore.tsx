@@ -630,15 +630,19 @@ export function useFarmerData() {
   return ctx;
 }
 
-export function previewFromImages(images: ClaimImageEvidence[]) {
+export function previewFromImages(images: ClaimImageEvidence[], peril?: string | null) {
   return computeEvidencePreview(
     images.map((img) => ({
       angleType: img.angleType,
       bytes: new Uint8Array(img.imageUrl ? 1 : 0),
       sha256: img.sha256,
       blurScore: img.blurScore,
+      lightingScore: img.lightingScore,
+      qualityPassed: img.qualityPassed,
       lat: img.lat,
       lon: img.lon,
+      accuracyM: img.accuracyM,
     })),
+    peril,
   );
 }

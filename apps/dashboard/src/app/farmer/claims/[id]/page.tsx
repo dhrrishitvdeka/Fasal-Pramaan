@@ -162,9 +162,9 @@ export default function FarmerClaimDetailPage() {
             </div>
 
             <h1 className="text-lg font-bold text-slate-900 sm:text-2xl">
-              {lang === "hi" ? claim.plotNameHi : claim.plotName} ·{" "}
+              {lang === "hi" ? (claim.plotNameHi || claim.plotName) : claim.plotName} ·{" "}
               <span className="font-semibold text-[var(--ink)]">
-                {lang === "hi" ? claim.cropTypeHi : claim.cropType} ({claim.cropVariety})
+                {lang === "hi" ? (claim.cropTypeHi || claim.cropType) : claim.cropType} ({claim.cropVariety})
               </span>
             </h1>
 
@@ -236,7 +236,7 @@ export default function FarmerClaimDetailPage() {
               {lang === "hi" ? "अधिकारी की विस्तृत टिप्पणी:" : "Reviewer Instructions:"}
             </div>
             <p className="text-xs sm:text-sm text-slate-800 font-medium leading-relaxed">
-              {lang === "hi" ? claim.recaptureReasonHi : claim.recaptureReason}
+              {lang === "hi" ? (claim.recaptureReasonHi || claim.recaptureReason) : claim.recaptureReason}
             </p>
             <div className="pt-2 flex flex-wrap items-center gap-2 text-xs text-amber-800">
               <span className="font-bold">
@@ -430,7 +430,7 @@ export default function FarmerClaimDetailPage() {
               <div className="text-[11px] text-slate-500 font-medium">{t.detectedCondition}</div>
               <div className="mt-1 font-bold text-slate-900">
                 {lang === "hi"
-                  ? claim.aiPrediction.diseaseDetectedHi
+                  ? (claim.aiPrediction.diseaseDetectedHi || claim.aiPrediction.diseaseDetected)
                   : claim.aiPrediction.diseaseDetected}
               </div>
               <div className="text-[10px] text-slate-400 font-mono">

@@ -8,9 +8,11 @@ const bootWebServer = process.env.PLAYWRIGHT_E2E === "1";
 const webServerConfig = bootWebServer
   ? {
       webServer: {
-        command: "npm run dev",
+        // Production build + start — tests must exercise the shipped artifact,
+        // not the dev server (different bundle, different error surfaces).
+        command: "npm run build && npm run start",
         url: "http://localhost:3000",
-        timeout: 120_000,
+        timeout: 300_000,
         reuseExistingServer: true,
         env: {
           // Point the client bundle at a staging project so pages take the

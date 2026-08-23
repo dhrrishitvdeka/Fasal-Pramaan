@@ -10,6 +10,7 @@ import {
   persistFarmerSubmission,
   recaptureAndInfer,
   sanitizeHfPrediction,
+  type PersistedImageInput,
 } from "../src/lib/claim-pipeline";
 import { inferCropDisease, parseSpacePrediction } from "../src/lib/hf-infer";
 import { predictionIsAcceptable } from "../src/lib/review-accept";
@@ -465,6 +466,91 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(detail!.latest_prediction?.overall_confidence).toBe(0);
   });
 
+  it("fails CLOSED when the vision gate throws on first submission and never reaches inference", async () => {
+    const store = createMemoryClaimStore();
+    let inferCalls = 0;
+    // Poison a gate-only metadata field: gateSingleImage reads greenPct when building the
+    // Gemini/heuristic metadata payload, but nothing after the gate touches it.
+    const poisoned: PersistedImageInput = {
+      angleType: "closeup_damage",
+      bytes: jpegLikeBytes(),
+      sha256: "f".repeat(64),
+      get greenPct(): number {
+        throw new Error("gate metadata boom");
+      },
+    };
+    const result = await persistAndInfer(
+      store,
+      {
+        cropType: "Wheat",
+        plotName: "Gate outage farm",
+        images: [poisoned],
+      },
+      async () => {
+        inferCalls += 1;
+        throw new Error("Space should never be called when the gate is unavailable");
+      },
+      { fetchImpl: spaceFetchImpl() },
+    );
+
+    // B1 regression: gate error → unusable gate_unavailable prediction, no ungated HF call.
+    expect(inferCalls).toBe(0);
+    expect(result.prediction?.label).toBe("unusable_or_out_of_domain");
+    expect(result.prediction?.predictedGrade).toBe("U");
+    expect(result.prediction?.qualityWarnings).toEqual(["gate_unavailable"]);
+
+    // Claim is persisted under_review with the failure recorded for reviewer adjudication.
+    const stored = store.claims.get(result.claimId);
+    expect(stored?.status).toBe("under_review");
+    expect(stored?.quality_notes).toBe("Gate rejected: gate_unavailable");
+    expect(stored?.overall_confidence).toBe(0);
+    const gateResult = stored?.gate_result as { blockingReason?: string; error?: string };
+    expect(gateResult.blockingReason).toBe("gate_unavailable");
+    expect(String(gateResult.error)).toMatch(/boom/i);
+
+    const detail = await getReviewerClaim(store, result.claimId);
+    expect(detail!.latest_prediction?.predicted_grade).toBe("U");
+    // Reviewer view surfaces the persisted gate note as the warning.
+    expect(detail!.latest_prediction?.quality_warnings).toContain("Gate rejected: gate_unavailable");
+  });
+
+  it("fails CLOSED when the vision gate throws during recapture", async () => {
+    const seeded = await persistSeed();
+    await applyReviewerAction(seeded.store, seeded.claimId, {
+      action: "request_recapture",
+      required_angles: ["wide_field"],
+    });
+    let inferCalls = 0;
+    // Same gate-only poison as the submission test above.
+    const poisoned: PersistedImageInput = {
+      angleType: "wide_field",
+      bytes: jpegLikeBytes(),
+      sha256: "1".repeat(64),
+      get greenPct(): number {
+        throw new Error("gate metadata boom");
+      },
+    };
+    const result = await recaptureAndInfer(
+      seeded.store,
+      {
+        claimId: seeded.claimId,
+        images: [poisoned],
+      },
+      async () => {
+        inferCalls += 1;
+        throw new Error("Space should never be called when the gate is unavailable");
+      },
+      { fetchImpl: spaceFetchImpl() },
+    );
+
+    expect(inferCalls).toBe(0);
+    expect(result.prediction?.qualityWarnings).toEqual(["gate_unavailable"]);
+    expect(result.prediction?.predictedGrade).toBe("U");
+    const stored = seeded.store.claims.get(seeded.claimId);
+    expect(stored?.status).toBe("under_review");
+    expect(stored?.quality_notes).toBe("Gate rejected: gate_unavailable");
+  });
+
   it("strips wheat 100% from an unusable Space payload", () => {
     const sanitized = sanitizeHfPrediction({
       modelId: "dhrrishitvdeka/fasal-pramaan-model",
@@ -480,5 +566,12 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(sanitized.predictedCrop).toBe("unknown");
     expect(sanitized.cropConfidence).toBe(0);
     expect(sanitized.score).toBe(0);
+  });
+
+  it("disallows one-click acceptance on unusable Grade U claims", () => {
+    expect(predictionIsAcceptable({ predicted_grade: "U" }, false)).toBe(false);
+    expect(predictionIsAcceptable({ predicted_grade: "A" }, false)).toBe(true);
+    expect(predictionIsAcceptable({ predicted_grade: "B" }, false)).toBe(true);
+    expect(predictionIsAcceptable({ predicted_grade: "C" }, false)).toBe(true);
   });
 });

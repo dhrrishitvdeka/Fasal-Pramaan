@@ -1,5 +1,5 @@
 import { inferCropDisease, resolveHfModelId, type HfPrediction } from "./hf-infer";
-import { isUnusableLighting } from "./evidence";
+import { computeAngleCoverage, isRealSha256, isUnusableLighting } from "./evidence";
 import type { Submission } from "./api";
 import { heuristicGate, geminiGate, type GateResult } from "./vision/gate-shared";
 import type { ContextSignal } from "./context/types";
@@ -9,18 +9,7 @@ import { ROUTE_CONFIG, type Peril } from "./claim-routing";
 // ---------- Vision gate helpers (shared with /api/vision/gate) ----------
 
 const GATE_CACHE_TTL_MS = 10 * 60 * 1000;
-const GATE_BLOCK_REASONS = new Set(["wrong_crop", "ai_generated", "too_dark", "not_crop"]);
 const gateCache = new Map<string, { result: GateResult; expiresAt: number }>();
-
-export function shouldGatePeril(peril?: string | null): boolean {
-  if (peril == null || String(peril).trim() === "") return true;
-  // Gate all perils — fire_burn is handled leniently inside heuristic/gemini gate.
-  // Return false here to skip gating for a peril entirely if needed.
-  const p = String(peril).trim().toLowerCase();
-  // Example: if you ever want to skip gating for a specific peril, add: if (p === "some_peril") return false;
-  void p;
-  return true;
-}
 
 function bytesToDataUrl(bytes: Uint8Array, contentType?: string): string {
   const mime = (contentType || "image/jpeg").toLowerCase();
@@ -108,6 +97,8 @@ export type PersistedGateOutcome = {
   gateFailed: boolean;
   blockingReason?: string;
   gateResult: unknown;
+  /** True when the gate itself threw — the claim must fail CLOSED (no ungated inference). */
+  gateUnavailable?: boolean;
 };
 
 /** Attach per-angle gate results onto image rows before insertImages persists them. */
@@ -130,22 +121,6 @@ export async function gateImagesGate(
 ): Promise<PersistedGateOutcome> {
   if (!inputImages.length) {
     return { perImage: [], gateFailed: false, gateResult: { perImage: [], gateFailed: false } };
-  }
-  if (!shouldGatePeril(peril)) {
-    const perImage = inputImages.map((img) => ({
-      usable: true,
-      reason: "ok",
-      crop_detected: expectedCrop || "unknown",
-      warnings: [] as string[],
-      confidence: 0.62,
-      fallback: true as const,
-      angleType: img.angleType,
-    }));
-    return {
-      perImage,
-      gateFailed: false,
-      gateResult: { perImage, gateFailed: false, skippedPeril: peril ?? null, expectedCrop: expectedCrop || null },
-    };
   }
 
   const perImage: Array<GateResult & { angleType: string }> = [];
@@ -184,6 +159,38 @@ function pruneGateCache(): void {
       if (i++ >= toDelete) break;
       gateCache.delete(key);
     }
+  }
+}
+
+/**
+ * Run the vision gate, failing CLOSED on errors (B1): a thrown gate becomes a
+ * terminal `gate_unavailable` outcome instead of silently passing the claim through.
+ * A successful run (including heuristic fallback when Gemini is unconfigured) is
+ * returned unchanged — only genuine errors are terminal.
+ */
+async function runVisionGate(
+  images: PersistedImageInput[],
+  expectedCrop?: string,
+  peril?: string,
+): Promise<PersistedGateOutcome> {
+  try {
+    pruneGateCache();
+    return await gateImagesGate(images, expectedCrop, peril);
+  } catch (error) {
+    const reason = "gate_unavailable";
+    return {
+      perImage: [],
+      gateFailed: true,
+      blockingReason: reason,
+      gateResult: {
+        perImage: [],
+        gateFailed: true,
+        blockingReason: reason,
+        error: error instanceof Error ? error.message : String(error),
+        checkedAt: new Date().toISOString(),
+      },
+      gateUnavailable: true,
+    };
   }
 }
 
@@ -476,28 +483,40 @@ export function sanitizeHfPrediction(prediction: HfPrediction): HfPrediction {
 export function computeEvidencePreview(images: PersistedImageInput[], peril?: string | null) {
   const reqAngles: readonly string[] =
     (peril && ROUTE_CONFIG[peril as Peril]?.requiredAngles) || REQUIRED_ANGLES;
-  const reqAnglesSet = new Set(reqAngles);
-  const presentUsableAngles = new Set(
-    images
-      .filter(imageIsPresent)
-      .map((img) => img.angleType)
-      .filter((a) => reqAnglesSet.has(a)),
+  const angleCoverage = computeAngleCoverage(
+    images.map((img) => ({
+      angleType: img.angleType,
+      present: imageIsPresent(img),
+      qualityPassed:
+        img.qualityPassed == null ? undefined : img.qualityPassed === true ? true : false,
+      blurScore: img.blurScore,
+      lightingScore: img.lightingScore,
+      sha256: img.sha256,
+      lat: img.lat,
+      lon: img.lon,
+      accuracyM: img.accuracyM,
+    })),
+    reqAngles,
   );
   const coverage = Math.min(
     100,
-    Math.round((presentUsableAngles.size / Math.max(1, reqAngles.length)) * 100),
+    Math.round((angleCoverage.covered / Math.max(1, angleCoverage.total)) * 100),
   );
-  const missing = reqAngles.filter((angle) => !presentUsableAngles.has(angle));
-  const measuredQuality = images
-    .map((img) => img.blurScore)
+  const missing = angleCoverage.missing;
+  const qualityParts = images
+    .map((img) => {
+      const parts = [img.blurScore, img.lightingScore].filter((n): n is number => typeof n === "number");
+      if (!parts.length) return null;
+      return parts.reduce((a, b) => a + b, 0) / parts.length;
+    })
     .filter((value): value is number => typeof value === "number");
-  const quality = measuredQuality.length
-    ? Math.round(measuredQuality.reduce((a, b) => a + b, 0) / measuredQuality.length)
+  const quality = qualityParts.length
+    ? Math.round(qualityParts.reduce((a, b) => a + b, 0) / qualityParts.length)
     : 0;
-  const realHashes = images.filter((img) => img.sha256 && /^[a-f0-9]{64}$/i.test(img.sha256)).length;
+  const realHashes = images.filter((img) => img.sha256 && isRealSha256(img.sha256)).length;
   const integrity = images.length === 0 ? 0 : Math.round((realHashes / images.length) * 100);
-  const gpsOk = images.some((img) => img.lat != null && img.lon != null);
-  const context = gpsOk ? 80 : 0;
+  const gpsOk = images.filter((img) => img.lat != null && img.lon != null);
+  const context = images.length === 0 ? 0 : Math.round((gpsOk.length / images.length) * 100);
   const overall = Math.round(0.4 * quality + 0.3 * coverage + 0.2 * context + 0.1 * integrity);
   return {
     qualityScore: quality,
@@ -506,9 +525,14 @@ export function computeEvidencePreview(images: PersistedImageInput[], peril?: st
     integrityScore: integrity,
     overallConfidence: overall,
     missingAngles: missing,
-    qualityNotes: measuredQuality.length ? "Measured from capture metadata" : "Quality not measured",
-    coverageNotes: `${presentUsableAngles.size}/${reqAngles.length} required angles present`,
-    contextNotes: gpsOk ? "GPS coordinates present on at least one image" : "GPS unavailable",
+    qualityNotes: qualityParts.length ? `Measured blur/lighting on ${qualityParts.length} image(s)` : "Quality not measured",
+    coverageNotes: `${angleCoverage.covered}/${angleCoverage.total} required angles present`,
+    contextNotes:
+      gpsOk.length === images.length && images.length > 0
+        ? "GPS coordinates present on all images"
+        : gpsOk.length > 0
+          ? `GPS coordinates present on ${gpsOk.length}/${images.length} images`
+          : "GPS unavailable",
     integrityNotes: realHashes ? `${realHashes} SHA-256 digest(s) stored` : "No SHA-256 digest stored",
   };
 }
@@ -532,6 +556,43 @@ function requireImageBytes(image: PersistedImageInput, label: string): Uint8Arra
     throw new Error(`${label} requires image bytes`);
   }
   return image.bytes;
+}
+
+/** Upload every frame and build persisted image rows (shared by submit + recapture paths). */
+async function buildImageRows(
+  store: ClaimStore,
+  claimId: string,
+  images: PersistedImageInput[],
+  nowIso: string,
+  perImageGate?: Array<GateResult & { angleType: string }> | null,
+): Promise<WebImageRow[]> {
+  const imageRows: WebImageRow[] = [];
+  for (const image of images) {
+    const imageId = image.id || newId("img");
+    const ext = (image.contentType || "image/jpeg").includes("png") ? "png" : "jpg";
+    const path = `${claimId}/${image.angleType}-${imageId}.${ext}`;
+    const uploaded = await store.uploadImage(
+      path,
+      requireImageBytes(image, image.angleType),
+      image.contentType || "image/jpeg",
+    );
+    imageRows.push({
+      id: imageId,
+      claim_id: claimId,
+      angle_type: image.angleType,
+      image_url: uploaded.url,
+      storage_path: uploaded.storagePath,
+      captured_at: image.capturedAt || nowIso,
+      lat: image.lat ?? null,
+      lon: image.lon ?? null,
+      accuracy_m: image.accuracyM ?? null,
+      sha256: image.sha256 || null,
+      quality_passed: image.qualityPassed ?? null,
+      blur_score: image.blurScore ?? null,
+      lighting_score: image.lightingScore ?? null,
+    });
+  }
+  return attachPerImageGate(imageRows, perImageGate);
 }
 
 export async function persistFarmerSubmission(
@@ -594,33 +655,8 @@ export async function persistFarmerSubmission(
     }
   }
 
-  const imageRows: WebImageRow[] = [];
-  for (const image of input.images) {
-    const imageId = image.id || newId("img");
-    const ext = (image.contentType || "image/jpeg").includes("png") ? "png" : "jpg";
-    const path = `${claimId}/${image.angleType}-${imageId}.${ext}`;
-    const uploaded = await store.uploadImage(
-      path,
-      requireImageBytes(image, image.angleType),
-      image.contentType || "image/jpeg",
-    );
-    imageRows.push({
-      id: imageId,
-      claim_id: claimId,
-      angle_type: image.angleType,
-      image_url: uploaded.url,
-      storage_path: uploaded.storagePath,
-      captured_at: image.capturedAt || now,
-      lat: image.lat ?? null,
-      lon: image.lon ?? null,
-      accuracy_m: image.accuracyM ?? null,
-      sha256: image.sha256 || null,
-      quality_passed: image.qualityPassed ?? null,
-      blur_score: image.blurScore ?? null,
-      lighting_score: image.lightingScore ?? null,
-    });
-  }
-  await store.insertImages(attachPerImageGate(imageRows, gate?.perImage));
+  const imageRows = await buildImageRows(store, claimId, input.images, now, gate?.perImage);
+  await store.insertImages(imageRows);
   return { claimId, claim };
 }
 
@@ -649,6 +685,114 @@ export async function attachHfPrediction(
   });
 }
 
+/** Stamp a blocking gate verdict onto the claim (kept under_review so a reviewer can adjudicate). */
+async function persistGateRejection(
+  store: ClaimStore,
+  claimId: string,
+  gatePayload: unknown,
+  reason: string,
+): Promise<void> {
+  try {
+    await store.updateClaim(claimId, {
+      status: "under_review",
+      gate_result: gatePayload as any,
+      quality_notes: `Gate rejected: ${reason}`,
+      overall_confidence: 0,
+      updated_at: new Date().toISOString(),
+    } as any);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/gate_result/i.test(msg)) throw e;
+  }
+}
+
+/** Persist the successful/audit gate_result for a passing gate (best-effort). */
+async function persistGateResult(
+  store: ClaimStore,
+  claimId: string,
+  gatePayload: unknown,
+  opts?: { swallowAll?: boolean },
+): Promise<void> {
+  try {
+    await store.updateClaim(claimId, {
+      gate_result: gatePayload as any,
+      updated_at: new Date().toISOString(),
+    } as any);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (opts?.swallowAll) return;
+    if (!/gate_result/i.test(msg)) throw e;
+  }
+}
+
+/**
+ * Terminal handling for a blocked or unavailable vision gate: record the verdict,
+ * attach an unusable prediction, and return early — never falls through to HF inference.
+ */
+async function gateBlockedEarlyReturn(
+  store: ClaimStore,
+  claimId: string,
+  gate: PersistedGateOutcome,
+): Promise<{ claimId: string; prediction: HfPrediction }> {
+  const reason = gate.blockingReason || "unusable";
+  const gatePayload = gate.gateResult;
+  await persistGateRejection(store, claimId, gatePayload, reason);
+  const prediction = unusablePrediction([reason]);
+  try {
+    await attachHfPrediction(store, claimId, prediction);
+    // re-ensure gate_result + overallConfidence 0 after attach (attach overwrites quality_notes)
+    await persistGateRejection(store, claimId, gatePayload, reason);
+  } catch {}
+  return { claimId, prediction };
+}
+
+/** Persist the adaptive result; auto-recapture claims additionally flip to needs_recapture. */
+async function persistAdaptiveResult(
+  store: ClaimStore,
+  claimId: string,
+  adaptive: AdaptiveResult,
+  adaptivePayload: Record<string, unknown>,
+  previewMissingAngles: string[],
+): Promise<void> {
+  if (adaptive.nextStep === "request_missing") {
+    // Auto recapture request: the adaptive engine detected an evidence gap — route the
+    // claim straight to needs_recapture instead of waiting in the reviewer queue.
+    // (escalate_to_human / proceed stay under_review.)
+    const autoPatch = {
+      status: "needs_recapture",
+      missing_angles:
+        adaptive.missingAngles.length > 0 ? adaptive.missingAngles : previewMissingAngles,
+      recapture_reason: adaptive.reasons[0] || "Automated evidence gap detected",
+      recapture_reason_hi: adaptive.reasonsHi[0] || null,
+      adaptive_result: adaptivePayload,
+      updated_at: new Date().toISOString(),
+    };
+    try {
+      await store.updateClaim(claimId, autoPatch as any);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/adaptive_result|recapture_reason/i.test(msg)) throw e;
+      const {
+        adaptive_result: _ar,
+        recapture_reason: _rr,
+        recapture_reason_hi: _rh,
+        ...fallback
+      } = autoPatch as any;
+      await store.updateClaim(claimId, fallback as any);
+    }
+  } else {
+    try {
+      await store.updateClaim(claimId, {
+        adaptive_result: adaptivePayload as any,
+        updated_at: new Date().toISOString(),
+      } as any);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!/adaptive_result/i.test(msg)) throw e;
+    }
+  }
+}
+
 export async function persistAndInfer(
   store: ClaimStore,
   input: PersistClaimInput,
@@ -656,14 +800,8 @@ export async function persistAndInfer(
   inferOptions?: { apiToken?: string; fetchImpl?: typeof fetch; spaceUrl?: string },
 ): Promise<{ claimId: string; prediction: HfPrediction | null; inferError?: string }> {
   // ----- Vision gate (computed BEFORE image persistence so each web_claim_images row can
-  // carry its own per-angle gate_result; blocking logic below is unchanged) -----
-  let gate: PersistedGateOutcome | null = null;
-  try {
-    pruneGateCache();
-    gate = await gateImagesGate(input.images, input.cropType, input.peril);
-  } catch {
-    gate = null; // gate errors should not block persistence or inference
-  }
+  // carry its own per-angle gate_result; a thrown gate fails CLOSED via runVisionGate) -----
+  const gate = await runVisionGate(input.images, input.cropType, input.peril);
   const persisted = await persistFarmerSubmission(store, input, gate);
   // Assemble multi-signal context internally (not via HTTP) and persist to claim with context_signals.
   // Best-effort: do not fail pipeline if context fetch errors or column missing.
@@ -700,43 +838,12 @@ export async function persistAndInfer(
   }
   // ----- Vision gate blocking (uses the gate computed early above; cache behavior unchanged) -----
   // If any image Gate usable==false, set claim's gate_result JSON and return unusablePrediction terminally.
-  if (gate && gate.gateFailed) {
-    const reason = gate.blockingReason || "unusable";
-    const gatePayload = gate.gateResult;
-    try {
-      await store.updateClaim(persisted.claimId, {
-        gate_result: gatePayload as any,
-        quality_notes: `Gate rejected: ${reason}`,
-        overall_confidence: 0,
-        updated_at: new Date().toISOString(),
-      } as any);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!/gate_result/i.test(msg)) throw e;
-    }
-    const prediction = unusablePrediction([reason]);
-    try {
-      await attachHfPrediction(store, persisted.claimId, prediction);
-      // re-ensure gate_result + overallConfidence 0 after attach (attach overwrites quality_notes)
-      await store.updateClaim(persisted.claimId, {
-        gate_result: gatePayload as any,
-        quality_notes: `Gate rejected: ${reason}`,
-        overall_confidence: 0,
-      } as any);
-    } catch {}
-    return { claimId: persisted.claimId, prediction };
+  if (gate.gateFailed) {
+    return gateBlockedEarlyReturn(store, persisted.claimId, gate);
   }
   // Gate passed — persist successful gate_result for audit trail (best-effort)
-  if (gate && gate.perImage.length) {
-    try {
-      await store.updateClaim(persisted.claimId, {
-        gate_result: gate.gateResult as any,
-        updated_at: new Date().toISOString(),
-      } as any);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!/gate_result/i.test(msg)) throw e;
-    }
+  if (gate.perImage.length) {
+    await persistGateResult(store, persisted.claimId, gate.gateResult);
   }
   // ----- Adaptive engine: compute level/nextStep and persist for reviewer queue -----
   try {
@@ -751,56 +858,18 @@ export async function persistAndInfer(
       signals: effectiveSignals,
       missingAngles: previewForAdaptive.missingAngles,
     });
-    // Confidence delta vs. the claim as stored before this write (meaningful on re-submission).
-    let prevConfidence: number | null = null;
-    try {
-      const existing = await store.getClaim(persisted.claimId);
-      prevConfidence = existing?.overall_confidence ?? null;
-    } catch {}
+    // For initial submission, there is no previous evaluation (meaningful delta only applies on recapture).
     const adaptivePayload = {
       ...adaptive,
-      previousConfidence: prevConfidence,
-      ...(prevConfidence != null
-        ? { confidence_delta: Math.round((previewForAdaptive.overallConfidence - prevConfidence) * 10) / 10 }
-        : {}),
+      previousConfidence: null,
     };
-    if (adaptive.nextStep === "request_missing") {
-      // Auto recapture request: the adaptive engine detected an evidence gap — route the
-      // claim straight to needs_recapture instead of waiting in the reviewer queue.
-      // (escalate_to_human / proceed stay under_review.)
-      const autoPatch = {
-        status: "needs_recapture",
-        missing_angles:
-          adaptive.missingAngles.length > 0 ? adaptive.missingAngles : previewForAdaptive.missingAngles,
-        recapture_reason: adaptive.reasons[0] || "Automated evidence gap detected",
-        recapture_reason_hi: adaptive.reasonsHi[0] || null,
-        adaptive_result: adaptivePayload,
-        updated_at: new Date().toISOString(),
-      };
-      try {
-        await store.updateClaim(persisted.claimId, autoPatch as any);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (!/adaptive_result|recapture_reason/i.test(msg)) throw e;
-        const {
-          adaptive_result: _ar,
-          recapture_reason: _rr,
-          recapture_reason_hi: _rh,
-          ...fallback
-        } = autoPatch as any;
-        await store.updateClaim(persisted.claimId, fallback as any);
-      }
-    } else {
-      try {
-        await store.updateClaim(persisted.claimId, {
-          adaptive_result: adaptivePayload as any,
-          updated_at: new Date().toISOString(),
-        } as any);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (!/adaptive_result/i.test(msg)) throw e;
-      }
-    }
+    await persistAdaptiveResult(
+      store,
+      persisted.claimId,
+      adaptive,
+      adaptivePayload,
+      previewForAdaptive.missingAngles,
+    );
   } catch {
     // adaptive is best-effort; never block pipeline
   }
@@ -855,34 +924,7 @@ async function uploadNewImages(
   images: PersistedImageInput[],
   perImageGate?: Array<GateResult & { angleType: string }> | null,
 ): Promise<WebImageRow[]> {
-  const now = new Date().toISOString();
-  const imageRows: WebImageRow[] = [];
-  for (const image of images) {
-    const imageId = image.id || newId("img");
-    const ext = (image.contentType || "image/jpeg").includes("png") ? "png" : "jpg";
-    const path = `${claimId}/${image.angleType}-${imageId}.${ext}`;
-    const uploaded = await store.uploadImage(
-      path,
-      requireImageBytes(image, image.angleType),
-      image.contentType || "image/jpeg",
-    );
-    imageRows.push({
-      id: imageId,
-      claim_id: claimId,
-      angle_type: image.angleType,
-      image_url: uploaded.url,
-      storage_path: uploaded.storagePath,
-      captured_at: image.capturedAt || now,
-      lat: image.lat ?? null,
-      lon: image.lon ?? null,
-      accuracy_m: image.accuracyM ?? null,
-      sha256: image.sha256 || null,
-      quality_passed: image.qualityPassed ?? null,
-      blur_score: image.blurScore ?? null,
-      lighting_score: image.lightingScore ?? null,
-    });
-  }
-  return attachPerImageGate(imageRows, perImageGate);
+  return buildImageRows(store, claimId, images, new Date().toISOString(), perImageGate);
 }
 
 export async function recaptureAndInfer(
@@ -902,14 +944,12 @@ export async function recaptureAndInfer(
     throw new Error("Claim not found");
   }
   // ----- Vision gate for recapture (computed BEFORE image persistence so each new
-  // web_claim_images row carries its own per-angle gate_result) -----
-  let gate: PersistedGateOutcome | null = null;
-  try {
-    pruneGateCache();
-    gate = await gateImagesGate(input.images, existing.crop_type || undefined, (existing as any).peril || undefined);
-  } catch {
-    gate = null; // gate errors should not block persistence or inference
-  }
+  // web_claim_images row carries its own per-angle gate_result; throws fail CLOSED) -----
+  const gate = await runVisionGate(
+    input.images,
+    existing.crop_type || undefined,
+    (existing as any).peril || undefined,
+  );
   const uploaded = await uploadNewImages(store, input.claimId, input.images, gate?.perImage);
   await store.replaceAngleImages(input.claimId, uploaded);
   const merged = await store.listImages(input.claimId);
@@ -938,38 +978,11 @@ export async function recaptureAndInfer(
   });
 
   // ----- Vision gate blocking for recapture (uses the gate computed early above) -----
-  if (gate && gate.gateFailed) {
-    const reason = gate.blockingReason || "unusable";
-    const gatePayload = gate.gateResult;
-    try {
-      await store.updateClaim(input.claimId, {
-        gate_result: gatePayload as any,
-        quality_notes: `Gate rejected: ${reason}`,
-        overall_confidence: 0,
-        updated_at: new Date().toISOString(),
-      } as any);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!/gate_result/i.test(msg)) throw e;
-    }
-    const prediction = unusablePrediction([reason]);
-    try {
-      await attachHfPrediction(store, input.claimId, prediction);
-      await store.updateClaim(input.claimId, {
-        gate_result: gatePayload as any,
-        quality_notes: `Gate rejected: ${reason}`,
-        overall_confidence: 0,
-      } as any);
-    } catch {}
-    return { claimId: input.claimId, prediction };
+  if (gate.gateFailed) {
+    return gateBlockedEarlyReturn(store, input.claimId, gate);
   }
-  if (gate && gate.perImage.length) {
-    try {
-      await store.updateClaim(input.claimId, {
-        gate_result: gate.gateResult as any,
-        updated_at: new Date().toISOString(),
-      } as any);
-    } catch {}
+  if (gate.perImage.length) {
+    await persistGateResult(store, input.claimId, gate.gateResult, { swallowAll: true });
   }
 
   // ----- Adaptive engine for recapture (same policy as first submission) -----
@@ -998,15 +1011,13 @@ export async function recaptureAndInfer(
         ? { confidence_delta: Math.round((preview.overallConfidence - prevConfidence) * 10) / 10 }
         : {}),
     };
-    try {
-      await store.updateClaim(input.claimId, {
-        adaptive_result: adaptivePayload as any,
-        updated_at: new Date().toISOString(),
-      } as any);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!/adaptive_result/i.test(msg)) throw e;
-    }
+    await persistAdaptiveResult(
+      store,
+      input.claimId,
+      adaptive,
+      adaptivePayload as unknown as Record<string, unknown>,
+      preview.missingAngles,
+    );
   } catch {
     // adaptive is best-effort; never block pipeline
   }
@@ -1048,6 +1059,7 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
     id: claim.id,
     crop_cycle_id: claim.plot_id || claim.id,
     status: claim.status,
+    createdAt: (claim as any).created_at || undefined,
     capture_lat: claim.capture_lat,
     capture_lon: claim.capture_lon,
     capture_accuracy_m: claim.capture_accuracy_m,

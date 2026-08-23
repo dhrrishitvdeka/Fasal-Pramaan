@@ -1,5 +1,57 @@
 import { describe, expect, it } from "vitest";
-import { computeEvidencePreview, isRealSha256 } from "../src/lib/evidence";
+import { computeAngleCoverage, computeEvidencePreview, isRealSha256 } from "../src/lib/evidence";
+
+describe("computeAngleCoverage (B10 unified scoring)", () => {
+  it("counts distinct usable required angles and reports missing in canonical order", () => {
+    const res = computeAngleCoverage([
+      { angleType: "wide_field", imageUrl: "data:image/jpeg;base64,x", qualityPassed: true },
+      // duplicate frame of the same angle must not double-count
+      { angleType: "wide_field", imageUrl: "data:image/jpeg;base64,y", qualityPassed: true },
+      // explicitly failed quality → unusable
+      { angleType: "closeup_damage", imageUrl: "data:image/jpeg;base64,z", qualityPassed: false },
+      // no image at all → absent
+      { angleType: "mid_canopy" },
+      // presence marker (pipeline path) with unmeasured quality still counts
+      { angleType: "left_context", present: true },
+    ]);
+    expect(res.covered).toBe(2);
+    expect(res.total).toBe(5);
+    expect(res.missing).toEqual(["mid_canopy", "right_context", "closeup_damage"]);
+  });
+
+  it("honors route-specific required angle lists", () => {
+    const res = computeAngleCoverage(
+      [
+        { angleType: "wide_field", imageUrl: "x" },
+        { angleType: "closeup_damage", imageUrl: "y" },
+      ],
+      ["wide_field", "closeup_damage"],
+    );
+    expect(res.covered).toBe(2);
+    expect(res.total).toBe(2);
+    expect(res.missing).toEqual([]);
+  });
+
+  it("treats unmeasured quality as present and explicit failure as unusable", () => {
+    const unmeasured = computeAngleCoverage([
+      { angleType: "wide_field", imageUrl: "x", qualityPassed: undefined },
+    ]);
+    expect(unmeasured.covered).toBe(1);
+
+    const failed = computeAngleCoverage([
+      { angleType: "wide_field", imageUrl: "x", qualityPassed: false },
+    ]);
+    expect(failed.covered).toBe(0);
+    // With the default 5-angle list, the single failed frame leaves every angle missing.
+    expect(failed.missing).toEqual([
+      "wide_field",
+      "left_context",
+      "mid_canopy",
+      "right_context",
+      "closeup_damage",
+    ]);
+  });
+});
 
 describe("honest evidence preview", () => {
   it("scores coverage from usable distinct required angles only", () => {

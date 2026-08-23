@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { buildDefaultMilestones } from "@/lib/growth-stages";
 import { createServerSupabase } from "@/lib/supabase";
 import { requireWebActor } from "@/lib/web-auth";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 import { katthaToHectares, toKattha } from "@/lib/land-units";
 
 const CROPS: Record<string, { en: string; hi: string }> = {
@@ -22,6 +23,13 @@ const CROPS: Record<string, { en: string; hi: string }> = {
 export async function POST(request: Request) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
+  const limit = checkRateLimit(`plots-create:${auth.actor.userId}`, 10, 60_000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
   const supabase = createServerSupabase();
   if (!supabase) return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
 

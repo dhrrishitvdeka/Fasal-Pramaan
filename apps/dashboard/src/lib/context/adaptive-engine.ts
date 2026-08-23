@@ -34,11 +34,9 @@ export function adaptiveConfidence(opts: {
   const signals = opts.signals || [];
   const required = new Set(cfg.requiredAngles);
   const capturedMissing = (opts.missingAngles || []).filter((a) => required.has(a));
-  const optionalMissing = (opts.missingAngles || []).filter((a) => !required.has(a));
 
   const hasSentinel = signals.find((s) => s.source === "sentinel");
   const sentinelOk = hasSentinel?.status === "available";
-  const imd = signals.find((s) => s.source === "imd");
   const gps = signals.find((s) => s.source === "gps");
   const gateBlock = opts.gateFailed;
 
@@ -68,7 +66,9 @@ export function adaptiveConfidence(opts: {
     reasons.push("Animal damage benefits from GPS trail — request location");
     reasonsHi.push("जानवर क्षति के लिए जीपीएस ट्रेल सहायक — स्थान माँगें");
     if (opts.overall >= 70) {
-      return { level: "medium", nextStep: "request_missing", threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: capturedMissing };
+      // B2: never route to request_missing with zero missing angles — proceed instead.
+      const nextStep = capturedMissing.length > 0 ? "request_missing" : "proceed";
+      return { level: "medium", nextStep, threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: capturedMissing };
     }
   }
 
@@ -79,15 +79,19 @@ export function adaptiveConfidence(opts: {
     reasonsHi.push("साक्ष्य आपदा सीमा पर खरा");
   } else if (opts.overall >= threshold - 20 && opts.coverage >= 40) {
     level = "medium";
-    nextStep = "request_missing";
+    // B2: never request_missing with zero missing angles — there is nothing to ask for.
+    nextStep = capturedMissing.length > 0 ? "request_missing" : "proceed";
     if (capturedMissing.length > 0) {
       reasons.push(`Missing required angles: ${capturedMissing.join(", ")}`);
       reasonsHi.push(`आवश्यक कोण अनुपलब्ध: ${capturedMissing.join(", ")}`);
     } else if (opts.coverage < 80) {
       reasons.push("Missing angles — request specific views");
+      reasonsHi.push("कुछ कोणों की कमी — विशिष्ट दृश्य माँगें");
     }
-    if (opts.quality < 50) reasons.push("Quality low — request retake of blurry frame");
-    reasonsHi.push("कुछ कोण/गुणवत्ता में कमी — लक्षित पुनः फोटो माँगें");
+    if (opts.quality < 50) {
+      reasons.push("Quality low — request retake of blurry frame");
+      reasonsHi.push("गुणवत्ता कम — धुंधले फ्रेम की पुनः फोटो माँगें");
+    }
   } else {
     level = "low";
     // if coverage low but integrity ok → retake; else escalate
@@ -97,11 +101,5 @@ export function adaptiveConfidence(opts: {
     reasonsHi.push("कुल विश्वास अनुकूल सीमा से कम");
   }
 
-  // imd weak signal as extra reason
-  if (imd?.status === "available" && typeof (imd.meta as any)?.rainfall_7d_mm === "number") {
-    // no change to level, just info
-  }
-
-  void optionalMissing;
   return { level, nextStep, threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: capturedMissing };
 }

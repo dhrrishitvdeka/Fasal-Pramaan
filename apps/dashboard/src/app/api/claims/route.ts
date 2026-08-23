@@ -10,6 +10,7 @@ import { createServerSupabase } from "@/lib/supabase";
 import { createSupabaseClaimStore } from "@/lib/supabase-store";
 import { isReviewerRole, requireWebActor } from "@/lib/web-auth";
 import { checkRateLimit } from "@/lib/server/rate-limit";
+import { claimSubmissionSchema } from "@/lib/schemas";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 const MAX_BYTES = 15 * 1024 * 1024;
@@ -73,6 +74,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
   }
   const body = await request.json().catch(() => ({}));
+  const parsedBody = claimSubmissionSchema.safeParse(body);
+  if (!parsedBody.success) {
+    return NextResponse.json(
+      { error: parsedBody.error.issues[0]?.message || "Invalid request body" },
+      { status: 400 },
+    );
+  }
   const rawImages = Array.isArray(body.images) ? body.images : [];
   const claimId =
     typeof body.id === "string" && body.id.trim().length > 0 ? body.id.trim() : undefined;

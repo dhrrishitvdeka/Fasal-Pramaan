@@ -26,7 +26,10 @@ ON CONFLICT (id) DO UPDATE SET
     file_size_limit = 15728640,
     allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp'];
 
--- 4. Storage Security Policies — authenticated / service_role upload only
+-- 4. Storage Security Policies — service_role upload only.
+-- All app uploads go through server routes using the service-role client
+-- (src/lib/supabase.ts); browsers never write to the bucket directly.
+-- Deny-by-default posture matches scripts/lock_web_rls.sql.
 DROP POLICY IF EXISTS "Public Read Access for Evidence" ON storage.objects;
 DROP POLICY IF EXISTS "Service Role Upload Access" ON storage.objects;
 DROP POLICY IF EXISTS "Authenticated User Upload Access" ON storage.objects;
@@ -34,11 +37,6 @@ DROP POLICY IF EXISTS "Authenticated User Upload Access" ON storage.objects;
 CREATE POLICY "Service Role Upload Access"
 ON storage.objects FOR INSERT
 TO service_role
-WITH CHECK (bucket_id = 'fasal-web-evidence');
-
-CREATE POLICY "Authenticated User Upload Access"
-ON storage.objects FOR INSERT
-TO authenticated
 WITH CHECK (bucket_id = 'fasal-web-evidence');
 
 -- ============================================================================

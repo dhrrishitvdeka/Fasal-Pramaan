@@ -20,7 +20,9 @@ export default function MapPage() {
   const [dateTo, setDateTo] = useState("");
 
   const { data = [], isLoading } = useQuery({
-    queryKey: ["map", status, severity, crop, damage, district, dateFrom, dateTo],
+    // district is a client-side filter (api.ts mapMarkers) — kept out of the key
+    // so typing doesn't refetch the full stats payload on every keystroke.
+    queryKey: ["map", status, severity, crop, damage, dateFrom, dateTo],
     queryFn: async () => {
       const params: Record<string, string> = {};
       if (status) params.status = status;

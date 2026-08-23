@@ -11,11 +11,11 @@ export function predictionIsAcceptable(
   integrityFailed = false,
 ): boolean {
   if (!pred || integrityFailed) return false;
+  if (pred.predicted_grade === "U") return false;
   if (
     pred.predicted_grade === "A" ||
     pred.predicted_grade === "B" ||
-    pred.predicted_grade === "C" ||
-    pred.predicted_grade === "U"
+    pred.predicted_grade === "C"
   ) {
     return true;
   }

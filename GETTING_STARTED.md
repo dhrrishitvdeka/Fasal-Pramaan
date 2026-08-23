@@ -8,7 +8,7 @@ This guide walks you through setting up and running the Next.js webapp (`apps/da
 
 ## 1. Prerequisites
 
-- **Node.js 20+** (Node 22 recommended — CI uses Node 22) and npm.
+- **Node.js 22** (CI pins 22; the Docker image uses `node:22-alpine`) and npm.
 - **A Supabase account** (free tier works): you will create one project for auth, Postgres tables, and evidence storage.
 - **Git**: for cloning the repository.
 - **Optional API keys**:
@@ -72,7 +72,7 @@ In the Supabase dashboard open **SQL Editor** and run these files in order (all 
 
 Then create Auth users for yourself (and reviewers). Emails listed in `REVIEWER_EMAILS` get the reviewer role at `/review`; everyone else is a farmer.
 
-Optionally verify connectivity:
+Optionally verify connectivity (requires the `psycopg` package: `pip install psycopg`):
 
 ```bash
 python scripts/test_supabase_conn.py
@@ -107,7 +107,19 @@ npm run build
 # Or from the repository root (same commands via --prefix apps/dashboard)
 ```
 
-CI runs exactly this suite on every push and pull request (see `.github/workflows/ci.yml`).
+CI runs lint, typecheck, unit tests, and the production build on every push and pull request (see `.github/workflows/ci.yml`). The Playwright e2e suite is separate — run it locally with `PLAYWRIGHT_E2E=1 npm run e2e` (it boots a production server and needs the staging env described in `e2e/helpers.ts`).
+
+---
+
+## 6.5 Run with Docker
+
+```bash
+cd apps/dashboard
+docker build -t fasal-dashboard .
+docker run -p 3000:3000 --env-file .env.local fasal-dashboard
+```
+
+The image is a multi-stage build on `node:22-alpine`; the container serves the standalone Next.js output as a non-root user and exposes `GET /api/health` for the built-in healthcheck.
 
 ---
 

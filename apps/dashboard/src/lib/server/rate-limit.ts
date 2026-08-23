@@ -10,11 +10,17 @@ export type RateLimitResult = { ok: true } | { ok: false; retryAfterSeconds: num
  * Keyed per caller, e.g. `${route}:${actor.userId}`. Single-process only —
  * acceptable for this deployment; swap for a shared store if we scale horizontally.
  */
+export const RATE_LIMIT_ENABLED = process.env.ENABLE_RATE_LIMIT === "true";
+
 export function checkRateLimit(
   key: string,
   max: number,
   windowMs = 60_000,
+  forceEnforce = false,
 ): RateLimitResult {
+  if (!RATE_LIMIT_ENABLED && !forceEnforce) {
+    return { ok: true };
+  }
   const now = Date.now();
   const bucket = buckets.get(key);
   if (!bucket || now - bucket.windowStart >= windowMs) {
