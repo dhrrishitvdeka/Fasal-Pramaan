@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
+import { getSpeechLocale } from "@/lib/live-indian-languages";
 import {
   isUnusableLighting,
   measureLightingScore,
@@ -395,7 +396,7 @@ function CaptureStudioContent() {
         const SpeechRec =
           (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         const recognition = new SpeechRec();
-        recognition.lang = lang === "hi" ? "hi-IN" : "en-IN";
+        recognition.lang = getSpeechLocale(lang);
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
@@ -407,16 +408,16 @@ function CaptureStudioContent() {
         };
         recognition.onerror = () => {
           setIsListening(false);
-          showToast(lang === "hi" ? "आवाज उपलब्ध नहीं है — नोट खुद लिखें" : "Voice unavailable — type the note instead");
+          showToast(t.saathiVoiceUnsupported || (lang === "hi" ? "आवाज उपलब्ध नहीं है — नोट खुद लिखें" : "Voice unavailable — type the note instead"));
         };
         recognition.onend = () => setIsListening(false);
         recognition.start();
       } catch {
         setIsListening(false);
-        showToast(lang === "hi" ? "आवाज उपलब्ध नहीं है — नोट खुद लिखें" : "Voice unavailable — type the note instead");
+        showToast(t.saathiVoiceUnsupported || (lang === "hi" ? "आवाज उपलब्ध नहीं है — नोट खुद लिखें" : "Voice unavailable — type the note instead"));
       }
     } else {
-      showToast(lang === "hi" ? "आवाज उपलब्ध नहीं है — नोट खुद लिखें" : "Voice unavailable — type the note instead");
+      showToast(t.saathiVoiceUnsupported || (lang === "hi" ? "आवाज उपलब्ध नहीं है — नोट खुद लिखें" : "Voice unavailable — type the note instead"));
     }
   };
 

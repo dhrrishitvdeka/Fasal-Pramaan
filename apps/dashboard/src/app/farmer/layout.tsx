@@ -31,7 +31,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
     },
     {
       href: "/farmer/saathi",
-      label: lang === "hi" ? "साथी (AI आवाज़)" : "Saathi AI",
+      label: t.saathiNav,
       icon: Sprout,
       highlight: true,
     },
@@ -91,7 +91,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
                   Fasal-Pramaan
                 </span>
                 <span className="rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.2 text-[10px] font-bold uppercase tracking-wider text-emerald-800">
-                  {lang === "hi" ? "किसान पोर्टल" : "Farmer Portal"}
+                  {t.farmerPortalLabel}
                 </span>
               </div>
             </div>

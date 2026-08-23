@@ -7,6 +7,7 @@ import { startLiveAudio, type LiveAudioSession } from "@/lib/voice/live-audio";
 import { farmerScreenFromPath, WebVoiceBroker, type VoiceToolResult } from "@/lib/voice/web-voice-broker";
 import { useFarmerData } from "@/lib/farmerStore";
 import type { AppLang } from "@/lib/live-indian-languages";
+import { getFarmerT } from "@/lib/farmerI18n";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -36,6 +37,7 @@ export default function FasalSaathiOverlay() {
     snoozeMilestone,
     completeMilestone,
   } = useFarmerData();
+  const t = getFarmerT(lang);
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<LiveStatus>("idle");
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -588,12 +590,10 @@ export default function FasalSaathiOverlay() {
               </div>
               <div className="rounded-2xl rounded-tl-xs bg-white border border-stone-200/90 p-3 text-slate-800 shadow-2xs leading-relaxed max-w-[88%]">
                 <p className="font-semibold text-slate-900 text-xs">
-                  {lang === "hi" ? "नमस्ते किसान भाई!" : "Welcome, Kisan!"}
+                  {t.greeting}
                 </p>
                 <p className="mt-0.5 text-xs text-slate-600">
-                  {lang === "hi"
-                    ? "आप अपनी भाषा में फसल नुकसान या खेत की स्थिति बोल सकते हैं।"
-                    : "Speak naturally in Hindi or English about crop loss, field status, or claims."}
+                  {t.saathiSub}
                 </p>
               </div>
             </div>
@@ -655,11 +655,11 @@ export default function FasalSaathiOverlay() {
                     <span className="w-0.5 h-3 bg-emerald-600 rounded-full animate-pulse" />
                     <span className="w-0.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                   </span>
-                  <span>{lang === "hi" ? "आवाज़ सुन रहे हैं…" : "Listening…"}</span>
+                  <span>{t.saathiListening}</span>
                 </div>
               ) : (
                 <span className="text-slate-500 text-[11px]">
-                  {lang === "hi" ? "माइक चालू करने के लिए टैप करें" : "Voice assistant active"}
+                  {t.saathiTapToSpeak}
                 </span>
               )}
             </div>
