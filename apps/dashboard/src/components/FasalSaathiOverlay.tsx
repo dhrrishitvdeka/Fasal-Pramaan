@@ -467,8 +467,8 @@ export default function FasalSaathiOverlay() {
         {/* Animated speaking audio ripples */}
         {isSpeaking && (
           <>
-            <span className="absolute -inset-3 rounded-full bg-emerald-400/30 mic-sonar-1 pointer-events-none" />
-            <span className="absolute -inset-2 rounded-full bg-emerald-500/25 mic-sonar-2 pointer-events-none" />
+            <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
+            <span className="absolute -inset-1 animate-pulse rounded-full bg-emerald-500/20" />
           </>
         )}
 
