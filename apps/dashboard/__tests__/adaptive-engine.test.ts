@@ -84,7 +84,7 @@ describe("adaptive engine", () => {
     expect(res.missingAngles).toEqual(["wide_field"]);
   });
 
-  it("asks animal_damage farmers for a GPS trail without injecting non-canonical angle IDs", () => {
+  it("proceeds for animal_damage when GPS is unavailable but every required angle was captured", () => {
     const res = adaptiveConfidence({
       ...base,
       overall: 76,
@@ -92,8 +92,49 @@ describe("adaptive engine", () => {
       signals: [sig("imd", "available", { rainfall_7d_mm: 4 })],
       missingAngles: [],
     });
+    // B2 regression: request_missing with zero missing angles is never returned.
+    expect(res.level).toBe("medium");
+    expect(res.nextStep).toBe("proceed");
+    expect(res.missingAngles).toEqual([]);
+  });
+
+  it("keeps request_missing for animal_damage when a required angle is genuinely absent", () => {
+    const res = adaptiveConfidence({
+      ...base,
+      overall: 76,
+      peril: "animal_damage",
+      signals: [sig("imd", "available", { rainfall_7d_mm: 4 })],
+      missingAngles: ["wide_field"],
+    });
     expect(res.level).toBe("medium");
     expect(res.nextStep).toBe("request_missing");
+    expect(res.missingAngles).toEqual(["wide_field"]);
+  });
+
+  it("never requests missing angles for animal_damage when only optional angles are absent", () => {
+    // animal_damage requires wide_field/mid_canopy/closeup_damage; left/right context are optional.
+    const res = adaptiveConfidence({
+      ...base,
+      overall: 76,
+      peril: "animal_damage",
+      signals: [sig("imd", "available", { rainfall_7d_mm: 4 })],
+      missingAngles: ["left_context"],
+    });
+    expect(res.level).toBe("medium");
+    expect(res.nextStep).toBe("proceed");
+    expect(res.missingAngles).toEqual([]);
+  });
+
+  it("proceeds instead of requesting missing angles in the medium band when everything required arrived", () => {
+    // overall 70 sits below the normal threshold (85) but inside the threshold-20 medium band.
+    const res = adaptiveConfidence({
+      ...base,
+      overall: 70,
+      peril: "normal",
+      missingAngles: [],
+    });
+    expect(res.level).toBe("medium");
+    expect(res.nextStep).toBe("proceed");
     expect(res.missingAngles).toEqual([]);
   });
 

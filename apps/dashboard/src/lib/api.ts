@@ -297,6 +297,8 @@ export type Submission = {
   id: string;
   crop_cycle_id: string;
   status: string;
+  /** ISO timestamp of claim creation (emitted by claimToSubmission; used by review-queue CSV export). */
+  createdAt?: string;
   capture_lat?: number | null;
   capture_lon?: number | null;
   capture_accuracy_m?: number | null;

@@ -2,14 +2,15 @@
 
 import React, { useState } from "react";
 import { Submission } from "@/lib/api";
+import { REQUIRED_ANGLES } from "@/lib/evidence";
 
-const REQUIRED_ANGLES = [
-  { key: "wide_field", label: "Wide Field" },
-  { key: "left_context", label: "Left Context" },
-  { key: "mid_canopy", label: "Mid Canopy" },
-  { key: "right_context", label: "Right Context" },
-  { key: "closeup_damage", label: "Closeup Damage" },
-];
+const ANGLE_LABELS: Record<string, string> = {
+  wide_field: "Wide Field",
+  left_context: "Left Context",
+  mid_canopy: "Mid Canopy",
+  right_context: "Right Context",
+  closeup_damage: "Closeup Damage",
+};
 
 export interface AiConfidenceBreakdownProps {
   prediction: NonNullable<Submission["latest_prediction"]>;
@@ -71,8 +72,8 @@ export function AiConfidenceBreakdown({
       .filter(Boolean)
   );
 
-  const angleCount = REQUIRED_ANGLES.filter((a) =>
-    uploadedAngles.has(a.key)
+  const angleCount = REQUIRED_ANGLES.filter((angle) =>
+    uploadedAngles.has(angle)
   ).length;
   const anglePct = Math.round((angleCount / REQUIRED_ANGLES.length) * 100);
 
@@ -149,10 +150,10 @@ export function AiConfidenceBreakdown({
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
           {REQUIRED_ANGLES.map((angle) => {
-            const isUploaded = uploadedAngles.has(angle.key);
+            const isUploaded = uploadedAngles.has(angle);
             return (
               <div
-                key={angle.key}
+                key={angle}
                 className={`flex items-center gap-1.5 rounded px-2 py-1 text-[11px] border ${
                   isUploaded
                     ? "border-[var(--ink)] bg-[var(--accent-soft)] text-[var(--ink)]"
@@ -160,7 +161,7 @@ export function AiConfidenceBreakdown({
                 }`}
               >
                 <span className="text-xs">{isUploaded ? "✓" : "⚠️"}</span>
-                <span className="truncate">{angle.label}</span>
+                <span className="truncate">{ANGLE_LABELS[angle] ?? angle}</span>
               </div>
             );
           })}

@@ -1,7 +1,7 @@
 import { FASAL_SPACE_ID, resolveHfModelId, resolveHfSpaceUrl } from "./hf-infer";
 
-export const HF_MODEL_ID = resolveHfModelId();
-
+// Lazy accessors — env may change after boot (tests, edge re-eval), so never
+// snapshot process.env at module load.
 export function getHfModelId(): string {
   return resolveHfModelId();
 }

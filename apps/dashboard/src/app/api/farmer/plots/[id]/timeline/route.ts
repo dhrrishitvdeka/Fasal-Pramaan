@@ -2,10 +2,18 @@ import { NextResponse } from "next/server";
 import { buildDefaultMilestones } from "@/lib/growth-stages";
 import { createServerSupabase } from "@/lib/supabase";
 import { isReviewerRole, requireWebActor } from "@/lib/web-auth";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
+  const limit = checkRateLimit(`plots-timeline:${auth.actor.userId}`, 20, 60_000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
   const { id } = await context.params;
   const supabase = createServerSupabase();
   if (!supabase) return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });

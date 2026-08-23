@@ -1,12 +1,20 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { SITE_LOCK_COOKIE, isSiteLockActive, isValidSiteLockToken } from "@/lib/site-lock";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 import { assertNoSecretLeak, mintVoiceSession } from "@/lib/voice/gemini-session";
 import { requireWebActor } from "@/lib/web-auth";
 
 export async function POST(request: Request) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
+  const limit = checkRateLimit(`voice-session:${auth.actor.userId}`, 10, 60_000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again shortly." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
   const jar = await cookies();
   const unlocked = await isValidSiteLockToken(jar.get(SITE_LOCK_COOKIE)?.value);
   const result = await mintVoiceSession({

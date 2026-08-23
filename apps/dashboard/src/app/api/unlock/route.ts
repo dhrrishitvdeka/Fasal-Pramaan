@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 import {
   SITE_LOCK_COOKIE,
   isSiteLockActive,
@@ -29,6 +30,13 @@ function timingSafeEqualStrings(a: string, b: string): boolean {
 export async function POST(request: Request) {
   if (!isSiteLockActive()) {
     return NextResponse.json({ ok: true, locked: false });
+  }
+  const unlockLimit = checkRateLimit("unlock", 10, 60_000);
+  if (!unlockLimit.ok) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again shortly." },
+      { status: 429, headers: { "Retry-After": String(unlockLimit.retryAfterSeconds) } },
+    );
   }
   const expected = siteLockPassword();
   if (!expected) {

@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node -e \"require.resolve('next')\" || npm ci",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --quiet",
@@ -19,7 +18,6 @@
     "@tanstack/react-query": "^5.101.2",
     "axios": "^1.18.1",
     "clsx": "^2.1.1",
-    "es-toolkit": "^1.51.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.28.0",
     "next": "^16.3.0",
@@ -42,8 +40,5 @@
     "tailwindcss": "^3.4.19",
     "typescript": "^5",
     "vitest": "4.1.10"
-  },
-  "overrides": {
-    "postcss": "8.5.25"
   }
 }

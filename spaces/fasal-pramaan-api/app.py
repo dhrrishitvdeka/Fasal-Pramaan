@@ -127,10 +127,16 @@ def load_runtime() -> dict[str, Any]:
     options = ort.SessionOptions()
     options.intra_op_num_threads = 2
     options.inter_op_num_threads = 1
+    available_providers = ort.get_available_providers()
+    providers = (
+        ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        if "CUDAExecutionProvider" in available_providers
+        else ["CPUExecutionProvider"]
+    )
     session = ort.InferenceSession(
         str(model_dir / "model.onnx"),
         sess_options=options,
-        providers=["CPUExecutionProvider"],
+        providers=providers,
     )
     model_input = session.get_inputs()[0]
     model_output = session.get_outputs()[0]
@@ -289,10 +295,12 @@ def analyze(
         warnings.append("expected_crop_required")
         grade_label = "missing_expected_crop_metadata"
         recommendation = "physical_inspection"
+        decision_confidence = 0.0
     elif expected_index is None:
         warnings.append("unsupported_crop")
         grade_label = "unsupported_crop"
         recommendation = "physical_inspection"
+        decision_confidence = 0.0
     elif weighted_heads:
         selected = aggregate_heads[expected_index].copy()
         healthy_score, disease_score, invalid_score = map(float, selected)
