@@ -19,17 +19,19 @@ All notable changes to **Fasal-Pramaan** will be documented in this file. The fo
   - Removed redundant top creation buttons on the Claims page to streamline mobile workflow.
 
 ### Advanced Multi-Spectral Crop CV Engine, Anti-Screen Fraud, & 75%+ Shutter Lock
-- **Multi-Spectral & Multi-Phenology Crop Recognition**:
-  - Extended agronomic color and spatial analysis beyond green chlorophyll to accurately classify:
-    - **Mature Golden Grain & Paddy** (ExR index, golden hue $28^\circ-68^\circ$, ripe wheat/barley/paddy).
-    - **Flowering Yellow Blooms** (NDYI index, bloom hue $40^\circ-64^\circ$, mustard/sunflower blooms).
-    - **Drought / Scorch / Blight** (Necrotic amber/brown foliar damage).
-    - **Charred / Fire Biomass** (Burned crop residue and scorched organic matter).
-  - Spatial gradient entropy and organic micro-texture filtering to reject flat synthetic surfaces.
-- **Screen & Recapture Anti-Spoofing Detector**:
-  - Realtime detection of Moiré interference grids, screen bezels/borders, and planar specular reflections to reject photographs of computer monitors, tablets, and mobile screens.
-- **Strict 75%+ Crop Quality Shutter Lock**:
-  - Capture button remains locked (`disabled`) until live crop identification confidence reaches $\ge 75\%$ on real outdoor crops, complete with live HUD status and phenology tagging.
+- **Two-Tier Semantic & Bio-Optical Realtime Vision**:
+  - Combined MobileNet v2 deep semantic classification with multi-spectral agronomic indices (**ExG**, **GLI**, **ExR**, **NDYI**) across vegetative, golden grain, yellow bloom, scorch, and fire burn phenotypes.
+  - **Person & Non-Crop Subject Rejection (`person_detected`)**:
+    - Integrated multi-scale human skin tone locus (Fitzpatrick I-VI) and MobileNet anthropogenic class suppression (clothing, suits, jerseys, faces, furniture, rooms) to reject selfies, indoor human subjects, and non-field objects.
+  - **Bio-Optical Canopy Micro-Texture Density ($STD$)**:
+    - Computes 2D Laplacian spatial variance strictly over canopy pixels ($STD = \frac{1}{|Canopy|} \sum |\nabla^2 I|$). Distinguishes living cellular biological foliage from flat indoor painted walls and synthetic surfaces ($STD < 0.6$).
+  - **Screen & Display Anti-Spoofing Detector (`detectScreenArtifacts`)**:
+    - Realtime detection of Moiré interference grids, screen bezels/borders, and planar specular reflections to reject photographs of computer monitors, tablets, and mobile screens (`screen_detected`).
+  - **Strict 75%+ Crop Quality Shutter Lock**:
+    - Capture button remains locked (`disabled`) until live crop identification confidence reaches $\ge 75\%$ on real outdoor crops, with localized live HUD guidance in Hindi and English.
+
+### Project Team & Realtime Dynamic Contributors
+- Updated `README.md` with all 4 core team contributors (**Dhrrishit V Deka**, **Paras Dwivedi**, **Vedant Parashar**, and **Sandeep Kumar Gupta**), direct live GitHub avatar links, and an auto-updating real-time GitHub contributors graph.
 
 ### Autonomous Agentic Fasal Saathi & Assistant Synchronization
 - **Autonomous Agentic Command Execution**:
