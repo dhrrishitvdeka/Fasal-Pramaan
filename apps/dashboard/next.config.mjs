@@ -59,9 +59,12 @@ const contentSecurityPolicy = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Standalone output is required by the Docker image (Dockerfile copies
-  // .next/standalone). Vercel builds handle standalone output fine too.
-  output: "standalone",
+  // Standalone output is only needed for Docker container builds.
+  // On Vercel, omitting standalone allows Vercel's native serverless NFT bundler to operate properly.
+  output:
+    process.env.DOCKER_BUILD === "true" || process.env.OUTPUT_STANDALONE === "true"
+      ? "standalone"
+      : undefined,
   async headers() {
     return [
       {
