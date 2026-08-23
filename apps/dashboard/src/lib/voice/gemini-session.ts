@@ -27,7 +27,7 @@ export function geminiApiKey(): string {
 }
 
 export function geminiLiveModel(): string {
-  return (process.env.GEMINI_LIVE_MODEL || "gemini-2.0-flash-exp").replace(
+  return (process.env.GEMINI_LIVE_MODEL || "gemini-3.1-flash-live-preview").replace(
     /^models\//,
     "",
   );

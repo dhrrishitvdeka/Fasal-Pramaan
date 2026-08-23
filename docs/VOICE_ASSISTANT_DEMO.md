@@ -117,6 +117,7 @@ All keys are **server-only** (set on Vercel or in `apps/dashboard/.env.local`):
 VOICE_ASSISTANT_ENABLED=true
 GEMINI_API_KEY=your_google_ai_studio_key
 GEMINI_LIVE_MODEL=gemini-3.1-flash-live-preview
+GEMINI_VISION_MODEL=gemini-3.7-flash
 GEMINI_LIVE_VOICE=Kore
 GEMINI_LIVE_SESSION_MINUTES=15
 # optional external signals (see §7, docs/environment-variables.md)

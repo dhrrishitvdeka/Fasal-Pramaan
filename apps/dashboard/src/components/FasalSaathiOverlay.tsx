@@ -230,9 +230,8 @@ export default function FasalSaathiOverlay() {
     try {
       socket.send(
         JSON.stringify({
-          clientContent: {
-            turns: [{ role: "user", parts: [{ text }] }],
-            turnComplete: false,
+          realtimeInput: {
+            text,
           },
         }),
       );
