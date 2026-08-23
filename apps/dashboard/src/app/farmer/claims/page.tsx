@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   FileText,
   Search,
@@ -28,12 +29,26 @@ import { CardSkeleton } from "@/components/LoadingAnimation";
 import ErrorMessage, { InlineError } from "@/components/ErrorMessage";
 import clsx from "clsx";
 
-export default function FarmerClaimsPage() {
+function FarmerClaimsContent() {
   const { lang, claims, isLoading, persistError } = useFarmerData();
   const t = getFarmerT(lang);
+  const searchParams = useSearchParams();
+  const initialStatus = searchParams?.get("status");
 
-  const [activeFilter, setActiveFilter] = useState<"all" | "under_review" | "needs_recapture" | "verified" | "draft">("all");
+  const [activeFilter, setActiveFilter] = useState<"all" | "under_review" | "needs_recapture" | "verified" | "draft">(() => {
+    if (initialStatus === "verified" || initialStatus === "needs_recapture" || initialStatus === "under_review" || initialStatus === "draft") {
+      return initialStatus;
+    }
+    return "all";
+  });
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    const statusParam = searchParams?.get("status");
+    if (statusParam === "verified" || statusParam === "needs_recapture" || statusParam === "under_review" || statusParam === "draft") {
+      setActiveFilter(statusParam);
+    }
+  }, [searchParams]);
 
   const filteredClaims = claims.filter((claim) => {
     // Status filter
@@ -390,5 +405,13 @@ export default function FarmerClaimsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function FarmerClaimsPage() {
+  return (
+    <Suspense fallback={<CardSkeleton count={3} className="space-y-4 !grid-cols-1" />}>
+      <FarmerClaimsContent />
+    </Suspense>
   );
 }
