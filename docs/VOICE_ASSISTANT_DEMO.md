@@ -16,7 +16,12 @@ On the **Vercel web path**, Saathi is now the **first-line entry** (`/farmer/saa
 
 **Agent:** `apps/dashboard/src/lib/saathi-agent.ts`
 
-- `extractSlotsFromText(text, plots)` → `{peril, perilConfidence, crop, village, farmerNote}` using `classifyPerilHeuristic(text)` (keywords: fire/aag, animal/jaanwar, flood/paani, drought/sukha, pest/keet/rog/spot, hail/ola, lodging/gira + confidence 0.82–0.92, threshold ≥0.55).
+- `extractSlotsFromText(text, plots)` → `{peril, perilConfidence, crop, village, farmerNote}` using `classifyPerilHeuristic(text)` (keywords in English and Devanagari Hindi: fire/aag/आग, animal/jaanwar/जानवर, flood/paani/बाढ़, drought/sukha/सूखा, pest/keet/rog/कीट/रोग, hail/ola/ओलावृष्टि, lodging/gira/गिराव + confidence 0.82–0.92, threshold ≥0.55).
+- `resolveAgenticAction(text, currentSlots, plots, currentLang)` → Autonomous Agentic Controller:
+  - **Camera Launch Orders**: *"खेत में आग लग गई है, फोटो खींचनी है"* / *"Open camera for flood damage"* automatically extracts peril/plot/crop and routes straight to `/farmer/capture`.
+  - **Navigation Orders**: *"सत्यापित दावे दिखाओ"* / *"Show verified claims"* filters `/farmer/claims?status=verified`.
+  - **Registered Plots**: *"मेरे खेत दिखाओ"* / *"Show my plots"* routes to `/farmer#registered-plots`.
+  - **Dynamic Language Switching**: *"हिंदी में बात करो"* / *"Talk in English"* switches the app locale and voice synthesizer dynamically.
 - `mergeSlots(a,b)`, `buildSaathiReply(slots, lang)`, `nextQuestion(slots, lang)` (asks crop if missing), `slotsToIntent(slots, source)` → `ClaimIntent`.
 - `isRouteReady(slots) === Boolean(slots.peril)`.
 
