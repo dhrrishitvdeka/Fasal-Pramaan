@@ -445,7 +445,7 @@ export default function FasalSaathiOverlay() {
     if (statusRef.current === "idle" || statusRef.current === "error") void connect();
   }, [connect]);
 
-  if (!pathname.startsWith("/farmer")) return null;
+  if (!pathname.startsWith("/farmer") || pathname.startsWith("/farmer/saathi")) return null;
 
   return (
     <>

@@ -30,9 +30,11 @@ import {
   nextQuestion,
   slotsToIntent,
   buildSystemPrompt,
+  resolveAgenticAction,
   SAATHI_FUNCTION_DECLARATIONS,
   type SaathiMessage,
   type SaathiSlot,
+  type AgentAction,
 } from "@/lib/saathi-agent";
 import { apiFetch } from "@/lib/auth-headers";
 import {
@@ -48,7 +50,7 @@ type LiveStatus = "idle" | "connecting" | "live";
 
 export default function SaathiIntakePage() {
   const router = useRouter();
-  const { lang, plots, setActiveIntent, activeIntent } = useFarmerData();
+  const { lang, setLang, plots, setActiveIntent, activeIntent } = useFarmerData();
   const t = getFarmerT(lang);
   const [messages, setMessages] = useState<SaathiMessage[]>(() => [initialSaathiGreeting(lang)]);
   const [slots, setSlots] = useState<SaathiSlot>({});
@@ -194,14 +196,35 @@ export default function SaathiIntakePage() {
     const text = raw.trim();
     if (!text) return;
     pushFarmer(text);
-    const extracted = extractSlotsFromText(text, plots as any);
-    const nextSlots = mergeSlots(slots, extracted);
-    setSlots(nextSlots);
-    // first reply to extraction
-    const reply = buildSaathiReply(nextSlots, lang);
-    setTimeout(() => pushSaathi(reply), 350);
-    const q = nextQuestion(nextSlots, lang);
-    if (q) setTimeout(() => pushSaathi(q), 900);
+
+    // Agentic Intent & Action Resolution
+    const res = resolveAgenticAction(text, slots, plots as any, lang);
+    setSlots(res.slots);
+
+    setTimeout(() => pushSaathi(res.replyMessage), 350);
+
+    // Execute Autonomous Agent Action
+    if (res.action) {
+      const action = res.action;
+      if (action.type === "open_camera") {
+        const intent = slotsToIntent(res.slots, source === "voice" ? "saathi_voice" : "saathi_text");
+        setActiveIntent(intent);
+        const peril = action.peril || "normal";
+        const cameraUrl = `/farmer/capture?peril=${encodeURIComponent(peril)}${res.slots.plotId ? `&plotId=${encodeURIComponent(res.slots.plotId)}` : ""}${res.slots.crop ? `&crop=${encodeURIComponent(res.slots.crop)}` : ""}`;
+        setTimeout(() => {
+          router.push(cameraUrl);
+        }, 1200);
+      } else if (action.type === "navigate") {
+        setTimeout(() => {
+          router.push(action.url);
+        }, 1000);
+      } else if (action.type === "switch_language") {
+        setLang(action.lang);
+      }
+    } else {
+      const q = nextQuestion(res.slots, lang);
+      if (q) setTimeout(() => pushSaathi(q), 900);
+    }
   };
 
   // Autonomous LLM classification — runs server-side via /api/saathi/tool so

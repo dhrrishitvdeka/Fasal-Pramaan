@@ -130,6 +130,164 @@ export function slotsToIntent(slots: SaathiSlot, source: ClaimIntent["source"] =
   };
 }
 
+export type AgentAction =
+  | { type: "open_camera"; peril?: string; plotId?: string; crop?: string; angles?: string[] }
+  | { type: "navigate"; url: string; label: string; labelHi?: string }
+  | { type: "switch_language"; lang: AppLang }
+  | { type: "filter_claims"; status: "verified" | "needs_recapture" | "under_review" | "all" }
+  | { type: "snooze_reminder"; reminderId?: string; days: number }
+  | { type: "show_plots" }
+  | { type: "show_claims" }
+  | { type: "show_timeline" };
+
+export type AgentResolution = {
+  replyMessage: SaathiMessage;
+  action?: AgentAction | null;
+  actionSummary?: string;
+  actionSummaryHi?: string;
+  slots: SaathiSlot;
+};
+
+export function resolveAgenticAction(
+  text: string,
+  currentSlots: SaathiSlot,
+  plots: Array<{ id: string; name: string; nameHi: string; cropType: string; cropTypeHi: string; village: string }>,
+  currentLang: string,
+): AgentResolution {
+  const t = text.toLowerCase().trim();
+  const extracted = extractSlotsFromText(text, plots);
+  const nextSlots = mergeSlots(currentSlots, extracted);
+
+  // 1. Language switch orders
+  if (/(हिंदी|hindi|switch to hindi|talk in hindi|hindi me)/i.test(t)) {
+    return {
+      replyMessage: newMsg("saathi", "जी, अब मैं हिंदी में बात करूँगा। आपकी फसल में क्या समस्या है?", "जी, अब मैं हिंदी में बात करूँगा। आपकी फसल में क्या समस्या है?"),
+      action: { type: "switch_language", lang: "hi" },
+      actionSummary: "Language switched to Hindi",
+      actionSummaryHi: "भाषा हिंदी में बदली गई",
+      slots: nextSlots,
+    };
+  }
+  if (/(english|switch to english|talk in english)/i.test(t)) {
+    return {
+      replyMessage: newMsg("saathi", "Sure, I will assist you in English now. What issue did you face with your crop?"),
+      action: { type: "switch_language", lang: "en" },
+      actionSummary: "Language switched to English",
+      actionSummaryHi: "भाषा अंग्रेज़ी में बदली गई",
+      slots: nextSlots,
+    };
+  }
+  if (/(gujarati|ગુજરાતી|gujrati)/i.test(t)) {
+    return {
+      replyMessage: newMsg("saathi", "હા, હું હવે ગુજરાતીમાં વાત કરીશ. તમારા પાકમાં શું સમસ્યા છે?"),
+      action: { type: "switch_language", lang: "gu" },
+      actionSummary: "Language switched to Gujarati",
+      actionSummaryHi: "ભાષા ગુજરાતીમાં બદલી",
+      slots: nextSlots,
+    };
+  }
+  if (/(tamil|தமிழ்)/i.test(t)) {
+    return {
+      replyMessage: newMsg("saathi", "சரி, நான் இப்போது தமிழில் பேசுகிறேன். உங்கள் பயிரில் என்ன பிரச்சனை?"),
+      action: { type: "switch_language", lang: "ta" },
+      actionSummary: "Language switched to Tamil",
+      actionSummaryHi: "மொழி தமிழில் மாற்றப்பட்டது",
+      slots: nextSlots,
+    };
+  }
+
+  // 2. Direct Camera / Photo capture orders
+  const hasPhotoOrder = /(कैमरा खोलो|फोटो खींच|फोटो ले|फोटो खींचनी|camera|take photo|open camera|start capture|photo kheechna|tasveer)/i.test(t);
+  if (hasPhotoOrder || (nextSlots.peril && /(हाँ|yes|sure|khol|kholo|open|chalo|ready)/i.test(t))) {
+    const peril = nextSlots.peril || "normal";
+    const cfg = routeForPeril(peril);
+    return {
+      replyMessage: newMsg(
+        "saathi",
+        currentLang === "hi"
+          ? `कैमरा खोला जा रहा है — ${cfg.labelHi} के लिए ${cfg.requiredAngles.length} आवश्यक कोण तैयार हैं।`
+          : `Opening camera studio — ${cfg.requiredAngles.length} angles protocol ready for ${cfg.labelEn}.`,
+        `कैमरा खोला जा रहा है — ${cfg.labelHi} के लिए ${cfg.requiredAngles.length} आवश्यक कोण तैयार हैं।`
+      ),
+      action: {
+        type: "open_camera",
+        peril,
+        plotId: nextSlots.plotId,
+        crop: nextSlots.crop,
+        angles: cfg.requiredAngles,
+      },
+      actionSummary: `Opening Camera Studio with ${cfg.requiredAngles.length}-Angle Protocol (${cfg.labelEn})`,
+      actionSummaryHi: `कैमरा स्टूडियो खोला जा रहा है (${cfg.labelHi})`,
+      slots: nextSlots,
+    };
+  }
+
+  // 3. Claims Navigation & Filtering Orders
+  if (/(सत्यापित दावे|verified claim|approved claim|स्वीकृत दावे|verified claims)/i.test(t)) {
+    return {
+      replyMessage: newMsg(
+        "saathi",
+        currentLang === "hi" ? "सत्यापित दावों की सूची खोली जा रही है…" : "Opening verified claims list…",
+        "सत्यापित दावों की सूची खोली जा रही है…"
+      ),
+      action: { type: "navigate", url: "/farmer/claims?status=verified", label: "Opening Verified Claims" },
+      actionSummary: "Navigating to Verified Claims",
+      actionSummaryHi: "सत्यापित दावों पर ले जाया जा रहा है",
+      slots: nextSlots,
+    };
+  }
+  if (/(दावे दिखाओ|मेरे दावे|show claims|my claims|claim list|claims)/i.test(t)) {
+    return {
+      replyMessage: newMsg(
+        "saathi",
+        currentLang === "hi" ? "आपके सभी दावों की सूची खोली जा रही है…" : "Opening your claims list…",
+        "आपके सभी दावों की सूची खोली जा रही है…"
+      ),
+      action: { type: "navigate", url: "/farmer/claims", label: "Opening Claims List" },
+      actionSummary: "Navigating to Claims List",
+      actionSummaryHi: "दावों की सूची पर ले जाया जा रहा है",
+      slots: nextSlots,
+    };
+  }
+
+  // 4. Registered Plots Navigation
+  if (/(पंजीकृत खेत|खेत दिखाओ|मेरे खेत|registered plots|my plots|show plots|plot details)/i.test(t)) {
+    return {
+      replyMessage: newMsg(
+        "saathi",
+        currentLang === "hi" ? "पंजीकृत खेतों का विवरण खोला जा रहा है…" : "Opening registered plot details…",
+        "पंजीकृत खेतों का विवरण खोला जा रहा है…"
+      ),
+      action: { type: "navigate", url: "/farmer#registered-plots", label: "Opening Registered Plots" },
+      actionSummary: "Navigating to Registered Plots",
+      actionSummaryHi: "पंजीकृत खेतों पर ले जाया जा रहा है",
+      slots: nextSlots,
+    };
+  }
+
+  // 5. Timeline / Reminders
+  if (/(समयसीमा|रिमाइंडर|timeline|reminders|milestones|tasks)/i.test(t)) {
+    return {
+      replyMessage: newMsg(
+        "saathi",
+        currentLang === "hi" ? "समयसीमा एवं रिमाइंडर पृष्ठ खोला जा रहा है…" : "Opening reminders & timeline…",
+        "समयसीमा एवं रिमाइंडर पृष्ठ खोला जा रहा है…"
+      ),
+      action: { type: "navigate", url: "/farmer/reminders", label: "Opening Reminders" },
+      actionSummary: "Navigating to Reminders",
+      actionSummaryHi: "रिमाइंडर पर ले जाया जा रहा है",
+      slots: nextSlots,
+    };
+  }
+
+  // 6. Default Multi-turn Reply
+  const reply = buildSaathiReply(nextSlots, currentLang);
+  return {
+    replyMessage: reply,
+    slots: nextSlots,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Frontier LLM autonomous helpers
 // NOTE: LLM calls live in src/lib/saathi/classify-server.ts (server-only).

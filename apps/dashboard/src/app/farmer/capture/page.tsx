@@ -29,6 +29,7 @@ import {
   Compass,
   Check,
   AlertTriangle,
+  Lock,
 } from "lucide-react";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
@@ -442,8 +443,24 @@ function CaptureStudioContent() {
   };
 
   const capturePhotoFromCamera = async () => {
-    // CV crop hint — alert farmer if frame needs alignment, but do not hard-lock shutter on mature/dry crops
     const isDryOrCharredPeril = requestedPeril === "fire_burn" || requestedPeril === "drought";
+    
+    // Anti-Screen Fraud Rejection
+    if (cvResult?.isScreenDetected) {
+      const msg = lang === "hi" ? "स्क्रीन / डिस्प्ले पहचानी गई — कृपया असली खेत व फसल की फोटो लें।" : "Screen / display detected — photograph real outdoor crop.";
+      showToast(msg);
+      return { ok: false as const, message: msg };
+    }
+
+    // Strict 75%+ Crop Quality Lock
+    if (cvResult && cvResult.cropScore < 75 && !isDryOrCharredPeril) {
+      const msg = lang === "hi"
+        ? `फसल पहचान केवल ${cvResult.cropScore}% है — फोटो लेने के लिए 75%+ होना आवश्यक है। कैमरे को फसल के पास लाएँ।`
+        : `Crop match is only ${cvResult.cropScore}% — 75%+ required to unlock capture. Aim closer at crop foliage.`;
+      showToast(msg);
+      return { ok: false as const, message: msg };
+    }
+
     if (cvResult?.shouldBlockShutter && !isDryOrCharredPeril && cvResult.hintCode === "too_dark") {
       showToast(lang === "hi" ? cvResult.hintHi : cvResult.hintEn);
       return { ok: false as const, message: lang === "hi" ? cvResult.hintHi : cvResult.hintEn };
@@ -513,7 +530,10 @@ function CaptureStudioContent() {
           dimensions,
           cvAnalysis: cvResult
             ? {
+                cropScore: cvResult.cropScore,
                 greenPct: cvResult.greenPct,
+                isScreenDetected: cvResult.isScreenDetected,
+                phenologyType: cvResult.phenologyType,
                 luma: cvResult.luma,
                 blurScore: cvResult.blurScore,
                 hintCode: cvResult.hintCode,
@@ -1074,7 +1094,9 @@ function CaptureStudioContent() {
                   <span
                     className={clsx(
                       "h-2 w-2 rounded-full shrink-0",
-                      cvResult?.hintCode === "ok"
+                      cvResult?.isScreenDetected
+                        ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,1)] animate-ping"
+                        : (cvResult?.cropScore ?? 0) >= 75
                         ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"
                         : cvResult?.hintCode === "too_dark"
                         ? "bg-rose-500"
@@ -1082,9 +1104,11 @@ function CaptureStudioContent() {
                     )}
                   />
 
-                  {/* Localized Guidance Text */}
+                  {/* Anti-Screen Alert or Localized Guidance Text */}
                   <span className="font-semibold tracking-wide truncate">
-                    {cvResult
+                    {cvResult?.isScreenDetected
+                      ? (lang === "hi" ? "स्क्रीन / डिस्प्ले पहचानी गई — असली फसल दिखाएँ" : "Screen Detected — aim at real outdoor crop")
+                      : cvResult
                       ? lang === "hi"
                         ? cvResult.hintHi
                         : cvResult.hintEn
@@ -1093,16 +1117,34 @@ function CaptureStudioContent() {
                       : "Camera active — focus on crop"}
                   </span>
 
-                  {/* Canopy & AI status tags */}
-                  {cvResult && cvResult.greenPct > 0 && (
-                    <span className="rounded bg-white/20 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white/90">
-                      {cvResult.greenPct}% {lang === "hi" ? "कैनोपी" : "canopy"}
+                  {/* Multi-spectral phenology tag */}
+                  {cvResult?.phenologyType && cvResult.phenologyType !== "none" && (
+                    <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold text-white/90">
+                      {cvResult.phenologyType === "mature_golden"
+                        ? "🌾 Ripe Golden"
+                        : cvResult.phenologyType === "bloom_yellow"
+                        ? "🌼 Yellow Bloom"
+                        : cvResult.phenologyType === "scorch"
+                        ? "🍂 Scorch"
+                        : cvResult.phenologyType === "charred"
+                        ? "🔥 Charred"
+                        : "🌿 Vegetative"}
                     </span>
                   )}
 
-                  {cvModelStatus === "ready" && (
-                    <span className="hidden sm:inline rounded bg-emerald-500/30 border border-emerald-400/40 px-1.5 py-0.5 font-mono text-[10px] font-bold text-emerald-200">
-                      AI Ready
+                  {/* Crop Score & 75%+ Requirement Badge */}
+                  {cvResult && cvResult.cropScore > 0 && (
+                    <span
+                      className={clsx(
+                        "rounded px-1.5 py-0.5 font-mono text-[10px] font-bold",
+                        cvResult.isScreenDetected
+                          ? "bg-rose-600 text-white"
+                          : cvResult.cropScore >= 75
+                          ? "bg-emerald-500/80 text-white shadow-xs"
+                          : "bg-amber-500/80 text-white"
+                      )}
+                    >
+                      {cvResult.cropScore}% {cvResult.cropScore >= 75 ? "✓" : "/ 75%"}
                     </span>
                   )}
                 </div>
@@ -1165,19 +1207,51 @@ function CaptureStudioContent() {
               <span className="hidden sm:inline">{t.switchCamera}</span>
             </button>
 
-            {/* Main Shutter / Capture Button */}
-            <button
-              type="button"
-              onClick={capturePhotoFromCamera}
-              className={clsx(
-                "fp-btn-primary w-full gap-2 px-3 py-3 sm:px-6 transition-all",
-                cvResult?.hintCode === "ok" &&
-                  "ring-2 ring-emerald-500 ring-offset-2 ring-offset-[var(--surface)] shadow-[0_0_15px_rgba(16,185,129,0.35)]"
-              )}
-            >
-              <Camera className="h-5 w-5" />
-              <span>{t.takePhoto}</span>
-            </button>
+            {/* Main Shutter / Capture Button with 75%+ Crop Lock */}
+            {(() => {
+              const isDryOrCharred = requestedPeril === "fire_burn" || requestedPeril === "drought";
+              const isLocked =
+                isCameraActive &&
+                !capturedImages[currentAngle.id] &&
+                (cvResult?.isScreenDetected === true ||
+                  (cvResult != null && cvResult.cropScore < 75 && !isDryOrCharred) ||
+                  (cvResult?.shouldBlockShutter === true && !isDryOrCharred));
+
+              if (isLocked) {
+                return (
+                  <button
+                    type="button"
+                    onClick={capturePhotoFromCamera}
+                    aria-label="Capture locked (Need 75%+ crop match)"
+                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-stone-300 bg-stone-200 px-3 py-3 text-xs font-bold text-stone-600 shadow-inner sm:text-sm cursor-not-allowed opacity-90 transition-all"
+                  >
+                    <Lock className="h-4 w-4 text-stone-600 shrink-0" />
+                    <span>
+                      {cvResult?.isScreenDetected
+                        ? (lang === "hi" ? "स्क्रीन लॉक (असली फसल दिखाएँ)" : "Screen Blocked (Aim at real crop)")
+                        : (lang === "hi"
+                          ? `कैमरा लॉक (${cvResult?.cropScore ?? 0}% / 75% आवश्यक)`
+                          : `Locked (${cvResult?.cropScore ?? 0}% / 75% Crop Needed)`)}
+                    </span>
+                  </button>
+                );
+              }
+
+              return (
+                <button
+                  type="button"
+                  onClick={capturePhotoFromCamera}
+                  className={clsx(
+                    "fp-btn-primary w-full gap-2 px-3 py-3 sm:px-6 transition-all",
+                    cvResult?.hintCode === "ok" &&
+                      "ring-2 ring-emerald-500 ring-offset-2 ring-offset-[var(--surface)] shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+                  )}
+                >
+                  <Camera className="h-5 w-5" />
+                  <span>{t.takePhoto}</span>
+                </button>
+              );
+            })()}
 
             {/* Realtime Live Camera Notice */}
             <div className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-slate-500 shrink-0">
