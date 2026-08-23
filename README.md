@@ -1,6 +1,9 @@
 # Fasal-Pramaan (फसल प्रमाण)
 
 <p align="center">
+  <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/releases">
+    <img src="https://img.shields.io/badge/Release-v2.5.0-blue?style=for-the-badge" alt="Latest Release v2.5.0" />
+  </a>
   <img src="https://img.shields.io/badge/Next.js%2016-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
   <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
   <img src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" alt="Hugging Face" />
@@ -21,66 +24,48 @@ The v1.5.0 release makes every signal real: the CV worker runs **TF.js MobileNet
 The v1.6.0 wave closes the loop end-to-end: captures are checked against the **registered plot center** (`plot_match` haversine containment), weather signals become **sowing-date-aware** (drought rainfall since sowing, hail growth-stage estimates), farmers get **in-app recapture notifications** (`farmer-notifications.ts`), reviewers get a **Satellite Cross-Check card** (wide_field vs Bhuvan WMS + Copernicus Browser deep-link), a **Gate re-run button**, **per-peril analytics**, and **CSV export**, plus a bilingual **CV AI-ready warmup badge** in the capture studio.
 
 ```mermaid
-flowchart TD
-    subgraph ClientTier["<b>CLIENT / BROWSER TIERS (Responsive PWA)</b>"]
-        direction LR
-        subgraph FarmerPortal["<b>Farmer Evidence Portal</b> (<code>/farmer/*</code>)"]
-            direction TB
-            FP1["<b>Fasal Saathi Intake</b><br/>• Gemini Live 16kHz Voice Mode<br/>• 15 Indian Languages / Dialects<br/>• 8-Peril Classification"]
-            FP2["<b>Guided Capture Studio</b><br/>• Realtime MobileNet v2 CV Worker<br/>• Tamper & Authenticity Checks<br/>• Targeted Recapture Stepper"]
-            FP1 --> FP2
-        end
-
-        subgraph ReviewerPortal["<b>Reviewer Command Centre</b> (<code>/review/*</code>)"]
-            direction TB
-            RP1["<b>Triage Queue & Detail</b><br/>• 4-Pillar Adaptive Confidence Breakdown<br/>• Gate Rerun & Decision Overrides<br/>• Audit Trails & Decision Stamps"]
-            RP2["<b>Satellite & Signal Cross-Check</b><br/>• Bhuvan WMS vs Field Photo Split<br/>• Copernicus Sentinel-2 L2A Viewer<br/>• Per-Peril Analytics & CSV Export"]
-            RP1 --> RP2
-        end
+flowchart TB
+  %% Client / Browser Tier
+  subgraph T_CLIENT["Client & Experience Tier (Next.js Responsive Web PWA)"]
+    direction LR
+    subgraph P_FARMER["👨‍🌾 Farmer Evidence Studio (/farmer)"]
+      F_SAATHI["<b>Fasal Saathi Assistant</b><br/>• 15 Indian Languages & Audio<br/>• 8-Peril Autonomous Intake<br/>• Full-Duplex Gemini Live Voice"]
+      F_CAPTURE["<b>Peril-Aware Capture Studio</b><br/>• Realtime MobileNet v2 CV Worker<br/>• Anti-Screen & Person Rejection<br/>• Strict 75%+ Crop Shutter Lock"]
+      F_SAATHI -->|"Active Intent & Protocol"| F_CAPTURE
     end
 
-    subgraph AppTier["<b>NEXT.JS UNIFIED EDGE & API TIER</b> (<code>apps/dashboard</code> on Vercel)"]
-        direction TB
-        APIs["<b>Core API Handlers & Verification Routes</b><br/><code>POST /api/claims</code> (Evidence & Ingestion) • <code>POST /api/vision/gate</code> (Tamper Detection)<br/><code>POST /api/context/assemble</code> (Signal Triangulation) • <code>POST /api/saathi/tool</code> (Server-Side Tools)"]
-        
-        CoreEngine["<b>Pipeline Core Engine & Routing Libraries</b><br/><code>claim-routing.ts</code> (Peril Protocols) • <code>adaptive-engine.ts</code> (Trust Evaluation)<br/><code>saathi/tools-server.ts</code> (Allowlisted Actions) • <code>farmer-notifications.ts</code> (Push Alerts)"]
-        
-        APIs --- CoreEngine
+    subgraph P_REVIEWER["🔍 Reviewer Command Centre (/review)"]
+      R_QUEUE["<b>Triage & Assessment Queue</b><br/>• 4-Pillar Evidence Trust Score<br/>• Adaptive Recapture Engine<br/>• Immutable Audit Trails"]
+      R_SAT["<b>Satellite & Signal Cross-Check</b><br/>• Bhuvan WMS vs Field Photo<br/>• Sentinel-2 NDVI Burn Scar<br/>• Per-Peril Analytics & CSV Export"]
+      R_QUEUE -->|"Spatial & Orbital Triangulation"| R_SAT
     end
+  end
 
-    subgraph ServicesTier["<b>INTEGRATED SERVICES & EXTERNAL SIGNAL ORCHESTRATION</b>"]
-        direction LR
-        S_DB["<b>Supabase Postgres & Storage</b><br/>• Auth / JWT Role Gating<br/>• <code>web_claims</code> Tables & Blobs<br/>• Row-Level Security (RLS)"]
-        S_HF["<b>Hugging Face Space</b><br/>• DINOv2 / ViT-S/14 Model<br/>• Crop Disease Screening<br/>• 12s Resilient SSE Fallback"]
-        S_GEMINI["<b>Google Gemini API</b><br/>• Multimodal Vision Gate<br/>• Gemini Live 16kHz Audio<br/>• Peril Extraction Engine"]
-        S_ORBITAL["<b>Orbital & Geo Signals</b><br/>• Sentinel-2 NDVI Burn Scars<br/>• IMD / Open-Meteo Weather<br/>• ISRO Bhuvan & Overpass"]
-    end
+  %% Edge API & Pipeline Tier
+  subgraph T_GATEWAY["Next.js Unified Edge & Verification Pipeline (apps/dashboard)"]
+    direction TB
+    API_ROUTES["<b>Core Verification Handlers</b><br/><code>/api/claims</code> • <code>/api/vision/gate</code> • <code>/api/context/assemble</code> • <code>/api/saathi/tool</code>"]
+    CORE_PIPELINE["<b>Evidence Trust & Adjudication Pipeline</b><br/>• Cryptographic Hash & Tamper Verification • Peril Routing Engine • Adaptive Recapture Scheduler"]
+    API_ROUTES --- CORE_PIPELINE
+  end
 
-    FarmerPortal ==>|"HTTPS / WebSockets"| APIs
-    ReviewerPortal ==>|"HTTPS / REST"| APIs
+  %% Integrated Cloud & Inference Tier
+  subgraph T_SERVICES["Multi-Model AI & External Signal Infrastructure"]
+    direction LR
+    S_SUPABASE[("<b>Supabase Cloud</b><br/>• Postgres DB & RLS<br/>• Encrypted Storage<br/>• Auth & JWT Role Gates")]
+    S_GEMINI["<b>Google Gemini 2.0</b><br/>• Multimodal Vision Gate<br/>• 16kHz BiDi Live Voice<br/>• Peril Slot Extraction"]
+    S_HF["<b>Hugging Face Space</b><br/>• DINOv2 ViT-S/14 Model<br/>• Crop Disease Screening<br/>• Resilient Fallback Engine"]
+    S_SIGNALS["<b>Orbital & Weather APIs</b><br/>• Copernicus Sentinel-2<br/>• IMD / Open-Meteo Data<br/>• ISRO Bhuvan WMS"]
+  end
 
-    AppTier ==> S_DB
-    AppTier ==> S_HF
-    AppTier ==> S_GEMINI
-    AppTier ==> S_ORBITAL
+  %% Connections
+  P_FARMER ==>|"Secure HTTPS / WebSockets"| API_ROUTES
+  P_REVIEWER ==>|"JWT Role-Gated REST"| API_ROUTES
 
-    style ClientTier fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
-    style FarmerPortal fill:#1e293b,stroke:#0284c7,stroke-width:1.5px,color:#f8fafc
-    style ReviewerPortal fill:#1e293b,stroke:#0d9488,stroke-width:1.5px,color:#f8fafc
-    style AppTier fill:#0f172a,stroke:#818cf8,stroke-width:2px,color:#f8fafc
-    style ServicesTier fill:#0f172a,stroke:#34d399,stroke-width:2px,color:#f8fafc
-
-    style FP1 fill:#334155,stroke:#64748b,color:#ffffff
-    style FP2 fill:#334155,stroke:#64748b,color:#ffffff
-    style RP1 fill:#334155,stroke:#64748b,color:#ffffff
-    style RP2 fill:#334155,stroke:#64748b,color:#ffffff
-    style APIs fill:#1e293b,stroke:#818cf8,color:#ffffff
-    style CoreEngine fill:#1e293b,stroke:#818cf8,color:#ffffff
-
-    style S_DB fill:#1e293b,stroke:#38bdf8,stroke-width:1.5px,color:#ffffff
-    style S_HF fill:#1e293b,stroke:#fbbf24,stroke-width:1.5px,color:#ffffff
-    style S_GEMINI fill:#1e293b,stroke:#c084fc,stroke-width:1.5px,color:#ffffff
-    style S_ORBITAL fill:#1e293b,stroke:#34d399,stroke-width:1.5px,color:#ffffff
+  CORE_PIPELINE ==>|"Persistence & Storage"| S_SUPABASE
+  CORE_PIPELINE ==>|"Multimodal Gate & Voice"| S_GEMINI
+  CORE_PIPELINE ==>|"Verified Evidence Inference"| S_HF
+  CORE_PIPELINE ==>|"Context Assembly"| S_SIGNALS
 ```
 
 ---
@@ -424,6 +409,23 @@ python scripts/test_supabase_conn.py
 | **Security** | See [SECURITY.md](SECURITY.md) — vulnerability reporting and security guidelines. |
 | **Code of Conduct** | See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). |
 | **License** | MIT — see the [LICENSE](LICENSE) file. |
+
+---
+
+## Releases & Version History
+
+All stable releases are tagged on GitHub and documented in detail in [CHANGELOG.md](CHANGELOG.md).
+
+| Release | Release Date | Key Innovations & Architectural Milestones | Detailed Notes |
+|---|---|---|---|
+| **[v2.5.0](https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/releases/tag/v2.5.0)** | Aug 23, 2026 | Multi-Spectral Vision (ExG/ExR/NDYI), Screen Moiré Anti-Spoofing, Strict 75%+ Shutter Lock, Person Presence Rejection, Full 15 Indian Languages, Autonomous Agentic Webapp Control, Reviewer Multi-Tab Session Isolation | [Release Notes](CHANGELOG.md#250--2026-08-23) |
+| **[v2.4.0](https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/releases/tag/v2.4.0)** | Aug 22, 2026 | Autonomous Fasal Saathi Agent Function Tools, Complete Sensory Metadata Bundling (GPS, SHA-256 Hash, Facing), Sequential Gemini Multimodal Gate → Hugging Face DINOv2 Pipeline | [Release Notes](CHANGELOG.md#240--2026-08-22) |
+| **[v2.3.0](https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/releases/tag/v2.3.0)** | Aug 22, 2026 | Full-Stack Reviewer Audit Trail & Security, Decision Stamps, AccessGuard Role-Gating, Dynamic Autofocus Reticles | [Release Notes](CHANGELOG.md#230--2026-08-22) |
+| **[v2.2.0](https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/releases/tag/v2.2.0)** | Aug 22, 2026 | 8-Peril Adaptive Routing Protocols, Multi-Signal Context Assembly (IMD Weather + Sentinel-2 Burn Scar + Bhuvan WMS), Sowing-Date Awareness | [Release Notes](CHANGELOG.md#220--2026-08-22) |
+| **[v1.6.0](https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/releases/tag/v1.6.0)** | Aug 21, 2026 | Registered Plot Haversine Containment, In-App Farmer Recapture Notifications, Satellite Cross-Check Card | [Release Notes](CHANGELOG.md#160--2026-08-21) |
+| **[v1.5.0](https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/releases/tag/v1.5.0)** | Aug 20, 2026 | TF.js MobileNet v2 Web Worker CV, Gemini Live Duplex Audio, Live Copernicus Sentinel & Open-Meteo Integration | [Release Notes](CHANGELOG.md#150--2026-08-20) |
+
+👉 Explore all releases on [GitHub Releases](https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/releases).
 
 ---
 
