@@ -36,13 +36,14 @@ export function initialSaathiGreeting(lang: string): SaathiMessage {
   if (lang === "hi") {
     return newMsg(
       "saathi",
-      "Namaste! Main Fasal Saathi hoon. Aapki fasal ko kya nuksaan hua hai? Jaise: aag lagi, jaanwar ne khaya, baadh, keet/rog.",
-      "नमस्ते! मैं फसल साथी हूँ। आपकी फसल को क्या नुकसान हुआ है? जैसे: आग लगी, जानवर ने खाया, बाढ़, कीट/रोग।"
+      "नमस्ते! मैं फसल साथी हूँ। आपकी फसल को क्या नुकसान हुआ है? अपने शब्दों में बताएँ — जैसे: आग/जलना, जानवर क्षति, बाढ़/जलभराव, कीट/रोग, ओलावृष्टि, या फसल गिरना।",
+      "नमस्ते! मैं फसल साथी हूँ। आपकी फसल को क्या नुकसान हुआ है? अपने शब्दों में बताएँ — जैसे: आग/जलना, जानवर क्षति, बाढ़/जलभराव, कीट/रोग, ओलावृष्टि, या फसल गिरना।"
     );
   }
   return newMsg(
     "saathi",
-    "Hi, I am Fasal Saathi. What happened to your crop? Tell me in your words — e.g., fire/burn, animal grazing, flood, pest/disease, hail, lodging."
+    "Hi, I am Fasal Saathi. What happened to your crop? Tell me in your words — e.g., fire/burn, animal grazing, flood, pest/disease, hail, lodging.",
+    "नमस्ते! मैं फसल साथी हूँ। आपकी फसल को क्या नुकसान हुआ है? अपने शब्दों में बताएँ — जैसे: आग/जलना, जानवर क्षति, बाढ़/जलभराव, कीट/रोग, ओलावृष्टि, या फसल गिरना।"
   );
 }
 
@@ -86,27 +87,34 @@ export function buildSaathiReply(slots: SaathiSlot, lang: string): SaathiMessage
   if (!slots.peril) {
     return newMsg(
       "saathi",
-      "Got it. Is this fire/burn, animal grazing, flood, hail, pest/disease, or general damage? One word is enough.",
-      "समझ गया। क्या यह आग/जलन, जानवर क्षति, बाढ़, ओलावृष्टि, कीट/रोग या सामान्य क्षति है? एक शब्द में बताएँ।"
+      lang === "hi"
+        ? "समझ गया। क्या यह आग/जलना, जानवर क्षति, बाढ़, ओलावृष्टि, कीट/रोग या सामान्य क्षति है? एक शब्द में बताएँ।"
+        : "Got it. Is this fire/burn, animal grazing, flood, hail, pest/disease, or general damage? One word is enough.",
+      "समझ गया। क्या यह आग/जलना, जानवर क्षति, बाढ़, ओलावृष्टि, कीट/रोग या सामान्य क्षति है? एक शब्द में बताएँ।"
     );
   }
   const angles = cfg.requiredAngles.join(", ");
   if (lang === "hi") {
     return newMsg(
       "saathi",
-      `समझ गया — ${cfg.labelHi}। मैं ${cfg.requiredAngles.length} कोणों की गाइड तैयार कर रहा हूँ: ${angles}. ${cfg.guidanceExtraHi} कैमरा खोलें?`,
-      undefined
+      `समझ गया — ${cfg.labelHi}। मैं ${cfg.requiredAngles.length} कोणों की गाइड तैयार कर रहा हूँ: ${angles}। ${cfg.guidanceExtraHi} क्या अब कैमरा खोलें?`,
+      `समझ गया — ${cfg.labelHi}। मैं ${cfg.requiredAngles.length} कोणों की गाइड तैयार कर रहा हूँ: ${angles}। ${cfg.guidanceExtraHi} क्या अब कैमरा खोलें?`
     );
   }
   return newMsg(
     "saathi",
-    `Understood — ${cfg.labelEn}. I'll guide you for ${cfg.requiredAngles.length} angles: ${angles}. ${cfg.guidanceExtraEn} Ready to open camera?`
+    `Understood — ${cfg.labelEn}. I'll guide you for ${cfg.requiredAngles.length} angles: ${angles}. ${cfg.guidanceExtraEn} Ready to open camera?`,
+    `समझ गया — ${cfg.labelHi}। मैं ${cfg.requiredAngles.length} कोणों की गाइड तैयार कर रहा हूँ: ${angles}। ${cfg.guidanceExtraHi} क्या अब कैमरा खोलें?`
   );
 }
 
 export function nextQuestion(slots: SaathiSlot, lang: string): SaathiMessage | null {
   if (!slots.crop) {
-    return newMsg("saathi", "Which crop is affected? e.g., Wheat, Paddy, Mustard.", "कौन सी फसल प्रभावित है? जैसे: गेहूँ, धान, सरसों।");
+    return newMsg(
+      "saathi",
+      lang === "hi" ? "कौन सी फसल प्रभावित है? जैसे: गेहूँ, धान, सरसों।" : "Which crop is affected? e.g., Wheat, Paddy, Mustard.",
+      "कौन सी फसल प्रभावित है? जैसे: गेहूँ, धान, सरसों。"
+    );
   }
   return null;
 }
