@@ -8,6 +8,7 @@ import {
   initialSaathiGreeting,
   mergeSlots,
   slotsToIntent,
+  resolveAgenticAction,
   type SaathiSlot,
 } from "../src/lib/saathi-agent";
 
@@ -79,5 +80,43 @@ describe("saathi agent", () => {
       "submit_claim",
       "check_evidence_quality",
     ]);
+  });
+
+  describe("Autonomous Agentic Intent Resolution", () => {
+    it("resolves direct camera capture order with peril angles", () => {
+      const res = resolveAgenticAction("खेत में आग लग गई है, फोटो खींचनी है", {}, emptyPlots, "hi");
+      expect(res.action).toBeDefined();
+      expect(res.action?.type).toBe("open_camera");
+      expect(res.slots.peril).toBe("fire_burn");
+      expect(res.actionSummaryHi).toContain("कैमरा");
+    });
+
+    it("resolves navigation orders for verified claims and plots", () => {
+      const resClaims = resolveAgenticAction("सत्यापित दावे दिखाओ", {}, emptyPlots, "hi");
+      expect(resClaims.action?.type).toBe("navigate");
+      if (resClaims.action?.type === "navigate") {
+        expect(resClaims.action.url).toBe("/farmer/claims?status=verified");
+      }
+
+      const resPlots = resolveAgenticAction("मेरे पंजीकृत खेत दिखाओ", {}, emptyPlots, "hi");
+      expect(resPlots.action?.type).toBe("navigate");
+      if (resPlots.action?.type === "navigate") {
+        expect(resPlots.action.url).toBe("/farmer#registered-plots");
+      }
+    });
+
+    it("resolves language switching orders autonomously", () => {
+      const resHi = resolveAgenticAction("हिंदी में बात करो", {}, emptyPlots, "en");
+      expect(resHi.action?.type).toBe("switch_language");
+      if (resHi.action?.type === "switch_language") {
+        expect(resHi.action.lang).toBe("hi");
+      }
+
+      const resGu = resolveAgenticAction("ગુજરાતીમાં વાત કરો", {}, emptyPlots, "hi");
+      expect(resGu.action?.type).toBe("switch_language");
+      if (resGu.action?.type === "switch_language") {
+        expect(resGu.action.lang).toBe("gu");
+      }
+    });
   });
 });

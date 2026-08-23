@@ -187,5 +187,50 @@ describe("Realtime Multi-Spectral Agricultural CV Engine & Guidance", () => {
       expect(result.modelLabel).toBe("corn, maize");
       expect(result.modelProb).toBe(0.88);
     });
+
+    it("detects and rejects screen / monitor pixel grid artifacts", () => {
+      const data = new Uint8ClampedArray(pixelCount * 4);
+      // Simulate artificial horizontal scanlines / subpixel grid lines
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const idx = (y * width + x) * 4;
+          const isScanline = y % 2 === 0;
+          data[idx] = isScanline ? 240 : 20;
+          data[idx + 1] = isScanline ? 240 : 20;
+          data[idx + 2] = isScanline ? 240 : 20;
+          data[idx + 3] = 255;
+        }
+      }
+      const result = analyzeInWorker(data, width, height, "overview_north");
+      expect(result.isScreenDetected).toBe(true);
+      expect(result.hintCode).toBe("screen_detected");
+      expect(result.shouldBlockShutter).toBe(true);
+      expect(result.cropDetected).toBe(false);
+    });
+
+    it("enforces strict 75%+ crop score requirement for shutter unlock", () => {
+      const data = new Uint8ClampedArray(pixelCount * 4);
+      // Sparse crop coverage (only ~30% frame contains crop)
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const idx = (y * width + x) * 4;
+          if (x < width * 0.3) {
+            data[idx] = 40;
+            data[idx + 1] = 160;
+            data[idx + 2] = 40;
+          } else {
+            // Concrete / non-crop
+            data[idx] = 120;
+            data[idx + 1] = 120;
+            data[idx + 2] = 120;
+          }
+          data[idx + 3] = 255;
+        }
+      }
+      const result = analyzeInWorker(data, width, height, "overview_north");
+      expect(result.cropScore).toBeLessThan(75);
+      expect(result.cropDetected).toBe(false);
+      expect(result.shouldBlockShutter).toBe(true);
+    });
   });
 });

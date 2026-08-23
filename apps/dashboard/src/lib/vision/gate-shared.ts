@@ -17,7 +17,10 @@ export type ImageEvidenceMetadata = {
   facing?: "environment" | "user" | string | null;
   dimensions?: { width: number; height: number } | null;
   cvAnalysis?: {
+    cropScore?: number | null;
     greenPct?: number | null;
+    isScreenDetected?: boolean | null;
+    phenologyType?: string | null;
     luma?: number | null;
     blurScore?: number | null;
     hintCode?: string | null;
