@@ -47,6 +47,9 @@ describe("saathi agent", () => {
     const hi = initialSaathiGreeting("hi");
     const en = initialSaathiGreeting("en");
     expect(hi.text).not.toBe(en.text);
+    expect(hi.text).toContain("नमस्ते! मैं फसल साथी हूँ।");
+    expect(hi.textHi).toBe(hi.text);
+    expect(en.text).toContain("Hi, I am Fasal Saathi");
     expect(hi.role).toBe("saathi");
   });
 

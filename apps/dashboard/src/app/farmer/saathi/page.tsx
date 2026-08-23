@@ -93,6 +93,15 @@ export default function SaathiIntakePage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length <= 1) {
+        return [initialSaathiGreeting(lang)];
+      }
+      return prev;
+    });
+  }, [lang]);
+
   // hydrate from existing intent if returning
   useEffect(() => {
     if (activeIntent && !slots.peril) {
@@ -104,6 +113,7 @@ export default function SaathiIntakePage() {
           id: `sys-${Date.now()}`,
           role: "saathi",
           text: lang === "hi" ? `पिछला इरादा: ${cfg.labelHi} — जारी रखें या नया बताएँ।` : `Previous intent: ${cfg.labelEn} — continue or tell me a new issue.`,
+          textHi: `पिछला इरादा: ${cfg.labelHi} — जारी रखें या नया बताएँ।`,
           at: new Date().toISOString(),
         },
       ]);
@@ -233,8 +243,9 @@ export default function SaathiIntakePage() {
               role: "saathi",
               text:
                 lang === "hi"
-                  ? `क्या आप ${llm.peril} की बात कर रहे हैं? कृपया थोड़ा स्पष्ट करें (${llm.reasoning}).`
-                  : `Did you mean ${llm.peril}? Please clarify briefly. (${llm.reasoning})`,
+                  ? `क्या आप ${routeForPeril(llm.peril).labelHi || llm.peril} की बात कर रहे हैं? कृपया थोड़ा स्पष्ट करें (${llm.reasoning})।`
+                  : `Did you mean ${routeForPeril(llm.peril).labelEn || llm.peril}? Please clarify briefly. (${llm.reasoning})`,
+              textHi: `क्या आप ${routeForPeril(llm.peril).labelHi || llm.peril} की बात कर रहे हैं? कृपया थोड़ा स्पष्ट करें (${llm.reasoning})।`,
               at: new Date().toISOString(),
             }),
           1100,
@@ -251,8 +262,9 @@ export default function SaathiIntakePage() {
               role: "saathi",
               text:
                 lang === "hi"
-                  ? `समझ गया — ${routeForPeril(refined.peril!).labelHi}. कारण: ${llm.reasoning}`
+                  ? `समझ गया — ${routeForPeril(refined.peril!).labelHi}। ${llm.reasoning ? `कारण: ${llm.reasoning}` : ""}`
                   : `Understood — ${routeForPeril(refined.peril!).labelEn}. Reason: ${llm.reasoning}`,
+              textHi: `समझ गया — ${routeForPeril(refined.peril!).labelHi}। ${llm.reasoning ? `कारण: ${llm.reasoning}` : ""}`,
               at: new Date().toISOString(),
             }),
           1200,
@@ -804,7 +816,7 @@ export default function SaathiIntakePage() {
                     : "border border-stone-200/90 bg-white text-slate-800 rounded-tl-xs",
                 )}
               >
-                {m.text}
+                {lang === "hi" && m.textHi ? m.textHi : m.text}
               </div>
             </div>
           ))}
