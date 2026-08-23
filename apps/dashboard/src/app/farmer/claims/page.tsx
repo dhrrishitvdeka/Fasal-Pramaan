@@ -101,8 +101,8 @@ function FarmerClaimsContent() {
 
   return (
     <div className="space-y-4">
-      {/* Header & New Claim Button */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 sm:flex-row sm:items-center sm:justify-between sm:pb-4">
+      {/* Header */}
+      <div className="border-b border-slate-200 pb-3 sm:pb-4">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-lg font-bold text-slate-900 sm:text-2xl">
             <FileText className="h-5 w-5 text-[var(--accent)] sm:h-6 sm:w-6" />
@@ -114,14 +114,6 @@ function FarmerClaimsContent() {
               : "Complete record of all active, verified, and pending PMFBY crop damage claims"}
           </p>
         </div>
-
-        <Link
-          href="/farmer/capture"
-          className="fp-btn-primary w-full shrink-0 gap-2 sm:w-auto"
-        >
-          <Camera className="h-4 w-4" />
-          <span>{t.quickActionNewClaim}</span>
-        </Link>
       </div>
 
       {/* Search & Filter Controls — search full-width above chips, chips scroll horizontally on phone */}
