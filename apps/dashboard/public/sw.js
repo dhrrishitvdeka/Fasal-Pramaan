@@ -13,7 +13,7 @@
  * farmer shell ("/farmer") and static assets open without a network.
  */
 
-const VERSION = "v1"; // bump to invalidate all caches on deploy
+const VERSION = "v2"; // bump to invalidate all caches on deploy
 const SHELL_CACHE = `fp-shell-${VERSION}`;
 const ASSET_CACHE = `fp-assets-${VERSION}`;
 const SHELL_URL = "/farmer";

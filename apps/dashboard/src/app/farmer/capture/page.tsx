@@ -34,7 +34,6 @@ import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
 import {
   isUnusableLighting,
-  measureLightingFromDataUrl,
   measureLightingScore,
   qualityPassedFromSignals,
   sha256FromDataUrl,
@@ -444,7 +443,7 @@ function CaptureStudioContent() {
   const capturePhotoFromCamera = async () => {
     // CV crop hint — alert farmer if frame needs alignment, but do not hard-lock shutter on mature/dry crops
     const isDryOrCharredPeril = requestedPeril === "fire_burn" || requestedPeril === "drought";
-    if (cvResult?.shouldBlockShutter && !isDryOrCharredPeril && (cvResult.hintCode === "too_dark" || cvResult.hintCode === "too_bright")) {
+    if (cvResult?.shouldBlockShutter && !isDryOrCharredPeril && cvResult.hintCode === "too_dark") {
       showToast(lang === "hi" ? cvResult.hintHi : cvResult.hintEn);
       return { ok: false as const, message: lang === "hi" ? cvResult.hintHi : cvResult.hintEn };
     }

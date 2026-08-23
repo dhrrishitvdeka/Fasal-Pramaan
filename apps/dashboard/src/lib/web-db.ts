@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "./supabase";
 import { isRealSha256 } from "./evidence";
-import { HF_MODEL_ID } from "./hf-model";
+import { getHfModelId } from "./hf-model";
 import type {
   ClaimAiPrediction,
   ClaimImageEvidence,
@@ -595,7 +595,7 @@ export function submissionFromClaim(claim: FarmerClaim): Submission {
     })),
     latest_prediction: hasPrediction
       ? {
-          model_version: HF_MODEL_ID,
+          model_version: getHfModelId(),
           adapter_type: "hf_crop_leaf",
           is_production_validated: false,
           predicted_crop: pred.cropIdentified || null,
@@ -603,7 +603,7 @@ export function submissionFromClaim(claim: FarmerClaim): Submission {
           primary_damage: pred.diseaseDetected || null,
           severity: pred.severityGrade?.toLowerCase() || null,
           overall_confidence: pred.modelConfidence ? pred.modelConfidence / 100 : null,
-          affected_area_pct: pred.affectedAreaHectares || null,
+          affected_area_pct: pred.severityPercentage ?? null,
           quality_warnings: claim.images.some((img) => !img.qualityPassed) ? ["unmeasured_or_failed_quality"] : [],
           anomaly_flags: isRealSha256(claim.images[0]?.sha256) ? [] : ["sha256_missing"],
           human_review_recommendation: "Human review required. No automated payout.",

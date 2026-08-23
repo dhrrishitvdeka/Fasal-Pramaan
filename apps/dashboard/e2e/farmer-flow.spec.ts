@@ -70,7 +70,7 @@ test.describe("farmer capture flow", () => {
 
     // --- Saathi intake ---
     await page.goto("/farmer/saathi");
-    const intake = page.locator('input[placeholder*="Type or speak"]');
+    const intake = page.locator('input[placeholder*="Type your crop issue"]');
     await expect(intake).toBeVisible({ timeout: 15_000 });
     await intake.fill("Fire burned half of my wheat field near the bund");
     await intake.press("Enter");
@@ -80,7 +80,7 @@ test.describe("farmer capture flow", () => {
     await expect(page.getByText(/Fire \/ Burn/, { exact: false })).toBeVisible();
 
     // Proceed to guided capture.
-    await page.getByRole("button", { name: /Open Capture/ }).click();
+    await page.getByRole("button", { name: /Open Camera Studio/ }).click();
     await expect(page).toHaveURL(/\/farmer\/capture\?.*peril=fire_burn/);
 
     // --- Camera permission fails headless -> gallery/file-upload fallback ---

@@ -59,6 +59,9 @@ const contentSecurityPolicy = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Standalone output is required by the Docker image (Dockerfile copies
+  // .next/standalone). Vercel builds handle standalone output fine too.
+  output: "standalone",
   async headers() {
     return [
       {

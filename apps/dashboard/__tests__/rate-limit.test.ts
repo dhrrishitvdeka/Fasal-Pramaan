@@ -11,13 +11,20 @@ describe("fixed-window rate limiter", () => {
     vi.useRealTimers();
   });
 
-  it("allows up to max calls then blocks within the window, resetting after it elapses", () => {
-    const key = "route:user-a";
-    expect(checkRateLimit(key, 2)).toEqual({ ok: true });
-    vi.advanceTimersByTime(10_000);
-    expect(checkRateLimit(key, 2)).toEqual({ ok: true });
+  it("bypasses rate limits by default for seamless demonstrations", () => {
+    const key = "route:demo-user";
+    for (let i = 0; i < 20; i++) {
+      expect(checkRateLimit(key, 2)).toEqual({ ok: true });
+    }
+  });
 
-    const blocked = checkRateLimit(key, 2);
+  it("allows up to max calls then blocks within the window when enforced, resetting after it elapses", () => {
+    const key = "route:user-a";
+    expect(checkRateLimit(key, 2, 60_000, true)).toEqual({ ok: true });
+    vi.advanceTimersByTime(10_000);
+    expect(checkRateLimit(key, 2, 60_000, true)).toEqual({ ok: true });
+
+    const blocked = checkRateLimit(key, 2, 60_000, true);
     expect(blocked.ok).toBe(false);
     if (!blocked.ok) {
       expect(blocked.retryAfterSeconds).toBeGreaterThanOrEqual(1);
@@ -25,13 +32,13 @@ describe("fixed-window rate limiter", () => {
     }
 
     vi.advanceTimersByTime(61_000);
-    expect(checkRateLimit(key, 2)).toEqual({ ok: true });
+    expect(checkRateLimit(key, 2, 60_000, true)).toEqual({ ok: true });
   });
 
-  it("isolates different keys so one exhausted bucket never blocks another", () => {
-    expect(checkRateLimit("route:key-x", 1)).toEqual({ ok: true });
-    expect(checkRateLimit("route:key-x", 1).ok).toBe(false);
+  it("isolates different keys so one exhausted bucket never blocks another when enforced", () => {
+    expect(checkRateLimit("route:key-x", 1, 60_000, true)).toEqual({ ok: true });
+    expect(checkRateLimit("route:key-x", 1, 60_000, true).ok).toBe(false);
 
-    expect(checkRateLimit("route:key-y", 1)).toEqual({ ok: true });
+    expect(checkRateLimit("route:key-y", 1, 60_000, true)).toEqual({ ok: true });
   });
 });

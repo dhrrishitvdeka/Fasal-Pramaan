@@ -159,7 +159,7 @@ function ReviewQueuePage() {
       uncertainty_type: ev.uncertainty.type || "",
       integrity_score: ev.integrity.score,
       model_confidence: s.latest_prediction?.overall_confidence ?? "",
-      created_at: (s as any).created_at || s.latest_evaluation?.created_at || "",
+      created_at: s.createdAt || "",
       recommended_action: ev.uncertainty.recommended_action || "",
       adaptive_level:
         (s as unknown as { adaptive_result?: { level?: string } }).adaptive_result?.level ?? "",
@@ -217,8 +217,15 @@ function ReviewQueuePage() {
     }
     setSelectedIds([]);
     setBulk(null);
+    // Same corrected set as the review-detail action onSuccess (B3): prefix keys
+    // that match real queries — phantom "reviewer-stats"/"claims" removed.
     void qc.invalidateQueries({ queryKey: ["review-queue"] });
     void qc.invalidateQueries({ queryKey: ["overview"] });
+    void qc.invalidateQueries({ queryKey: ["map"] });
+    void qc.invalidateQueries({ queryKey: ["audit"] });
+    void qc.invalidateQueries({ queryKey: ["damage-cat"] });
+    void qc.invalidateQueries({ queryKey: ["severity"] });
+    void qc.invalidateQueries({ queryKey: ["by-crop"] });
     setBulkResult(
       failed === 0
         ? `Accepted ${ids.length} case${ids.length === 1 ? "" : "s"}.`

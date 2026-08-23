@@ -8,6 +8,7 @@
     "start": "npm run start --prefix apps/dashboard",
     "lint": "npm run lint --prefix apps/dashboard",
     "typecheck": "npm run typecheck --prefix apps/dashboard",
-    "test": "npm test --prefix apps/dashboard"
+    "test": "npm test --prefix apps/dashboard",
+    "e2e": "npm run e2e --prefix apps/dashboard"
   }
 }

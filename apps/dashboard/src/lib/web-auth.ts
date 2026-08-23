@@ -82,16 +82,18 @@ export async function requireWebActor(
   const user = data.user;
   const server = createServerSupabase();
   let profileRole: string | null = null;
+  let hasProfile = false;
   if (server) {
     const existing = await server.from("web_profiles").select("role").eq("id", user.id).maybeSingle();
     profileRole = existing.data?.role ? String(existing.data.role) : null;
+    hasProfile = Boolean(existing.data);
   }
   const role = resolveWebRole({
     email: user.email,
     appRoles: user.app_metadata?.roles,
     profileRole,
   });
-  if (server) {
+  if (server && !hasProfile) {
     await server.from("web_profiles").upsert(
       {
         id: user.id,
