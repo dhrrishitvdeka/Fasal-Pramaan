@@ -676,26 +676,21 @@ export default function SaathiIntakePage() {
 
       {/* Hero Voice Orb Hub */}
       <div className="fp-panel rounded-2xl p-6 text-center sm:p-7 border border-stone-200/90 bg-[#fffdf9] shadow-2xs">
-        <div className="relative mb-5 flex items-center justify-center">
-          {/* Animated Ambient Acoustic Aura Rings */}
+        <div className="relative mx-auto mb-4 flex h-24 w-24 sm:h-28 sm:w-28 items-center justify-center">
+          {/* Animated Ambient Acoustic Rings */}
           {liveStatus === "live" ? (
             <>
-              <span className="absolute h-28 w-28 sm:h-32 sm:w-32 rounded-full bg-rose-500/30 mic-sonar-1 pointer-events-none" />
-              <span className="absolute h-28 w-28 sm:h-32 sm:w-32 rounded-full bg-rose-400/25 mic-sonar-2 pointer-events-none" />
-              <span className="absolute h-28 w-28 sm:h-32 sm:w-32 rounded-full bg-amber-400/20 mic-sonar-3 pointer-events-none" />
-              <span className="absolute -inset-3 rounded-full bg-gradient-to-r from-rose-500/20 via-pink-500/20 to-amber-500/20 blur-md animate-pulse pointer-events-none" />
+              <span className="absolute inset-0 rounded-full bg-rose-500/25 animate-ping pointer-events-none" />
+              <span className="absolute -inset-2 rounded-full bg-rose-400/20 animate-pulse pointer-events-none" />
             </>
           ) : liveStatus === "connecting" ? (
             <>
-              <span className="absolute h-28 w-28 sm:h-32 sm:w-32 animate-ping rounded-full bg-amber-400/30 pointer-events-none" />
-              <span className="absolute -inset-2 rounded-full border-2 border-dashed border-amber-400/60 animate-spin pointer-events-none" />
+              <span className="absolute inset-0 rounded-full bg-amber-400/20 animate-ping pointer-events-none" />
             </>
           ) : (
             <>
-              {/* Idle glowing breathing halos */}
-              <span className="absolute h-28 w-28 sm:h-32 sm:w-32 rounded-full bg-emerald-400/15 mic-breathe-ring pointer-events-none" />
-              <span className="absolute h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-emerald-500/20 mic-breathe-subtle-ring pointer-events-none" />
-              <span className="absolute -inset-2 rounded-full bg-gradient-to-tr from-emerald-500/20 via-teal-400/10 to-emerald-300/20 blur-sm pointer-events-none transition-opacity duration-300 group-hover:opacity-100" />
+              <span className="absolute inset-0 rounded-full bg-emerald-500/15 mic-breathe-ring pointer-events-none" />
+              <span className="absolute -inset-1.5 rounded-full bg-emerald-400/10 mic-breathe-subtle-ring pointer-events-none" />
             </>
           )}
 
@@ -704,24 +699,20 @@ export default function SaathiIntakePage() {
             onClick={toggleVoiceMode}
             aria-label={liveStatus === "live" ? t.saathiVoiceOff : t.saathiTapToSpeak}
             className={clsx(
-              "group relative z-10 flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full text-white transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg",
+              "group relative z-10 flex h-20 w-20 sm:h-22 sm:w-22 items-center justify-center rounded-full text-white transition-all duration-200 hover:scale-105 active:scale-95 shadow-md",
               liveStatus === "live"
-                ? "bg-gradient-to-tr from-rose-600 to-rose-500 shadow-rose-500/40 ring-4 ring-rose-300/80"
+                ? "bg-rose-600 shadow-rose-500/30 ring-4 ring-rose-200/80"
                 : liveStatus === "connecting"
-                  ? "bg-gradient-to-tr from-amber-600 to-amber-500 shadow-amber-500/30 ring-4 ring-amber-200/80"
-                  : "bg-gradient-to-b from-[#26231f] to-[#141210] border-2 border-emerald-500/40 shadow-emerald-900/30 hover:border-emerald-400 hover:shadow-emerald-500/25 hover:shadow-xl",
+                  ? "bg-amber-600 shadow-amber-500/30 ring-4 ring-amber-200/80"
+                  : "bg-[var(--ink)] border-2 border-emerald-500/40 hover:border-emerald-400 hover:shadow-emerald-500/20 hover:shadow-lg",
             )}
           >
-            {/* Subtle gloss highlight on top edge */}
-            <span className="absolute inset-x-3 top-1 h-3 rounded-t-full bg-white/15 blur-[1px] pointer-events-none" />
-
             {liveStatus === "connecting" ? (
-              <Loader2 className="h-8 w-8 sm:h-9 sm:w-9 animate-spin text-white drop-shadow-md" />
+              <Loader2 className="h-8 w-8 animate-spin text-white" />
             ) : liveStatus === "live" ? (
               <div className="flex flex-col items-center justify-center gap-1">
-                <Mic className="h-7 w-7 sm:h-8 sm:w-8 animate-pulse text-white drop-shadow-md" />
-                {/* Live soundwave equalizer indicator */}
-                <span className="flex items-center gap-0.5 h-3">
+                <Mic className="h-7 w-7 animate-pulse text-white" />
+                <span className="flex items-center gap-0.5 h-2.5">
                   <span className="w-0.5 rounded-full bg-white sound-bar-1" />
                   <span className="w-0.5 rounded-full bg-white sound-bar-2" />
                   <span className="w-0.5 rounded-full bg-white sound-bar-3" />
@@ -730,9 +721,7 @@ export default function SaathiIntakePage() {
                 </span>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center transition-transform duration-300 group-hover:scale-110">
-                <Mic className="h-8 w-8 sm:h-9 sm:w-9 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)] transition-all duration-300 group-hover:text-emerald-300 group-hover:drop-shadow-[0_0_14px_rgba(52,211,153,0.85)]" />
-              </div>
+              <Mic className="h-8 w-8 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)] transition-transform duration-200 group-hover:scale-110 group-hover:text-emerald-300" />
             )}
           </button>
         </div>

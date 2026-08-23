@@ -244,101 +244,56 @@ a {
 @keyframes mic-breathe {
   0%, 100% {
     transform: scale(1);
-    opacity: 0.35;
+    opacity: 0.3;
   }
   50% {
-    transform: scale(1.22);
-    opacity: 0.08;
+    transform: scale(1.18);
+    opacity: 0.05;
   }
 }
 
 @keyframes mic-breathe-subtle {
   0%, 100% {
     transform: scale(1);
-    opacity: 0.5;
+    opacity: 0.45;
   }
   50% {
-    transform: scale(1.12);
-    opacity: 0.18;
-  }
-}
-
-@keyframes mic-sonar-1 {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(1.65);
-    opacity: 0;
-  }
-}
-
-@keyframes mic-sonar-2 {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(1.95);
-    opacity: 0;
-  }
-}
-
-@keyframes mic-sonar-3 {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(2.3);
-    opacity: 0;
+    transform: scale(1.1);
+    opacity: 0.12;
   }
 }
 
 @keyframes sound-bar-1 {
-  0%, 100% { height: 4px; }
-  50% { height: 16px; }
+  0%, 100% { height: 3px; }
+  50% { height: 12px; }
 }
 
 @keyframes sound-bar-2 {
-  0%, 100% { height: 14px; }
-  50% { height: 6px; }
+  0%, 100% { height: 11px; }
+  50% { height: 4px; }
 }
 
 @keyframes sound-bar-3 {
-  0%, 100% { height: 8px; }
-  50% { height: 18px; }
+  0%, 100% { height: 5px; }
+  50% { height: 13px; }
 }
 
 @keyframes sound-bar-4 {
-  0%, 100% { height: 16px; }
-  50% { height: 8px; }
+  0%, 100% { height: 12px; }
+  50% { height: 5px; }
 }
 
 @keyframes sound-bar-5 {
-  0%, 100% { height: 6px; }
-  50% { height: 14px; }
+  0%, 100% { height: 4px; }
+  50% { height: 10px; }
 }
 
 .mic-breathe-ring {
-  animation: mic-breathe 3.5s ease-in-out infinite;
+  animation: mic-breathe 3.2s ease-in-out infinite;
 }
 
 .mic-breathe-subtle-ring {
-  animation: mic-breathe-subtle 3.5s ease-in-out infinite;
-}
-
-.mic-sonar-1 {
-  animation: mic-sonar-1 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
-}
-
-.mic-sonar-2 {
-  animation: mic-sonar-2 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite 0.7s;
-}
-
-.mic-sonar-3 {
-  animation: mic-sonar-3 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite 1.4s;
+  animation: mic-breathe-subtle 3.2s ease-in-out infinite;
 }
 
 .sound-bar-1 { animation: sound-bar-1 0.9s ease-in-out infinite; }
@@ -346,4 +301,5 @@ a {
 .sound-bar-3 { animation: sound-bar-3 0.8s ease-in-out infinite 0.3s; }
 .sound-bar-4 { animation: sound-bar-4 1.0s ease-in-out infinite 0.1s; }
 .sound-bar-5 { animation: sound-bar-5 0.9s ease-in-out infinite 0.25s; }
+
 
