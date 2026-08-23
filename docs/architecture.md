@@ -32,7 +32,7 @@ flowchart TB
   subgraph AIServiceTier["Assistive AI Inference Tier"]
     HF["Hugging Face Space (HF_SPACE_URL)\nfasal-pramaan-api → fasal-pramaan-model\n• DINOv2 ViT-S/14 crop screening\n• A/B/C/U signal via /api/claims"]
     OnDeviceCV["On-Device Vision Worker\n(vision/cv-worker.ts)\n• TF.js 4 + MobileNet v2 alpha 0.5 from CDN\n• Plant-class verdict ≥0.18 prob, 500ms throttle\n• Union with green-pixel heuristic\n• block shutter on too_dark/no-crop"]
-    GeminiLLM["Gemini LLM Gate\n(gemini-2.0-flash default)\n• authenticity + crop check"]
+    GeminiLLM["Gemini LLM Gate\n(gemini-3.7-flash default)\n• authenticity + crop check"]
   end
 
   subgraph StorageTier["Persistence & Evidence Storage Tier"]

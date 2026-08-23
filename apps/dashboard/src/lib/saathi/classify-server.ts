@@ -34,10 +34,10 @@ function getGeminiApiKey(): string {
 function getGeminiModel(): string {
   try {
     const env = (typeof process !== "undefined" ? (process as unknown as { env?: Record<string, string> }).env : undefined) as Record<string, string> | undefined;
-    const raw = env?.GEMINI_VISION_MODEL || env?.GEMINI_LIVE_MODEL || "gemini-2.0-flash";
-    return String(raw).replace(/^models\//, "").trim() || "gemini-2.0-flash";
+    const raw = env?.GEMINI_MODEL || env?.GEMINI_VISION_MODEL || "gemini-3.7-flash";
+    return String(raw).replace(/^models\//, "").trim() || "gemini-3.7-flash";
   } catch {
-    return "gemini-2.0-flash";
+    return "gemini-3.7-flash";
   }
 }
 
