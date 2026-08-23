@@ -19,7 +19,8 @@ export type CvHintCode =
   | "too_far"
   | "hold_steady"
   | "center_crop"
-  | "screen_detected";
+  | "screen_detected"
+  | "person_detected";
 
 export type PhenologyType =
   | "vegetative"
@@ -35,6 +36,7 @@ export type CvFrameResult = {
   cropScore: number; // 0-100 (Composite multi-spectral confidence score)
   greenPct: number; // 0-100 (Effective canopy coverage across vegetative + mature + damage)
   isScreenDetected: boolean; // Anti-spoofing screen/monitor detection
+  isPersonDetected: boolean; // Human/person presence rejection
   phenologyType: PhenologyType; // Dominant crop phenology
   luma: number | null; // 0-100
   blurScore: number | null; // 0-100 sharpness score
@@ -42,8 +44,8 @@ export type CvFrameResult = {
   hintEn: string;
   hintHi: string;
   cropOnlyOk: boolean;
-  shouldBlockShutter: boolean; // Locked if cropScore < 75 or isScreenDetected or underexposed
-  bbox?: { x: number; y: number; w: number; h: number } | null;
+  shouldBlockShutter: boolean; // Locked if cropScore < 75 or isScreenDetected or isPersonDetected or underexposed
+  bbox: { x: number; y: number; w: number; h: number } | null;
   /** MobileNet v2 (CDN, worker path only) matched/top class label – null when model unavailable */
   modelLabel?: string | null;
   /** Probability of modelLabel (0-1) – null when model unavailable */
@@ -176,10 +178,11 @@ function hintFor(
     glareRatio: number;
     syntheticRatio: number;
     isScreenDetected: boolean;
+    isPersonDetected: boolean;
   },
   angleId?: string,
 ): { code: CvHintCode; en: string; hi: string; block: boolean } {
-  const { cropScore, totalCanopyPct, luma, blur, glareRatio, syntheticRatio, isScreenDetected } = scores;
+  const { cropScore, totalCanopyPct, luma, blur, glareRatio, syntheticRatio, isScreenDetected, isPersonDetected } = scores;
 
   const isCloseup = angleId === "closeup_damage";
   const isFireRelax =
@@ -187,7 +190,17 @@ function hintFor(
     angleId === "wide_field" ||
     (angleId != null && angleId.includes("fire"));
 
-  // 1. Screen / Display Anti-Spoofing
+  // 1. Person / Human Subject Rejection
+  if (isPersonDetected) {
+    return {
+      code: "person_detected",
+      en: "Person / non-crop subject in frame — point camera at outdoor crops",
+      hi: "व्यक्ति या चेहरा पहचाना गया — कैमरे को खेत की फसल पर लाएँ",
+      block: true,
+    };
+  }
+
+  // 2. Screen / Display Anti-Spoofing
   if (isScreenDetected) {
     return {
       code: "screen_detected",
@@ -197,7 +210,7 @@ function hintFor(
     };
   }
 
-  // 2. Extreme Underexposure (Pitch Dark)
+  // 3. Extreme Underexposure (Pitch Dark)
   if (luma != null && luma < (isFireRelax ? 5 : 14)) {
     return {
       code: "too_dark",
@@ -207,7 +220,7 @@ function hintFor(
     };
   }
 
-  // 3. Direct Solar Glare / Washed-out Overexposure
+  // 4. Direct Solar Glare / Washed-out Overexposure
   if ((luma != null && luma > 92) || glareRatio > 0.30) {
     return {
       code: "too_bright",
@@ -217,8 +230,8 @@ function hintFor(
     };
   }
 
-  // 4. Synthetic / Artificial Green Surface Warning (False positive mitigation)
-  if (syntheticRatio > 0.40 && totalCanopyPct < 25) {
+  // 5. Synthetic / Artificial Surface Warning (False positive mitigation)
+  if (syntheticRatio > 0.35 && totalCanopyPct < 25) {
     return {
       code: "crop_not_detected",
       en: "Non-crop surface detected — aim directly at natural field crops",
@@ -227,7 +240,7 @@ function hintFor(
     };
   }
 
-  // 5. Strict 75%+ Crop Quality Lock
+  // 6. Strict 75%+ Crop Quality Lock
   if (cropScore < 75 && !isFireRelax) {
     return {
       code: "crop_not_detected",
@@ -237,7 +250,7 @@ function hintFor(
     };
   }
 
-  // 6. Motion Blur / Camera Instability
+  // 7. Motion Blur / Camera Instability
   if (blur != null && blur > 0 && blur < 18) {
     return {
       code: "hold_steady",
@@ -247,8 +260,8 @@ function hintFor(
     };
   }
 
-  // 7. Proximity Warnings
-  if (totalCanopyPct > 95 && !isCloseup) {
+  // 8. Proximity Warnings
+  if (totalCanopyPct > 98 && blur != null && blur < 15 && !isCloseup) {
     return {
       code: "too_close",
       en: "Too close — step back slightly to capture plot boundary",
@@ -287,9 +300,10 @@ export function classifyAgriculturalPixel(
   isCanopy: boolean;
   type: "vegetative" | "mature_golden" | "bloom_yellow" | "scorch" | "charred" | "none";
   isSyntheticCandidate: boolean;
+  isSkin: boolean;
 } {
   const sum = r + g + b;
-  if (sum === 0) return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  if (sum === 0) return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: false };
 
   // Normalized chromatic coordinates
   const rn = r / sum;
@@ -302,98 +316,34 @@ export function classifyAgriculturalPixel(
   const gli = (2 * g - r - b) / (2 * g + r + b); // Green Leaf Index
 
   const [h, s, v] = rgbToHsv(r, g, b);
-
-  // 1. Filter Out Non-Crop Backgrounds
-  // Sky / Atmosphere filter: High blue, low red
-  if (b > r + 24 && b > g - 4 && luma > 60 && h >= 185 && h <= 250) {
-    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
-  }
-
-  // Neutral Gray Concrete / Asphalt / Road
   const maxDiff = Math.max(r, g, b) - Math.min(r, g, b);
-  if (maxDiff < 14 && luma >= 35 && luma <= 210) {
-    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+
+  // 1. Human Skin Detection (Fitzpatrick I-VI / YCbCr & HSV skin locus)
+  const isSkin =
+    r > g &&
+    g > b &&
+    r - g >= 12 &&
+    r - g <= 110 &&
+    g - b <= 65 &&
+    s >= 0.15 &&
+    s <= 0.70 &&
+    (h <= 35 || h >= 335) &&
+    v >= 0.16 &&
+    v <= 0.95;
+
+  if (isSkin) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: true };
   }
 
-  // Human Skin Tone Filter
-  if (r > g && g > b && r - g > 12 && r - g < 95 && g - b > 5 && s > 0.15 && s < 0.65 && h < 38) {
-    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  // 2. Filter Out Atmospheric Sky (High blue, low red)
+  if (b > r + 24 && b > g - 4 && luma > 60 && h >= 185 && h <= 250) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: false };
   }
 
-  // 2. Synthetic Hyper-Saturated Green Flag (e.g. neon plastic tarp, neon green clothes)
-  const isHyperSaturatedSynthetic = (g > 200 && (r < 45 || b < 45)) || (s > 0.93 && h >= 70 && h <= 165);
-
-  // 3. Vegetative Foliage (Living green crops: wheat, paddy, maize, vegetables, legumes)
-  const isVegetative =
-    (exg > 0.05 || (gli > 0.03 && g > r && g > b)) &&
-    h >= 65 &&
-    h <= 165 &&
-    s >= 0.14 &&
-    v >= 0.12 &&
-    v <= 0.96;
-
-  if (isVegetative) {
-    return {
-      isCanopy: !isHyperSaturatedSynthetic,
-      type: isHyperSaturatedSynthetic ? "none" : "vegetative",
-      isSyntheticCandidate: isHyperSaturatedSynthetic,
-    };
-  }
-
-  if (isHyperSaturatedSynthetic) {
-    return { isCanopy: false, type: "none", isSyntheticCandidate: true };
-  }
-
-  // 4. Flowering Blooms (Mustard yellow flowers, sunflower, canola bloom)
-  const isBloomYellow =
-    h >= 38 &&
-    h <= 64 &&
-    s >= 0.32 &&
-    v >= 0.45 &&
-    r > 130 &&
-    g > 120 &&
-    b < 125 &&
-    Math.abs(r - g) <= 28;
-
-  if (isBloomYellow) {
-    return { isCanopy: true, type: "bloom_yellow", isSyntheticCandidate: false };
-  }
-
-  // 5. Drought Scorch & Necrosis (Brownish-amber scorched leaves)
-  const isScorch =
-    h >= 15 &&
-    h <= 42 &&
-    s >= 0.16 &&
-    s <= 0.85 &&
-    v >= 0.15 &&
-    v <= 0.85 &&
-    r > g + 15 &&
-    r > b + 15;
-
-  if (isScorch) {
-    return { isCanopy: true, type: "scorch", isSyntheticCandidate: false };
-  }
-
-  // 6. Mature Golden Grain & Dry Canopy (Ripe wheat heads, barley, mature paddy, dry pulses)
-  const isMatureGolden =
-    (exr > 0.02 || (r > b + 20 && g > b + 10)) &&
-    h >= 26 &&
-    h <= 68 &&
-    s >= 0.16 &&
-    s <= 0.90 &&
-    v >= 0.20 &&
-    v <= 0.95 &&
-    r >= g - 25 &&
-    r <= g + 50;
-
-  if (isMatureGolden) {
-    return { isCanopy: true, type: "mature_golden", isSyntheticCandidate: false };
-  }
-
-  // 7. Charred / Burn Scar Matter (Fire Peril)
+  // 3. Charred / Burn Scar Matter (Fire Peril Protocol)
   const isCharred =
     isFirePeril &&
-    luma >= 6 &&
+    luma >= 5 &&
     luma <= 48 &&
     maxDiff < 18 &&
     r < 85 &&
@@ -402,10 +352,93 @@ export function classifyAgriculturalPixel(
     s <= 0.30;
 
   if (isCharred) {
-    return { isCanopy: true, type: "charred", isSyntheticCandidate: false };
+    return { isCanopy: true, type: "charred", isSyntheticCandidate: false, isSkin: false };
   }
 
-  return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  // 4. Neutral Gray Concrete / Asphalt / Road / Indoor Neutral Painted Wall & Ceiling
+  if (maxDiff < 24 && luma >= 24 && luma <= 245) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: false };
+  }
+
+  // Low-saturation light indoor wall / furniture
+  if (s < 0.22 && luma >= 35) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: false };
+  }
+
+  // 5. Synthetic Hyper-Saturated Green Flag (e.g. neon plastic tarp, neon green clothes)
+  const isHyperSaturatedSynthetic = (g > 200 && (r < 45 || b < 45)) || (s > 0.93 && h >= 70 && h <= 165);
+
+  // 6. Natural Vegetative Foliage (Living chlorophyll leaves: wheat, paddy, maize, vegetables, legumes)
+  const isVegetative =
+    (exg > 0.08 || (gli > 0.04 && g > r + 10 && g > b + 10)) &&
+    g > r + 12 &&
+    g > b + 12 &&
+    h >= 68 &&
+    h <= 162 &&
+    s >= 0.22 &&
+    v >= 0.14 &&
+    v <= 0.94;
+
+  if (isVegetative) {
+    return {
+      isCanopy: !isHyperSaturatedSynthetic,
+      type: isHyperSaturatedSynthetic ? "none" : "vegetative",
+      isSyntheticCandidate: isHyperSaturatedSynthetic,
+      isSkin: false,
+    };
+  }
+
+  if (isHyperSaturatedSynthetic) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: true, isSkin: false };
+  }
+
+  // 7. Flowering Blooms (Mustard yellow flowers, sunflower, canola bloom)
+  const isBloomYellow =
+    h >= 36 &&
+    h <= 64 &&
+    s >= 0.35 &&
+    v >= 0.40 &&
+    r > 130 &&
+    g > 120 &&
+    b < 120 &&
+    Math.abs(r - g) <= 28;
+
+  if (isBloomYellow) {
+    return { isCanopy: true, type: "bloom_yellow", isSyntheticCandidate: false, isSkin: false };
+  }
+
+  // 8. Mature Golden Grain & Dry Canopy (Ripe wheat heads, barley, mature paddy, dry pulses)
+  const isMatureGolden =
+    (exr > 0.02 || (r > b + 25 && g > b + 15)) &&
+    h >= 28 &&
+    h <= 68 &&
+    s >= 0.20 &&
+    s <= 0.90 &&
+    v >= 0.20 &&
+    v <= 0.95 &&
+    r >= g - 20 &&
+    r <= g + 42;
+
+  if (isMatureGolden) {
+    return { isCanopy: true, type: "mature_golden", isSyntheticCandidate: false, isSkin: false };
+  }
+
+  // 9. Drought Scorch & Necrosis (Brownish-amber scorched leaves)
+  const isScorch =
+    h >= 12 &&
+    h <= 45 &&
+    s >= 0.20 &&
+    s <= 0.85 &&
+    v >= 0.15 &&
+    v <= 0.85 &&
+    r > g + 40 &&
+    r > b + 25;
+
+  if (isScorch) {
+    return { isCanopy: true, type: "scorch", isSyntheticCandidate: false, isSkin: false };
+  }
+
+  return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: false };
 }
 
 /**
@@ -435,6 +468,7 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
     let charredCount = 0;
     let syntheticCount = 0;
     let glareCount = 0;
+    let skinCount = 0;
     let total = 0;
 
     let minX = w;
@@ -444,6 +478,8 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
 
     let laplacianSum = 0;
     let laplacianCount = 0;
+    let canopyLaplacianSum = 0;
+    let canopyLaplacianCount = 0;
 
     const isFireRelax =
       angleId === "fire_burn" ||
@@ -465,6 +501,10 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
         }
 
         const classification = classifyAgriculturalPixel(r, g, b, luma, isFireRelax);
+
+        if (classification.isSkin) {
+          skinCount += 1;
+        }
 
         if (classification.isCanopy) {
           if (classification.type === "vegetative") vegetativeCount += 1;
@@ -496,6 +536,11 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
           const lap = Math.abs(4 * lumaCenter - (lumaLeft + lumaRight + lumaUp + lumaDown));
           laplacianSum += lap;
           laplacianCount += 1;
+
+          if (classification.isCanopy) {
+            canopyLaplacianSum += lap;
+            canopyLaplacianCount += 1;
+          }
         }
       }
     }
@@ -508,13 +553,20 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
     const charredPct = total ? Math.round((charredCount / total) * 100) : 0;
     const glareRatio = total ? glareCount / total : 0;
     const syntheticRatio = total ? syntheticCount / total : 0;
+    const skinRatio = total ? skinCount / total : 0;
+
+    // Person Presence Detection
+    const isPersonDetected = skinRatio > 0.04;
 
     // Screen & Display Anti-Spoofing Detection
     const screenCheck = detectScreenArtifacts(data, w, h, luma);
     const isScreenDetected = screenCheck.isScreen;
 
+    // Organic Micro-Texture Penalty for uniform flat artificial surfaces
     const meanLaplacian = laplacianCount > 0 ? laplacianSum / laplacianCount : 0;
-    const isFlatArtificialSurface = (vegetativePct > 20 || syntheticCount > 15) && meanLaplacian < 1.8 && syntheticRatio > 0.35;
+    const meanCanopyLaplacian = canopyLaplacianCount > 0 ? canopyLaplacianSum / canopyLaplacianCount : 0;
+    const isFlatCanopy = !isFireRelax && (vegetativePct > 10 || (vegetativeCount + matureGoldenCount) > 15) && meanCanopyLaplacian < 0.6;
+    const isFlatArtificialSurface = !isFireRelax && (((vegetativePct > 15 || syntheticCount > 15) && meanLaplacian < 1.8 && syntheticRatio > 0.30) || isFlatCanopy);
 
     // Determine dominant phenology
     let phenologyType: PhenologyType = "none";
@@ -525,22 +577,27 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
     else if (vegetativePct > 0) phenologyType = "vegetative";
 
     const rawCanopyPct =
-      vegetativePct * (isFlatArtificialSurface ? 0.1 : 1.0) +
+      vegetativePct * (isFlatArtificialSurface ? 0.05 : 1.0) +
       matureGoldenPct * 0.95 +
       bloomYellowPct * 0.95 +
       scorchPct * 0.85 +
       (isFireRelax ? charredPct : 0);
 
-    const totalCanopyPct = clamp(Math.round(rawCanopyPct), 0, 100);
+    const totalCanopyPct = isPersonDetected ? 0 : clamp(Math.round(rawCanopyPct), 0, 100);
     const blurScore = clamp(Math.round((meanLaplacian / 12) * 100), 0, 100);
 
     // Multi-spectral composite crop score (0-100)
+    const canopyScore = clamp(Math.round(totalCanopyPct * 1.08), 0, 100);
     const textureScore = clamp(Math.round((meanLaplacian / 3.8) * 100), 10, 100);
     const naturalnessScore = clamp(Math.round(100 - syntheticRatio * 100 - glareRatio * 100), 0, 100);
 
-    let compositeScore = Math.round(0.55 * totalCanopyPct + 0.30 * textureScore + 0.15 * naturalnessScore);
-    if (isFlatArtificialSurface) compositeScore = Math.round(compositeScore * 0.25);
+    let compositeScore =
+      totalCanopyPct === 0
+        ? 0
+        : Math.round(0.70 * canopyScore + 0.18 * textureScore + 0.12 * naturalnessScore);
+    if (isFlatArtificialSurface) compositeScore = Math.round(compositeScore * 0.15);
     if (isScreenDetected) compositeScore = Math.min(compositeScore, 18);
+    if (isPersonDetected) compositeScore = 0;
     const cropScore = clamp(compositeScore, 0, 100);
 
     const hint = hintFor(
@@ -553,13 +610,14 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
         glareRatio,
         syntheticRatio,
         isScreenDetected,
+        isPersonDetected,
       },
       angleId,
     );
 
-    const isCloseup = angleId === "closeup_damage";
     const minThreshold = isFireRelax ? 40 : 75;
-    const cropDetected = cropScore >= minThreshold && luma != null && luma >= 14 && !isFlatArtificialSurface && !isScreenDetected;
+    const minLuma = isFireRelax ? 5 : 14;
+    const cropDetected = cropScore >= minThreshold && luma != null && luma >= minLuma && !isFlatArtificialSurface && !isScreenDetected && !isPersonDetected;
 
     let bbox: { x: number; y: number; w: number; h: number } | null = null;
     if (cropDetected && maxX >= minX && maxY >= minY) {
@@ -583,7 +641,8 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
       cropScore,
       greenPct: totalCanopyPct,
       isScreenDetected,
-      phenologyType,
+      isPersonDetected,
+      phenologyType: isPersonDetected ? "none" : phenologyType,
       luma,
       blurScore,
       hintCode: hint.code,
@@ -591,19 +650,30 @@ export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): Cv
       hintHi: hint.hi,
       cropOnlyOk: cropDetected,
       shouldBlockShutter,
-      bbox,
+      bbox: isPersonDetected ? null : bbox,
     };
   } catch {
     return null;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Worker-backed async path – off-main-thread 64x64 sampling + analysis
-// ---------------------------------------------------------------------------
+export type CvModelLoadStatus = "loading" | "ready" | "unavailable";
 
 let cvWorker: Worker | null = null;
 let cvWorkerInitFailed = false;
+let currentModelStatus: CvModelLoadStatus = "loading";
+const modelStatusListeners = new Set<(status: CvModelLoadStatus) => void>();
+
+export function getModelStatus(): CvModelLoadStatus {
+  return currentModelStatus;
+}
+
+export function onModelStatus(listener: (status: CvModelLoadStatus) => void): () => void {
+  modelStatusListeners.add(listener);
+  return () => {
+    modelStatusListeners.delete(listener);
+  };
+}
 
 let scratchCanvas: HTMLCanvasElement | null = null;
 let scratchCtx: CanvasRenderingContext2D | null = null;
@@ -622,153 +692,94 @@ function getScratchCanvas(w: number, h: number): { canvas: HTMLCanvasElement; ct
   return { canvas: scratchCanvas, ctx: scratchCtx };
 }
 
-export type CvModelStatus = "unknown" | "loading" | "ready" | "unavailable";
-
-let modelStatus: CvModelStatus = "unknown";
-type ModelStatusListener = (status: CvModelStatus) => void;
-const modelStatusListeners = new Set<ModelStatusListener>();
-
-function setModelStatus(next: CvModelStatus): void {
-  if (modelStatus === next) return;
-  modelStatus = next;
-  modelStatusListeners.forEach((cb) => {
-    try {
-      cb(next);
-    } catch {
-      // ignore
-    }
-  });
-}
-
-export function getModelStatus(): CvModelStatus {
-  return modelStatus;
-}
-
-export function onModelStatus(cb: ModelStatusListener): () => void {
-  modelStatusListeners.add(cb);
-  cb(modelStatus);
-  return () => {
-    modelStatusListeners.delete(cb);
-  };
-}
-
-export function ensureCvWorker(): Worker | null {
-  if (typeof window === "undefined") return null;
-  if (typeof Worker === "undefined") return null;
+function getCvWorker(): Worker | null {
+  if (typeof window === "undefined" || typeof Worker === "undefined") return null;
   if (cvWorker) return cvWorker;
   if (cvWorkerInitFailed) return null;
   try {
-    cvWorker = new Worker(new URL("./cv-worker.ts", import.meta.url));
-    cvWorker.onmessage = (e: MessageEvent) => {
-      const data = e.data as { type?: string; status?: string } | undefined | null;
-      if (!data || data.type !== "model_status") return;
-      if (data.status === "loading" || data.status === "ready" || data.status === "unavailable") {
-        setModelStatus(data.status);
+    cvWorker = new Worker(new URL("./cv-worker.ts", import.meta.url), { type: "module" });
+    cvWorker.addEventListener("message", (e: MessageEvent) => {
+      if (e.data && typeof e.data === "object" && (e.data as { type?: string }).type === "model_status") {
+        const s = (e.data as { status?: CvModelLoadStatus }).status;
+        if (s === "loading" || s === "ready" || s === "unavailable") {
+          currentModelStatus = s;
+          modelStatusListeners.forEach((fn) => {
+            try {
+              fn(s);
+            } catch {
+              // ignore
+            }
+          });
+        }
       }
-    };
-    cvWorker.onerror = () => {
+    });
+    cvWorker.onerror = (err) => {
+      console.warn("[realtime-cv] CV Worker errored, falling back to main-thread analysis:", err);
       cvWorkerInitFailed = true;
-      setModelStatus("unavailable");
-      try {
-        cvWorker?.terminate();
-      } catch {
-        // ignore
-      }
       cvWorker = null;
     };
     return cvWorker;
-  } catch {
+  } catch (err) {
+    console.warn("[realtime-cv] Could not spawn CV worker, using main-thread fallback:", err);
     cvWorkerInitFailed = true;
-    setModelStatus("unavailable");
+    cvWorker = null;
     return null;
   }
 }
+
+export function ensureCvWorker(): Worker | null {
+  return getCvWorker();
+}
+
+export function terminateCvWorker(): void {
+  if (cvWorker) {
+    try {
+      cvWorker.terminate();
+    } catch {
+      // ignore
+    }
+    cvWorker = null;
+  }
+}
+
+let nextJobId = 1;
 
 export async function analyzeVideoFrameAsync(
   video: HTMLVideoElement,
   angleId?: string,
 ): Promise<CvFrameResult | null> {
-  const worker = ensureCvWorker();
-  if (!worker) return analyzeVideoFrame(video, angleId);
-
   try {
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if (!vw || !vh) return null;
 
-    if (typeof createImageBitmap === "function") {
-      try {
-        const bitmap = await createImageBitmap(video);
-        const id = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-        const result = await new Promise<CvFrameResult | null>((resolve) => {
-          let settled = false;
-          let timer: ReturnType<typeof setTimeout> | null = null;
-          const cleanup = () => {
-            worker.removeEventListener("message", onMessage);
-            worker.removeEventListener("error", onError);
-            if (timer) clearTimeout(timer);
-          };
-          const onMessage = (e: MessageEvent) => {
-            const data = e.data as { id?: string; result?: CvFrameResult; error?: string } | undefined;
-            if (!data || data.id !== id) return;
-            if (settled) return;
-            settled = true;
-            cleanup();
-            if (data.error) resolve(null);
-            else resolve(data.result ?? null);
-          };
-          const onError = () => {
-            if (settled) return;
-            settled = true;
-            cleanup();
-            resolve(null);
-          };
-          worker.addEventListener("message", onMessage);
-          worker.addEventListener("error", onError);
-          timer = setTimeout(() => {
-            if (settled) return;
-            settled = true;
-            cleanup();
-            resolve(null);
-          }, 900);
-          try {
-            worker.postMessage({ id, bitmap, angleId }, [bitmap as unknown as Transferable]);
-          } catch {
-            try {
-              bitmap.close();
-            } catch {}
-            if (!settled) {
-              settled = true;
-              cleanup();
-              resolve(null);
-            }
-          }
-        });
-        if (result) return result;
-      } catch {
-        // fall through
-      }
+    const w = 64;
+    const h = 64;
+    const scratch = getScratchCanvas(w, h);
+    if (!scratch) return analyzeVideoFrame(video, angleId);
+
+    const { ctx } = scratch;
+    ctx.drawImage(video, 0, 0, w, h);
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const buffer = imageData.data.buffer.slice(0);
+
+    const worker = getCvWorker();
+    if (!worker) {
+      return analyzeVideoFrame(video, angleId);
     }
 
+    const id = nextJobId++;
     try {
-      const w = Math.min(vw, 64);
-      const h = Math.min(vh, 64);
-      const scratch = getScratchCanvas(w, h);
-      if (!scratch) return analyzeVideoFrame(video, angleId);
-      scratch.ctx.drawImage(video, 0, 0, w, h);
-      const imageData = scratch.ctx.getImageData(0, 0, w, h);
-      const buffer = imageData.data.buffer.slice(0) as ArrayBuffer;
-      const id = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
       const result = await new Promise<CvFrameResult | null>((resolve) => {
         let settled = false;
         let timer: ReturnType<typeof setTimeout> | null = null;
         const cleanup = () => {
+          if (timer) clearTimeout(timer);
           worker.removeEventListener("message", onMessage);
           worker.removeEventListener("error", onError);
-          if (timer) clearTimeout(timer);
         };
         const onMessage = (e: MessageEvent) => {
-          const data = e.data as { id?: string; result?: CvFrameResult; error?: string } | undefined;
+          const data = e.data as { id?: number; result?: CvFrameResult; error?: string };
           if (!data || data.id !== id) return;
           if (settled) return;
           settled = true;
@@ -790,22 +801,12 @@ export async function analyzeVideoFrameAsync(
           cleanup();
           resolve(null);
         }, 900);
-        try {
-          worker.postMessage({ id, width: w, height: h, buffer, angleId }, [buffer]);
-        } catch {
-          if (!settled) {
-            settled = true;
-            cleanup();
-            resolve(null);
-          }
-        }
+        worker.postMessage({ id, width: w, height: h, buffer, angleId }, [buffer]);
       });
-      if (result) return result;
+      return result;
     } catch {
-      // ignore
+      return analyzeVideoFrame(video, angleId);
     }
-
-    return analyzeVideoFrame(video, angleId);
   } catch {
     return analyzeVideoFrame(video, angleId);
   }
@@ -837,10 +838,13 @@ export async function analyzeDataUrl(dataUrl: string, angleId?: string): Promise
         let charredCount = 0;
         let syntheticCount = 0;
         let glareCount = 0;
+        let skinCount = 0;
         let total = 0;
 
         let laplacianSum = 0;
         let laplacianCount = 0;
+        let canopyLaplacianSum = 0;
+        let canopyLaplacianCount = 0;
 
         const isFireRelax =
           angleId === "fire_burn" ||
@@ -858,6 +862,11 @@ export async function analyzeDataUrl(dataUrl: string, angleId?: string): Promise
           if (r > 248 && g > 248 && b > 248) glareCount += 1;
 
           const cl = classifyAgriculturalPixel(r, g, b, luma, isFireRelax);
+
+          if (cl.isSkin) {
+            skinCount += 1;
+          }
+
           if (cl.isCanopy) {
             if (cl.type === "vegetative") vegetativeCount += 1;
             else if (cl.type === "mature_golden") matureGoldenCount += 1;
@@ -872,8 +881,14 @@ export async function analyzeDataUrl(dataUrl: string, angleId?: string): Promise
 
           if (i >= 16 && i < data.length - 16) {
             const prevLuma = 0.299 * data[i - 16] + 0.587 * data[i - 15] + 0.114 * data[i - 14];
-            laplacianSum += Math.abs(luma - prevLuma);
+            const diff = Math.abs(luma - prevLuma);
+            laplacianSum += diff;
             laplacianCount += 1;
+
+            if (cl.isCanopy) {
+              canopyLaplacianSum += diff;
+              canopyLaplacianCount += 1;
+            }
           }
         }
 
@@ -885,9 +900,14 @@ export async function analyzeDataUrl(dataUrl: string, angleId?: string): Promise
         const charredPct = total ? Math.round((charredCount / total) * 100) : 0;
         const glareRatio = total ? glareCount / total : 0;
         const syntheticRatio = total ? syntheticCount / total : 0;
+        const skinRatio = total ? skinCount / total : 0;
+
+        const isPersonDetected = skinRatio > 0.04;
 
         const meanLap = laplacianCount > 0 ? laplacianSum / laplacianCount : 0;
-        const isFlat = (vegetativePct > 20 || syntheticCount > 15) && meanLap < 1.5 && syntheticRatio > 0.40;
+        const meanCanopyLap = canopyLaplacianCount > 0 ? canopyLaplacianSum / canopyLaplacianCount : 0;
+        const isFlatCanopy = !isFireRelax && (vegetativePct > 10 || (vegetativeCount + matureGoldenCount) > 15) && meanCanopyLap < 0.6;
+        const isFlat = !isFireRelax && (((vegetativePct > 15 || syntheticCount > 15) && meanLap < 1.5 && syntheticRatio > 0.35) || isFlatCanopy);
 
         // Determine dominant phenology
         let phenologyType: PhenologyType = "none";
@@ -897,23 +917,26 @@ export async function analyzeDataUrl(dataUrl: string, angleId?: string): Promise
         else if (charredPct > vegetativePct && charredPct > 15) phenologyType = "charred";
         else if (vegetativePct > 0) phenologyType = "vegetative";
 
-        const totalCanopyPct = clamp(
-          Math.round(
-            vegetativePct * (isFlat ? 0.1 : 1.0) +
-              matureGoldenPct * 0.95 +
-              bloomYellowPct * 0.95 +
-              scorchPct * 0.85 +
-              (isFireRelax ? charredPct : 0),
-          ),
-          0,
-          100,
-        );
+        const totalCanopyPct = isPersonDetected
+          ? 0
+          : clamp(
+              Math.round(
+                vegetativePct * (isFlat ? 0.05 : 1.0) +
+                  matureGoldenPct * 0.95 +
+                  bloomYellowPct * 0.95 +
+                  scorchPct * 0.85 +
+                  (isFireRelax ? charredPct : 0),
+              ),
+              0,
+              100,
+            );
 
         const blurScore = clamp(Math.round((meanLap / 12) * 100), 0, 100);
         const textureScore = clamp(Math.round((meanLap / 3.8) * 100), 10, 100);
         const naturalnessScore = clamp(Math.round(100 - syntheticRatio * 100 - glareRatio * 100), 0, 100);
-        let compositeScore = Math.round(0.65 * totalCanopyPct + 0.20 * textureScore + 0.15 * naturalnessScore);
-        if (isFlat) compositeScore = Math.round(compositeScore * 0.25);
+        let compositeScore = totalCanopyPct === 0 ? 0 : Math.round(0.65 * totalCanopyPct + 0.20 * textureScore + 0.15 * naturalnessScore);
+        if (isFlat) compositeScore = Math.round(compositeScore * 0.15);
+        if (isPersonDetected) compositeScore = 0;
         const cropScore = clamp(compositeScore, 0, 100);
 
         const hint = hintFor(
@@ -926,11 +949,11 @@ export async function analyzeDataUrl(dataUrl: string, angleId?: string): Promise
             glareRatio,
             syntheticRatio,
             isScreenDetected: false,
+            isPersonDetected,
           },
           angleId,
         );
 
-        const isCloseup = angleId === "closeup_damage";
         const minThreshold = isFireRelax ? 40 : 75;
         const minLuma = isFireRelax ? 5 : 14;
         const cropDetected = cropScore >= minThreshold && luma != null && luma >= minLuma && !isFlat;
@@ -940,6 +963,7 @@ export async function analyzeDataUrl(dataUrl: string, angleId?: string): Promise
           cropScore,
           greenPct: totalCanopyPct,
           isScreenDetected: false,
+          isPersonDetected,
           phenologyType,
           luma,
           blurScore,

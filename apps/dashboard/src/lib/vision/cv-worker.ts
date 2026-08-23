@@ -18,7 +18,8 @@ export type CvHintCode =
   | "too_far"
   | "hold_steady"
   | "center_crop"
-  | "screen_detected";
+  | "screen_detected"
+  | "person_detected";
 
 export type PhenologyType =
   | "vegetative"
@@ -34,6 +35,7 @@ export type CvFrameResult = {
   cropScore: number; // 0-100 (Composite multi-spectral confidence score)
   greenPct: number; // 0-100 (Effective canopy coverage across vegetative + mature + damage)
   isScreenDetected: boolean; // Anti-spoofing screen/monitor detection
+  isPersonDetected: boolean; // Human/person presence rejection
   phenologyType: PhenologyType; // Dominant crop phenology
   luma: number | null; // 0-100
   blurScore: number | null; // 0-100 sharpness score
@@ -41,7 +43,7 @@ export type CvFrameResult = {
   hintEn: string;
   hintHi: string;
   cropOnlyOk: boolean;
-  shouldBlockShutter: boolean; // Locked if cropScore < 75 or isScreenDetected or underexposed
+  shouldBlockShutter: boolean; // Locked if cropScore < 75 or isScreenDetected or isPersonDetected or underexposed
   bbox?: { x: number; y: number; w: number; h: number } | null;
   modelLabel?: string | null;
   modelProb?: number | null;
@@ -157,10 +159,11 @@ function hintFor(
     glareRatio: number;
     syntheticRatio: number;
     isScreenDetected: boolean;
+    isPersonDetected: boolean;
   },
   angleId?: string,
 ): { code: CvHintCode; en: string; hi: string; block: boolean } {
-  const { cropScore, totalCanopyPct, luma, blur, glareRatio, syntheticRatio, isScreenDetected } = scores;
+  const { cropScore, totalCanopyPct, luma, blur, glareRatio, syntheticRatio, isScreenDetected, isPersonDetected } = scores;
 
   const isCloseup = angleId === "closeup_damage";
   const isFireRelax =
@@ -168,7 +171,17 @@ function hintFor(
     angleId === "wide_field" ||
     (angleId != null && angleId.includes("fire"));
 
-  // 1. Screen / Display Anti-Spoofing
+  // 1. Person / Human Subject Rejection
+  if (isPersonDetected) {
+    return {
+      code: "person_detected",
+      en: "Person / non-crop subject in frame — point camera at outdoor crops",
+      hi: "व्यक्ति या चेहरा पहचाना गया — कैमरे को खेत की फसल पर लाएँ",
+      block: true,
+    };
+  }
+
+  // 2. Screen / Display Anti-Spoofing
   if (isScreenDetected) {
     return {
       code: "screen_detected",
@@ -178,7 +191,7 @@ function hintFor(
     };
   }
 
-  // 2. Extreme Underexposure
+  // 3. Extreme Underexposure
   if (luma != null && luma < (isFireRelax ? 5 : 14)) {
     return {
       code: "too_dark",
@@ -188,7 +201,7 @@ function hintFor(
     };
   }
 
-  // 3. Direct Solar Glare / Washed-out Overexposure
+  // 4. Direct Solar Glare / Washed-out Overexposure
   if ((luma != null && luma > 92) || glareRatio > 0.30) {
     return {
       code: "too_bright",
@@ -198,8 +211,8 @@ function hintFor(
     };
   }
 
-  // 4. Synthetic surface rejection
-  if (syntheticRatio > 0.40 && totalCanopyPct < 25) {
+  // 5. Synthetic surface rejection
+  if (syntheticRatio > 0.35 && totalCanopyPct < 25) {
     return {
       code: "crop_not_detected",
       en: "Non-crop surface detected — aim directly at natural field crops",
@@ -208,7 +221,7 @@ function hintFor(
     };
   }
 
-  // 5. Strict 75%+ Crop Quality Lock
+  // 6. Strict 75%+ Crop Quality Lock
   if (cropScore < 75 && !isFireRelax) {
     return {
       code: "crop_not_detected",
@@ -227,7 +240,7 @@ function hintFor(
     };
   }
 
-  if (totalCanopyPct > 95 && !isCloseup) {
+  if (totalCanopyPct > 98 && blur != null && blur < 15 && !isCloseup) {
     return {
       code: "too_close",
       en: "Too close — step back slightly to capture plot boundary",
@@ -266,9 +279,10 @@ function classifyPixel(
   isCanopy: boolean;
   type: "vegetative" | "mature_golden" | "bloom_yellow" | "scorch" | "charred" | "none";
   isSyntheticCandidate: boolean;
+  isSkin: boolean;
 } {
   const sum = r + g + b;
-  if (sum === 0) return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  if (sum === 0) return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: false };
 
   const rn = r / sum;
   const gn = g / sum;
@@ -279,98 +293,34 @@ function classifyPixel(
   const gli = (2 * g - r - b) / (2 * g + r + b);
 
   const [h, s, v] = rgbToHsv(r, g, b);
-
-  // Background suppressions:
-  // Sky
-  if (b > r + 24 && b > g - 4 && luma > 60 && h >= 185 && h <= 250) {
-    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
-  }
-
-  // Neutral Gray Asphalt/Concrete
   const maxDiff = Math.max(r, g, b) - Math.min(r, g, b);
-  if (maxDiff < 14 && luma >= 35 && luma <= 210) {
-    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+
+  // 1. Human Skin Detection (Fitzpatrick I-VI / YCbCr & HSV skin locus)
+  const isSkin =
+    r > g &&
+    g > b &&
+    r - g >= 12 &&
+    r - g <= 110 &&
+    g - b <= 65 &&
+    s >= 0.15 &&
+    s <= 0.70 &&
+    (h <= 35 || h >= 335) &&
+    v >= 0.16 &&
+    v <= 0.95;
+
+  if (isSkin) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: true };
   }
 
-  // Skin tone
-  if (r > g && g > b && r - g > 12 && r - g < 95 && g - b > 5 && s > 0.15 && s < 0.65 && h < 38) {
-    return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  // 2. Filter Out Atmospheric Sky (High blue, low red)
+  if (b > r + 24 && b > g - 4 && luma > 60 && h >= 185 && h <= 250) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: false };
   }
 
-  // Synthetic hyper-saturation
-  const isHyperSaturatedSynthetic = (g > 200 && (r < 45 || b < 45)) || (s > 0.93 && h >= 70 && h <= 165);
-
-  // Vegetative
-  const isVegetative =
-    (exg > 0.05 || (gli > 0.03 && g > r && g > b)) &&
-    h >= 65 &&
-    h <= 165 &&
-    s >= 0.14 &&
-    v >= 0.12 &&
-    v <= 0.96;
-
-  if (isVegetative) {
-    return {
-      isCanopy: !isHyperSaturatedSynthetic,
-      type: isHyperSaturatedSynthetic ? "none" : "vegetative",
-      isSyntheticCandidate: isHyperSaturatedSynthetic,
-    };
-  }
-
-  if (isHyperSaturatedSynthetic) {
-    return { isCanopy: false, type: "none", isSyntheticCandidate: true };
-  }
-
-  // Bloom Yellow
-  const isBloomYellow =
-    h >= 38 &&
-    h <= 64 &&
-    s >= 0.32 &&
-    v >= 0.45 &&
-    r > 130 &&
-    g > 120 &&
-    b < 125 &&
-    Math.abs(r - g) <= 28;
-
-  if (isBloomYellow) {
-    return { isCanopy: true, type: "bloom_yellow", isSyntheticCandidate: false };
-  }
-
-  // Drought Scorch
-  const isScorch =
-    h >= 15 &&
-    h <= 42 &&
-    s >= 0.16 &&
-    s <= 0.85 &&
-    v >= 0.15 &&
-    v <= 0.85 &&
-    r > g + 15 &&
-    r > b + 15;
-
-  if (isScorch) {
-    return { isCanopy: true, type: "scorch", isSyntheticCandidate: false };
-  }
-
-  // Mature Golden Grain
-  const isMatureGolden =
-    (exr > 0.02 || (r > b + 20 && g > b + 10)) &&
-    h >= 26 &&
-    h <= 68 &&
-    s >= 0.16 &&
-    s <= 0.90 &&
-    v >= 0.20 &&
-    v <= 0.95 &&
-    r >= g - 25 &&
-    r <= g + 50;
-
-  if (isMatureGolden) {
-    return { isCanopy: true, type: "mature_golden", isSyntheticCandidate: false };
-  }
-
-  // Charred Fire
+  // 3. Charred / Burn Scar Matter (Fire Peril Protocol)
   const isCharred =
     isFirePeril &&
-    luma >= 6 &&
+    luma >= 5 &&
     luma <= 48 &&
     maxDiff < 18 &&
     r < 85 &&
@@ -379,10 +329,93 @@ function classifyPixel(
     s <= 0.30;
 
   if (isCharred) {
-    return { isCanopy: true, type: "charred", isSyntheticCandidate: false };
+    return { isCanopy: true, type: "charred", isSyntheticCandidate: false, isSkin: false };
   }
 
-  return { isCanopy: false, type: "none", isSyntheticCandidate: false };
+  // 4. Neutral Gray Concrete / Asphalt / Road / Indoor Neutral Painted Wall & Ceiling
+  if (maxDiff < 24 && luma >= 24 && luma <= 245) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: false };
+  }
+
+  // Low-saturation light indoor wall / furniture
+  if (s < 0.22 && luma >= 35) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: false };
+  }
+
+  // 5. Synthetic Hyper-Saturated Green Flag (e.g. neon plastic tarp, neon green clothes)
+  const isHyperSaturatedSynthetic = (g > 200 && (r < 45 || b < 45)) || (s > 0.93 && h >= 70 && h <= 165);
+
+  // 6. Natural Vegetative Foliage (Living chlorophyll leaves: wheat, paddy, maize, vegetables, legumes)
+  const isVegetative =
+    (exg > 0.08 || (gli > 0.04 && g > r + 10 && g > b + 10)) &&
+    g > r + 12 &&
+    g > b + 12 &&
+    h >= 68 &&
+    h <= 162 &&
+    s >= 0.22 &&
+    v >= 0.14 &&
+    v <= 0.94;
+
+  if (isVegetative) {
+    return {
+      isCanopy: !isHyperSaturatedSynthetic,
+      type: isHyperSaturatedSynthetic ? "none" : "vegetative",
+      isSyntheticCandidate: isHyperSaturatedSynthetic,
+      isSkin: false,
+    };
+  }
+
+  if (isHyperSaturatedSynthetic) {
+    return { isCanopy: false, type: "none", isSyntheticCandidate: true, isSkin: false };
+  }
+
+  // 7. Flowering Blooms (Mustard yellow flowers, sunflower, canola bloom)
+  const isBloomYellow =
+    h >= 36 &&
+    h <= 64 &&
+    s >= 0.35 &&
+    v >= 0.40 &&
+    r > 130 &&
+    g > 120 &&
+    b < 120 &&
+    Math.abs(r - g) <= 28;
+
+  if (isBloomYellow) {
+    return { isCanopy: true, type: "bloom_yellow", isSyntheticCandidate: false, isSkin: false };
+  }
+
+  // 8. Mature Golden Grain & Dry Canopy (Ripe wheat heads, barley, mature paddy, dry pulses)
+  const isMatureGolden =
+    (exr > 0.02 || (r > b + 25 && g > b + 15)) &&
+    h >= 28 &&
+    h <= 68 &&
+    s >= 0.20 &&
+    s <= 0.90 &&
+    v >= 0.20 &&
+    v <= 0.95 &&
+    r >= g - 20 &&
+    r <= g + 42;
+
+  if (isMatureGolden) {
+    return { isCanopy: true, type: "mature_golden", isSyntheticCandidate: false, isSkin: false };
+  }
+
+  // 9. Drought Scorch & Necrosis (Brownish-amber scorched leaves)
+  const isScorch =
+    h >= 12 &&
+    h <= 45 &&
+    s >= 0.20 &&
+    s <= 0.85 &&
+    v >= 0.15 &&
+    v <= 0.85 &&
+    r > g + 40 &&
+    r > b + 25;
+
+  if (isScorch) {
+    return { isCanopy: true, type: "scorch", isSyntheticCandidate: false, isSkin: false };
+  }
+
+  return { isCanopy: false, type: "none", isSyntheticCandidate: false, isSkin: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -431,7 +464,9 @@ if (typeof self !== "undefined") {
 const MOBILENET_CDN =
   "https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js";
 const PLANT_CLASS_RE =
-  /plant|leaf|crop|grass|tree|flower|produce|vegetable|field|agricultur|maize|wheat|rice|paddy|corn|grain|barley|sorghum|mustard|rapeseed|sunflower|soybean|cotton|legume|chickpea|lentil/i;
+  /plant|leaf|foliage|flora|crop|grass|hay|straw|tree|branch|flower|blossom|bloom|daisy|sunflower|rose|dahlia|petunia|marigold|produce|vegetable|field|meadow|pasture|farmland|agricultur|maize|corn|ear|wheat|grain|rye|oat|barley|sorghum|millet|rice|paddy|mustard|rapeseed|canola|soybean|cotton|legume|chickpea|lentil|pea|bean|stalk|stem|garden|orchard|vineyard|bush|shrub|herb|moss|lichen|acorn|cardoon|cabbage|broccoli|cauliflower|zucchini|squash|cucumber|artichoke|pepper|greenhouse|flowerpot/i;
+const NON_PLANT_RE =
+  /person|human|man|woman|boy|girl|face|head|groom|bride|suit|tuxedo|jersey|jean|t-shirt|shirt|sweatshirt|cardigan|sweater|cloak|coat|jacket|pajama|apron|wig|hair|neck|room|wall|window|ceiling|door|desk|table|chair|couch|bed|pillow|quilt|blanket|wardrobe|bookcase|television|monitor|screen|laptop|computer|keyboard|mouse|cellular|phone|telephone|ipod|radio|speaker|cup|mug|bottle|beaker|carton|envelope|binder|notebook|towel|pen|remote|wallet|handbag|backpack|luggage|shoe|sneaker|sock|glove|seat belt|sunglass/i;
 const CLASSIFY_INTERVAL_MS = 500;
 const CLASSIFY_INPUT = 224;
 const CLASSIFY_PROB_MIN = 0.16;
@@ -583,6 +618,12 @@ async function classifySample(
     if (!Number.isFinite(topProb)) topProb = 0;
     let matchedLabel: string | null = null;
     let matchedProb: number | null = null;
+    let isExplicitNonPlant = false;
+
+    if (topLabel && NON_PLANT_RE.test(topLabel)) {
+      isExplicitNonPlant = true;
+    }
+
     for (const p of preds.slice(0, 3)) {
       const cls = typeof p?.className === "string" ? p.className : "";
       const prob = Number(p?.probability ?? NaN);
@@ -596,7 +637,7 @@ async function classifySample(
     const verdict: ModelVerdict = {
       label: matchedLabel ?? topLabel,
       prob: matchedLabel != null ? matchedProb : topProb,
-      saysPlant: matchedLabel != null,
+      saysPlant: !isExplicitNonPlant && matchedLabel != null,
     };
     lastVerdict = verdict;
     return verdict;
@@ -626,6 +667,7 @@ export function analyzeInWorker(
   let charredCount = 0;
   let syntheticCount = 0;
   let glareCount = 0;
+  let skinCount = 0;
   let total = 0;
 
   let minX = width;
@@ -635,6 +677,8 @@ export function analyzeInWorker(
 
   let laplacianSum = 0;
   let laplacianCount = 0;
+  let canopyLaplacianSum = 0;
+  let canopyLaplacianCount = 0;
 
   const isFireRelax =
     angleId === "fire_burn" ||
@@ -660,6 +704,10 @@ export function analyzeInWorker(
       }
 
       const classification = classifyPixel(r, g, b, luma, isFireRelax);
+
+      if (classification.isSkin) {
+        skinCount += 1;
+      }
 
       if (classification.isCanopy) {
         if (classification.type === "vegetative") vegetativeCount += 1;
@@ -693,6 +741,11 @@ export function analyzeInWorker(
         const lap = Math.abs(4 * lumaCenter - (lumaLeft + lumaRight + lumaUp + lumaDown));
         laplacianSum += lap;
         laplacianCount += 1;
+
+        if (classification.isCanopy) {
+          canopyLaplacianSum += lap;
+          canopyLaplacianCount += 1;
+        }
       }
     }
   }
@@ -705,6 +758,10 @@ export function analyzeInWorker(
   const charredPct = total ? Math.round((charredCount / total) * 100) : 0;
   const glareRatio = total ? glareCount / total : 0;
   const syntheticRatio = total ? syntheticCount / total : 0;
+  const skinRatio = total ? skinCount / total : 0;
+
+  // Person Presence Detection
+  const isPersonDetected = skinRatio > 0.04;
 
   // Screen & Display Anti-Spoofing Detection
   const screenCheck = detectScreenArtifacts(data, width, height, luma);
@@ -712,7 +769,9 @@ export function analyzeInWorker(
 
   // Organic Micro-Texture Penalty for uniform flat artificial surfaces
   const meanLaplacian = laplacianCount > 0 ? laplacianSum / laplacianCount : 0;
-  const isFlatArtificialSurface = (vegetativePct > 20 || syntheticCount > 15) && meanLaplacian < 1.8 && syntheticRatio > 0.35;
+  const meanCanopyLaplacian = canopyLaplacianCount > 0 ? canopyLaplacianSum / canopyLaplacianCount : 0;
+  const isFlatCanopy = !isFireRelax && (vegetativePct > 10 || (vegetativeCount + matureGoldenCount) > 15) && meanCanopyLaplacian < 0.6;
+  const isFlatArtificialSurface = !isFireRelax && (((vegetativePct > 15 || syntheticCount > 15) && meanLaplacian < 1.8 && syntheticRatio > 0.30) || isFlatCanopy);
 
   // Determine dominant phenology
   let phenologyType: PhenologyType = "none";
@@ -723,23 +782,28 @@ export function analyzeInWorker(
   else if (vegetativePct > 0) phenologyType = "vegetative";
 
   const rawCanopyPct =
-    vegetativePct * (isFlatArtificialSurface ? 0.1 : 1.0) +
+    vegetativePct * (isFlatArtificialSurface ? 0.05 : 1.0) +
     matureGoldenPct * 0.95 +
     bloomYellowPct * 0.95 +
     scorchPct * 0.85 +
     (isFireRelax ? charredPct : 0);
 
-  const totalCanopyPct = clamp(Math.round(rawCanopyPct), 0, 100);
+  const totalCanopyPct = isPersonDetected ? 0 : clamp(Math.round(rawCanopyPct), 0, 100);
   const blurScore = clamp(Math.round((meanLaplacian / 12) * 100), 0, 100);
 
   // Multi-spectral composite crop score (0-100)
+  const canopyScore = clamp(Math.round(totalCanopyPct * 1.08), 0, 100);
   const textureScore = clamp(Math.round((meanLaplacian / 3.8) * 100), 10, 100);
   const naturalnessScore = clamp(Math.round(100 - syntheticRatio * 100 - glareRatio * 100), 0, 100);
 
-  let compositeScore = Math.round(0.65 * totalCanopyPct + 0.20 * textureScore + 0.15 * naturalnessScore);
-  if (isFlatArtificialSurface) compositeScore = Math.round(compositeScore * 0.25);
+  let compositeScore =
+    totalCanopyPct === 0
+      ? 0
+      : Math.round(0.70 * canopyScore + 0.18 * textureScore + 0.12 * naturalnessScore);
+  if (isFlatArtificialSurface) compositeScore = Math.round(compositeScore * 0.15);
   if (isScreenDetected) compositeScore = Math.min(compositeScore, 18);
   if (modelVerdict?.saysPlant) compositeScore = Math.max(compositeScore, Math.round((modelVerdict.prob ?? 0.8) * 100));
+  if (isPersonDetected) compositeScore = 0;
   const cropScore = clamp(compositeScore, 0, 100);
 
   const hint = hintFor(
@@ -752,14 +816,14 @@ export function analyzeInWorker(
       glareRatio,
       syntheticRatio,
       isScreenDetected,
+      isPersonDetected,
     },
     angleId,
   );
 
-  const isCloseup = angleId === "closeup_damage";
   const minThreshold = isFireRelax ? 40 : 75;
   const minLuma = isFireRelax ? 5 : 14;
-  const cropDetected = cropScore >= minThreshold && luma != null && luma >= minLuma && !isFlatArtificialSurface && !isScreenDetected;
+  const cropDetected = cropScore >= minThreshold && luma != null && luma >= minLuma && !isFlatArtificialSurface && !isScreenDetected && !isPersonDetected;
 
   let bbox: { x: number; y: number; w: number; h: number } | null = null;
   if (cropDetected && maxX >= minX && maxY >= minY) {
@@ -783,7 +847,8 @@ export function analyzeInWorker(
     cropScore,
     greenPct: totalCanopyPct,
     isScreenDetected,
-    phenologyType,
+    isPersonDetected,
+    phenologyType: isPersonDetected ? "none" : phenologyType,
     luma,
     blurScore,
     hintCode: hint.code,
@@ -791,7 +856,7 @@ export function analyzeInWorker(
     hintHi: hint.hi,
     cropOnlyOk: cropDetected,
     shouldBlockShutter,
-    bbox,
+    bbox: isPersonDetected ? null : bbox,
     modelLabel: modelVerdict?.label ?? null,
     modelProb: modelVerdict?.prob ?? null,
   };
