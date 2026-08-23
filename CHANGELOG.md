@@ -2,6 +2,44 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] — 2026-08-23
+
+### Multi-Language Localization Across All 15 Indian Languages
+- **Universal Regional Language Infrastructure**:
+  - Expanded native dictionaries across all 15 supported Indian languages: **Assamese (`as`)**, **Bengali (`bn`)**, **English (`en`)**, **Gujarati (`gu`)**, **Hindi (`hi`)**, **Kannada (`kn`)**, **Malayalam (`ml`)**, **Marathi (`mr`)**, **Nepali (`ne`)**, **Odia (`or`)**, **Punjabi (`pa`)**, **Sindhi (`sd`)**, **Tamil (`ta`)**, **Telugu (`te`)**, and **Urdu (`ur`)**.
+  - Fully translated Saathi AI navigation, voice assistant headers, microphone states, peril chips, phrases, chat bubble greetings, placeholders, dashboard empty states, and claims list labels.
+  - Replaced hardcoded binary ternaries across all farmer pages with typed `getFarmerT(lang)` lookups.
+  - Added BCP-47 speech recognition mapping (`SPEECH_BCP47_MAP`) enabling native voice-to-text dictation across all 15 languages.
+
+### Reviewer Privacy & Dashboard Architecture
+- **Reviewer Session Isolation**:
+  - Sanitized reviewer and admin emails from farmer portal state endpoints (`/api/farmer/state`) and navigation bars to ensure strict separation between reviewer and farmer roles.
+- **Interactive 4-Card Farmer Dashboard**:
+  - Enhanced top stat cards (*Registered Plots*, *Claims Filed*, *Claims Verified*, *Needs Action*) into interactive routing links with direct anchors (`#registered-plots`, `#attention-required`, `/farmer/claims?status=verified`).
+  - Removed redundant top creation buttons on the Claims page to streamline mobile workflow.
+
+### Advanced Multi-Spectral Crop CV Engine, Anti-Screen Fraud, & 75%+ Shutter Lock
+- **Multi-Spectral & Multi-Phenology Crop Recognition**:
+  - Extended agronomic color and spatial analysis beyond green chlorophyll to accurately classify:
+    - **Mature Golden Grain & Paddy** (ExR index, golden hue $28^\circ-68^\circ$, ripe wheat/barley/paddy).
+    - **Flowering Yellow Blooms** (NDYI index, bloom hue $40^\circ-64^\circ$, mustard/sunflower blooms).
+    - **Drought / Scorch / Blight** (Necrotic amber/brown foliar damage).
+    - **Charred / Fire Biomass** (Burned crop residue and scorched organic matter).
+  - Spatial gradient entropy and organic micro-texture filtering to reject flat synthetic surfaces.
+- **Screen & Recapture Anti-Spoofing Detector**:
+  - Realtime detection of Moiré interference grids, screen bezels/borders, and planar specular reflections to reject photographs of computer monitors, tablets, and mobile screens.
+- **Strict 75%+ Crop Quality Shutter Lock**:
+  - Capture button remains locked (`disabled`) until live crop identification confidence reaches $\ge 75\%$ on real outdoor crops, complete with live HUD status and phenology tagging.
+
+### Autonomous Agentic Fasal Saathi & Assistant Synchronization
+- **Autonomous Agentic Command Execution**:
+  - Fasal Saathi executes agentic tasks on voice/text command (*"Open camera for flood damage"*, *"Show verified claims"*, *"Switch to Hindi"*, *"Show my plots"*, *"Snooze reminder"*), automatically configuring protocols, pre-filling parameters, and navigating to the right screen.
+- **Full Assistant Synchronization**:
+  - Unified conversation and intent store across the web application.
+  - Cleaned up interface by suppressing the duplicate floating launcher when on `/farmer/saathi`.
+
+---
+
 ## [2.4.0] — 2026-08-22
 
 ### Autonomous Fasal Saathi Agent & Agentic Webapp Control
