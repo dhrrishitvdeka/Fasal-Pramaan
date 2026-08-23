@@ -676,37 +676,63 @@ export default function SaathiIntakePage() {
 
       {/* Hero Voice Orb Hub */}
       <div className="fp-panel rounded-2xl p-6 text-center sm:p-7 border border-stone-200/90 bg-[#fffdf9] shadow-2xs">
-        <div className="relative mb-4 flex items-center justify-center">
-          {/* Animated pulse wave rings when live */}
-          {liveStatus === "live" && (
+        <div className="relative mb-5 flex items-center justify-center">
+          {/* Animated Ambient Acoustic Aura Rings */}
+          {liveStatus === "live" ? (
             <>
-              <span className="absolute h-32 w-32 animate-ping rounded-full bg-rose-400/20" />
-              <span className="absolute h-28 w-28 animate-pulse rounded-full bg-emerald-400/25" />
+              <span className="absolute h-28 w-28 sm:h-32 sm:w-32 rounded-full bg-rose-500/30 mic-sonar-1 pointer-events-none" />
+              <span className="absolute h-28 w-28 sm:h-32 sm:w-32 rounded-full bg-rose-400/25 mic-sonar-2 pointer-events-none" />
+              <span className="absolute h-28 w-28 sm:h-32 sm:w-32 rounded-full bg-amber-400/20 mic-sonar-3 pointer-events-none" />
+              <span className="absolute -inset-3 rounded-full bg-gradient-to-r from-rose-500/20 via-pink-500/20 to-amber-500/20 blur-md animate-pulse pointer-events-none" />
             </>
-          )}
-          {liveStatus === "connecting" && (
-            <span className="absolute h-28 w-28 animate-pulse rounded-full bg-amber-400/25" />
+          ) : liveStatus === "connecting" ? (
+            <>
+              <span className="absolute h-28 w-28 sm:h-32 sm:w-32 animate-ping rounded-full bg-amber-400/30 pointer-events-none" />
+              <span className="absolute -inset-2 rounded-full border-2 border-dashed border-amber-400/60 animate-spin pointer-events-none" />
+            </>
+          ) : (
+            <>
+              {/* Idle glowing breathing halos */}
+              <span className="absolute h-28 w-28 sm:h-32 sm:w-32 rounded-full bg-emerald-400/15 mic-breathe-ring pointer-events-none" />
+              <span className="absolute h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-emerald-500/20 mic-breathe-subtle-ring pointer-events-none" />
+              <span className="absolute -inset-2 rounded-full bg-gradient-to-tr from-emerald-500/20 via-teal-400/10 to-emerald-300/20 blur-sm pointer-events-none transition-opacity duration-300 group-hover:opacity-100" />
+            </>
           )}
 
           <button
             type="button"
             onClick={toggleVoiceMode}
-            aria-label={liveStatus === "live" ? "Stop Voice" : "Start Voice"}
+            aria-label={liveStatus === "live" ? t.saathiVoiceOff : t.saathiTapToSpeak}
             className={clsx(
-              "relative z-10 flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full text-white shadow-md transition-all duration-200 hover:scale-105 active:scale-95",
+              "group relative z-10 flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full text-white transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg",
               liveStatus === "live"
-                ? "bg-rose-700 ring-4 ring-rose-200/80"
+                ? "bg-gradient-to-tr from-rose-600 to-rose-500 shadow-rose-500/40 ring-4 ring-rose-300/80"
                 : liveStatus === "connecting"
-                  ? "bg-amber-600 ring-4 ring-amber-200/80"
-                  : "bg-[var(--ink)] text-emerald-400 border-2 border-emerald-500/30 hover:border-emerald-400",
+                  ? "bg-gradient-to-tr from-amber-600 to-amber-500 shadow-amber-500/30 ring-4 ring-amber-200/80"
+                  : "bg-gradient-to-b from-[#26231f] to-[#141210] border-2 border-emerald-500/40 shadow-emerald-900/30 hover:border-emerald-400 hover:shadow-emerald-500/25 hover:shadow-xl",
             )}
           >
+            {/* Subtle gloss highlight on top edge */}
+            <span className="absolute inset-x-3 top-1 h-3 rounded-t-full bg-white/15 blur-[1px] pointer-events-none" />
+
             {liveStatus === "connecting" ? (
-              <Loader2 className="h-8 w-8 animate-spin text-white" />
+              <Loader2 className="h-8 w-8 sm:h-9 sm:w-9 animate-spin text-white drop-shadow-md" />
             ) : liveStatus === "live" ? (
-              <Mic className="h-8 w-8 animate-pulse text-white" />
+              <div className="flex flex-col items-center justify-center gap-1">
+                <Mic className="h-7 w-7 sm:h-8 sm:w-8 animate-pulse text-white drop-shadow-md" />
+                {/* Live soundwave equalizer indicator */}
+                <span className="flex items-center gap-0.5 h-3">
+                  <span className="w-0.5 rounded-full bg-white sound-bar-1" />
+                  <span className="w-0.5 rounded-full bg-white sound-bar-2" />
+                  <span className="w-0.5 rounded-full bg-white sound-bar-3" />
+                  <span className="w-0.5 rounded-full bg-white sound-bar-4" />
+                  <span className="w-0.5 rounded-full bg-white sound-bar-5" />
+                </span>
+              </div>
             ) : (
-              <Mic className="h-8 w-8 text-emerald-400" />
+              <div className="flex flex-col items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                <Mic className="h-8 w-8 sm:h-9 sm:w-9 text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)] transition-all duration-300 group-hover:text-emerald-300 group-hover:drop-shadow-[0_0_14px_rgba(52,211,153,0.85)]" />
+              </div>
             )}
           </button>
         </div>

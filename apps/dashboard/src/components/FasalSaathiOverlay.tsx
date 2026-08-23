@@ -455,21 +455,26 @@ export default function FasalSaathiOverlay() {
         title={lang === "hi" ? "फसल साथी से बात करें" : "Talk to Fasal Saathi"}
         aria-label={lang === "hi" ? "फसल साथी - आवाज़ सहायक" : "Fasal Saathi - Voice Assistant"}
         className={clsx(
-          "group fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--ink)] shadow-xl transition-all duration-200 hover:scale-110 active:scale-95 sm:right-4 sm:h-14 sm:w-14 md:bottom-8 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-[var(--canvas)] border border-emerald-500/30",
+          "group fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-[#2a2620] to-[#141210] shadow-xl transition-all duration-300 hover:scale-110 active:scale-95 sm:right-4 sm:h-14 sm:w-14 md:bottom-8 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-[var(--canvas)] border border-emerald-500/40 hover:border-emerald-400 hover:shadow-emerald-500/25 hover:shadow-2xl",
           isSpeaking && "scale-105 ring-4 ring-emerald-400/50 shadow-emerald-500/30",
         )}
       >
+        {/* Idle & Live Ambient Halo */}
+        {!isSpeaking && status === "idle" && (
+          <span className="absolute -inset-1 rounded-full bg-emerald-400/20 mic-breathe-subtle-ring pointer-events-none" />
+        )}
+
         {/* Animated speaking audio ripples */}
         {isSpeaking && (
           <>
-            <span className="absolute -inset-2 animate-ping rounded-full bg-emerald-400/30 duration-1000" />
-            <span className="absolute -inset-1 animate-pulse rounded-full bg-emerald-500/20 ring-4 ring-emerald-400/40" />
+            <span className="absolute -inset-3 rounded-full bg-emerald-400/30 mic-sonar-1 pointer-events-none" />
+            <span className="absolute -inset-2 rounded-full bg-emerald-500/25 mic-sonar-2 pointer-events-none" />
           </>
         )}
 
         <svg
           className={clsx(
-            "h-6 w-6 sm:h-7 sm:w-7 text-emerald-400 transition-transform group-hover:scale-105",
+            "h-6 w-6 sm:h-7 sm:w-7 text-emerald-400 transition-all duration-300 group-hover:scale-110 drop-shadow-[0_0_6px_rgba(52,211,153,0.5)] group-hover:drop-shadow-[0_0_10px_rgba(52,211,153,0.8)]",
             isSpeaking && "animate-pulse scale-110 text-emerald-300",
           )}
           viewBox="0 0 24 24"
@@ -497,10 +502,10 @@ export default function FasalSaathiOverlay() {
         {/* Dynamic Voice Indicator */}
         {isSpeaking ? (
           <span className="absolute -bottom-1 flex items-end gap-0.5 rounded-full bg-emerald-950 px-1.5 py-0.5 border border-emerald-400/40 shadow-xs">
-            <span className="h-1.5 w-0.5 animate-pulse rounded-full bg-emerald-400" />
-            <span className="h-3 w-0.5 animate-pulse rounded-full bg-emerald-300" style={{ animationDelay: "150ms" }} />
-            <span className="h-2 w-0.5 animate-pulse rounded-full bg-emerald-400" style={{ animationDelay: "300ms" }} />
-            <span className="h-3.5 w-0.5 animate-pulse rounded-full bg-emerald-300" style={{ animationDelay: "75ms" }} />
+            <span className="h-1.5 w-0.5 rounded-full bg-emerald-400 sound-bar-1" />
+            <span className="h-3 w-0.5 rounded-full bg-emerald-300 sound-bar-2" />
+            <span className="h-2 w-0.5 rounded-full bg-emerald-400 sound-bar-3" />
+            <span className="h-3.5 w-0.5 rounded-full bg-emerald-300 sound-bar-4" />
           </span>
         ) : (
           <>
