@@ -7,11 +7,6 @@
   <img src="https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
 </p>
-<p align="center">
-  <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-github%20actions-2088FF?logo=githubactions&logoColor=white" alt="CI: GitHub Actions" /></a>
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="License MIT" />
-  <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs welcome" /></a>
-</p>
 
 ---
 
