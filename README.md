@@ -53,7 +53,7 @@ flowchart TB
   subgraph T_SERVICES["Multi-Model AI & External Signal Infrastructure"]
     direction LR
     S_SUPABASE[("<b>Supabase Cloud</b><br/>• Postgres DB & RLS<br/>• Encrypted Storage<br/>• Auth & JWT Role Gates")]
-    S_GEMINI["<b>Google Gemini 2.0</b><br/>• Multimodal Vision Gate<br/>• 16kHz BiDi Live Voice<br/>• Peril Slot Extraction"]
+    S_GEMINI["<b>Google Gemini</b><br/>• Multimodal Vision Gate (3.7 Flash)<br/>• 16kHz BiDi Live Voice (3.1 Flash Live)<br/>• Peril Slot Extraction"]
     S_HF["<b>Hugging Face Space</b><br/>• DINOv2 ViT-S/14 Model<br/>• Crop Disease Screening<br/>• Resilient Fallback Engine"]
     S_SIGNALS["<b>Orbital & Weather APIs</b><br/>• Copernicus Sentinel-2<br/>• IMD / Open-Meteo Data<br/>• ISRO Bhuvan WMS"]
   end

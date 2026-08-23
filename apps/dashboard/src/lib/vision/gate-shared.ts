@@ -239,7 +239,7 @@ Return ONLY valid JSON matching this schema:
 Angle: ${angleType}, Peril: ${peril || "normal"}`;
 
   const model =
-    process.env.GEMINI_VISION_MODEL || process.env.GEMINI_LIVE_MODEL || "gemini-2.0-flash";
+    process.env.GEMINI_VISION_MODEL || process.env.GEMINI_MODEL || "gemini-3.7-flash";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   try {
