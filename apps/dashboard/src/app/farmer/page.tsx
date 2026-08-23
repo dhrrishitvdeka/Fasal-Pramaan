@@ -234,7 +234,7 @@ export default function FarmerHomePage() {
               </div>
             </div>
             <div className="mt-2 text-[10px] sm:text-[11px] font-medium text-emerald-800 flex items-center gap-1">
-              <span>{plots.length === 0 ? (lang === "hi" ? "+ नया जोड़ें" : "+ Add plot") : (lang === "hi" ? "भूखंड देखें →" : "View plots →")}</span>
+              <span>{plots.length === 0 ? t.addPlotBtn : t.viewPlotsArrow}</span>
             </div>
           </Link>
 
@@ -242,7 +242,7 @@ export default function FarmerHomePage() {
           <Link
             href="/farmer/claims"
             className="group fp-panel relative flex flex-col justify-between rounded-xl p-3.5 sm:p-4 shadow-2xs transition-all duration-150 hover:border-emerald-300 hover:shadow-md hover:scale-[1.02] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-emerald-500"
-            title={lang === "hi" ? "सभी दायर दावे देखें" : "View all filed claims"}
+            title={t.viewAllClaims}
           >
             <div>
               <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">
@@ -254,7 +254,7 @@ export default function FarmerHomePage() {
               </div>
             </div>
             <div className="mt-2 text-[10px] sm:text-[11px] font-medium text-slate-600 flex items-center gap-1">
-              <span>{lang === "hi" ? "सभी दावे देखें →" : "View all claims →"}</span>
+              <span>{t.viewClaimsArrow}</span>
             </div>
           </Link>
 
@@ -262,7 +262,7 @@ export default function FarmerHomePage() {
           <Link
             href="/farmer/claims?status=verified"
             className="group fp-panel relative flex flex-col justify-between rounded-xl p-3.5 sm:p-4 shadow-2xs transition-all duration-150 hover:border-emerald-300 hover:shadow-md hover:scale-[1.02] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-emerald-500"
-            title={lang === "hi" ? "सत्यापित दावे व डीबीटी भुगतान देखें" : "View verified claims & sanctioned DBT payouts"}
+            title={t.payoutSanctioned}
           >
             <div>
               <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">
@@ -274,7 +274,7 @@ export default function FarmerHomePage() {
               </div>
             </div>
             <div className="mt-2 text-[10px] sm:text-[11px] font-medium text-emerald-700 flex items-center gap-1">
-              <span>{verifiedCount > 0 ? (lang === "hi" ? "स्वीकृत भुगतान →" : "Approved payouts →") : (lang === "hi" ? "सत्यापित देखें →" : "View verified →")}</span>
+              <span>{verifiedCount > 0 ? t.approvedPayoutsArrow : t.viewVerifiedArrow}</span>
             </div>
           </Link>
 
@@ -293,7 +293,7 @@ export default function FarmerHomePage() {
                 ? "border-amber-300 bg-amber-50/60 hover:border-amber-400 focus-visible:ring-amber-500"
                 : "hover:border-emerald-300 focus-visible:ring-emerald-500"
             )}
-            title={lang === "hi" ? "लंबित पुनः फोटो अनुरोध देखें" : "View pending action items and recaptures"}
+            title={t.attentionRequired}
           >
             <div>
               <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">
@@ -307,7 +307,7 @@ export default function FarmerHomePage() {
               </div>
             </div>
             <div className={clsx("mt-2 text-[10px] sm:text-[11px] font-bold flex items-center gap-1", recaptureClaims.length > 0 ? "text-amber-900" : "text-slate-500 font-medium")}>
-              <span>{recaptureClaims.length > 0 ? (lang === "hi" ? "⚠ तुरंत फोटो लें →" : "⚠ Retake required →") : (lang === "hi" ? "सभी पूर्ण" : "All complete")}</span>
+              <span>{recaptureClaims.length > 0 ? t.retakeRequiredAlert : t.allComplete}</span>
             </div>
           </Link>
         </div>
@@ -359,25 +359,23 @@ export default function FarmerHomePage() {
               className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-emerald-800 hover:underline"
             >
               <PlusCircle className="h-3.5 w-3.5" />
-              <span>{lang === "hi" ? "नया खेत जोड़ें" : "+ Register Plot"}</span>
+              <span>{t.addPlotBtn}</span>
             </Link>
           </div>
           {isLoading ? (
             <p className="text-xs text-slate-500">{t.loadingPlots}</p>
           ) : plots.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-200 p-5 sm:p-8 text-center">
-              <p className="text-sm font-semibold text-slate-700">{lang === "hi" ? "कोई पंजीकृत भूखंड नहीं" : "No registered plots"}</p>
+              <p className="text-sm font-semibold text-slate-700">{t.noPlots}</p>
               <p className="mt-1.5 text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
-                {lang === "hi"
-                  ? "आप बिना भूखंड रिकॉर्ड के भी नया दावा जमा कर सकते हैं।"
-                  : "You can still file a claim without a stored plot record."}
+                {t.noPlotsSub}
               </p>
               <Link
                 href="/farmer/reminders#register-plot"
                 className="mt-3.5 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 hover:underline"
               >
                 <PlusCircle className="h-3.5 w-3.5 shrink-0" />
-                <span>{lang === "hi" ? "पहला भूखंड (कट्ठा) पंजीकृत करें" : "Register First Plot (in Kattha)"}</span>
+                <span>{t.registerFirstPlot}</span>
               </Link>
             </div>
           ) : (
@@ -395,7 +393,7 @@ export default function FarmerHomePage() {
                           </span>
                         </div>
                         <div className="text-xs text-slate-600 mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                          {plot.khataNumber && <span>{lang === "hi" ? "खाता" : "Khata"}: <strong>{plot.khataNumber}</strong></span>}
+                          {plot.khataNumber && <span>{t.khataLabel}: <strong>{plot.khataNumber}</strong></span>}
                           <span>{t.khasra}: <strong>{plot.khasraNumber || "—"}</strong></span>
                           <span>{lang === "hi" ? plot.cropTypeHi || plot.cropType : plot.cropType}</span>
                         </div>

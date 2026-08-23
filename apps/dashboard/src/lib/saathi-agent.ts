@@ -7,7 +7,8 @@ import {
   type ClaimIntent,
   newIntentId,
 } from "./claim-routing";
-import { CANONICAL_ANGLES } from "./farmerI18n";
+import { CANONICAL_ANGLES, getFarmerT } from "./farmerI18n";
+import type { AppLang } from "./live-indian-languages";
 
 export type SaathiSlot = {
   peril?: Peril;
@@ -33,18 +34,9 @@ function newMsg(role: SaathiMessage["role"], text: string, textHi?: string): Saa
 }
 
 export function initialSaathiGreeting(lang: string): SaathiMessage {
-  if (lang === "hi") {
-    return newMsg(
-      "saathi",
-      "नमस्ते! मैं फसल साथी हूँ। आपकी फसल को क्या नुकसान हुआ है? अपने शब्दों में बताएँ — जैसे: आग/जलना, जानवर क्षति, बाढ़/जलभराव, कीट/रोग, ओलावृष्टि, या फसल गिरना।",
-      "नमस्ते! मैं फसल साथी हूँ। आपकी फसल को क्या नुकसान हुआ है? अपने शब्दों में बताएँ — जैसे: आग/जलना, जानवर क्षति, बाढ़/जलभराव, कीट/रोग, ओलावृष्टि, या फसल गिरना।"
-    );
-  }
-  return newMsg(
-    "saathi",
-    "Hi, I am Fasal Saathi. What happened to your crop? Tell me in your words — e.g., fire/burn, animal grazing, flood, pest/disease, hail, lodging.",
-    "नमस्ते! मैं फसल साथी हूँ। आपकी फसल को क्या नुकसान हुआ है? अपने शब्दों में बताएँ — जैसे: आग/जलना, जानवर क्षति, बाढ़/जलभराव, कीट/रोग, ओलावृष्टि, या फसल गिरना।"
-  );
+  const t = getFarmerT(lang as AppLang);
+  const greeting = t.saathiGreeting || "Hi, I am Fasal Saathi. What happened to your crop? Tell me in your words — e.g., fire/burn, animal grazing, flood, pest/disease, hail, lodging.";
+  return newMsg("saathi", greeting, greeting);
 }
 
 export function extractSlotsFromText(text: string, plots: Array<{ id: string; name: string; nameHi: string; cropType: string; cropTypeHi: string; village: string }>): Partial<SaathiSlot> {

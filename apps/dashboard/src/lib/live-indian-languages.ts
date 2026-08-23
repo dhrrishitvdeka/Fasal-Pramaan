@@ -59,6 +59,29 @@ export function persistAppLang(value: unknown, fallback: AppLang = "en"): AppLan
   return parseAppLang(value) ?? fallback;
 }
 
+export const SPEECH_BCP47_MAP: Record<AppLang, string> = {
+  as: "as-IN",
+  bn: "bn-IN",
+  en: "en-IN",
+  gu: "gu-IN",
+  hi: "hi-IN",
+  kn: "kn-IN",
+  ml: "ml-IN",
+  mr: "mr-IN",
+  ne: "ne-NP",
+  or: "or-IN",
+  pa: "pa-IN",
+  sd: "sd-IN",
+  ta: "ta-IN",
+  te: "te-IN",
+  ur: "ur-IN",
+};
+
+export function getSpeechLocale(lang: AppLang): string {
+  return SPEECH_BCP47_MAP[lang] || "en-IN";
+}
+
+
 export function nativeLabelForLang(code: AppLang): string {
   return GEMINI_LIVE_INDIAN_LANGUAGES.find((item) => item.code === code)?.nativeLabel ?? code;
 }

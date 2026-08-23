@@ -109,9 +109,7 @@ function FarmerClaimsContent() {
             <span>{t.claims}</span>
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-slate-600">
-            {lang === "hi"
-              ? "आपके सभी सक्रिय, सत्यापित और समीक्षाधीन फसल बीमा दावों की सूची"
-              : "Complete record of all active, verified, and pending PMFBY crop damage claims"}
+            {t.claimsListSub}
           </p>
         </div>
       </div>
@@ -185,9 +183,7 @@ function FarmerClaimsContent() {
           <FileText className="mx-auto h-12 w-12 text-slate-300 mb-3" />
           <h3 className="text-sm font-bold text-slate-700">{t.noClaimsFound}</h3>
           <p className="mt-1 text-xs text-slate-500">
-            {lang === "hi"
-              ? "कृपया कोई अन्य फ़िल्टर चुनें या नया दावा दर्ज करें।"
-              : "Try switching filters or search terms, or file a new crop damage claim."}
+            {t.noClaimsSub}
           </p>
           <Link
             href="/farmer/capture"
