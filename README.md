@@ -103,8 +103,10 @@ Every tool call is executed **server-side** through auth-gated, rate-limited `PO
 - **Comprehensive Image & Environmental Metadata Bundling**: Every shutter click in the capture studio bundles high-precision GPS (`lat`, `lon`, `accuracyM`), camera facing mode (`environment` vs `user`), video resolution (`width x height`), ISO 8601 timestamps, live agronomic indices (**ExG**, **GLI**, **ExR** canopy %), luma, 2D Laplacian sharpness score, MobileNet v2 classification tags, and client-side SHA-256 cryptographic hashes.
 - **Stage 1 (Gemini Multimodal Vision & Environmental Gate)**: `POST /api/vision/gate` (`src/app/api/vision/gate/route.ts`, auth-gated) and server-side `gateSingleImage` evaluate raw image bytes + comprehensive metadata + spatial context. Cross-verifies peril congruence (fire charred ash, flood standing water, hailstorm shredding, lodging flattening, drought chlorosis) and rejects AI fakes, screen captures, printed photos, and non-field artifacts.
 - **Stage 2 (Hugging Face DINOv2 Foundation Model)**: Only verified authentic outdoor crop evidence is dispatched to the Hugging Face Space (`dhrrishitvdeka/fasal-pramaan-api`, DINOv2 ViT-S/14) for deep neural crop screening and foliar damage grading ($A/B/C/U$). Fraudulent or unusable images bypass HF inference early, conserving compute quota and prompting targeted recapture.
-- **Multi-Spectral Realtime Computer Vision & False Positive Rejection**: `src/lib/vision/realtime-cv.ts` (running in `src/lib/vision/cv-worker.ts`) samples viewfinder frames at 3–4 fps in a Web Worker using normalized agronomic chromatic indices (**ExG**, **GLI**, **ExR**), 2D spatial Laplacian variance (organic micro-texture filter), and **TF.js + MobileNet v2** plant taxonomy classification.
-- **Seamless Camera Viewfinder UX**: Overlays dynamic autofocus corner reticles with color transitions (emerald glow when ready, amber when adjusting), a translucent glassmorphism HUD chip with live pulse dot indicator, and an interactive shutter ring that confirms optimal framing.
+- **Multi-Spectral Realtime Computer Vision & False Positive Rejection**: `src/lib/vision/realtime-cv.ts` (running in `src/lib/vision/cv-worker.ts`) samples viewfinder frames at 3–4 fps in a Web Worker using normalized multi-spectral agronomic chromatic indices (**ExG**, **GLI**, **ExR**), 2D spatial Laplacian variance (organic micro-texture filter), and **TF.js + MobileNet v2** plant taxonomy classification. Supports diverse agricultural phenologies: living green vegetative foliage, ripe golden wheat/paddy heads (`mature_golden`), yellow mustard and sunflower blooms (`bloom_yellow`), drought foliar necrosis (`scorch`), and fire charred biomass (`charred`).
+- **Screen & Display Anti-Spoofing Detection (`detectScreenArtifacts`)**: Analyzes orthogonal vs diagonal gradient ratios to identify raster scanlines, pixel subgrids, and Moiré interference (orthogonal ratio $> 0.80$) as well as rectilinear monitor bezel borders, immediately blocking recaptured digital displays and photos of screens (`⚠️ Screen Detected`).
+- **Strict 75%+ Crop Quality Shutter Lock**: Hardens the capture studio by disabling the shutter button with clear visual lock feedback (`Locked (XX% / 75% Crop Needed)`) unless the live frame achieves $\ge 75\%$ crop match (or $\ge 40\%$ under fire burn perils), eliminating false captures and non-field images before upload.
+- **Seamless Camera Viewfinder UX**: Overlays dynamic autofocus corner reticles with color transitions (emerald glow when ready, amber when adjusting), a translucent glassmorphism HUD chip with live pulse dot indicator, real-time phenology tags (e.g. `🌾 Ripe Golden`, `🌼 Yellow Bloom`, `🌿 Vegetative`), and an interactive shutter ring that confirms optimal framing.
 
 ### 4. Multi-Signal Context Validation
 `POST /api/context/assemble` assembles `ContextSignal[]` from **live free-tier sources**:
@@ -133,8 +135,9 @@ Special rules: integrity < 50 → `escalate_to_human`; gate flagged → `retake`
 
 **Transparent overrides:** reviewers can act with `override_gate` on a gate-flagged image; the action stamps `overridden` / `overriddenBy` / `overriddenAt` into `gate_result` and renders an Authenticity Gate card on the review detail page.
 
-### 6. Hardened API Surface
+### 6. Hardened API Surface & Multi-Tab Session Isolation
 Every evidence route (`/api/claims`, `/api/vision/gate`, `/api/context/assemble`, `/api/saathi/tool`) requires a **Supabase Auth JWT** (`requireWebActor`) and is rate-limited per user (20–30 req/min per route via shared `src/lib/server/rate-limit.ts`). Inputs are clamped server-side (lat ±90 / lon ±180, canonical angle whitelists, ≤64 KB tool bodies, strict `sowingDate` date regex), and the site-lock unlock compares passwords in constant time.
+- **Reviewer Multi-Tab Session Isolation (`review-session.ts`)**: Reviewer authentication and impersonated inspection profiles are decoupled from the farmer store via dedicated `sessionStorage` namespaces (`fasal_reviewer_email_v1`), ensuring simultaneous farmer and reviewer tabs never leak identities or active claims across portals.
 
 ### 7. Evidence Confidence & Trust Evaluation Engine
 Deterministic score ($0 - 100$):
@@ -145,14 +148,14 @@ $$\text{Final Confidence} = 0.4 \times \text{Quality} + 0.3 \times \text{Coverag
 - **Zero false-accept policy**: integrity anomalies force mandatory human review.
 - Every evaluation snapshot is immutable; re-evaluations track the exact confidence delta ($\Delta C$).
 
-### Production readiness (v2.0.0)
+### Production readiness & Inclusive Accessibility (v2.5.0)
 
-- **Role-guarded routes** — all 8 reviewer pages gate on session roles (`useRequireRole` + `AccessGate`); queries stay idle until the gate passes.
-- **Per-route rate limits with `Retry-After`** on every mutating route (claims 10/min, actions/milestones/context/saathi 30/min, gate 20/min, telemetry 5/min, system status 10/min).
-- **Error boundaries + loading skeletons + EmptyState**, plus client error telemetry (ring buffer → authed log-only intake; Sentry DSN slot ready).
-- **Installable PWA** — manifest + vanilla service worker (never caches `/api/*` or Supabase), prod-only registration, bilingual offline banner.
-- **Playwright E2E scaffold** — desktop + mobile projects, manually-triggered CI job.
-- **Bilingual `/privacy` + `/terms` placeholders** linked from landing and login footers.
+- **15 Indian Languages Full Webapp Localization**: Complete 15-language translation dictionary coverage (Hindi, English, Bengali, Telugu, Marathi, Tamil, Urdu, Gujarati, Kannada, Odia, Malayalam, Punjabi, Assamese, Maithili, Santali) spanning claim status badges, damage severity pills, review status indicators, and modal headers.
+- **Interactive 4-Card Farmer Summary Dashboard**: Actionable summary metrics (`Registered Plots`, `Claims Filed`, `Claims Verified`, `Needs Action`) with instant one-click navigational deep-links (`/farmer#registered-plots`, `/farmer/claims`, `/farmer/claims?status=verified`, `/farmer/claims?status=needs_recapture`).
+- **Autonomous Fasal Saathi Voice Agent (`resolveAgenticAction`)**: Spoken and typed agentic task execution directly triggering damage camera intake, language switching, plot inspection, and claims filtering.
+- **Role-guarded routes** — all reviewer pages gate on session roles (`useRequireRole` + `AccessGate`); queries stay idle until the gate passes.
+- **Per-route rate limits with `Retry-After`** on every mutating route.
+- **Installable PWA** — manifest + vanilla service worker, bilingual offline banners, responsive thumb-zone ergonomics.
 
 ---
 
