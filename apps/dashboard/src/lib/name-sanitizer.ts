@@ -55,6 +55,12 @@ export function sanitizeMojibake(text: string | null | undefined, fallback = "")
   return clean;
 }
 
+export function isReviewerEmailOrName(name?: string | null): boolean {
+  if (!name) return false;
+  const lower = name.toLowerCase().trim();
+  return lower.includes("reviewer") || lower.includes("admin");
+}
+
 export function getFarmerNavLabel(
   profile: { name?: string | null; nameHi?: string | null } | null | undefined,
   lang = 'en',
@@ -62,8 +68,10 @@ export function getFarmerNavLabel(
   const rawName = sanitizeMojibake(profile?.name, 'Farmer');
   const rawNameHi = sanitizeMojibake(profile?.nameHi, '');
 
-  // Email address login: always display email in clean English
-  if (rawName.includes('@')) {
+  const isReviewer = isReviewerEmailOrName(rawName);
+
+  // Email address login: display email in clean English only if it is not a reviewer/admin account
+  if (rawName.includes('@') && !isReviewer) {
     return {
       name: rawName,
       initial: rawName.charAt(0).toUpperCase(),
@@ -71,6 +79,7 @@ export function getFarmerNavLabel(
   }
 
   const isGeneric =
+    isReviewer ||
     !rawName ||
     rawName.toLowerCase() === 'farmer' ||
     rawName === 'किसान' ||

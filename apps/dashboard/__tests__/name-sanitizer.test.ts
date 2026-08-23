@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { sanitizeMojibake, getFarmerNavLabel } from "../src/lib/name-sanitizer";
 
 describe("name-sanitizer and nav label", () => {
@@ -43,14 +43,18 @@ describe("name-sanitizer and nav label", () => {
     });
   });
 
-  it("generates correct navbar label for custom user name", () => {
-    expect(getFarmerNavLabel({ name: "Ramesh Singh", nameHi: "रमेश सिंह" }, "hi")).toEqual({
-      name: "रमेश सिंह",
-      initial: "र",
+  it("filters out reviewer or admin emails from appearing as farmer name", () => {
+    expect(getFarmerNavLabel({ name: "reviewer@fasalpramaan.local" }, "en")).toEqual({
+      name: "Farmer",
+      initial: "F",
     });
-    expect(getFarmerNavLabel({ name: "Ramesh Singh", nameHi: "रमेश सिंह" }, "en")).toEqual({
-      name: "Ramesh Singh",
-      initial: "R",
+    expect(getFarmerNavLabel({ name: "reviewer@fasalpramaan.in" }, "hi")).toEqual({
+      name: "किसान",
+      initial: "क",
+    });
+    expect(getFarmerNavLabel({ name: "admin@gov.in" }, "en")).toEqual({
+      name: "Farmer",
+      initial: "F",
     });
   });
 });
