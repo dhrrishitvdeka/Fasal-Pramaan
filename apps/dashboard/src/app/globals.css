@@ -239,3 +239,111 @@ a {
     min-height: 2.75rem;
   }
 }
+
+/* Saathi AI Animated Microphone Effects */
+@keyframes mic-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.22);
+    opacity: 0.08;
+  }
+}
+
+@keyframes mic-breathe-subtle {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.18;
+  }
+}
+
+@keyframes mic-sonar-1 {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+@keyframes mic-sonar-2 {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.95);
+    opacity: 0;
+  }
+}
+
+@keyframes mic-sonar-3 {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.3);
+    opacity: 0;
+  }
+}
+
+@keyframes sound-bar-1 {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+
+@keyframes sound-bar-2 {
+  0%, 100% { height: 14px; }
+  50% { height: 6px; }
+}
+
+@keyframes sound-bar-3 {
+  0%, 100% { height: 8px; }
+  50% { height: 18px; }
+}
+
+@keyframes sound-bar-4 {
+  0%, 100% { height: 16px; }
+  50% { height: 8px; }
+}
+
+@keyframes sound-bar-5 {
+  0%, 100% { height: 6px; }
+  50% { height: 14px; }
+}
+
+.mic-breathe-ring {
+  animation: mic-breathe 3.5s ease-in-out infinite;
+}
+
+.mic-breathe-subtle-ring {
+  animation: mic-breathe-subtle 3.5s ease-in-out infinite;
+}
+
+.mic-sonar-1 {
+  animation: mic-sonar-1 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+.mic-sonar-2 {
+  animation: mic-sonar-2 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite 0.7s;
+}
+
+.mic-sonar-3 {
+  animation: mic-sonar-3 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite 1.4s;
+}
+
+.sound-bar-1 { animation: sound-bar-1 0.9s ease-in-out infinite; }
+.sound-bar-2 { animation: sound-bar-2 1.1s ease-in-out infinite 0.15s; }
+.sound-bar-3 { animation: sound-bar-3 0.8s ease-in-out infinite 0.3s; }
+.sound-bar-4 { animation: sound-bar-4 1.0s ease-in-out infinite 0.1s; }
+.sound-bar-5 { animation: sound-bar-5 0.9s ease-in-out infinite 0.25s; }
+
