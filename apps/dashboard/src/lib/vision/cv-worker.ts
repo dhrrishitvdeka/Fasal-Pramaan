@@ -17,18 +17,31 @@ export type CvHintCode =
   | "too_close"
   | "too_far"
   | "hold_steady"
-  | "center_crop";
+  | "center_crop"
+  | "screen_detected";
+
+export type PhenologyType =
+  | "vegetative"
+  | "mature_golden"
+  | "bloom_yellow"
+  | "scorch"
+  | "charred"
+  | "mixed"
+  | "none";
 
 export type CvFrameResult = {
   cropDetected: boolean;
-  greenPct: number;
-  luma: number | null;
-  blurScore: number | null;
+  cropScore: number; // 0-100 (Composite multi-spectral confidence score)
+  greenPct: number; // 0-100 (Effective canopy coverage across vegetative + mature + damage)
+  isScreenDetected: boolean; // Anti-spoofing screen/monitor detection
+  phenologyType: PhenologyType; // Dominant crop phenology
+  luma: number | null; // 0-100
+  blurScore: number | null; // 0-100 sharpness score
   hintCode: CvHintCode;
   hintEn: string;
   hintHi: string;
   cropOnlyOk: boolean;
-  shouldBlockShutter: boolean;
+  shouldBlockShutter: boolean; // Locked if cropScore < 75 or isScreenDetected or underexposed
   bbox?: { x: number; y: number; w: number; h: number } | null;
   modelLabel?: string | null;
   modelProb?: number | null;
@@ -60,20 +73,113 @@ function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
   return [h, s, v];
 }
 
+/**
+ * Detects Screen / Monitor / Digital Display / Paper Recapture artifacts:
+ * 1. Moiré / Pixel Grid: Gradients unnaturally aligned along orthogonal axis (0 / 90 / 180 deg).
+ * 2. Rectilinear Bezel Lines: Continuous straight horizontal or vertical boundary step edges.
+ */
+export function detectScreenArtifacts(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+  luma: number | null,
+): { isScreen: boolean; confidence: number; reason?: string } {
+  if (w < 8 || h < 8 || !luma) return { isScreen: false, confidence: 0 };
+
+  let orthogonalGradients = 0;
+  let organicDiagonalGradients = 0;
+  let totalEdges = 0;
+
+  const rowGradients = new Float32Array(h);
+  const colGradients = new Float32Array(w);
+
+  for (let y = 1; y < h - 1; y += 1) {
+    for (let x = 1; x < w - 1; x += 1) {
+      const idx = (y * w + x) * 4;
+      const lumCenter = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+      const lumL = 0.299 * data[idx - 4] + 0.587 * data[idx - 3] + 0.114 * data[idx - 2];
+      const lumR = 0.299 * data[idx + 4] + 0.587 * data[idx + 5] + 0.114 * data[idx + 6];
+      const lumU = 0.299 * data[idx - w * 4] + 0.587 * data[idx - w * 4 + 1] + 0.114 * data[idx - w * 4 + 2];
+      const lumD = 0.299 * data[idx + w * 4] + 0.587 * data[idx + w * 4 + 1] + 0.114 * data[idx + w * 4 + 2];
+
+      const gx = Math.abs(lumCenter - lumL) + Math.abs(lumCenter - lumR);
+      const gy = Math.abs(lumCenter - lumU) + Math.abs(lumCenter - lumD);
+      const mag = gx + gy;
+
+      if (mag > 14) {
+        totalEdges += 1;
+        rowGradients[y] += mag;
+        colGradients[x] += mag;
+
+        const ratio = Math.max(gx, gy) / (mag + 0.001);
+        if (ratio > 0.82) {
+          orthogonalGradients += 1;
+        } else {
+          organicDiagonalGradients += 1;
+        }
+      }
+    }
+  }
+
+  let maxRowPeak = 0;
+  let maxColPeak = 0;
+  for (let y = 1; y < h - 1; y += 1) {
+    if (rowGradients[y] > maxRowPeak) maxRowPeak = rowGradients[y];
+  }
+  for (let x = 1; x < w - 1; x += 1) {
+    if (colGradients[x] > maxColPeak) maxColPeak = colGradients[x];
+  }
+
+  const avgRowMag = totalEdges > 0 ? (totalEdges * 25) / h : 1;
+  const hasStrongBezelLine = maxRowPeak > avgRowMag * 3.5 || maxColPeak > avgRowMag * 3.5;
+
+  if (totalEdges >= 20) {
+    const orthogonalRatio = orthogonalGradients / totalEdges;
+    if (orthogonalRatio > 0.80 || (orthogonalRatio > 0.68 && hasStrongBezelLine)) {
+      return {
+        isScreen: true,
+        confidence: Math.round(orthogonalRatio * 100),
+        reason: "Pixel grid / rectilinear screen border detected",
+      };
+    }
+  }
+
+  return { isScreen: false, confidence: 0 };
+}
+
 function hintFor(
   scores: {
+    cropScore: number;
     totalCanopyPct: number;
     vegetativePct: number;
     luma: number | null;
     blur: number | null;
     glareRatio: number;
     syntheticRatio: number;
+    isScreenDetected: boolean;
   },
   angleId?: string,
 ): { code: CvHintCode; en: string; hi: string; block: boolean } {
-  const { totalCanopyPct, luma, blur, glareRatio, syntheticRatio } = scores;
+  const { cropScore, totalCanopyPct, luma, blur, glareRatio, syntheticRatio, isScreenDetected } = scores;
 
-  if (luma != null && luma < 14) {
+  const isCloseup = angleId === "closeup_damage";
+  const isFireRelax =
+    angleId === "fire_burn" ||
+    angleId === "wide_field" ||
+    (angleId != null && angleId.includes("fire"));
+
+  // 1. Screen / Display Anti-Spoofing
+  if (isScreenDetected) {
+    return {
+      code: "screen_detected",
+      en: "Screen / display detected — photograph real outdoor crop",
+      hi: "स्क्रीन / डिस्प्ले पहचानी गई — असली खेत व फसल की फोटो लें",
+      block: true,
+    };
+  }
+
+  // 2. Extreme Underexposure
+  if (luma != null && luma < (isFireRelax ? 5 : 14)) {
     return {
       code: "too_dark",
       en: "Too dark — move into brighter light or turn on torch",
@@ -82,7 +188,8 @@ function hintFor(
     };
   }
 
-  if ((luma != null && luma > 90) || glareRatio > 0.28) {
+  // 3. Direct Solar Glare / Washed-out Overexposure
+  if ((luma != null && luma > 92) || glareRatio > 0.30) {
     return {
       code: "too_bright",
       en: "Too bright — avoid direct solar glare and lens reflection",
@@ -91,15 +198,7 @@ function hintFor(
     };
   }
 
-  const isCloseup = angleId === "closeup_damage";
-  const isFireRelax =
-    angleId === "fire_burn" ||
-    angleId === "wide_field" ||
-    (angleId != null && angleId.includes("fire"));
-
-  const minCanopyThreshold = isCloseup ? 15 : isFireRelax ? 8 : 12;
-
-  // Synthetic surface rejection
+  // 4. Synthetic surface rejection
   if (syntheticRatio > 0.40 && totalCanopyPct < 25) {
     return {
       code: "crop_not_detected",
@@ -109,11 +208,12 @@ function hintFor(
     };
   }
 
-  if (totalCanopyPct < minCanopyThreshold) {
+  // 5. Strict 75%+ Crop Quality Lock
+  if (cropScore < 75 && !isFireRelax) {
     return {
       code: "crop_not_detected",
-      en: "No crop in frame — center the crop or point directly at foliage",
-      hi: "फसल फ्रेम में नहीं — फसल को बीच में रखें या कैमरे को सीधे पत्तियों पर लाएँ",
+      en: `Crop match ${cropScore}% — need 75%+ to capture (aim closer at crop foliage)`,
+      hi: `फसल पहचान ${cropScore}% — फोटो लेने के लिए 75%+ आवश्यक है`,
       block: true,
     };
   }
@@ -127,7 +227,7 @@ function hintFor(
     };
   }
 
-  if (totalCanopyPct > 92 && !isCloseup) {
+  if (totalCanopyPct > 95 && !isCloseup) {
     return {
       code: "too_close",
       en: "Too close — step back slightly to capture plot boundary",
@@ -147,8 +247,8 @@ function hintFor(
 
   return {
     code: "ok",
-    en: "Good framing & focus — ready to capture",
-    hi: "सही फ्रेम और फोकस — कैप्चर के लिए तैयार",
+    en: "Good crop framing & focus — ready to capture",
+    hi: "सही फसल व फ्रेम — कैप्चर के लिए तैयार",
     block: false,
   };
 }
@@ -202,11 +302,11 @@ function classifyPixel(
 
   // Vegetative
   const isVegetative =
-    (exg > 0.06 || (gli > 0.04 && g > r && g > b)) &&
-    h >= 68 &&
+    (exg > 0.05 || (gli > 0.03 && g > r && g > b)) &&
+    h >= 65 &&
     h <= 165 &&
-    s >= 0.16 &&
-    v >= 0.14 &&
+    s >= 0.14 &&
+    v >= 0.12 &&
     v <= 0.96;
 
   if (isVegetative) {
@@ -223,14 +323,14 @@ function classifyPixel(
 
   // Bloom Yellow
   const isBloomYellow =
-    h >= 42 &&
+    h >= 38 &&
     h <= 64 &&
-    s >= 0.38 &&
-    v >= 0.50 &&
-    r > 140 &&
-    g > 130 &&
-    b < 120 &&
-    Math.abs(r - g) <= 22;
+    s >= 0.32 &&
+    v >= 0.45 &&
+    r > 130 &&
+    g > 120 &&
+    b < 125 &&
+    Math.abs(r - g) <= 28;
 
   if (isBloomYellow) {
     return { isCanopy: true, type: "bloom_yellow", isSyntheticCandidate: false };
@@ -238,14 +338,14 @@ function classifyPixel(
 
   // Drought Scorch
   const isScorch =
-    h >= 16 &&
-    h <= 40 &&
-    s >= 0.18 &&
+    h >= 15 &&
+    h <= 42 &&
+    s >= 0.16 &&
     s <= 0.85 &&
-    v >= 0.16 &&
+    v >= 0.15 &&
     v <= 0.85 &&
-    r > g + 25 &&
-    r > b + 25;
+    r > g + 15 &&
+    r > b + 15;
 
   if (isScorch) {
     return { isCanopy: true, type: "scorch", isSyntheticCandidate: false };
@@ -253,15 +353,15 @@ function classifyPixel(
 
   // Mature Golden Grain
   const isMatureGolden =
-    (exr > 0.03 || (r > b + 25 && g > b + 15)) &&
-    h >= 30 &&
+    (exr > 0.02 || (r > b + 20 && g > b + 10)) &&
+    h >= 26 &&
     h <= 68 &&
-    s >= 0.18 &&
+    s >= 0.16 &&
     s <= 0.90 &&
-    v >= 0.22 &&
+    v >= 0.20 &&
     v <= 0.95 &&
     r >= g - 25 &&
-    r <= g + 45;
+    r <= g + 50;
 
   if (isMatureGolden) {
     return { isCanopy: true, type: "mature_golden", isSyntheticCandidate: false };
@@ -273,9 +373,9 @@ function classifyPixel(
     luma >= 6 &&
     luma <= 48 &&
     maxDiff < 18 &&
-    r < 80 &&
-    g < 80 &&
-    b < 80 &&
+    r < 85 &&
+    g < 85 &&
+    b < 85 &&
     s <= 0.30;
 
   if (isCharred) {
@@ -606,38 +706,60 @@ export function analyzeInWorker(
   const glareRatio = total ? glareCount / total : 0;
   const syntheticRatio = total ? syntheticCount / total : 0;
 
+  // Screen & Display Anti-Spoofing Detection
+  const screenCheck = detectScreenArtifacts(data, width, height, luma);
+  const isScreenDetected = screenCheck.isScreen;
+
   // Organic Micro-Texture Penalty for uniform flat artificial surfaces
   const meanLaplacian = laplacianCount > 0 ? laplacianSum / laplacianCount : 0;
   const isFlatArtificialSurface = (vegetativePct > 20 || syntheticCount > 15) && meanLaplacian < 1.8 && syntheticRatio > 0.35;
 
+  // Determine dominant phenology
+  let phenologyType: PhenologyType = "none";
+  if (matureGoldenPct > vegetativePct && matureGoldenPct > bloomYellowPct) phenologyType = "mature_golden";
+  else if (bloomYellowPct > vegetativePct && bloomYellowPct > matureGoldenPct) phenologyType = "bloom_yellow";
+  else if (scorchPct > vegetativePct && scorchPct > 20) phenologyType = "scorch";
+  else if (charredPct > vegetativePct && charredPct > 15) phenologyType = "charred";
+  else if (vegetativePct > 0) phenologyType = "vegetative";
+
   const rawCanopyPct =
     vegetativePct * (isFlatArtificialSurface ? 0.1 : 1.0) +
-    matureGoldenPct * 0.90 +
-    bloomYellowPct * 0.90 +
-    scorchPct * 0.75 +
+    matureGoldenPct * 0.95 +
+    bloomYellowPct * 0.95 +
+    scorchPct * 0.85 +
     (isFireRelax ? charredPct : 0);
 
   const totalCanopyPct = clamp(Math.round(rawCanopyPct), 0, 100);
   const blurScore = clamp(Math.round((meanLaplacian / 12) * 100), 0, 100);
 
+  // Multi-spectral composite crop score (0-100)
+  const textureScore = clamp(Math.round((meanLaplacian / 3.8) * 100), 10, 100);
+  const naturalnessScore = clamp(Math.round(100 - syntheticRatio * 100 - glareRatio * 100), 0, 100);
+
+  let compositeScore = Math.round(0.65 * totalCanopyPct + 0.20 * textureScore + 0.15 * naturalnessScore);
+  if (isFlatArtificialSurface) compositeScore = Math.round(compositeScore * 0.25);
+  if (isScreenDetected) compositeScore = Math.min(compositeScore, 18);
+  if (modelVerdict?.saysPlant) compositeScore = Math.max(compositeScore, Math.round((modelVerdict.prob ?? 0.8) * 100));
+  const cropScore = clamp(compositeScore, 0, 100);
+
   const hint = hintFor(
     {
+      cropScore,
       totalCanopyPct,
       vegetativePct,
       luma,
       blur: blurScore,
       glareRatio,
       syntheticRatio,
+      isScreenDetected,
     },
     angleId,
   );
 
   const isCloseup = angleId === "closeup_damage";
-  const minCanopyThreshold = isCloseup ? 15 : isFireRelax ? 8 : 12;
-
-  const heuristicCanopyOk = totalCanopyPct >= minCanopyThreshold && luma != null && luma >= 14 && !isFlatArtificialSurface;
-  const modelSaysPlant = !!modelVerdict?.saysPlant;
-  const cropDetected = heuristicCanopyOk || modelSaysPlant;
+  const minThreshold = isFireRelax ? 40 : 75;
+  const minLuma = isFireRelax ? 5 : 14;
+  const cropDetected = cropScore >= minThreshold && luma != null && luma >= minLuma && !isFlatArtificialSurface && !isScreenDetected;
 
   let bbox: { x: number; y: number; w: number; h: number } | null = null;
   if (cropDetected && maxX >= minX && maxY >= minY) {
@@ -654,11 +776,14 @@ export function analyzeInWorker(
     bbox = { x: 0.2, y: 0.2, w: 0.6, h: 0.6 };
   }
 
-  const shouldBlockShutter = hint.block && !isFireRelax && !cropDetected;
+  const shouldBlockShutter = hint.block || !cropDetected;
 
   return {
     cropDetected,
+    cropScore,
     greenPct: totalCanopyPct,
+    isScreenDetected,
+    phenologyType,
     luma,
     blurScore,
     hintCode: hint.code,

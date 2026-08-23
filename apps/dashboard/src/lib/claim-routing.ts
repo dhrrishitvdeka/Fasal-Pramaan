@@ -208,13 +208,13 @@ export function newIntentId(): string {
 
 export function classifyPerilHeuristic(text: string): { peril: Peril; confidence: number } {
   const t = text.toLowerCase();
-  if (/(fire|burn|jalna|aag|jala)/.test(t)) return { peril: "fire_burn", confidence: 0.92 };
-  if (/(animal|wild|boar|nilgai|jaanwar|pashu|graz)/.test(t)) return { peril: "animal_damage", confidence: 0.88 };
-  if (/(flood|waterlog|paani|bharav|inund)/.test(t)) return { peril: "flood", confidence: 0.87 };
-  if (/(drought|sukha|sookha|dry)/.test(t)) return { peril: "drought", confidence: 0.82 };
-  if (/(pest|keet|disease|rog|fung|spot|lesion|yellow)/.test(t)) return { peril: "pest_disease", confidence: 0.85 };
-  if (/(hail|ola|olavrishti)/.test(t)) return { peril: "hailstorm", confidence: 0.9 };
-  if (/(lodg|gira|gir gaya|wind|hawa|tufan)/.test(t)) return { peril: "lodging", confidence: 0.84 };
+  if (/(fire|burn|jalna|aag|jala|आग|जलना|जला)/.test(t)) return { peril: "fire_burn", confidence: 0.92 };
+  if (/(animal|wild|boar|nilgai|jaanwar|pashu|graz|जानवर|नीलगाय|जंगली|पशु)/.test(t)) return { peril: "animal_damage", confidence: 0.88 };
+  if (/(flood|waterlog|paani|bharav|inund|बाढ़|जलभराव|पानी भर)/.test(t)) return { peril: "flood", confidence: 0.87 };
+  if (/(drought|sukha|sookha|dry|सूखा|मुरझा)/.test(t)) return { peril: "drought", confidence: 0.82 };
+  if (/(pest|keet|disease|rog|fung|spot|lesion|कीट|रोग|फफूंद|इल्ली|कीड़े)/.test(t)) return { peril: "pest_disease", confidence: 0.85 };
+  if (/(hail|ola|olavrishti|ओला|ओलावृष्टि)/.test(t)) return { peril: "hailstorm", confidence: 0.9 };
+  if (/(lodg|gira|gir gaya|wind|hawa|tufan|गिरा|हवा से गिर|तूफान)/.test(t)) return { peril: "lodging", confidence: 0.84 };
   return { peril: "normal", confidence: 0.55 };
 }
 
