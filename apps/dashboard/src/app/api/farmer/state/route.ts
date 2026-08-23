@@ -78,7 +78,17 @@ export async function GET(request: Request) {
   }
 
   const profile = profileRes.data as WebProfileRow | null;
-  const rawName = sanitizeMojibake(profile?.name || profile?.full_name || auth.actor.email || EMPTY_FARMER_PROFILE.name, "Farmer");
+  const isReviewer =
+    isReviewerRole(auth.actor.role) ||
+    Boolean(auth.actor.email?.toLowerCase().includes("reviewer")) ||
+    Boolean(auth.actor.email?.toLowerCase().includes("admin"));
+  const rawName = sanitizeMojibake(
+    profile?.name ||
+      profile?.full_name ||
+      (isReviewer ? EMPTY_FARMER_PROFILE.name : auth.actor.email) ||
+      EMPTY_FARMER_PROFILE.name,
+    "Farmer",
+  );
   const isEmail = rawName.includes("@");
   let rawNameHi = sanitizeMojibake(profile?.name_hi || profile?.full_name_hi || "", "");
   if (isEmail || rawNameHi === "किसान") {

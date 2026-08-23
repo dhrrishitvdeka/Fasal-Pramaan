@@ -9,6 +9,8 @@ import {
   FileText,
   Clock,
   ArrowRight,
+  ArrowUpRight,
+  ChevronRight,
   Layers,
   RefreshCw,
   PlusCircle,
@@ -57,7 +59,16 @@ export default function FarmerHomePage() {
 
   const displayName = React.useMemo(() => {
     const n = sanitizeMojibake(farmerProfile.name);
-    if (!n || n.toLowerCase() === "farmer" || n === "किसान" || n.toLowerCase() === "kisan") return "";
+    if (
+      !n ||
+      n.toLowerCase() === "farmer" ||
+      n === "किसान" ||
+      n.toLowerCase() === "kisan" ||
+      n.toLowerCase().includes("reviewer") ||
+      n.toLowerCase().includes("admin")
+    ) {
+      return "";
+    }
     // If it's an email address, keep it in pure English
     if (n.includes("@")) return n;
     const nHi = sanitizeMojibake(farmerProfile.nameHi);
@@ -204,33 +215,107 @@ export default function FarmerHomePage() {
         </div>
       </section>
 
-      {/* Stats: clean 2x2 grid on phones, 4-up grid on sm+ */}
+      {/* Stats: interactive 2x2 grid on phones, 4-up grid on sm+ */}
       <section aria-label={t.statClaims}>
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3.5">
-          {[
-            { label: t.statPlots, value: plots.length },
-            { label: t.statClaims, value: claims.length },
-            { label: t.statVerified, value: verifiedCount },
-            { label: t.statPendingAction, value: recaptureClaims.length, alert: recaptureClaims.length > 0 },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="fp-panel rounded-xl p-3.5 sm:p-4 shadow-2xs transition-all hover:shadow-xs"
-            >
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">
-                {stat.label}
+          {/* Card 1: Registered Plots */}
+          <Link
+            href={plots.length > 0 ? "#registered-plots" : "/farmer/reminders#register-plot"}
+            className="group fp-panel relative flex flex-col justify-between rounded-xl p-3.5 sm:p-4 shadow-2xs transition-all duration-150 hover:border-emerald-300 hover:shadow-md hover:scale-[1.02] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-emerald-500"
+            title={lang === "hi" ? "पंजीकृत भूखंड विवरण देखें" : "View registered plot details"}
+          >
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">
+                <span>{t.statPlots}</span>
+                <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-emerald-700" />
               </div>
-              <div className={clsx("mt-1.5 text-2xl font-bold sm:text-3xl", stat.alert ? "text-amber-700" : "text-slate-900")}>
-                {isLoading ? "—" : stat.value}
+              <div className="mt-1.5 text-2xl font-bold sm:text-3xl text-slate-900 font-mono">
+                {isLoading ? "—" : plots.length}
               </div>
             </div>
-          ))}
+            <div className="mt-2 text-[10px] sm:text-[11px] font-medium text-emerald-800 flex items-center gap-1">
+              <span>{plots.length === 0 ? (lang === "hi" ? "+ नया जोड़ें" : "+ Add plot") : (lang === "hi" ? "भूखंड देखें →" : "View plots →")}</span>
+            </div>
+          </Link>
+
+          {/* Card 2: Claims Filed */}
+          <Link
+            href="/farmer/claims"
+            className="group fp-panel relative flex flex-col justify-between rounded-xl p-3.5 sm:p-4 shadow-2xs transition-all duration-150 hover:border-emerald-300 hover:shadow-md hover:scale-[1.02] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-emerald-500"
+            title={lang === "hi" ? "सभी दायर दावे देखें" : "View all filed claims"}
+          >
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">
+                <span>{t.statClaims}</span>
+                <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-emerald-700" />
+              </div>
+              <div className="mt-1.5 text-2xl font-bold sm:text-3xl text-slate-900 font-mono">
+                {isLoading ? "—" : claims.length}
+              </div>
+            </div>
+            <div className="mt-2 text-[10px] sm:text-[11px] font-medium text-slate-600 flex items-center gap-1">
+              <span>{lang === "hi" ? "सभी दावे देखें →" : "View all claims →"}</span>
+            </div>
+          </Link>
+
+          {/* Card 3: Claims Verified */}
+          <Link
+            href="/farmer/claims?status=verified"
+            className="group fp-panel relative flex flex-col justify-between rounded-xl p-3.5 sm:p-4 shadow-2xs transition-all duration-150 hover:border-emerald-300 hover:shadow-md hover:scale-[1.02] active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-emerald-500"
+            title={lang === "hi" ? "सत्यापित दावे व डीबीटी भुगतान देखें" : "View verified claims & sanctioned DBT payouts"}
+          >
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">
+                <span>{t.statVerified}</span>
+                <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-emerald-700" />
+              </div>
+              <div className={clsx("mt-1.5 text-2xl font-bold sm:text-3xl font-mono", verifiedCount > 0 ? "text-emerald-800" : "text-slate-900")}>
+                {isLoading ? "—" : verifiedCount}
+              </div>
+            </div>
+            <div className="mt-2 text-[10px] sm:text-[11px] font-medium text-emerald-700 flex items-center gap-1">
+              <span>{verifiedCount > 0 ? (lang === "hi" ? "स्वीकृत भुगतान →" : "Approved payouts →") : (lang === "hi" ? "सत्यापित देखें →" : "View verified →")}</span>
+            </div>
+          </Link>
+
+          {/* Card 4: Needs Action */}
+          <Link
+            href={
+              recaptureClaims.length > 0
+                ? (recaptureClaims.length === 1
+                    ? `/farmer/capture?recapture=${recaptureClaims[0].id}&angles=${(recaptureClaims[0].missingAngles || []).join(",") || "closeup_damage,mid_canopy"}`
+                    : "#attention-required")
+                : "/farmer/claims?status=needs_recapture"
+            }
+            className={clsx(
+              "group fp-panel relative flex flex-col justify-between rounded-xl p-3.5 sm:p-4 shadow-2xs transition-all duration-150 hover:shadow-md hover:scale-[1.02] active:scale-[0.99] focus-visible:ring-2",
+              recaptureClaims.length > 0
+                ? "border-amber-300 bg-amber-50/60 hover:border-amber-400 focus-visible:ring-amber-500"
+                : "hover:border-emerald-300 focus-visible:ring-emerald-500"
+            )}
+            title={lang === "hi" ? "लंबित पुनः फोटो अनुरोध देखें" : "View pending action items and recaptures"}
+          >
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">
+                <span className={recaptureClaims.length > 0 ? "text-amber-900 font-bold" : ""}>
+                  {t.statPendingAction}
+                </span>
+                <ArrowUpRight className={clsx("h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5", recaptureClaims.length > 0 ? "text-amber-700" : "text-slate-400")} />
+              </div>
+              <div className={clsx("mt-1.5 text-2xl font-bold sm:text-3xl font-mono", recaptureClaims.length > 0 ? "text-amber-800" : "text-slate-900")}>
+                {isLoading ? "—" : recaptureClaims.length}
+              </div>
+            </div>
+            <div className={clsx("mt-2 text-[10px] sm:text-[11px] font-bold flex items-center gap-1", recaptureClaims.length > 0 ? "text-amber-900" : "text-slate-500 font-medium")}>
+              <span>{recaptureClaims.length > 0 ? (lang === "hi" ? "⚠ तुरंत फोटो लें →" : "⚠ Retake required →") : (lang === "hi" ? "सभी पूर्ण" : "All complete")}</span>
+            </div>
+          </Link>
         </div>
       </section>
 
       {/* Recapture banner */}
       {recaptureClaims.length > 0 && (
-        <div className="fp-panel space-y-3.5 rounded-2xl border-[var(--ink)] p-4 sm:p-6 shadow-2xs">
+        <div id="attention-required" className="fp-panel space-y-3.5 rounded-2xl border-[var(--ink)] p-4 sm:p-6 shadow-2xs scroll-mt-20">
           <div className="flex items-start gap-2.5">
             <AlertTriangle className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
             <div>
@@ -263,7 +348,7 @@ export default function FarmerHomePage() {
 
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-2">
         {/* Registered Farm Plots */}
-        <section className="fp-panel rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden">
+        <section id="registered-plots" className="fp-panel rounded-2xl p-4 sm:p-6 shadow-2xs overflow-hidden scroll-mt-20">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-4">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 min-w-0">
               <Layers className="h-4 w-4 text-[var(--accent)] shrink-0" />
