@@ -608,39 +608,39 @@ export default function SaathiIntakePage() {
   const quickPerils = [
     {
       peril: "fire_burn",
-      label: lang === "hi" ? "खेत में आग" : "Fire in Field",
+      label: t.perilFire,
       icon: Flame,
-      phrase: lang === "hi" ? "खेत में आग लग गई है" : "There is a fire in my field",
+      phrase: t.perilFirePhrase,
     },
     {
       peril: "animal_damage",
-      label: lang === "hi" ? "जंगली जानवर" : "Wild Animals",
+      label: t.perilAnimals,
       icon: PawPrint,
-      phrase: lang === "hi" ? "जंगली जानवर ने फसल नुकसान किया" : "Wild animals damaged my crop",
+      phrase: t.perilAnimalsPhrase,
     },
     {
       peril: "flood",
-      label: lang === "hi" ? "बाढ़ / जलभराव" : "Flood & Waterlogging",
+      label: t.perilFlood,
       icon: Waves,
-      phrase: lang === "hi" ? "बाढ़ का पानी खेत में भर गया है" : "Flood water is logged in the field",
+      phrase: t.perilFloodPhrase,
     },
     {
       peril: "pest_disease",
-      label: lang === "hi" ? "कीट व रोग" : "Pest & Disease",
+      label: t.perilPest,
       icon: Bug,
-      phrase: lang === "hi" ? "फसल पर कीट और रोग लगा है" : "Pest and disease on my crop",
+      phrase: t.perilPestPhrase,
     },
     {
       peril: "hailstorm",
-      label: lang === "hi" ? "ओलावृष्टि" : "Hailstorm",
+      label: t.perilHail,
       icon: CloudHail,
-      phrase: lang === "hi" ? "ओले गिरने से फसल बर्बाद हुई" : "Hailstorm damaged the field",
+      phrase: t.perilHailPhrase,
     },
     {
       peril: "normal",
-      label: lang === "hi" ? "अन्य नुकसान" : "General Loss",
+      label: t.perilOther,
       icon: Sprout,
-      phrase: lang === "hi" ? "फसल का नुकसान हुआ है" : "I have general crop loss",
+      phrase: t.perilOtherPhrase,
     },
   ];
 
@@ -717,29 +717,29 @@ export default function SaathiIntakePage() {
             {liveStatus === "live" ? (
               <>
                 <span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" />
-                <span className="text-rose-700">{lang === "hi" ? "साथी सुन रहा है (बोलें)…" : "Listening (speak now)…"}</span>
+                <span className="text-rose-700">{t.saathiListening}</span>
               </>
             ) : liveStatus === "connecting" ? (
               <>
                 <span className="h-2 w-2 animate-spin rounded-full bg-amber-500" />
-                <span className="text-amber-700">{lang === "hi" ? "जुड़ रहा है…" : "Connecting voice stream…"}</span>
+                <span className="text-amber-700">{t.saathiConnecting}</span>
               </>
             ) : (
               <>
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="text-slate-700">{lang === "hi" ? "बोलने के लिए माइक दबाएँ" : "Tap microphone to speak"}</span>
+                <span className="text-slate-700">{t.saathiTapToSpeak}</span>
               </>
             )}
           </div>
           <p className="text-[11px] text-slate-500 select-none cursor-default">
-            {lang === "hi" ? "15 भारतीय भाषाएँ और क्षेत्रीय बोलियाँ समर्थित" : "15 Indian languages & regional dialects supported"}
+            {t.saathiLangSupported}
           </p>
         </div>
 
         {/* Quick Voice Phrase Chips */}
         <div className="mt-6 w-full pt-4 border-t border-stone-100">
           <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 select-none cursor-default">
-            {lang === "hi" ? "सामान्य फसल समस्याएँ (टैप या बोलें)" : "Common Crop Issues (tap or speak)"}
+            {t.saathiCommonIssues}
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 max-w-lg mx-auto">
             {quickPerils.map((q) => {
@@ -786,13 +786,13 @@ export default function SaathiIntakePage() {
               <Sprout className="h-3 w-3" />
             </span>
             <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              {lang === "hi" ? "साथी संवाद" : "Assessment Conversation"}
+              {t.saathiAssessmentConvo}
             </span>
           </div>
           {isAnalyzing && (
             <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--accent)]">
               <Loader2 className="h-3 w-3 animate-spin" />
-              {lang === "hi" ? "विश्लेषण…" : "Analyzing…"}
+              {t.saathiAnalyzing}
             </span>
           )}
         </div>
@@ -816,7 +816,7 @@ export default function SaathiIntakePage() {
                     : "border border-stone-200/90 bg-white text-slate-800 rounded-tl-xs",
                 )}
               >
-                {lang === "hi" && m.textHi ? m.textHi : m.text}
+                {m.text}
               </div>
             </div>
           ))}
@@ -837,11 +837,7 @@ export default function SaathiIntakePage() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={
-              lang === "hi"
-                ? "यहाँ अपनी फसल समस्या लिखें..."
-                : "Type your crop issue or reply here..."
-            }
+            placeholder={t.saathiPlaceholder}
             className="fp-input flex-1 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs sm:text-sm"
           />
           <button
@@ -850,7 +846,7 @@ export default function SaathiIntakePage() {
             className="fp-btn-primary rounded-xl px-4 py-2 text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5"
           >
             <Send className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{lang === "hi" ? "भेजें" : "Send"}</span>
+            <span className="hidden sm:inline">{t.saathiSend}</span>
           </button>
         </form>
       </div>
@@ -865,20 +861,20 @@ export default function SaathiIntakePage() {
               </span>
               <div>
                 <h2 className="text-sm font-bold text-slate-900">
-                  {lang === "hi" ? route.labelHi : route.labelEn}
+                  {lang === "en" ? route.labelEn : (lang === "hi" ? route.labelHi : route.labelHi || route.labelEn)}
                 </h2>
                 <p className="text-[11px] text-emerald-800 font-medium">
-                  {route.requiredAngles.length} {lang === "hi" ? "फोटो कोण आवश्यक" : "Photo angles required"}
+                  {route.requiredAngles.length} {t.saathiAnglesRequired}
                 </p>
               </div>
             </div>
             <span className="rounded-full bg-emerald-700 px-2.5 py-0.5 text-xs font-bold text-white">
-              {lang === "hi" ? "प्रोटोकॉल तैयार" : "Protocol Set"}
+              {lang === "en" ? "Protocol Set" : "प्रोटोकॉल तैयार"}
             </span>
           </div>
 
           <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-            {lang === "hi" ? route.descriptionHi : route.descriptionEn}
+            {lang === "en" ? route.descriptionEn : (lang === "hi" ? route.descriptionHi : route.descriptionHi || route.descriptionEn)}
           </p>
 
           <div className="mt-3 flex flex-wrap gap-1.5">
@@ -900,7 +896,7 @@ export default function SaathiIntakePage() {
           {route.needsSatellite && (
             <p className="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-amber-900 bg-amber-50 border border-amber-200/80 rounded-xl p-2.5">
               <Volume2 className="h-3.5 w-3.5 text-amber-700 shrink-0" />
-              <span>{lang === "hi" ? "सैटेलाइट जाँच (Sentinel-2 L2A) इस दावे में स्वतः जुड़ेगी।" : "Sentinel-2 satellite burn scar verification attached."}</span>
+              <span>{lang === "en" ? "Sentinel-2 satellite burn scar verification attached." : "सैटेलाइट जाँच (Sentinel-2 L2A) इस दावे में स्वतः जुड़ेगी।"}</span>
             </p>
           )}
 

@@ -36,10 +36,32 @@ describe("shipped language lookups", () => {
       if (code === "en") {
         expect(t(code, "overview")).toBe("Overview");
         expect(getFarmerT(code).home).toBe("Home");
+        expect(getFarmerT(code).saathiNav).toBe("Saathi AI");
         continue;
       }
       expect(t(code, "overview")).not.toBe(t("en", "overview"));
       expect(getFarmerT(code).home).not.toBe(getFarmerT("en").home);
+      expect(getFarmerT(code).saathiNav).not.toBe(getFarmerT("en").saathiNav);
+      expect(getFarmerT(code).saathiGreeting).toBeDefined();
+      expect(getFarmerT(code).saathiGreeting).not.toBe(getFarmerT("en").saathiGreeting);
+      expect(getFarmerT(code).perilFire).toBeDefined();
+      expect(getFarmerT(code).perilFire).not.toBe(getFarmerT("en").perilFire);
+      expect(getFarmerT(code).saathiCommonIssues).toBeDefined();
+      expect(getFarmerT(code).saathiCommonIssues).not.toBe(getFarmerT("en").saathiCommonIssues);
     }
   });
+
+  it("provides localized Saathi and Gujarati peril phrases properly", () => {
+    const gu = getFarmerT("gu");
+    expect(gu.saathiNav).toBe("સાથી (AI અવાજ)");
+    expect(gu.perilFire).toBe("ખેતરમાં આગ");
+    expect(gu.perilAnimals).toBe("જંગલી પ્રાણી");
+    expect(gu.perilFlood).toBe("પૂર / પાણી ભરાવું");
+    expect(gu.perilPest).toBe("જીવાત અને રોગ");
+    expect(gu.perilHail).toBe("કરા પડવા");
+    expect(gu.saathiTapToSpeak).toBe("બોલવા માટે માઇક દબાવો");
+    expect(gu.saathiAssessmentConvo).toBe("સાથી સંવાદ");
+    expect(gu.saathiGreeting).toContain("નમસ્તે! હું ફસલ સાથી છું");
+  });
 });
+
