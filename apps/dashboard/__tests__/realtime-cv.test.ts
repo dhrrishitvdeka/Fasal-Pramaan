@@ -208,6 +208,49 @@ describe("Realtime Multi-Spectral Agricultural CV Engine & Guidance", () => {
       expect(result.cropDetected).toBe(false);
     });
 
+    it("detects and rejects human person / selfie subjects in frame", () => {
+      const data = new Uint8ClampedArray(pixelCount * 4);
+      // Simulate a person in center (skin tones) against neutral indoor wall
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const idx = (y * width + x) * 4;
+          if (x >= width * 0.25 && x <= width * 0.75 && y >= height * 0.2) {
+            // Human skin tone: R=170, G=120, B=90
+            data[idx] = 170;
+            data[idx + 1] = 120;
+            data[idx + 2] = 90;
+          } else {
+            // Pale indoor wall: R=165, G=175, B=165
+            data[idx] = 165;
+            data[idx + 1] = 175;
+            data[idx + 2] = 165;
+          }
+          data[idx + 3] = 255;
+        }
+      }
+      const result = analyzeInWorker(data, width, height, "overview_north");
+      expect(result.isPersonDetected).toBe(true);
+      expect(result.hintCode).toBe("person_detected");
+      expect(result.shouldBlockShutter).toBe(true);
+      expect(result.cropDetected).toBe(false);
+      expect(result.cropScore).toBe(0);
+    });
+
+    it("rejects pale green-tinted indoor painted walls with low chromatic saturation", () => {
+      const data = new Uint8ClampedArray(pixelCount * 4);
+      // Pale lime/green painted room wall: R=160, G=178, B=160 (low saturation S=0.10)
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = 160;
+        data[i + 1] = 178;
+        data[i + 2] = 160;
+        data[i + 3] = 255;
+      }
+      const result = analyzeInWorker(data, width, height, "overview_north");
+      expect(result.cropDetected).toBe(false);
+      expect(result.cropScore).toBe(0);
+      expect(result.shouldBlockShutter).toBe(true);
+    });
+
     it("enforces strict 75%+ crop score requirement for shutter unlock", () => {
       const data = new Uint8ClampedArray(pixelCount * 4);
       // Sparse crop coverage (only ~30% frame contains crop)

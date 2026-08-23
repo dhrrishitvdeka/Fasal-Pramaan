@@ -431,15 +431,27 @@ python scripts/test_supabase_conn.py
 
 <p align="left">
   <a href="https://github.com/dhrrishitvdeka">
-    <img src="https://avatars.githubusercontent.com/u/260863532?v=4&s=100" width="80" height="80" alt="Dhrrishit V Deka" style="border-radius:50%;" />
+    <img src="https://github.com/dhrrishitvdeka.png?size=100" width="72" height="72" alt="Dhrrishit V Deka" style="border-radius:50%; margin-right: 8px;" />
   </a>
   <a href="https://github.com/parasdwivedi26">
-    <img src="https://avatars.githubusercontent.com/u/226138841?v=4&s=100" width="80" height="80" alt="Paras Dwivedi" style="border-radius:50%;" />
+    <img src="https://github.com/parasdwivedi26.png?size=100" width="72" height="72" alt="Paras Dwivedi" style="border-radius:50%; margin-right: 8px;" />
+  </a>
+  <a href="https://github.com/vedantparashar25">
+    <img src="https://github.com/vedantparashar25.png?size=100" width="72" height="72" alt="Vedant Parashar" style="border-radius:50%; margin-right: 8px;" />
+  </a>
+  <a href="https://github.com/sandeepkumargupta1">
+    <img src="https://github.com/sandeepkumargupta1.png?size=100" width="72" height="72" alt="Sandeep Kumar Gupta" style="border-radius:50%; margin-right: 8px;" />
   </a>
 </p>
 
 - **Dhrrishit V Deka** ([@dhrrishitvdeka](https://github.com/dhrrishitvdeka)) — Project Lead, Architecture & Core Systems
 - **Paras Dwivedi** ([@parasdwivedi26](https://github.com/parasdwivedi26)) — Co-Author, Modeling & Evaluation
+- **Vedant Parashar** ([@vedantparashar25](https://github.com/vedantparashar25)) — Core Contributor
+- **Sandeep Kumar Gupta** ([@sandeepkumargupta1](https://github.com/sandeepkumargupta1)) — Core Contributor
+
+### Live Contributors Graph
+
+[![Realtime GitHub Contributors](https://contrib.rocks/image?repo=dhrrishitvdeka/Fasal-Pramaan-main)](https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/graphs/contributors)
 
 ---
 

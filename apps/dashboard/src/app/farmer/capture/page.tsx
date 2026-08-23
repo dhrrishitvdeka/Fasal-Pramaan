@@ -1094,7 +1094,7 @@ function CaptureStudioContent() {
                   <span
                     className={clsx(
                       "h-2 w-2 rounded-full shrink-0",
-                      cvResult?.isScreenDetected
+                      cvResult?.isPersonDetected || cvResult?.isScreenDetected
                         ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,1)] animate-ping"
                         : (cvResult?.cropScore ?? 0) >= 75
                         ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"
@@ -1104,9 +1104,11 @@ function CaptureStudioContent() {
                     )}
                   />
 
-                  {/* Anti-Screen Alert or Localized Guidance Text */}
+                  {/* Anti-Screen / Person Alert or Localized Guidance Text */}
                   <span className="font-semibold tracking-wide truncate">
-                    {cvResult?.isScreenDetected
+                    {cvResult?.isPersonDetected
+                      ? (lang === "hi" ? "व्यक्ति या चेहरा पहचाना गया — खेत की फसल दिखाएँ" : "Person in Frame — aim camera at field crops")
+                      : cvResult?.isScreenDetected
                       ? (lang === "hi" ? "स्क्रीन / डिस्प्ले पहचानी गई — असली फसल दिखाएँ" : "Screen Detected — aim at real outdoor crop")
                       : cvResult
                       ? lang === "hi"
@@ -1118,7 +1120,7 @@ function CaptureStudioContent() {
                   </span>
 
                   {/* Multi-spectral phenology tag */}
-                  {cvResult?.phenologyType && cvResult.phenologyType !== "none" && (
+                  {cvResult?.phenologyType && cvResult.phenologyType !== "none" && !cvResult.isPersonDetected && (
                     <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold text-white/90">
                       {cvResult.phenologyType === "mature_golden"
                         ? "🌾 Ripe Golden"
@@ -1133,7 +1135,7 @@ function CaptureStudioContent() {
                   )}
 
                   {/* Crop Score & 75%+ Requirement Badge */}
-                  {cvResult && cvResult.cropScore > 0 && (
+                  {cvResult && cvResult.cropScore > 0 && !cvResult.isPersonDetected && (
                     <span
                       className={clsx(
                         "rounded px-1.5 py-0.5 font-mono text-[10px] font-bold",
@@ -1213,7 +1215,8 @@ function CaptureStudioContent() {
               const isLocked =
                 isCameraActive &&
                 !capturedImages[currentAngle.id] &&
-                (cvResult?.isScreenDetected === true ||
+                (cvResult?.isPersonDetected === true ||
+                  cvResult?.isScreenDetected === true ||
                   (cvResult != null && cvResult.cropScore < 75 && !isDryOrCharred) ||
                   (cvResult?.shouldBlockShutter === true && !isDryOrCharred));
 
@@ -1227,7 +1230,9 @@ function CaptureStudioContent() {
                   >
                     <Lock className="h-4 w-4 text-stone-600 shrink-0" />
                     <span>
-                      {cvResult?.isScreenDetected
+                      {cvResult?.isPersonDetected
+                        ? (lang === "hi" ? "व्यक्ति / चेहरा लॉक (फसल दिखाएँ)" : "Person in Frame (Aim at real crop)")
+                        : cvResult?.isScreenDetected
                         ? (lang === "hi" ? "स्क्रीन लॉक (असली फसल दिखाएँ)" : "Screen Blocked (Aim at real crop)")
                         : (lang === "hi"
                           ? `कैमरा लॉक (${cvResult?.cropScore ?? 0}% / 75% आवश्यक)`
