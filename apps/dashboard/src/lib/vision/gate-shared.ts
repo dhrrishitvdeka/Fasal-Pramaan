@@ -20,6 +20,7 @@ export type ImageEvidenceMetadata = {
     cropScore?: number | null;
     greenPct?: number | null;
     isScreenDetected?: boolean | null;
+    isPersonDetected?: boolean | null;
     phenologyType?: string | null;
     luma?: number | null;
     blurScore?: number | null;
@@ -80,6 +81,31 @@ export function heuristicGate(
   }
 
   const cv = metadata?.cvAnalysis;
+
+  if (cv?.isPersonDetected === true) {
+    return {
+      usable: false,
+      reason: "person_detected",
+      crop_detected: null,
+      visual_reason: "Human or non-crop subject detected instead of outdoor crop foliage",
+      warnings: ["person_detected"],
+      confidence: 0.05,
+      fallback: true,
+    };
+  }
+
+  if (cv?.isScreenDetected === true) {
+    return {
+      usable: false,
+      reason: "screen_replay_detected",
+      crop_detected: null,
+      visual_reason: "Photo of a screen/monitor display detected",
+      warnings: ["screen_detected"],
+      confidence: 0.05,
+      fallback: true,
+    };
+  }
+
   const luma = cv?.luma;
   if (luma != null && luma < 12) {
     return {
