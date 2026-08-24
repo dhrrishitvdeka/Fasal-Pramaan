@@ -10,7 +10,9 @@ export type VoiceActionResult = {
 /** Outcome used by the capture page and the Fasal Saathi shutter tool. */
 export async function runVoiceShutter(input: {
   cameraActive: boolean;
-  grabFrame: () => Promise<{ dataUrl: string; lightingScore?: number } | null>;
+  grabFrame: () =>
+    | Promise<{ dataUrl: string; lightingScore?: number } | null>
+    | ({ dataUrl: string; lightingScore?: number } | null);
   saveFrame: (dataUrl: string, extras?: { lightingScore?: number }) => Promise<void>;
   angleId?: string;
   peril?: string;
