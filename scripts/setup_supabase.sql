@@ -40,6 +40,5 @@ TO service_role
 WITH CHECK (bucket_id = 'fasal-web-evidence');
 
 -- ============================================================================
--- Completed! Next step: Run Alembic migrations against this database:
--- alembic upgrade head
+-- Completed! Next step: Run scripts/setup_web_schema.sql in Supabase SQL editor.
 -- ============================================================================
