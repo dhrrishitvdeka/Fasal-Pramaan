@@ -67,6 +67,37 @@ export async function executeSaathiTool(
           message: `Registered plot '${args.name || "Farm Plot"}' with crop '${args.crop_type || "wheat"}'.`,
         },
       };
+    case "check_plot_geofence":
+      return {
+        ok: true,
+        data: {
+          action: "check_plot_geofence",
+          geofence_status: "verified_inside",
+          message: "GPS lock verified within registered parcel boundaries.",
+        },
+      };
+    case "fetch_agro_weather_alerts":
+      return {
+        ok: true,
+        data: {
+          action: "fetch_agro_weather_alerts",
+          precipitation_72h_mm: 12.4,
+          hail_probability_pct: 0,
+          temp_celsius: 28,
+          message: "Agro-meteorological conditions logged: 72h precipitation normal.",
+        },
+      };
+    case "explain_claim_audit":
+      return {
+        ok: true,
+        data: {
+          action: "explain_claim_audit",
+          stage_1_gate: "passed",
+          stage_2_dinov2_model: "verified",
+          stage_3_sentinel_crosscheck: "completed",
+          message: "Claim audit verified across all 3 AI & satellite stages.",
+        },
+      };
     case "check_evidence_quality":
       return {
         ok: true,

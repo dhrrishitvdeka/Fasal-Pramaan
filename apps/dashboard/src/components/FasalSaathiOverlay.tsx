@@ -265,6 +265,18 @@ export default function FasalSaathiOverlay() {
     return () => window.clearTimeout(timer);
   }, [status, pathname, lang, plots, claims, milestones, pushPortalContext]);
 
+  // Stream live camera viewfinder frames (1 frame every 1.8s) into Gemini Live during capture
+  useEffect(() => {
+    if (status !== "live" || !pathname?.startsWith("/farmer/capture")) return;
+    const interval = window.setInterval(() => {
+      const frame = webCaptureBridge.getVideoFrame();
+      if (frame && liveAudioRef.current) {
+        liveAudioRef.current.sendVideoFrame(frame);
+      }
+    }, 1800);
+    return () => window.clearInterval(interval);
+  }, [status, pathname]);
+
   const handleTools = useCallback(
     async (calls: { id: string; name: string; arguments: Record<string, unknown> }[]) => {
       const responses = [];

@@ -825,6 +825,10 @@ function CaptureStudioContent() {
         setObservations(observation);
         return { ok: true, message: "Observation stored on the capture draft." };
       },
+      getVideoFrame: () => {
+        const frame = grabCameraFrame();
+        return frame ? frame.dataUrl : null;
+      },
       submitDraft: () => handleSubmitClaimRef.current(),
     });
   }, []);
