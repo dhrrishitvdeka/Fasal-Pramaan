@@ -10,29 +10,27 @@ Fasal-Pramaan is architected as a decoupled, web-first platform (Next.js on Verc
 flowchart TB
   subgraph ExperienceLayer["Experience Layer"]
     direction TB
-    SaathiWeb["Fasal Saathi Web Intake\n(Next.js /farmer/saathi :3000)\n• saathi-agent.ts slot extraction\n• 8-peril classifier → ClaimIntent\n• Duplex Gemini Live Voice Mode (mic toggle)\n• Tools dispatched to POST /api/saathi/tool\n• farmerStore.activeIntent (sessionStorage)"]
-    CaptureWeb["Peril-Aware Capture Studio\n(Next.js /farmer/capture)\n• claim-routing.ts ROUTE_CONFIG\n• Realtime CV worker (TF.js MobileNet v2 α0.5)\n• Gemini gate gatekeeping"]
-    Dashboard["Reviewer Command Centre\n(Next.js TypeScript :3000)\n• Role-gated pages (useRequireRole + AccessGate)\n• GIS Plot Boundary Map\n• EvidenceConfidenceSection\n  (adaptive level + multi-signal strip)\n• Satellite cross-check card\n• Authenticity Gate card + override_gate\n  + gate re-run\n• Review Queue & Audit Log\n• Per-peril analytics + CSV export"]
+    SaathiWeb["Fasal Saathi Multimodal Assistant v3.0\n(Next.js /farmer/saathi + FasalSaathiOverlay)\n• AudioWorkletNode 16kHz PCM duplex stream\n• 1-FPS Live Viewfinder Video Streaming\n• Proactive Opening Spoken Greeting\n• Soothing Natural Voice (Aoede)\n• Multi-Agent Context & Parcel Geofence\n• 15 Indian Languages Dynamic i18n"]
+    CaptureWeb["Peril-Aware Capture Studio\n(Next.js /farmer/capture)\n• claim-routing.ts ROUTE_CONFIG\n• Realtime CV worker (TF.js MobileNet v2 α0.5)\n• Gemini 3.7 Vision Gate (Anti-Screen & Species)\n• Hands-Free Voice Directed Shutter"]
+    Dashboard["Reviewer Command Centre\n(Next.js TypeScript :3000)\n• Role-gated pages (useRequireRole + AccessGate)\n• GIS Plot Boundary Map\n• EvidenceConfidenceSection\n  (adaptive level + multi-signal strip)\n• Satellite cross-check card\n• Authenticity Gate card + override_gate\n• Review Queue & Audit Log\n• Per-peril analytics + CSV export"]
     TelemetryPath["Client Error Telemetry\n(src/lib/telemetry.ts · initTelemetry)\n• window.onerror + unhandledrejection\n• 50-entry in-memory ring buffer + console log\n• forwards authed errors only"]
     PwaShell["PWA Service Worker\n(public/sw.js · prod-only via PwaRegister)\n• cache-first: /_next/static, /icons, fonts\n• network-first: navigations → cached\n  /farmer shell when offline\n• NEVER caches /api/* or Supabase domains"]
   end
 
   subgraph GatewayLayer["Gateway & Routing Layer"]
     API["Next.js API Routes (/api/*)\n• Supabase Auth JWT via requireWebActor\n• Per-user rate limits (rate-limit.ts)\n• Spatial Jurisdiction Scoping\n• Claims, Milestones, Reviewer Stats"]
-    VisionGate["Vision Gate Route\n(/api/vision/gate)\n• Gemini generateContent inlineData\n• Heuristic fallback\n• {usable, reason, crop_detected}"]
-    SaathiTool["Saathi Tool Route\n(/api/saathi/tool)\n• Server-side dispatcher tools-server.ts\n• classify_claim LLM peril classification\n• Arg clamps, ≤64KB body, allowlist"]
-    ContextAssemble["Context Assemble Route\n(/api/context/assemble)\n• Sentinel Tier1 NDVI burn-scar / Tier2 heat proxy\n• IMD open-meteo rain+hail+gust\n  (+ sowing-window drought rainfall, hail growth stage)\n• plot_match haversine containment (200 m default)\n• Bhuvan WMS probe · Overpass wildlife/nearby"]
+    VisionGate["Vision Gate Route\n(/api/vision/gate)\n• Gemini 3.7 Flash generateContent inlineData\n• Anti-Screen & Crop Species Verification\n• {usable, reason, crop_detected}"]
+    SaathiTool["Saathi Tool Route\n(/api/saathi/tool)\n• Server-side dispatcher tools-server.ts\n• classify_claim, register_plot, check_geofence\n• weather_alerts, explain_audit\n• Arg clamps, ≤64KB body, allowlist"]
+    VoiceSession["Voice Session Minter\n(/api/voice/session)\n• Ephemeral Token Minter (v1alpha)\n• Model: gemini-3.1-flash-live-preview\n• Voice: Aoede, Indian Languages allowlist"]
+    ContextAssemble["Context Assemble Route\n(/api/context/assemble)\n• Sentinel Tier1 NDVI burn-scar / Tier2 heat proxy\n• IMD open-meteo rain+hail+gust\n• plot_match haversine containment (200 m default)\n• Bhuvan WMS probe · Overpass wildlife/nearby"]
     SystemStatus["Admin System Status Route\n(GET /api/system/status)\n• administrator-only + 10 req/min/user\n• config booleans only (supabase, gemini,\n  sentinel, imdKey) + public hfSpaceUrl + version"]
   end
 
-  subgraph InRequestProcessing["In-Request Processing Tier (POST /api/claims)"]
-    Pipeline["Claim Processing Pipeline\n• Byte & Checksum Verifier\n• Evidence Trust Engine v1\n• Adaptive Engine (High/Medium/Low)\n   auto-creates needs_recapture requests\n• Case Router & State Machine"]
-  end
-
   subgraph AIServiceTier["Assistive AI Inference Tier"]
+    GeminiLive["Gemini 3.1 Flash Live (v1alpha)\n• Duplex 16kHz PCM16 audio + 1-FPS video\n• Proactive spoken guidance & auto greeting"]
     HF["Hugging Face Space (HF_SPACE_URL)\nfasal-pramaan-api → fasal-pramaan-model\n• DINOv2 ViT-S/14 crop screening\n• A/B/C/U signal via /api/claims"]
-    OnDeviceCV["On-Device Vision Worker\n(vision/cv-worker.ts)\n• TF.js 4 + MobileNet v2 alpha 0.5 from CDN\n• Plant-class verdict ≥0.18 prob, 500ms throttle\n• Union with green-pixel heuristic\n• block shutter on too_dark/no-crop"]
-    GeminiLLM["Gemini LLM Gate\n(gemini-3.7-flash default)\n• authenticity + crop check"]
+    OnDeviceCV["On-Device Vision Worker\n(vision/cv-worker.ts)\n• TF.js 4 + MobileNet v2 alpha 0.5 from CDN\n• Plant-class verdict ≥0.18 prob, 500ms throttle\n• Strict 75%+ crop quality shutter lock"]
+    GeminiLLM["Gemini LLM Gate\n(gemini-3.7-flash)\n• Authenticity + crop + peril consistency"]
   end
 
   subgraph StorageTier["Persistence & Evidence Storage Tier"]
@@ -41,6 +39,8 @@ flowchart TB
     ExternalSignals[("External Free-Tier Signals\n• Sentinel process API (token) / open-meteo archive\n• Open-meteo forecast (rain, hail codes, gusts)\n• Bhuvan WMS GetMap probe\n• Overpass: forest 10km + farmland 2km")]
   end
 
+  SaathiWeb <== "Duplex 16kHz Audio + 1-FPS Video" ==> GeminiLive
+  SaathiWeb -->|"Mint Session"| VoiceSession
   SaathiWeb -->|"Intent → ?peril&intentId"| CaptureWeb
   SaathiWeb -->|"toolCall {name,args}"| SaathiTool
   CaptureWeb -->|"analyzeVideoFrame / analyzeDataUrl"| OnDeviceCV
@@ -52,14 +52,11 @@ flowchart TB
   Dashboard -->|"GET /api/system/status (admin)"| SystemStatus
   CaptureWeb -->|"POST /api/claims (peril+intentId)"| API
   PwaShell -.->|"offline: serves cached farmer shell\n+ static assets"| SaathiWeb
-  TelemetryPath -->|"POST /api/telemetry/error\n(5/min, log-only, authed)"| API
+  TelemetryPath -->|"POST /api/telemetry/error"| API
 
   API --> Postgres
   API --> Storage
-  Pipeline -->|"HF_TOKEN inference call"| HF
-  Pipeline --> Postgres
-  Pipeline --> Storage
-  Pipeline --> ContextAssemble
+  API --> ContextAssemble
 ```
 
 ---

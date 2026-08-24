@@ -24,6 +24,17 @@ This guide provides a structured, presentation-ready script and walkthrough for 
 
 ## Showcase Scenarios
 
+### Scenario 0: Autonomous Fasal Saathi Voice & Multimodal Co-Pilot (Hands-Free Entry)
+
+**Narrative**: The farmer opens `/farmer/saathi` or the floating assistant widget. Saathi immediately introduces itself aloud with a warm Hindi/English greeting (*"नमस्ते किसान भाई! मैं फसल साथी हूँ। आपके खेत में क्या समस्या हुई है?"*), registers a plot hands-free on spoken command, and acts as a real-time multimodal viewfinder co-pilot during 5-angle capture.
+
+1. **Automatic Spoken Greeting**: Open `/farmer/saathi` and toggle voice or open `FasalSaathiOverlay`. Notice Saathi automatically speaks the welcome greeting aloud immediately on connection.
+2. **Spoken Plot Registration**: Say *"मेरा नया गेहूँ का खेत जोड़ो"* (or *"Register a new wheat plot in Rampur"*). Saathi executes `register_plot` and confirms the cadastral landholding is saved.
+3. **Multimodal 1-FPS Live Camera Co-Pilot**: Tap **Guided Capture** (`/farmer/capture`). While framing the crop, Saathi visually inspects the camera feed in real time over WebSocket, advising the farmer aloud on canopy framing, lighting, and foliage angles.
+4. **Hands-Free Shutter**: Say *"फोटो खींचो"* (*"Take the photo"*). The camera triggers, passes the anti-screen authenticity gate, and guides the next angle smoothly.
+
+---
+
 ### Scenario 1: High-Trust Verified Claim (The Ideal Assessment)
 
 **Narrative**: A smallholder farmer captures complete, high-quality, geotagged evidence of blast disease on a paddy plot. The system verifies optical quality, spatial boundaries, and authenticity, assisting the reviewer with instant triage.
