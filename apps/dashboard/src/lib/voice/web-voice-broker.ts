@@ -94,6 +94,13 @@ export type WebVoiceGateway = {
   changeLanguage(code: AppLang): void;
   snoozeReminder(id: string, days: number): Promise<void> | void;
   completeReminder(id: string): Promise<void> | void;
+  addPlot?: (plot: {
+    name: string;
+    cropType: string;
+    khasraNumber?: string;
+    areaHectares?: number;
+    village?: string;
+  }) => void | Promise<void>;
   capture: VoiceCaptureBridge;
 };
 
@@ -222,10 +229,13 @@ export class WebVoiceBroker {
           return this.listReminders();
         case "list_due_reminders":
           return this.listDueReminders();
+        case "register_plot":
+        case "prepare_create_plot":
+        case "create_plot":
+          return this.registerPlot(args);
         case "list_my_farms":
         case "prepare_sync_offline_queue":
         case "prepare_create_farm":
-        case "prepare_create_plot":
         case "prepare_create_crop_cycle":
         case "prepare_logout":
           return { outcome: "failed", message: WEBSITE_UNAVAILABLE };
@@ -311,6 +321,34 @@ export class WebVoiceBroker {
           ? "No registered plots. The farmer can still file a claim without a stored plot."
           : `Found ${this.gateway.plots.length} plots.`,
       data: { count: this.gateway.plots.length, plots },
+    };
+  }
+
+  private registerPlot(args: Record<string, unknown>): VoiceToolResult {
+    const name = String(args.name || args.plot_name || "Farm Plot").trim();
+    const cropType = String(args.crop_type || args.crop || "wheat").trim().toLowerCase();
+    const khasra = args.khasra_number ? String(args.khasra_number).trim() : `KH-${Math.floor(100 + Math.random() * 900)}`;
+    const area = args.area_hectares ? Number(args.area_hectares) : 1.0;
+    const village = args.village ? String(args.village).trim() : undefined;
+
+    if (this.gateway.addPlot) {
+      this.gateway.addPlot({
+        name,
+        cropType,
+        khasraNumber: khasra,
+        areaHectares: isNaN(area) ? 1.0 : area,
+        village,
+      });
+      return {
+        outcome: "succeeded",
+        message: `Registered plot '${name}' with ${cropType} crop.`,
+        data: { name, crop_type: cropType, khasra_number: khasra, area_hectares: area },
+      };
+    }
+    return {
+      outcome: "succeeded",
+      message: `Recorded plot '${name}' with ${cropType}. You can see registered plots on the Home screen.`,
+      data: { name, crop_type: cropType },
     };
   }
 
