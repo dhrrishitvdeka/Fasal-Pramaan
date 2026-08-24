@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -27,7 +27,6 @@ import {
   Share2,
 } from "lucide-react";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
-import { Suspense, useState } from "react";
 import { getFarmerT } from "@/lib/farmerI18n";
 import { safeDisplayUrl } from "@/lib/media";
 import { DetailSkeleton } from "@/components/LoadingAnimation";
