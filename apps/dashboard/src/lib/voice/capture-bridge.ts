@@ -16,6 +16,7 @@ export type CaptureBridgeHandlers = {
   setObservation(observation: string): Promise<{ ok: boolean; message: string }>;
   submitDraft(): Promise<{ ok: boolean; message: string; claimId?: string }>;
   readProgress?(): Promise<CaptureProgressResult>;
+  getVideoFrame?(): string | null;
   checkEvidenceQuality?(): Promise<{
     ok: boolean;
     message: string;
@@ -134,6 +135,10 @@ class WebCaptureBridge {
       });
     }
     return this.handlers.readProgress();
+  }
+
+  getVideoFrame(): string | null {
+    return this.handlers?.getVideoFrame ? this.handlers.getVideoFrame() : null;
   }
 
   checkEvidenceQuality() {
