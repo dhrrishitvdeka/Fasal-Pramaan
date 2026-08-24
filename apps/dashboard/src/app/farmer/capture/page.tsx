@@ -422,7 +422,7 @@ function CaptureStudioContent() {
     }
   };
 
-  const grabCameraFrame = async (): Promise<{ dataUrl: string; lightingScore?: number } | null> => {
+  const grabCameraFrame = (): { dataUrl: string; lightingScore?: number } | null => {
     if (!videoRef.current) return null;
     const video = videoRef.current;
     const size = videoFrameCaptureSize(video);
