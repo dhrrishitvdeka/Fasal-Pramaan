@@ -150,7 +150,7 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
     const pcm = downsampleTo16k(input, event.inputBuffer.sampleRate);
     socket.send(
       JSON.stringify({
-        realtimeInput: { mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: pcm16ToBase64(pcm) }] },
+        realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: pcm16ToBase64(pcm) } },
       }),
     );
   };
