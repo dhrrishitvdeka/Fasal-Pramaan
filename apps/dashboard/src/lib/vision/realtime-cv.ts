@@ -187,7 +187,6 @@ function hintFor(
   const isCloseup = angleId === "closeup_damage";
   const isFireRelax =
     angleId === "fire_burn" ||
-    angleId === "wide_field" ||
     (angleId != null && angleId.includes("fire"));
 
   // 1. Person / Human Subject Rejection

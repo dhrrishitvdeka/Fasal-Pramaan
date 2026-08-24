@@ -10,35 +10,14 @@ export type RateLimitResult = { ok: true } | { ok: false; retryAfterSeconds: num
  * Keyed per caller, e.g. `${route}:${actor.userId}`. Single-process only —
  * acceptable for this deployment; swap for a shared store if we scale horizontally.
  */
-export const RATE_LIMIT_ENABLED = process.env.ENABLE_RATE_LIMIT === "true";
+export const RATE_LIMIT_ENABLED = false;
 
 export function checkRateLimit(
-  key: string,
-  max: number,
-  windowMs = 60_000,
-  forceEnforce = false,
+  _key: string,
+  _max?: number,
+  _windowMs?: number,
+  _forceEnforce?: boolean,
 ): RateLimitResult {
-  if (!RATE_LIMIT_ENABLED && !forceEnforce) {
-    return { ok: true };
-  }
-  const now = Date.now();
-  const bucket = buckets.get(key);
-  if (!bucket || now - bucket.windowStart >= windowMs) {
-    if (buckets.size >= MAX_BUCKETS) {
-      for (const [k, b] of buckets) {
-        if (now - b.windowStart >= windowMs) buckets.delete(k);
-        if (buckets.size < MAX_BUCKETS) break;
-      }
-    }
-    buckets.set(key, { count: 1, windowStart: now });
-    return { ok: true };
-  }
-  bucket.count += 1;
-  if (bucket.count > max) {
-    return {
-      ok: false,
-      retryAfterSeconds: Math.max(1, Math.ceil((bucket.windowStart + windowMs - now) / 1000)),
-    };
-  }
+  // Rate limiting disabled for hackathon demonstration
   return { ok: true };
 }

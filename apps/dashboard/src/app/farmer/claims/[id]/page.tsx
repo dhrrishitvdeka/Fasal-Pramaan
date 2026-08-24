@@ -27,13 +27,14 @@ import {
   Share2,
 } from "lucide-react";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
+import { Suspense, useState } from "react";
 import { getFarmerT } from "@/lib/farmerI18n";
 import { safeDisplayUrl } from "@/lib/media";
 import { DetailSkeleton } from "@/components/LoadingAnimation";
 import ErrorMessage from "@/components/ErrorMessage";
 import clsx from "clsx";
 
-export default function FarmerClaimDetailPage() {
+function FarmerClaimDetailContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -164,7 +165,8 @@ export default function FarmerClaimDetailPage() {
             <h1 className="text-lg font-bold text-slate-900 sm:text-2xl">
               {lang === "hi" ? (claim.plotNameHi || claim.plotName) : claim.plotName} ·{" "}
               <span className="font-semibold text-[var(--ink)]">
-                {lang === "hi" ? (claim.cropTypeHi || claim.cropType) : claim.cropType} ({claim.cropVariety})
+                {lang === "hi" ? (claim.cropTypeHi || claim.cropType) : claim.cropType}
+                {claim.cropVariety ? ` (${claim.cropVariety})` : ""}
               </span>
             </h1>
 
@@ -616,5 +618,13 @@ export default function FarmerClaimDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function FarmerClaimDetailPage() {
+  return (
+    <Suspense fallback={<DetailSkeleton className="py-6" />}>
+      <FarmerClaimDetailContent />
+    </Suspense>
   );
 }

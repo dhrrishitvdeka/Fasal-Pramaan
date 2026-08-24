@@ -111,15 +111,32 @@ export function parseSpacePrediction(payload: unknown): HfPrediction {
 }
 
 function parseSsePayload(text: string): unknown {
-  const lines = text.split(/\r?\n/).filter((line) => line.startsWith("data:"));
-  if (lines.length === 0) {
-    return JSON.parse(text);
+  const trimmed = text.trim();
+  if (!trimmed.includes("data:")) {
+    return JSON.parse(trimmed);
   }
+  // Split on double newlines to isolate complete SSE events
+  const events = trimmed.split(/\r?\n\r?\n/);
   let last: unknown = null;
-  for (const line of lines) {
-    const data = line.slice(5).trim();
-    if (!data || data === "[DONE]") continue;
-    last = JSON.parse(data);
+  for (const event of events) {
+    const dataLines = event
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trim())
+      .filter((line) => line && line !== "[DONE]");
+    if (dataLines.length > 0) {
+      const combined = dataLines.join("\n");
+      try {
+        last = JSON.parse(combined);
+      } catch {
+        // if multi-line array wasn't json directly, try line by line
+        for (const dl of dataLines) {
+          try {
+            last = JSON.parse(dl);
+          } catch {}
+        }
+      }
+    }
   }
   return last;
 }

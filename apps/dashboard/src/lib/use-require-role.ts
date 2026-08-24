@@ -19,6 +19,11 @@ export type RequireRoleResult = {
 let cachedRoles: string[] | undefined;
 let inflight: Promise<string[] | null> | null = null;
 
+export function clearRoleCache(): void {
+  cachedRoles = undefined;
+  inflight = null;
+}
+
 function fetchSessionRoles(): Promise<string[] | null> {
   inflight ??= currentSessionRoles()
     .catch(() => null)

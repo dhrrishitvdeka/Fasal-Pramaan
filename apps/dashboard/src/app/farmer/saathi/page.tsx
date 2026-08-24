@@ -436,13 +436,14 @@ export default function SaathiIntakePage() {
   const handlersRef = useRef({ handleTools, processFinalSpokenTurn, failVoice });
   handlersRef.current = { handleTools, processFinalSpokenTurn, failVoice };
 
-  const scheduleReconnect = () => {
+  const scheduleReconnect = (reason?: string) => {
     if (!mountedRef.current) return;
     if (retryCountRef.current >= 2) {
+      const reasonDetail = reason ? `: ${reason}` : "";
       failVoice(
         langRef.current === "hi"
-          ? "Gemini Live सत्र पुनः कनेक्ट नहीं हो सका। दोबारा माइक दबाएँ।"
-          : "Gemini Live session could not reconnect. Tap mic to restart.",
+          ? `Gemini Live सत्र पुनः कनेक्ट नहीं हो सका${reasonDetail}। दोबारा माइक दबाएँ।`
+          : `Gemini Live session could not reconnect${reasonDetail}. Tap mic to restart.`,
       );
       return;
     }
@@ -514,12 +515,12 @@ export default function SaathiIntakePage() {
         };
       });
 
-      socket.onclose = () => {
+      socket.onclose = (ev) => {
         if (intentionalCloseRef.current || !mountedRef.current) return;
         if (socketRef.current === socket) socketRef.current = null;
         connectingRef.current = false;
         stopAudio();
-        scheduleReconnect();
+        scheduleReconnect(ev.reason);
       };
       socket.onerror = () => {
         // socket.onclose follows and drives the bounded retry.

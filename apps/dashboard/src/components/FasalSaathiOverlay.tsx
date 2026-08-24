@@ -325,17 +325,18 @@ export default function FasalSaathiOverlay() {
           reject(new Error("Could not open Gemini Live"));
         };
       });
-      socket.onclose = () => {
+      socket.onclose = (ev) => {
         if (intentionalCloseRef.current) return;
         if (socketRef.current === socket) socketRef.current = null;
         connectingRef.current = false;
         setupCompleteRef.current = false;
         stopAudio();
         setStatus("error");
+        const reasonDetail = ev.reason ? `: ${ev.reason}` : "";
         setError(
           langRef.current === "hi"
-            ? "कनेक्शन टूट गया। फिर से बात करने के लिए टैप करें।"
-            : "Connection dropped. Tap to talk again.",
+            ? `कनेक्शन टूट गया${reasonDetail}। फिर से बात करने के लिए टैप करें।`
+            : `Connection dropped${reasonDetail}. Tap to talk again.`,
         );
       };
       socket.onerror = () => {

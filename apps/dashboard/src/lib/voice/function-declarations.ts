@@ -3,7 +3,7 @@ import { GEMINI_LIVE_INDIAN_LANGUAGE_CODES } from "../live-indian-languages";
 export const GEMINI_AUTH_TOKENS_URL =
   "https://generativelanguage.googleapis.com/v1alpha/auth_tokens";
 export const GEMINI_LIVE_WEBSOCKET_URL =
-  "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained";
+  "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained";
 
 export const WEB_VOICE_SYSTEM_INSTRUCTION = `
 You are Fasal Saathi (फसल साथी), the spoken assistant on the Fasal-Pramaan farmer website.
