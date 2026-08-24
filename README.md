@@ -450,7 +450,7 @@ All stable releases are tagged on GitHub and documented in detail in [CHANGELOG.
 </p>
 
 - **Dhrrishit V Deka** ([@dhrrishitvdeka](https://github.com/dhrrishitvdeka)) — Project Lead, Architecture & Core Systems
-- **Paras Dwivedi** ([@parasdwivedi26](https://github.com/parasdwivedi26)) — Co-Author, Modeling & Evaluation
+- **Paras Dwivedi** ([@parasdwivedi26](https://github.com/parasdwivedi26)) — Core Contributor, Modeling & Evaluation
 - **Vedant Parashar** ([@vedantparashar25](https://github.com/vedantparashar25)) — Core Contributor
 - **Sandeep Kumar Gupta** ([@sandeepkumargupta1](https://github.com/sandeepkumargupta1)) — Core Contributor
 
