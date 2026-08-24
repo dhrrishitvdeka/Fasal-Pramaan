@@ -249,12 +249,35 @@ Server-side dispatcher for the Fasal Saathi function tools (`SAATHI_FUNCTION_DEC
 
 | Tool | Args (sanitized/clamped server-side) | Returns |
 |---|---|---|
+| `register_plot` | `name`, `crop_type`, `khasra_number`, `area_hectares`, `village` | Registers plot in state with complete agronomic metadata |
+| `check_plot_geofence` | `plot_id` (optional) | Validates GPS coordinates against cadastral parcel boundaries |
+| `fetch_agro_weather_alerts` | `plot_id` (optional) | Fetches 72-hour precipitation, hail probability, temperature stress |
+| `explain_claim_audit` | `claim_id` | Full plain-language breakdown of 3-stage AI & satellite verification |
 | `request_evidence_angles` | `peril: string` | ROUTE_CONFIG for the peril: required/optional angles, context checks, minConfidence, needsSatellite, bilingual guidance |
 | `call_context_signal` | `lat` (±90), `lon` (±180), `peril`, optional `sowingDate` | Compact context signals (source/status/summary), overall status, `imdRainfallMm` |
 | `guide_capture` | `angle` (canonical id whitelist), `lang` | Localized angle name, instructions, tips |
 | `classify_claim` | `text` (≤1000 chars), `lang`, optional `contextNotes` (≤2000 chars) | `{ peril, confidence (0–1), reasoning }` from the server-side Gemini function-call classification |
 
 **Response 200:** the `SaathiToolResult` payload — `{ ok: true, data: {...} }`; invalid args or unknown tools return `400` with `{ ok: false, error }`; transient failures return `500`.
+
+---
+
+### 6.4 Gemini Live Session Minter — `POST /api/voice/session` (`apps/dashboard/src/app/api/voice/session/route.ts`)
+
+Mints an ephemeral token for direct browser-to-Gemini Live WebSocket streaming.
+
+**Auth:** Bearer Supabase JWT (`requireWebActor`). **Rate limit:** 10 req/min/user.
+
+**Response 200:**
+```json
+{
+  "token": "ephemeral_auth_token_xyz...",
+  "websocketUrl": "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained",
+  "model": "gemini-3.1-flash-live-preview",
+  "voice": "Aoede",
+  "expiresAt": "2026-08-24T11:00:00.000Z"
+}
+```
 
 ---
 

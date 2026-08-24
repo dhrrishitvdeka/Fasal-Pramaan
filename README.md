@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/releases">
-    <img src="https://img.shields.io/badge/Release-v2.5.0-blue?style=for-the-badge" alt="Latest Release v2.5.0" />
+    <img src="https://img.shields.io/badge/Release-v2.6.0-blue?style=for-the-badge" alt="Latest Release v2.6.0" />
   </a>
   <img src="https://img.shields.io/badge/Next.js%2016-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
   <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
@@ -17,11 +17,14 @@
 
 **Fasal-Pramaan (*फसल प्रमाण* — Capture. Verify. Protect.)** is an open-source agricultural evidence capture, trust evaluation, and verification webapp designed for agricultural insurance claim adjudication, disaster loss assessment, and crop monitoring programs.
 
-The system addresses the fundamental trust deficit in rural crop insurance by pairing **verified multi-angle field evidence capture** with an explainable **Evidence Confidence & Trust Evaluation Engine**, a **Hugging Face crop-model screening Space**, and a **Human-in-the-Loop Reviewer Dashboard**. The platform includes **Fasal Saathi as autonomous first-line entry point at `/farmer/saathi`**, **variable claims routing per peril (`src/lib/claim-routing.ts`, 8 perils)**, an **evidence quality & authenticity filter (realtime CV + Gemini LLM gate)**, an **adaptive confidence engine (`src/lib/context/adaptive-engine.ts`)**, and **multi-signal context validation (IMD weather + GPS + Sentinel + Bhuvan + nearby fields via `POST /api/context/assemble`)**.
+The system addresses the fundamental trust deficit in rural crop insurance by pairing **verified multi-angle field evidence capture** with an explainable **Evidence Confidence & Trust Evaluation Engine**, a **Hugging Face crop-model screening Space**, and a **Human-in-the-Loop Reviewer Dashboard**. The platform includes **Fasal Saathi v3.0 as an autonomous first-line entry point (`/farmer/saathi`)**, **variable claims routing per peril (`src/lib/claim-routing.ts`, 8 perils)**, an **evidence quality & authenticity filter (realtime CV + Gemini LLM gate)**, an **adaptive confidence engine (`src/lib/context/adaptive-engine.ts`)**, and **multi-signal context validation (IMD weather + GPS + Sentinel + Bhuvan + nearby fields via `POST /api/context/assemble`)**.
 
-The v1.5.0 release makes every signal real: the CV worker runs **TF.js MobileNet v2 (alpha 0.5)** plant classification inside a Web Worker, Fasal Saathi speaks through a **full-duplex Gemini Live Voice Mode** whose function tools execute server-side via `POST /api/saathi/tool`, context checks hit **live free-tier sources** (Copernicus Sentinel process API, Open-Meteo forecast/archive, ISRO Bhuvan WMS, OpenStreetMap Overpass), and the adaptive engine **auto-creates bilingual recapture requests** instead of waiting for a reviewer.
-
-The v1.6.0 wave closes the loop end-to-end: captures are checked against the **registered plot center** (`plot_match` haversine containment), weather signals become **sowing-date-aware** (drought rainfall since sowing, hail growth-stage estimates), farmers get **in-app recapture notifications** (`farmer-notifications.ts`), reviewers get a **Satellite Cross-Check card** (wide_field vs Bhuvan WMS + Copernicus Browser deep-link), a **Gate re-run button**, **per-peril analytics**, and **CSV export**, plus a bilingual **CV AI-ready warmup badge** in the capture studio.
+The **v2.6.0 release** elevates Fasal Saathi to a full-fledged **multimodal autonomous field assistant**:
+- **High-Performance AudioWorklet Engine:** Off-main-thread audio sampling, 16kHz PCM16 downsampling, and half-duplex acoustic echo suppression with instant barge-in support.
+- **1-FPS Live Viewfinder Video Streaming:** Streams real-time camera frames directly to Gemini Live over WebSocket, turning Saathi into a visual co-pilot.
+- **Proactive Spoken Opening Greeting:** Immediately welcomes the farmer aloud on connect without waiting for speech.
+- **Soothing Aoede Voice:** Warm, accessible voice model tailored for rural Indian agricultural dialogue across 15 regional languages.
+- **Agentic Spatial & Weather Tools:** Spoken plot registration (`register_plot`), GPS cadastral geofencing (`check_plot_geofence`), agro-weather radar (`fetch_agro_weather_alerts`), and plain-language AI audit explanations (`explain_claim_audit`).
 
 ```mermaid
 flowchart TB

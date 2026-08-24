@@ -1,10 +1,31 @@
-# Farmer Voice Assistant (Fasal Saathi)
+# Farmer Voice Assistant (Fasal Saathi v3.0)
 
-**Fasal Saathi (*फसल साथी*)** is a conversational, full-duplex spoken assistant built for the Fasal-Pramaan field application. Powered by Google Gemini Live, it enables hands-free operation in **Hindi** and **English** for smallholder farmers and field officers working in outdoor agricultural environments.
+**Fasal Saathi (*फसल साथी*)** is a multimodal, full-duplex spoken and visual AI companion built for the Fasal-Pramaan agricultural platform. Powered by **Google Gemini Live (Gemini 3.1 Flash / v1alpha)** and **Gemini 3.7 Flash Vision**, it delivers zero-friction, hands-free operation across 15 Indian languages for smallholder farmers and field officers.
 
-The client streams 16 kHz PCM microphone audio and renders native 24 kHz audio responses in real time. To maintain strict security and data governance, Gemini executes operations exclusively through an allowlisted, server-mediated tool broker with mandatory spoken confirmation gates for state-mutating actions.
+---
 
-On the **Vercel web path**, Saathi is now the **first-line entry** (`/farmer/saathi`): autonomous text+voice intake that classifies peril, builds a `ClaimIntent`, and routes to a peril-aware capture studio. The Gemini Live overlay runs in parallel, fed live CV + peril context via `webCaptureBridge`.
+## 🌟 Key Capabilities in v3.0
+
+1. **High-Performance AudioWorklet Engine:**
+   - Microphone input is sampled off the main UI thread via `AudioWorkletNode` (`FasalAudioProcessor`), eliminating UI stutter during heavy Mapbox/Leaflet renders.
+   - Built-in in-worklet 16 kHz PCM16 downsampling and RMS noise-floor calculation.
+   - Automatic half-duplex acoustic echo suppression prevents speaker audio from looping back into the microphone, while detecting deliberate user speech for instant barge-in interruptions.
+
+2. **1-FPS Live Viewfinder Multimodal Video Streaming:**
+   - While on the `/farmer/capture` camera studio, the client streams 1-FPS live viewfinder frames (`realtimeInput: { video: { mimeType: "image/jpeg", data: base64 } }`) directly to Gemini Live over WebSocket.
+   - Saathi **sees what the farmer sees in real-time** and provides proactive agronomic guidance on framing, foliage coverage, and pest/disease symptoms aloud.
+
+3. **Proactive Spoken Opening Greeting:**
+   - As soon as the WebSocket connection completes its handshake (`setupComplete`), Saathi automatically greets the farmer aloud without waiting for the user to speak first (*"नमस्ते किसान भाई! मैं फसल साथी हूँ। आपके खेत में क्या समस्या हुई है? मुझे बताएं।"*).
+
+4. **Soothing Natural Voice (`Aoede`):**
+   - Configured with Google's warm, natural `Aoede` voice timbre tailored for accessible agricultural dialogue.
+
+5. **Hierarchical Multi-Agent Tools:**
+   - `register_plot`: Spoken parcel registration with automatic khasra/crop assignment.
+   - `check_plot_geofence`: GPS boundary validation against cadastral survey records.
+   - `fetch_agro_weather_alerts`: Live 72-hour precipitation, hail probability, and temperature stress.
+   - `explain_claim_audit`: Plain-language explanation of the 3-stage AI confidence breakdown (Gemini Vision Gate + DINOv2 Disease Classifier + Sentinel-2 Satellite Cross-Check).
 
 ---
 
@@ -19,174 +40,83 @@ On the **Vercel web path**, Saathi is now the **first-line entry** (`/farmer/saa
 - `extractSlotsFromText(text, plots)` → `{peril, perilConfidence, crop, village, farmerNote}` using `classifyPerilHeuristic(text)` (keywords in English and Devanagari Hindi: fire/aag/आग, animal/jaanwar/जानवर, flood/paani/बाढ़, drought/sukha/सूखा, pest/keet/rog/कीट/रोग, hail/ola/ओलावृष्टि, lodging/gira/गिराव + confidence 0.82–0.92, threshold ≥0.55).
 - `resolveAgenticAction(text, currentSlots, plots, currentLang)` → Autonomous Agentic Controller:
   - **Camera Launch Orders**: *"खेत में आग लग गई है, फोटो खींचनी है"* / *"Open camera for flood damage"* automatically extracts peril/plot/crop and routes straight to `/farmer/capture`.
+  - **Plot Registration**: *"मेरा 2 एकड़ गेहूँ का खेत जोड़ो"* registers the plot in state and prompts next steps.
   - **Navigation Orders**: *"सत्यापित दावे दिखाओ"* / *"Show verified claims"* filters `/farmer/claims?status=verified`.
-  - **Registered Plots**: *"मेरे खेत दिखाओ"* / *"Show my plots"* routes to `/farmer#registered-plots`.
-  - **Dynamic Language Switching**: *"हिंदी में बात करो"* / *"Talk in English"* switches the app locale and voice synthesizer dynamically.
-- `mergeSlots(a,b)`, `buildSaathiReply(slots, lang)`, `nextQuestion(slots, lang)` (asks crop if missing), `slotsToIntent(slots, source)` → `ClaimIntent`.
-- `isRouteReady(slots) === Boolean(slots.peril)`.
-
-**ClaimIntent** (`apps/dashboard/src/lib/claim-routing.ts`):
-
-```ts
-type ClaimIntent = {
-  id: string; // newIntentId() — crypto.randomUUID
-  peril: Peril; perilLabelEn: string; perilLabelHi: string;
-  crop?: string; village?: string; district?: string;
-  plotId?: string; sowingDate?: string; farmerNote?: string;
-  createdAt: string; source: "saathi_voice"|"saathi_text"|"manual";
-}
-type Peril = "normal"|"fire_burn"|"animal_damage"|"flood"|"drought"|"pest_disease"|"hailstorm"|"lodging";
-```
-
-Persisted in `farmerStore` (`apps/dashboard/src/lib/farmerStore.tsx`) as `activeIntent` via `sessionStorage` key `fp_active_claim_intent_v1` (`INTENT_STORAGE_KEY`). Hydrated on revisit; Saathi shows "Previous intent: {label} — continue or new issue."
-
-**Routing:** `routeForPeril(peril)` → `RouteConfig {requiredAngles, optionalAngles, contextChecks, needsSatellite, guidanceExtraEn/Hi}`; `anglesForPeril(peril)` filters `CANONICAL_ANGLES`. On **Open Capture**, `setActiveIntent(intent)` then:
-
-```
-/farmer/capture?intentId=<intent.id>&peril=<peril>[&plotId][&crop]
-```
-
-Example: `POST /api/claims` later carries `peril: "fire_burn", intentId: "intent-..."` (see `docs/api.md`).
-
-**Capture studio peril-awareness** (`apps/dashboard/src/app/farmer/capture/page.tsx`):
-
-- `requestedPeril = normalizePeril(perilParam || activeIntent?.peril || "normal")`
-- `intentAngles = anglesForPeril(requestedPeril)` → `activeAngleDefs` (recapture `?angles=` overrides). `activeRoute = routeForPeril(requestedPeril)` drives header badge, angle count pill, and guidance.
-- Realtime CV (`apps/dashboard/src/lib/vision/realtime-cv.ts` `analyzeVideoFrame` ~3 fps) → `cvResult {greenPct, luma, hintEn/Hi, shouldBlockShutter, bbox}`. Shutter blocked if `shouldBlockShutter && peril!=="fire_burn"` (charred field relaxes green check). Hint chip + bbox overlay in viewfinder.
-- `webCaptureBridge.register({readGuidance})` now returns `"${angle.name}: ${instructions} | Live CV: ${hint} (green X%, luma Y) | Peril: ${peril}"` — see §2.
-
-**Parallel LLM gate:** After each capture, `POST /api/vision/gate` with `{imageDataUrl, angleType, expectedCrop, peril}`; `usable:false` (e.g., `wrong_crop`, `ai_generated`) marks `qualityPassed=false` and toasts in hi/en. Second opinion via `analyzeDataUrl`.
+  - **Dynamic Language Switching**: *"हिंदी में बात करो"* / *"Talk in English"* switches the app locale and voice synthesizer dynamically across 15 Indian languages.
 
 ---
 
-## 2. Voice Parallel Context — Realtime CV + Peril → Gemini Live
-
-On the Vercel web path, **two voice systems run in parallel**:
-
-1. **Saathi intake** (`/farmer/saathi`) uses `webkitSpeechRecognition` for lightweight Hindi/English utterance → `saathi-agent.ts` (no Gemini needed, works offline).
-2. **Gemini Live overlay** (`FasalSaathiOverlay`, `apps/dashboard/src/components/FasalSaathiOverlay.tsx`) is an audio-only session (`video:false`) so it never contests the capture camera. It streams 16 kHz PCM and renders 24 kHz audio.
-
-Bridge: `apps/dashboard/src/lib/voice/capture-bridge.ts` (`webCaptureBridge`). Capture studio registers handlers:
-
-```ts
-webCaptureBridge.register({
-  readGuidance: async () => ({ message: `${angle.name}: ${instructions} | Live CV: ${hint} | Peril: ${peril}` }),
-  readProgress: async () => ({ captured, total, currentAngle }),
-  captureCurrentAngle, setObservation, submitDraft
-})
-```
-
-Gemini tools `read_capture_guidance` / `read_capture_progress` call these; the overlay pushes portal context (`PORTAL CONTEXT` text turn) with `peril`, `recapture_count`, `plot_count`, current `path`/`screen`/`language` on `session_start` and on state change. Result: Saathi can say e.g. *"Good framing — move a bit closer, 2 of 3 angles done, fire_burn — include burn edge"* without the farmer leaving the viewfinder.
-
-LLM vision gate runs **in parallel** to Gemini: after shutter, capture page `POST /api/vision/gate` (Gemini `generateContent` with `inlineData` if `GEMINI_API_KEY` set, else heuristic) validates crop presence / AI-generation; `usable:false` toasts and marks `qualityPassed=false`.
-
----
-
-## 3. Architecture & Audio Protocol
+## 2. AudioWorklet & Multimodal Live Stream Protocol
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant Saathi as Saathi Intake (/farmer/saathi)
-  participant Store as farmerStore activeIntent (sessionStorage)
-  participant Capture as Capture Studio (/farmer/capture)
-  participant CV as Realtime CV (realtime-cv.ts)
-  participant Bridge as webCaptureBridge
-  participant Overlay as FasalSaathiOverlay (Gemini Live)
-  participant Gate as POST /api/vision/gate
-  participant Claims as POST /api/claims
+  actor Farmer as 👨‍🌾 Farmer
+  participant Client as 📱 AudioWorklet + WebVoiceBroker
+  participant Socket as ⚡ Gemini Live WebSocket (v1alpha)
+  participant Camera as 📸 Viewfinder (1 FPS)
+  participant Gate as 🛡️ Gemini 3.7 Vision Gate
 
-  Saathi->>Store: setActiveIntent(ClaimIntent {peril,crop,village,plotId})
-  Saathi->>Capture: /farmer/capture?peril=fire_burn&intentId=intent-...
-  Capture->>CV: analyzeVideoFrame(video, angleId) ~3fps
-  CV-->>Capture: CvFrameResult {greenPct,luma,hint,shouldBlockShutter,bbox}
-  Capture->>Bridge: register({readGuidance: includes CV hint + peril})
-  Bridge-->>Overlay: readGuidance() on Gemini tool call
-  Capture->>Gate: POST /api/vision/gate {imageDataUrl, angleType, expectedCrop, peril}
-  Gate-->>Capture: {usable, reason, crop_detected} → toast + qualityPassed
-  Capture->>Claims: POST /api/claims {peril, intentId, images[], captureLat/Lon}
+  Client->>Socket: Connect wss://... + Setup Frame
+  Socket-->>Client: setupComplete
+  Client->>Socket: Kickoff Prompt (Proactive Spoken Greeting)
+  Socket-->>Farmer: 🔊 "नमस्ते किसान भाई! मैं फसल साथी हूँ। क्या समस्या हुई है?"
+  
+  rect rgb(240, 248, 255)
+    Note over Client,Camera: Live Multimodal Co-Pilot
+    Camera->>Socket: 1-FPS JPEG Video Frames (realtimeInput.video)
+    Farmer->>Client: 🎙️ Speaks (16kHz PCM downsampled via AudioWorklet)
+    Client->>Socket: realtimeInput.audio (16kHz PCM16)
+    Socket-->>Farmer: 🔊 "पत्तियों पर पीले धब्बे दिख रहे हैं। कैमरा थोड़ा और पास ले जाएँ।"
+  end
+
+  Farmer->>Client: "फोटो खींचो" (Take photo)
+  Client->>Camera: Trigger Shutter (5-Angle Capture)
+  Camera->>Gate: POST /api/vision/gate (Anti-Screen & Species Check)
+  Gate-->>Client: usable: true, crop_detected: "wheat", peril_match: true
 ```
 
-**Vercel web path:** `POST /api/voice/session` (`apps/dashboard/src/app/api/voice/session/route.ts`) mints `{token, websocketUrl, model, expiresAt}` → client opens `wss://generativelanguage.googleapis.com/...?access_token=...` via `FasalSaathiOverlay` with tools `captureCurrentAngle`, `readGuidance`, `readProgress`, `setObservation`, `submitDraft`. The ephemeral token keeps `GEMINI_API_KEY` server-only; the browser never sees it.
+---
 
-## 4. Configuration & Setup
+## 3. Configuration & Setup
 
-All keys are **server-only** (set on Vercel or in `apps/dashboard/.env.local`):
+All secrets are **server-only** (configured in Vercel or `apps/dashboard/.env.local`):
 
 ```dotenv
 VOICE_ASSISTANT_ENABLED=true
 GEMINI_API_KEY=your_google_ai_studio_key
 GEMINI_LIVE_MODEL=gemini-3.1-flash-live-preview
 GEMINI_VISION_MODEL=gemini-3.7-flash
-GEMINI_LIVE_VOICE=Kore
-GEMINI_LIVE_SESSION_MINUTES=15
-# optional external signals (see §7, docs/environment-variables.md)
+GEMINI_LIVE_VOICE=Aoede
+GEMINI_LIVE_SESSION_MINUTES=30
+# optional external signals
 SENTINEL_TOKEN=your_dataspace_copernicus_token
 IMD_API_KEY=optional
 HF_TOKEN=hf_...
 ```
 
-*Security Assurance: The `GEMINI_API_KEY` (and `SENTINEL_TOKEN`, `IMD_API_KEY`, `HF_TOKEN`) reside strictly server-side (never in client bundles). Clients receive only short-lived ephemeral Live tokens via `/api/voice/session`.*
-
-Vercel: set the same vars in Project → Settings → Environment Variables (Production + Preview). No `NEXT_PUBLIC_*` prefix for secrets. Local dev: put them in `apps/dashboard/.env.local` and run `npm run dev`.
-
 ---
 
-## 5. Spoken Demonstration Script (Hindi & English)
-
-**Web Saathi intake:** Open `/farmer/saathi` (autonomous, no login gate bypass). Type or tap 🎙️ and say e.g. *"khet me aag lag gayi"* → Saathi replies with peril route (e.g. `fire_burn: wide_field, closeup_damage — Show burnt patch + surrounding edge. Satellite will be cross-checked.`) → **Open Capture** → capture studio shows `fire_burn` badge, 2-angle pill, CV hint chip. During capture, tap the floating **Talk to Fasal Saathi** overlay — Gemini now answers with live guidance (`Live CV: Good framing — ready to capture (green 42%, luma 58) | Peril: fire_burn`).
+## 4. Spoken Commands Reference
 
 | Intended Action | Spoken Prompt (Hindi) | Spoken Prompt (English) | Expected Behavior |
 |---|---|---|---|
-| **Query Farms** | *"मेरे खेत बताओ"* | *"List my registered farms."* | Reads list of farms and associated acreage. |
-| **Query Cycles** | *"मेरे फसल चक्र बताओ"* | *"Show my active crop cycles."* | Lists active crops (e.g., Kharif Paddy 2026). |
-| **Start Capture** | *"धान के लिए कैप्चर शुरू करो"* | *"Start capture for my paddy crop."* | Deep-links directly into peril-aware guided capture. |
-| **Capture Shutter** | *"फोटो खींचो"* | *"Take the photo."* | Triggers camera shutter for active canonical angle with full metadata. |
+| **Auto Greeting** | *(Automatic on connect)* | *(Automatic on connect)* | Assistant immediately speaks opening welcome aloud. |
+| **Register Plot** | *"मेरा नया गेहूँ का खेत जोड़ो"* | *"Register a new wheat plot."* | Calls `register_plot` with crop/village attributes. |
+| **Check Geofence** | *"खेत की सीमा जांचो"* | *"Check my plot geofence."* | Calls `check_plot_geofence` and checks GPS accuracy. |
+| **Weather Alerts** | *"मौसम का हाल बताओ"* | *"Check agro-weather alerts."* | Calls `fetch_agro_weather_alerts` for 72h precipitation & hail. |
+| **Explain Audit** | *"मेरे दावे का स्कोर समझाओ"* | *"Explain my claim AI audit."* | Calls `explain_claim_audit` for 3-stage breakdown. |
+| **Capture Shutter** | *"फोटो खींचो"* | *"Take the photo."* | Triggers camera shutter for active angle with metadata. |
 | **Switch Camera** | *"कैमरा बदलो"* | *"Switch camera."* | Toggles between front and back environment cameras. |
-| **Select Angle** | *"नजदीकी फोटो दिखाओ"* | *"Select closeup damage angle."* | Switches the active capture angle in the viewfinder. |
-| **Retake Angle** | *"यह फोटो दोबारा लो"* | *"Retake this angle."* | Clears the current frame and prompts immediate recapture. |
-| **Check Quality** | *"फोटो की क्वालिटी जांचो"* | *"Check evidence quality."* | Inspects realtime CV metrics (canopy %, blur, luma) and gives voice feedback. |
-| **Add Observation** | *"ऑब्जर्वेशन लिखो: पत्तों पर भूरे धब्बे हैं"* | *"Note observation: brown leaf spots visible."* | Records spoken observation into the draft container. |
-| **Submit Claim** | *"क्लेम सबमिट करो"* | *"Submit my claim."* | Requests spoken confirmation before submitting via sequential Gemini-HF pipeline. |
+| **Select Angle** | *"नजदीकी फोटो दिखाओ"* | *"Select closeup damage angle."* | Switches active capture angle in the viewfinder. |
+| **Retake Angle** | *"यह फोटो दोबारा लो"* | *"Retake this angle."* | Clears current frame and opens angle for recapture. |
+| **Check Quality** | *"फोटो की क्वालिटी जांचो"* | *"Check evidence quality."* | Inspects realtime CV metrics (canopy %, blur, luma). |
+| **Add Observation** | *"ऑब्जर्वेशन: ओले से पत्ते फट गए"* | *"Observation: hailstorm tore foliage."* | Records spoken observation into the claim draft. |
+| **Submit Claim** | *"क्लेम सबमिट करो"* | *"Submit my claim."* | Requests spoken confirmation before submitting to PMFBY queue. |
 
 ---
 
-## 6. Tool Allowlist & Confirmation Security
+## 5. Security & Action Confirmation Protocol
 
-### Immediate Operations (Read-Only, Optics & Navigation)
-- Switch application interface language across 15 Indian languages.
-- Query registered farms, plots, crop cycles, growth stages, and past submissions.
-- Navigate to specific farmer application routes (`home`, `capture`, `claims`, `reminders`).
-- Trigger camera shutter (`take_photo` / `capture_current_angle`) with full metadata bundling.
-- Switch camera facing mode (`switch_camera`).
-- Select and navigate capture angles (`select_angle` / `select_capture_angle`).
-- Retake capture angles (`retake_angle` / `retake_capture_angle`).
-- Realtime CV quality inspections (`check_evidence_quality`).
-- Record spoken text into the farmer observation field (`set_observation` / `set_capture_observation`).
-
-### Confirmation-Gated Operations (State-Mutating)
-- Submit a completed guided-capture claim to the server (`submit_claim` / `prepare_submit_claim`).
-- Update or snooze recurring evidence reminder plans (`prepare_snooze_evidence_reminder`).
-- Mark milestone reminders complete (`prepare_complete_reminder`).
-
-*Security Gate Implementation: The action broker requires a prepare turn, an unexpired pending action, and an explicit spoken affirmative ("हाँ", "Yes", "Confirm"). Rejection ("नहीं", "Cancel") immediately clears the pending action from memory.*
-
----
-
-## 7. Protocol Characteristics & Operational Notes
-
-- **Audio Framing**: Microphone audio is resampled to 16 kHz PCM 16-bit mono. Gemini responses are rendered at 24 kHz native audio.
-- **Half-Duplex Shutter**: During audio playback turns, the client pauses microphone ingestion to prevent acoustic feedback loop cancellation.
-- **Session Renewal**: If a live WebSocket session expires after the configured 15-minute window, the client automatically requests a fresh ephemeral token to continue the session seamlessly.
-
----
-
-## 8. External Signals Referenced
-
-Saathi routes may attach external context (see `POST /api/context/assemble`, `docs/api.md`):
-
-- **Copernicus Sentinel-2** via **Sentinel Data Space Ecosystem** — `dataspace.copernicus.eu` and **Sentinel Hub APIs** (`sh.dataspace.copernicus.eu/api/v1/process`). ESA open data; burn-scar / water-extent for `fire_burn` / `flood` perils when `SENTINEL_TOKEN` set.
-- **ISRO Bhuvan** (`bhuvan.nrsc.gov.in`) — land-use / forest-edge proximity for `animal_damage` / `flood`.
-- **IMD** — `mausam.imd.gov.in`, `dsp.imdpune.gov.in`, **GKMS** (Gramin Krishi Mausam Sewa), **Meghdoot** app. 7-day rainfall via IMD/open-meteo proxy when `IMD_API_KEY` (optional) or `lat`/`lon` present; `imd_weather` context check for most perils.
-
-No extra keys required for local demo — stubs return `pending`/`available` with `stub:true`.
+- **Immediate Operations (Read-Only & Optics):** Camera shutter, angle selection, camera flipping, navigation, geofence checks, and weather alerts execute immediately upon spoken command.
+- **Confirmation-Gated Operations (State-Mutating):** Submitting a claim draft (`prepare_submit_claim`), snoozing growth milestones (`prepare_snooze_evidence_reminder`), or marking milestones complete require a preparation turn and an explicit spoken affirmative (*"हाँ"*, *"Yes"*, *"Confirm"*). Rejection (*"नहीं"*, *"Cancel"*) clears the pending action from memory.
