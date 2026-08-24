@@ -3,6 +3,7 @@ import { apiFetch } from "./auth-headers";
 import { resolveClaimClientPath } from "./claim-routes";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
 import { emptyOverview, type PerilAnalytics, type ReviewActionPayload } from "./web-db";
+import { clearRoleCache } from "./use-require-role";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/backend";
 
@@ -46,6 +47,7 @@ export function setAuthToken(token: string | null) {
     delete api.defaults.headers.common.Authorization;
     refreshToken = null;
     writeStored(REFRESH_KEY, null);
+    clearRoleCache();
   }
 }
 
@@ -296,6 +298,13 @@ export interface EvidenceEvaluation {
 export type Submission = {
   id: string;
   crop_cycle_id: string;
+  plot_name?: string | null;
+  plot_name_hi?: string | null;
+  khasra_number?: string | null;
+  crop_type?: string | null;
+  crop_type_hi?: string | null;
+  crop_variety?: string | null;
+  sowing_date?: string | null;
   status: string;
   /** ISO timestamp of claim creation (emitted by claimToSubmission; used by review-queue CSV export). */
   createdAt?: string;

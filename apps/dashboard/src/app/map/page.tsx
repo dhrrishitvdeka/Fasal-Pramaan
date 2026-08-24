@@ -30,8 +30,14 @@ export default function MapPage() {
       if (crop) params.crop = crop;
       if (damage) params.damage = damage;
       if (district) params.district = district;
-      if (dateFrom) params.date_from = new Date(`${dateFrom}T00:00:00`).toISOString();
-      if (dateTo) params.date_to = new Date(`${dateTo}T23:59:59`).toISOString();
+      if (dateFrom) {
+        const d = new Date(`${dateFrom}T00:00:00`);
+        if (!isNaN(d.getTime())) params.date_from = d.toISOString();
+      }
+      if (dateTo) {
+        const d = new Date(`${dateTo}T23:59:59`);
+        if (!isNaN(d.getTime())) params.date_to = d.toISOString();
+      }
       return mapMarkers(params);
     },
     refetchInterval: 15_000,

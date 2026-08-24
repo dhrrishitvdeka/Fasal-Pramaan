@@ -2,9 +2,17 @@ import { getSupabaseClient } from "@/lib/supabase";
 
 export async function supabaseAccessToken(): Promise<string | null> {
   const supabase = getSupabaseClient();
-  if (!supabase) return null;
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token || null;
+  if (supabase) {
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.access_token) return data.session.access_token;
+  }
+  if (typeof window !== "undefined") {
+    try {
+      const stored = sessionStorage.getItem("fp_access_token");
+      if (stored) return stored;
+    } catch {}
+  }
+  return null;
 }
 
 export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {

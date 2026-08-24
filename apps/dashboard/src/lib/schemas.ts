@@ -2,7 +2,7 @@ import { z } from "zod";
 import { CANONICAL_ANGLES } from "@/lib/farmerI18n";
 
 export const loginSchema = z.object({
-  email: z.email(),
+  email: z.string().email(),
   password: z.string().min(6),
 });
 
@@ -151,7 +151,7 @@ export type PlotBody = z.infer<typeof plotSchema>;
 // POST /api/farmer/plots/[id]/timeline
 // ---------------------------------------------------------------------------
 /** Seed accepts an empty body ({}) — kept as a passthrough object schema. */
-export const plotTimelineSchema = z.looseObject({});
+export const plotTimelineSchema = z.object({}).passthrough();
 
 // ---------------------------------------------------------------------------
 // PATCH /api/milestones/[id]
@@ -189,5 +189,5 @@ export const SAATHI_TOOL_NAMES = [
 /** Tool name enum + free-form args object; per-tool arg rules stay in sanitizeArgs. */
 export const toolCallSchema = z.object({
   name: z.enum(SAATHI_TOOL_NAMES),
-  args: z.looseObject({}).optional(),
+  args: z.object({}).passthrough().optional(),
 });
