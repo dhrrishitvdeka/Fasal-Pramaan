@@ -5,10 +5,9 @@ export function siteLockPassword(): string {
   return (process.env.SITE_LOCK_PASSWORD || "").trim();
 }
 
-/** Lock when a password is set, or fail closed on Vercel if it is missing. */
+/** Lock when a password is set; otherwise allow direct access. */
 export function isSiteLockActive(): boolean {
-  if (siteLockPassword()) return true;
-  return process.env.VERCEL === "1";
+  return Boolean(siteLockPassword());
 }
 
 export async function siteLockToken(password = siteLockPassword()): Promise<string> {
