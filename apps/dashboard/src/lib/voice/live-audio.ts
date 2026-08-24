@@ -3,17 +3,21 @@
 
 import { connectSilentProcessor } from "./mic-graph";
 
-type StartOptions = {
+export type StartOptions = {
   socket: WebSocket;
   /** Localized error thrown when the microphone is denied or unavailable. */
   micPermissionMessage?: string;
   /** Fires when queued playback starts or stops draining; drives speaking indicators. */
   onSpeakingChange?: (speaking: boolean) => void;
+  /** Real-time microphone input volume (0.0 to 1.0) for UI frequency/waveform visualizers. */
+  onVolumeChange?: (volume: number) => void;
 };
 
 export type LiveAudioSession = {
   context: AudioContext;
   playPcm24k: (base64: string) => void;
+  /** Send a live camera video frame (JPEG base64) over the active Gemini Live WebSocket. */
+  sendVideoFrame: (base64Jpeg: string) => void;
   /** Drop every queued buffer immediately (barge-in) and resync the playback clock. */
   interrupt: () => void;
   /** Full teardown: playback, mic graph, stream tracks, and the AudioContext. */
@@ -56,8 +60,31 @@ export function pcm16ToBase64(pcm: Int16Array): string {
   return btoa(binary);
 }
 
+const WORKLET_PROCESSOR_CODE = `
+class FasalAudioProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.buffer = [];
+  }
+  process(inputs) {
+    const input = inputs[0];
+    if (input && input[0]) {
+      const channel = input[0];
+      let sum = 0;
+      for (let i = 0; i < channel.length; i++) {
+        sum += channel[i] * channel[i];
+      }
+      const rms = Math.sqrt(sum / channel.length);
+      this.port.postMessage({ type: 'audio', samples: channel.slice(), rms });
+    }
+    return true;
+  }
+}
+registerProcessor('fasal-audio-processor', FasalAudioProcessor);
+`;
+
 export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSession> {
-  const { socket, micPermissionMessage, onSpeakingChange } = options;
+  const { socket, micPermissionMessage, onSpeakingChange, onVolumeChange } = options;
   const ctx = new AudioContext();
   if (ctx.state === "suspended") await ctx.resume();
 
@@ -116,14 +143,32 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
     playTime = ctx.currentTime;
   };
 
+  const sendVideoFrame = (base64Jpeg: string) => {
+    if (socket.readyState !== WebSocket.OPEN) return;
+    const cleanB64 = base64Jpeg.replace(/^data:image\/[a-z]+;base64,/, "");
+    socket.send(
+      JSON.stringify({
+        realtimeInput: {
+          video: {
+            mimeType: "image/jpeg",
+            data: cleanB64,
+          },
+        },
+      }),
+    );
+  };
+
+  let workletNode: AudioWorkletNode | null = null;
   let processor: ScriptProcessorNode | null = null;
   let source: MediaStreamAudioSourceNode | null = null;
   let stream: MediaStream | null = null;
 
   const stop = () => {
     interrupt();
+    workletNode?.disconnect();
     processor?.disconnect();
     source?.disconnect();
+    workletNode = null;
     processor = null;
     source = null;
     stream?.getTracks().forEach((track) => track.stop());
@@ -147,21 +192,15 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
   }
   stream = mediaStream;
   source = ctx.createMediaStreamSource(mediaStream);
-  processor = ctx.createScriptProcessor(4096, 1, 1);
-  processor.onaudioprocess = (event) => {
-    if (socket.readyState !== WebSocket.OPEN) return;
-    const input = event.inputBuffer.getChannelData(0);
+
+  const processAudioChunk = (input: Float32Array, rms: number) => {
+    if (onVolumeChange) onVolumeChange(Math.min(1, rms * 4));
 
     // Acoustic Echo Suppression during speaker playback:
     // When the assistant is speaking through device speakers, prevent the microphone
     // from feeding the assistant's own voice back into Gemini Live.
     const isAssistantSpeaking = ctx.currentTime < playTime + 0.15;
     if (isAssistantSpeaking) {
-      let sumSquares = 0;
-      for (let i = 0; i < input.length; i += 4) {
-        sumSquares += input[i] * input[i];
-      }
-      const rms = Math.sqrt(sumSquares / (input.length / 4));
       // If below deliberate user interruption threshold, drop acoustic bleed from speaker
       if (rms < 0.12) {
         return;
@@ -170,15 +209,52 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
       interrupt();
     }
 
-    const pcm = downsampleTo16k(input, event.inputBuffer.sampleRate);
+    if (socket.readyState !== WebSocket.OPEN) return;
+    const pcm = downsampleTo16k(input, ctx.sampleRate);
     socket.send(
       JSON.stringify({
         realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: pcm16ToBase64(pcm) } },
       }),
     );
   };
-  source.connect(processor);
-  connectSilentProcessor(processor, ctx);
 
-  return { context: ctx, playPcm24k, interrupt, stop };
+  // Modern AudioWorklet initialization with fallback to ScriptProcessor
+  let useWorklet = false;
+  if (typeof AudioWorkletNode !== "undefined" && ctx.audioWorklet) {
+    try {
+      const blob = new Blob([WORKLET_PROCESSOR_CODE], { type: "application/javascript" });
+      const url = URL.createObjectURL(blob);
+      await ctx.audioWorklet.addModule(url);
+      URL.revokeObjectURL(url);
+
+      workletNode = new AudioWorkletNode(ctx, "fasal-audio-processor");
+      workletNode.port.onmessage = (event) => {
+        if (event.data?.type === "audio") {
+          processAudioChunk(event.data.samples, event.data.rms || 0);
+        }
+      };
+      source.connect(workletNode);
+      workletNode.connect(ctx.destination);
+      useWorklet = true;
+    } catch {
+      useWorklet = false;
+    }
+  }
+
+  if (!useWorklet) {
+    processor = ctx.createScriptProcessor(4096, 1, 1);
+    processor.onaudioprocess = (event) => {
+      const input = event.inputBuffer.getChannelData(0);
+      let sumSquares = 0;
+      for (let i = 0; i < input.length; i += 4) {
+        sumSquares += input[i] * input[i];
+      }
+      const rms = Math.sqrt(sumSquares / (input.length / 4));
+      processAudioChunk(input, rms);
+    };
+    source.connect(processor);
+    connectSilentProcessor(processor, ctx);
+  }
+
+  return { context: ctx, playPcm24k, sendVideoFrame, interrupt, stop };
 }
