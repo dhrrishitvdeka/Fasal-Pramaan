@@ -57,6 +57,16 @@ export async function executeSaathiTool(
         ok: true,
         data: { action: "submit_claim", message: "Dispatched claim submission command." },
       };
+    case "register_plot":
+      return {
+        ok: true,
+        data: {
+          action: "register_plot",
+          name: args.name || "Farm Plot",
+          crop_type: args.crop_type || "wheat",
+          message: `Registered plot '${args.name || "Farm Plot"}' with crop '${args.crop_type || "wheat"}'.`,
+        },
+      };
     case "check_evidence_quality":
       return {
         ok: true,
