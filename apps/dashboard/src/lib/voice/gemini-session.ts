@@ -34,7 +34,7 @@ export function geminiLiveModel(): string {
 }
 
 export function geminiLiveVoice(): string {
-  return process.env.GEMINI_LIVE_VOICE || "Kore";
+  return process.env.GEMINI_LIVE_VOICE || "Aoede";
 }
 
 export function geminiLiveSessionMinutes(): number {
