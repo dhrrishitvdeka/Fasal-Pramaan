@@ -36,6 +36,7 @@ export default function FasalSaathiOverlay() {
     farmerProfile,
     snoozeMilestone,
     completeMilestone,
+    addPlot,
   } = useFarmerData();
   const t = getFarmerT(lang);
   const [open, setOpen] = useState(false);
@@ -113,9 +114,27 @@ export default function FasalSaathiOverlay() {
         changeLanguage: setLang,
         snoozeReminder: (id, days) => snoozeMilestone(id, days),
         completeReminder: (id) => completeMilestone(id, "", ""),
+        addPlot: (input) => {
+          addPlot({
+            id: `plot-${Date.now()}`,
+            name: input.name,
+            nameHi: input.name,
+            khasraNumber: input.khasraNumber || `KH-${Math.floor(100 + Math.random() * 900)}`,
+            cropType: input.cropType,
+            cropTypeHi: input.cropType,
+            areaHectares: input.areaHectares || 1.0,
+            currentStage: "Vegetative / वानस्पतिक",
+            sowingDate: new Date().toISOString().split("T")[0],
+            village: input.village || farmerProfile.village || "Rampur",
+            district: farmerProfile.district || "Patna",
+            state: farmerProfile.state || "Bihar",
+            lat: 25.5941,
+            lon: 85.1376,
+          });
+        },
         capture: webCaptureBridge,
       }),
-    [plots, claims, milestones, farmerProfile, pathname, lang, router, setLang, snoozeMilestone, completeMilestone],
+    [plots, claims, milestones, farmerProfile, pathname, lang, router, setLang, snoozeMilestone, completeMilestone, addPlot],
   );
 
   const brokerRef = useRef(broker);
