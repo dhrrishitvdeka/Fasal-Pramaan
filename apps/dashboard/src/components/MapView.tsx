@@ -10,9 +10,12 @@ import Link from "next/link";
 function FitBounds({ markers }: { markers: MapMarker[] }) {
   const map = useMap();
   useEffect(() => {
-    if (markers.length === 0) return;
-    const lats = markers.map((m) => m.lat);
-    const lons = markers.map((m) => m.lon);
+    const valid = markers.filter(
+      (m) => typeof m.lat === "number" && typeof m.lon === "number" && !isNaN(m.lat) && !isNaN(m.lon),
+    );
+    if (valid.length === 0) return;
+    const lats = valid.map((m) => m.lat);
+    const lons = valid.map((m) => m.lon);
     map.fitBounds(
       [
         [Math.min(...lats) - 0.01, Math.min(...lons) - 0.01],
@@ -44,15 +47,18 @@ function severityColor(severity?: string | null, status?: string) {
 }
 
 export default function MapView({ markers }: { markers: MapMarker[] }) {
+  const validMarkers = markers.filter(
+    (m) => typeof m.lat === "number" && typeof m.lon === "number" && !isNaN(m.lat) && !isNaN(m.lon),
+  );
   const center: [number, number] =
-    markers.length > 0 ? [markers[0].lat, markers[0].lon] : [23.26, 77.41];
+    validMarkers.length > 0 ? [validMarkers[0].lat, validMarkers[0].lon] : [23.26, 77.41];
 
   return (
     <div className="h-[min(58vh,380px)] w-full overflow-hidden border border-slate-200 bg-white md:h-[520px]">
       <MapContainer center={center} zoom={12} className="h-full w-full" scrollWheelZoom>
         <TileLayer attribution={OSM_TILE_ATTRIBUTION} url={OSM_TILE_URL} />
-        <FitBounds markers={markers} />
-        {markers.map((m) => (
+        <FitBounds markers={validMarkers} />
+        {validMarkers.map((m) => (
           <CircleMarker
             key={m.id}
             center={[m.lat, m.lon]}
