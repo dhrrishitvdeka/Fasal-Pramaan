@@ -134,7 +134,11 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
   let mediaStream: MediaStream;
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true },
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
       video: false,
     });
   } catch {
@@ -147,6 +151,25 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
   processor.onaudioprocess = (event) => {
     if (socket.readyState !== WebSocket.OPEN) return;
     const input = event.inputBuffer.getChannelData(0);
+
+    // Acoustic Echo Suppression during speaker playback:
+    // When the assistant is speaking through device speakers, prevent the microphone
+    // from feeding the assistant's own voice back into Gemini Live.
+    const isAssistantSpeaking = ctx.currentTime < playTime + 0.15;
+    if (isAssistantSpeaking) {
+      let sumSquares = 0;
+      for (let i = 0; i < input.length; i += 4) {
+        sumSquares += input[i] * input[i];
+      }
+      const rms = Math.sqrt(sumSquares / (input.length / 4));
+      // If below deliberate user interruption threshold, drop acoustic bleed from speaker
+      if (rms < 0.12) {
+        return;
+      }
+      // User is deliberately speaking over the assistant (barge-in interruption)
+      interrupt();
+    }
+
     const pcm = downsampleTo16k(input, event.inputBuffer.sampleRate);
     socket.send(
       JSON.stringify({
