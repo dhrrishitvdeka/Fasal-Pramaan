@@ -532,7 +532,21 @@ export default function SaathiIntakePage() {
             if (!frame) return;
             const parsed = parseGeminiLiveMessage(frame);
             for (const item of parsed.events) {
-              if (item.type === "setupComplete") setLiveStatus("live");
+              if (item.type === "setupComplete") {
+                setLiveStatus("live");
+                try {
+                  socket.send(
+                    JSON.stringify({
+                      realtimeInput: {
+                        text:
+                          langRef.current === "hi"
+                            ? "नमस्ते किसान भाई! मैं फसल साथी हूँ। आपके खेत में क्या समस्या हुई है? मुझे बताएं।"
+                            : "Hello! I am Fasal Saathi. What happened to your crop? Tell me in your words.",
+                      },
+                    }),
+                  );
+                } catch {}
+              }
               if (item.type === "inputTranscript") {
                 inputBufRef.current += item.text;
                 upsertTranscript("farmer", inputBufRef.current);
