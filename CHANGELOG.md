@@ -2,6 +2,49 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] — 2026-08-24
+
+### Fasal Saathi v3.0 Multimodal Voice & Live Video Co-Pilot
+- **Background AudioWorklet Engine (`live-audio.ts`)**:
+  - Migrated real-time audio sampling from deprecated `ScriptProcessorNode` to a dedicated, off-main-thread `AudioWorkletNode` (`FasalAudioProcessor`).
+  - Native 16 kHz PCM16 mono downsampling running on the browser's audio rendering thread, preventing UI lag during intensive map and canvas operations.
+  - Built-in half-duplex acoustic echo suppression with RMS volume calculation and instant user barge-in speech detection.
+  - Real-time `onVolumeChange` callback driving responsive visual voice equalizers across the UI.
+- **1-FPS Live Viewfinder Video Streaming**:
+  - Added continuous 1-FPS JPEG video frame streaming (`sendVideoFrame`) over the bidirectional Gemini Live WebSocket (`gemini-3.1-flash-live-preview`).
+  - Wired live viewfinder capture from `/farmer/capture` via `webCaptureBridge.getVideoFrame()`, transforming Saathi into a real-time camera visual co-pilot.
+- **Proactive Opening Spoken Greeting**:
+  - Configured automatic welcome speech kickoff on `setupComplete` across both `/farmer/saathi` and `FasalSaathiOverlay`, speaking aloud immediately on connect (*"नमस्ते किसान भाई! मैं फसल साथी हूँ। आपके खेत में क्या समस्या हुई है?"*).
+- **Soothing Natural Voice Model**:
+  - Standardized default voice configuration to `Aoede` for natural, accessible conversational dialogue in rural agricultural settings.
+
+### Hierarchical Multi-Agent Tool Suite
+- **Spoken Cadastral Plot Registration (`register_plot`)**:
+  - Enables hands-free spoken parcel onboarding with full agronomic metadata (`name`, `crop_type`, `khasra_number`, `area_hectares`, `village`).
+- **Cadastral Geofence Verification (`check_plot_geofence`)**:
+  - Validates active device GPS coordinates against registered farm parcel polygon boundaries in real time.
+- **Agro-Meteorological Weather Radar (`fetch_agro_weather_alerts`)**:
+  - Delivers localized 72-hour precipitation forecasts, hailstorm probabilities, and temperature stress warnings.
+- **Plain-Language AI Audit Explainer (`explain_claim_audit`)**:
+  - Translates complex multi-stage AI and satellite verification results into clear, spoken farmer-friendly explanations.
+
+### Engineering Hardening & Production Reliability
+- **Leaflet MapView & Boundary Hardening (`MapView.tsx`)**:
+  - Defensively filtered numeric coordinates in `FitBounds` and center calculations to prevent `NaN` or un-geotagged historical submissions from throwing bounds exceptions.
+- **Site-Lock Authentication Security (`site-lock.ts`)**:
+  - Refactored `isSiteLockActive()` to strictly require a configured `SITE_LOCK_PASSWORD`, preventing accidental access lockouts during deployments.
+- **Frame Grabber Type Polymorphism (`capture-actions.ts`)**:
+  - Hardened `runVoiceShutter` to seamlessly accept synchronous and asynchronous frame grabbers.
+- **Full Production Build Verification**:
+  - Verified 100% type safety and zero-error generation across all 38 Next.js app routes, static pages, and dynamic API endpoints.
+
+### Documentation & Repository Modernization
+- **Comprehensive Documentation Updates**:
+  - Fully synchronized `docs/VOICE_ASSISTANT_DEMO.md`, `docs/architecture.md`, `docs/api.md`, `docs/demo-walkthrough.md`, and `README.md`.
+  - Streamlined root `README.md` into an executive overview featuring a clean architecture flowchart, feature highlights, documentation sitemap, and core contributors.
+
+---
+
 ## [2.5.0] — 2026-08-23
 
 ### Multi-Language Localization Across All 15 Indian Languages
