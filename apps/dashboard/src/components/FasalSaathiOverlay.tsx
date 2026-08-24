@@ -377,6 +377,18 @@ export default function FasalSaathiOverlay() {
                 setupCompleteRef.current = true;
                 setStatus("live");
                 pushPortalContext("session_start");
+                try {
+                  socket.send(
+                    JSON.stringify({
+                      realtimeInput: {
+                        text:
+                          langRef.current === "hi"
+                            ? "किसान भाई का गर्मजोशी से अभिवादन करें और पूछें कि उनकी फसल में क्या समस्या हुई है।"
+                            : "Greet the farmer warmly and ask what happened to their crop.",
+                      },
+                    }),
+                  );
+                } catch {}
               }
               if (item.type === "inputTranscript") {
                 inputBufRef.current += item.text;
