@@ -145,10 +145,6 @@ Comprehensive architectural, mathematical, API, and deployment documentation is 
 - **Vedant Parashar** ([@vedantparashar25](https://github.com/vedantparashar25)) — Core Contributor
 - **Sandeep Kumar Gupta** ([@sandeepkumargupta1](https://github.com/sandeepkumargupta1)) — Core Contributor
 
-### Realtime GitHub Community
-
-[![Realtime GitHub Contributors](https://contrib.rocks/image?repo=dhrrishitvdeka/Fasal-Pramaan-main)](https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/graphs/contributors)
-
 ---
 
 ## License
