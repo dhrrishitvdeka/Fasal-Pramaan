@@ -1058,6 +1058,13 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
   return {
     id: claim.id,
     crop_cycle_id: claim.plot_id || claim.id,
+    plot_name: claim.plot_name ?? null,
+    plot_name_hi: claim.plot_name_hi ?? null,
+    khasra_number: claim.khasra_number ?? null,
+    crop_type: claim.crop_type ?? null,
+    crop_type_hi: claim.crop_type_hi ?? null,
+    crop_variety: claim.crop_variety ?? null,
+    sowing_date: (claim as any).sowing_date ?? null,
     status: claim.status,
     createdAt: (claim as any).created_at || undefined,
     capture_lat: claim.capture_lat,

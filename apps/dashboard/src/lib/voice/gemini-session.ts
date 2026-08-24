@@ -38,9 +38,9 @@ export function geminiLiveVoice(): string {
 }
 
 export function geminiLiveSessionMinutes(): number {
-  const raw = Number(process.env.GEMINI_LIVE_SESSION_MINUTES || 15);
-  if (!Number.isFinite(raw)) return 15;
-  return Math.max(5, Math.min(Math.round(raw), 30));
+  const raw = Number(process.env.GEMINI_LIVE_SESSION_MINUTES || 30);
+  if (!Number.isFinite(raw)) return 30;
+  return Math.max(5, Math.min(Math.round(raw), 60));
 }
 
 export function buildAuthTokenRequest(now = new Date()): {
@@ -50,16 +50,15 @@ export function buildAuthTokenRequest(now = new Date()): {
 } {
   const duration = geminiLiveSessionMinutes();
   const expiresAt = new Date(now.getTime() + duration * 60_000);
-  const newSessionExpiresAt = new Date(now.getTime() + 60_000);
   const model = geminiLiveModel();
   const rfc = (value: Date) => value.toISOString().replace(/\.\d{3}Z$/, "Z");
   return {
     model,
     expiresAt,
     body: {
-      uses: 1,
+      uses: 20,
       expireTime: rfc(expiresAt),
-      newSessionExpireTime: rfc(newSessionExpiresAt),
+      newSessionExpireTime: rfc(expiresAt),
       bidiGenerateContentSetup: {
         model: `models/${model}`,
         generationConfig: {
@@ -68,9 +67,6 @@ export function buildAuthTokenRequest(now = new Date()): {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: geminiLiveVoice() } },
           },
         },
-        inputAudioTranscription: {},
-        outputAudioTranscription: {},
-        sessionResumption: {},
         systemInstruction: { parts: [{ text: WEB_VOICE_SYSTEM_INSTRUCTION }] },
         tools: [{ functionDeclarations: WEB_FUNCTION_DECLARATIONS }],
       },
