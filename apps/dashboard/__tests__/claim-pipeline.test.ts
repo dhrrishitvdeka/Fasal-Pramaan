@@ -258,6 +258,21 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
       expect(store.reviewActions.some((row) => row.claim_id === claimId && row.action === item.action)).toBe(true);
     }
 
+    const annotated = await persistSeed();
+    const beforeStatus = annotated.store.claims.get(annotated.claimId)?.status;
+    const noted = await applyReviewerAction(annotated.store, annotated.claimId, {
+      action: "annotate",
+      notes: "Gate re-run recorded: 2/2 usable",
+    });
+    expect(noted.status).toBe(beforeStatus);
+    expect(annotated.store.reviewActions.some((row) => row.action === "annotate")).toBe(true);
+
+    const closed = await persistSeed();
+    await applyReviewerAction(closed.store, closed.claimId, { action: "accept", notes: "ok" });
+    await expect(
+      applyReviewerAction(closed.store, closed.claimId, { action: "reject", notes: "too late" }),
+    ).rejects.toThrow(/verified/i);
+
     const recaptureSeed = await persistSeed();
     const recaptured = await applyReviewerAction(recaptureSeed.store, recaptureSeed.claimId, {
       action: "request_recapture",

@@ -112,6 +112,8 @@ function ReviewQueuePage() {
         (item) =>
           item.submission.id.toLowerCase().includes(q) ||
           item.submission.crop_cycle_id.toLowerCase().includes(q) ||
+          (item.submission.plot_name || "").toLowerCase().includes(q) ||
+          (item.submission.crop_type || "").toLowerCase().includes(q) ||
           item.submission.severity?.toLowerCase().includes(q) ||
           item.submission.latest_prediction?.primary_damage?.toLowerCase().includes(q) ||
           item.submission.peril?.toLowerCase().includes(q) ||
@@ -119,7 +121,11 @@ function ReviewQueuePage() {
       );
     }
 
-    if (sortBy === "evidence_asc") {
+    if (sortBy === "newest") {
+      list.sort((a, b) =>
+        String(b.submission.createdAt || "").localeCompare(String(a.submission.createdAt || "")),
+      );
+    } else if (sortBy === "evidence_asc") {
       list.sort((a, b) => a.evaluation.confidence.final - b.evaluation.confidence.final);
     } else if (sortBy === "evidence_desc") {
       list.sort((a, b) => b.evaluation.confidence.final - a.evaluation.confidence.final);
@@ -147,6 +153,9 @@ function ReviewQueuePage() {
       coverage: count("coverage"),
       visual: count("visual"),
       context: count("context"),
+      verified: count("verified"),
+      rejected: count("rejected"),
+      physical_inspection: count("physical_inspection"),
     };
   }, [augmentedItems]);
 
@@ -180,7 +189,21 @@ function ReviewQueuePage() {
   const [bulk, setBulk] = useState<{ done: number; total: number; failed: number } | null>(null);
   const [bulkResult, setBulkResult] = useState<string | null>(null);
 
-  const selectableIds = useMemo(() => filteredItems.map((item) => item.submission.id), [filteredItems]);
+  function canQueueAccept(s: Submission, ev: { integrity: { score: number } }) {
+    if (s.status === "verified" || s.status === "rejected") return false;
+    if (ev.integrity.score < 50) return false;
+    const g = s.gate_result as { gateFailed?: boolean; overridden?: boolean } | null | undefined;
+    if (g?.gateFailed && !g.overridden) return false;
+    return true;
+  }
+
+  const selectableIds = useMemo(
+    () =>
+      filteredItems
+        .filter(({ submission: s, evaluation: ev }) => canQueueAccept(s, ev))
+        .map((item) => item.submission.id),
+    [filteredItems],
+  );
   const allVisibleSelected =
     selectableIds.length > 0 && selectableIds.every((id) => selectedIds.includes(id));
 
@@ -263,6 +286,9 @@ function ReviewQueuePage() {
           { id: "coverage" as const, label: "Coverage Uncertainty", count: tabCounts.coverage },
           { id: "visual" as const, label: "Visual Uncertainty", count: tabCounts.visual },
           { id: "context" as const, label: "Context Uncertainty", count: tabCounts.context },
+          { id: "physical_inspection" as const, label: "Field inspection", count: tabCounts.physical_inspection },
+          { id: "verified" as const, label: "Verified", count: tabCounts.verified },
+          { id: "rejected" as const, label: "Rejected", count: tabCounts.rejected },
         ].map((tab) => (
           <Link
             key={tab.id}
@@ -296,7 +322,7 @@ function ReviewQueuePage() {
         <div className="w-full sm:w-72">
           <input
             type="search"
-            placeholder="Search by ID, peril, uncertainty…"
+            placeholder="Search by ID, plot, crop, peril…"
             value={searchQuery}
             onChange={(e) => setParam("q", e.target.value)}
             className="fp-input mt-0"
@@ -367,7 +393,7 @@ function ReviewQueuePage() {
                 <div className="min-w-0">
                   <div className="font-mono text-xs font-semibold text-slate-800">{s.id.slice(0, 8)}…</div>
                   <div className="mt-0.5 truncate text-xs capitalize text-slate-600">
-                    {s.latest_prediction?.primary_damage?.replaceAll("_", " ") || "—"} · {s.status.replaceAll("_", " ")}
+                    {s.plot_name || s.crop_type || s.crop_cycle_id} · {s.status.replaceAll("_", " ")}
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
@@ -410,6 +436,7 @@ function ReviewQueuePage() {
                 />
               </th>
               <th>Reference</th>
+              <th>Plot / crop</th>
               <th>Status</th>
               <th>Severity</th>
               <th>AI Damage</th>
@@ -439,6 +466,7 @@ function ReviewQueuePage() {
                       onChange={() => toggleRow(s.id)}
                       disabled={
                         bulkBusy ||
+                        !canQueueAccept(s, ev) ||
                         (!isSelected && selectedIds.length >= MAX_BULK_SELECT)
                       }
                       className="h-3.5 w-3.5 rounded border-[var(--line)] align-middle"
@@ -446,6 +474,10 @@ function ReviewQueuePage() {
                   </td>
                   <td className="font-mono text-[11px] font-semibold text-slate-700">
                     {s.id.slice(0, 8)}…
+                  </td>
+                  <td className="max-w-[10rem]">
+                    <div className="truncate font-medium text-slate-800">{s.plot_name || s.crop_cycle_id || "—"}</div>
+                    <div className="truncate capitalize text-[10px] text-slate-500">{s.crop_type || "—"}</div>
                   </td>
                   <td>
                     <div className="flex flex-col gap-1">
@@ -522,7 +554,7 @@ function ReviewQueuePage() {
             })}
             {!isLoading && filteredItems.length === 0 && (
               <tr>
-                <td colSpan={11} className="py-12 text-center text-slate-500">
+                <td colSpan={12} className="py-12 text-center text-slate-500">
                   No cases found matching the selected filter criteria.
                 </td>
               </tr>

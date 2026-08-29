@@ -68,6 +68,7 @@ export default function MapPage() {
               <option value="verified">Verified</option>
               <option value="needs_recapture">Needs recapture</option>
               <option value="physical_inspection">Physical inspection</option>
+              <option value="rejected">Rejected</option>
             </select>
           </label>
           <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">

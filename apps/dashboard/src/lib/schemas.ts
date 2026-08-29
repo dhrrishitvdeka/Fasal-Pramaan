@@ -49,6 +49,7 @@ export const REVIEW_ACTION_IDS = [
   "physical_inspection",
   "reject",
   "override_gate",
+  "annotate",
 ] as const;
 
 // ---------------------------------------------------------------------------

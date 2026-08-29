@@ -9,7 +9,15 @@ export const REVIEWER_CARD_BUCKETS = [
 
 export type ReviewerCardBucket = (typeof REVIEWER_CARD_BUCKETS)[number];
 
-export type ReviewerQueueFilter = ReviewerCardBucket | "all" | "coverage" | "visual" | "context";
+export type ReviewerQueueFilter =
+  | ReviewerCardBucket
+  | "all"
+  | "coverage"
+  | "visual"
+  | "context"
+  | "verified"
+  | "rejected"
+  | "physical_inspection";
 
 const QUEUE_FILTERS = new Set<string>([
   "all",
@@ -20,6 +28,9 @@ const QUEUE_FILTERS = new Set<string>([
   "coverage",
   "visual",
   "context",
+  "verified",
+  "rejected",
+  "physical_inspection",
 ]);
 
 export function parseReviewerFilter(raw: string | null | undefined): ReviewerQueueFilter {
@@ -53,6 +64,15 @@ export function submissionMatchesBucket(
   }
   if (bucket === "needs_recapture") {
     return submission.status === "needs_recapture";
+  }
+  if (bucket === "verified") {
+    return submission.status === "verified";
+  }
+  if (bucket === "rejected") {
+    return submission.status === "rejected";
+  }
+  if (bucket === "physical_inspection") {
+    return submission.status === "physical_inspection";
   }
   if (bucket === "integrity") {
     return evaluation.integrity.score < 70;

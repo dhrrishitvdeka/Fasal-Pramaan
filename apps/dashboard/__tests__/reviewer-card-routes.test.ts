@@ -45,6 +45,9 @@ describe("reviewer card href helper", () => {
     expect(submissionMatchesBucket({ status: "verified" }, ev({ final: 90 }), "low_confidence")).toBe(false);
     expect(submissionMatchesBucket({ status: "submitted" }, ev({}), "pending_review")).toBe(true);
     expect(submissionMatchesBucket({ status: "needs_recapture" }, ev({}), "needs_recapture")).toBe(true);
+    expect(submissionMatchesBucket({ status: "verified" }, ev({}), "verified")).toBe(true);
+    expect(submissionMatchesBucket({ status: "rejected" }, ev({}), "rejected")).toBe(true);
+    expect(submissionMatchesBucket({ status: "physical_inspection" }, ev({}), "physical_inspection")).toBe(true);
     expect(submissionMatchesBucket({ status: "under_review" }, ev({ integrity: 40, flags: ["sha"] }), "integrity")).toBe(
       true,
     );
