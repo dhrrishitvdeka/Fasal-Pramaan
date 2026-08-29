@@ -62,11 +62,13 @@ export default function ReviewDetailPage() {
   // Specific adaptive recapture angle selection
   const [selectedAngles, setSelectedAngles] = useState<string[]>([]);
   const [recaptureModalOpen, setRecaptureModalOpen] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["submission", id],
     queryFn: async () => getWebClaim(id),
     enabled: gate.status === "ok",
+    refetchInterval: (query) => (query.state.data && !query.state.data.latest_prediction ? 5_000 : false),
   });
 
   const { data: history } = useQuery({
@@ -254,8 +256,8 @@ export default function ReviewDetailPage() {
     );
   }
   const pred = data.latest_prediction;
-
-  const canAccept = predictionIsAcceptable(pred, hasIntegrityFailure);
+  const isClosed = data.status === "verified" || data.status === "rejected";
+  const canAccept = !isClosed && predictionIsAcceptable(pred, hasIntegrityFailure);
 
   const handleAccept = () => {
     if (canAccept) {
@@ -264,9 +266,14 @@ export default function ReviewDetailPage() {
   };
 
   const handleCorrect = () => {
+    const why = (reason || notes || "").trim();
+    if (!why) {
+      setMessage("Add an override reason before correcting and verifying.");
+      return;
+    }
     action.mutate({
       action: "correct",
-      override_reason: reason || notes || "Human recorded screening decision",
+      override_reason: why,
       corrected_severity: severity || undefined,
       corrected_damage_codes: damage ? [damage] : undefined,
       corrected_affected_area_pct: affectedArea === "" ? undefined : Number(affectedArea),
@@ -362,7 +369,7 @@ export default function ReviewDetailPage() {
         }
       }
       await applyWebReviewAction(id, {
-        action: "correct",
+        action: "annotate",
         notes: `Gate re-run recorded: ${usable}/${total} usable`,
       });
       qc.invalidateQueries({ queryKey: ["submission", id] });
@@ -416,18 +423,24 @@ export default function ReviewDetailPage() {
           Farmer & plot
         </h3>
         <dl className="grid grid-cols-1 gap-y-1.5 text-sm sm:grid-cols-[auto_1fr] sm:gap-x-4">
-          <dt className="text-slate-500">Plot / cycle</dt>
-          <dd className="font-mono text-xs">{data.crop_cycle_id || "—"}</dd>
+          <dt className="text-slate-500">Plot</dt>
+          <dd>{data.plot_name || data.crop_cycle_id || "—"}</dd>
+          <dt className="text-slate-500">Crop</dt>
+          <dd className="capitalize">{data.crop_type || data.latest_prediction?.predicted_crop || "—"}</dd>
+          <dt className="text-slate-500">Khasra</dt>
+          <dd className="font-mono text-xs">{data.khasra_number || "—"}</dd>
+          <dt className="text-slate-500">Peril</dt>
+          <dd className="capitalize">{(data.peril || "normal").replaceAll("_", " ")}</dd>
           <dt className="text-slate-500">Farmer notes</dt>
           <dd className="break-words text-slate-700">{data.farmer_observations || "—"}</dd>
-          <dt className="text-slate-500">GPS / location</dt>
-          <dd className="break-all font-mono text-xs tabular-nums">
-            {data.capture_lat != null && data.capture_lon != null
-              ? `${data.capture_lat.toFixed(5)}, ${data.capture_lon.toFixed(5)} (±${data.capture_accuracy_m ?? "?"} m)`
-              : "No GPS on this case"}
-          </dd>
         </dl>
       </section>
+
+      {isClosed && (
+        <div className="border border-slate-400 bg-slate-50 px-3 py-2 text-sm text-slate-800" role="status">
+          This case is <strong>{data.status}</strong>. Outcome buttons are locked. Request recapture only if new field evidence is required.
+        </div>
+      )}
 
       {message && (
         <div
@@ -466,12 +479,18 @@ export default function ReviewDetailPage() {
               <div className="font-semibold text-slate-800 truncate capitalize">{img.angle_type.replaceAll("_", " ")}</div>
               <div className="text-[11px] text-slate-500">{img.upload_status}</div>
               {img.download_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={img.download_url}
-                  alt={img.angle_type}
-                  className="mt-1.5 h-24 w-full object-cover rounded border border-slate-100"
-                />
+                <button
+                  type="button"
+                  className="mt-1.5 block w-full"
+                  onClick={() => setLightboxUrl(img.download_url as string)}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={img.download_url}
+                    alt={img.angle_type}
+                    className="h-24 w-full cursor-zoom-in object-cover rounded border border-slate-100"
+                  />
+                </button>
               ) : (
                 <div className="mt-1.5 flex h-24 items-center justify-center bg-slate-100 text-slate-400 rounded text-[11px]">
                   No preview
@@ -581,7 +600,7 @@ export default function ReviewDetailPage() {
             <button
               type="button"
               className="fp-btn-secondary text-xs"
-              disabled={action.isPending}
+              disabled={action.isPending || isClosed}
               onClick={handleOverrideGate}
               title="Mark the gate-blocked evidence as usable and record the override in the audit trail"
             >
@@ -593,7 +612,7 @@ export default function ReviewDetailPage() {
           </div>
         )}
 
-        {(data.images || []).length > 0 && (!gateInfo || gateInfo.overridden) && (
+        {(data.images || []).length > 0 && (
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               type="button"
@@ -786,7 +805,7 @@ export default function ReviewDetailPage() {
           <button
             type="button"
             className="fp-btn-primary flex min-h-12 w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 px-6 py-3 text-base font-semibold sm:w-auto"
-            disabled={action.isPending || !canAccept}
+            disabled={action.isPending || isClosed || !canAccept}
             onClick={handleAccept}
             title={
               hasIntegrityFailure
@@ -803,7 +822,7 @@ export default function ReviewDetailPage() {
           <button
             type="button"
             className="fp-btn-secondary flex w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 sm:w-auto"
-            disabled={action.isPending}
+            disabled={action.isPending || isClosed}
             onClick={handleCorrect}
           >
             <span>Correct & verify</span>
@@ -823,7 +842,7 @@ export default function ReviewDetailPage() {
           <button
             type="button"
             className="fp-btn-danger flex w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 sm:w-auto"
-            disabled={action.isPending}
+            disabled={action.isPending || isClosed}
             onClick={handleInspection}
           >
             <span>Physical inspection</span>
@@ -833,7 +852,7 @@ export default function ReviewDetailPage() {
           <button
             type="button"
             className="fp-btn-danger flex w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 sm:w-auto"
-            disabled={action.isPending}
+            disabled={action.isPending || isClosed}
             onClick={handleReject}
             title="Requires a reason in the override box"
           >
@@ -960,6 +979,19 @@ export default function ReviewDetailPage() {
                 {action.isPending ? "Sending…" : `Request ${selectedAngles.length} Angle(s)`}
               </button>
             </div>
+        </ModalShell>
+      )}
+
+      {lightboxUrl && (
+        <ModalShell labelledById="evidence-lightbox-title" onClose={() => setLightboxUrl(null)}>
+          <h3 id="evidence-lightbox-title" className="text-sm font-bold text-slate-900">
+            Evidence photo
+          </h3>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightboxUrl} alt="Evidence" className="max-h-[75vh] w-full object-contain bg-black" />
+          <button type="button" className="fp-btn-secondary w-full" onClick={() => setLightboxUrl(null)}>
+            Close
+          </button>
         </ModalShell>
       )}
     </div>
