@@ -1195,6 +1195,23 @@ export async function applyReviewerAction(
     throw new Error("Claim not found");
   }
 
+  const mutatingDecision =
+    payload.action === "accept" ||
+    payload.action === "correct" ||
+    payload.action === "reject" ||
+    payload.action === "request_recapture" ||
+    payload.action === "physical_inspection" ||
+    payload.action === "override_gate";
+  if (
+    mutatingDecision &&
+    (existing.status === "verified" || existing.status === "rejected") &&
+    payload.action !== "request_recapture"
+  ) {
+    throw new Error(
+      `Cannot ${payload.action.replaceAll("_", " ")} a ${existing.status} case. Reopen via recapture if new evidence is required.`,
+    );
+  }
+
   if (payload.action === "accept") {
     const gateResult = (existing as any).gate_result as
       | { gateFailed?: boolean; overridden?: boolean }
@@ -1217,6 +1234,7 @@ export async function applyReviewerAction(
   else if (payload.action === "accept" || payload.action === "correct") status = "verified";
   else if (payload.action === "physical_inspection") status = "physical_inspection";
   else if (payload.action === "reject") status = "rejected";
+  else if (payload.action === "annotate") status = existing.status;
 
   const patch: Partial<WebClaimRow> = {
     status,

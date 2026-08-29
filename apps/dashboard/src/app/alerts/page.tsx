@@ -66,9 +66,9 @@ export default function AlertsPage() {
                   <span className="fp-badge-neutral">{a.alert_type}</span>
                   <span
                     className={`rounded px-1.5 py-0.5 font-bold ${
-                      a.severity === "high"
+                      a.severity.toLowerCase() === "high"
                         ? "border border-rose-200 bg-rose-50 text-rose-700"
-                        : a.severity === "medium"
+                        : a.severity.toLowerCase() === "medium"
                           ? "border border-amber-200 bg-amber-50 text-amber-700"
                           : "bg-slate-100 text-slate-600"
                     }`}

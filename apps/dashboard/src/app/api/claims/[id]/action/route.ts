@@ -12,6 +12,7 @@ const ALLOWED_ACTIONS = new Set([
   "physical_inspection",
   "reject",
   "override_gate",
+  "annotate",
 ]);
 const RATE_LIMIT_MAX = 30;
 const RATE_LIMIT_WINDOW_MS = 60_000;

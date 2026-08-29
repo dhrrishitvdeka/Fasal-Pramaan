@@ -676,6 +676,13 @@ export function overviewFromClaims(claims: FarmerClaim[]): Overview {
     ...base,
     total_submissions: total,
     submissions_today: todayCount,
+    pending_ai_processing: claims.filter(
+      (c) =>
+        (c.status === "under_review" || c.status === "submitted") &&
+        !c.aiPrediction.cropIdentified &&
+        !c.aiPrediction.diseaseDetected &&
+        (c.aiPrediction.modelConfidence || 0) === 0,
+    ).length,
     pending_human_review: pending,
     verified_assessments: verified,
     recapture_requests: recapture,
@@ -771,18 +778,50 @@ export function analyticsFromClaims(claims: FarmerClaim[]) {
 }
 
 export function alertsFromClaims(claims: FarmerClaim[]) {
-  return claims
-    .filter((c) => c.status === "needs_recapture" || c.evidenceTrust.integrityScore < 70)
-    .map((c) => ({
-      id: `alert-${c.id}`,
-      alert_type: c.status === "needs_recapture" ? "RECAPTURE_REQUIRED" : "INTEGRITY_GAP",
-      severity: c.evidenceTrust.integrityScore < 70 ? "HIGH" : "MEDIUM",
-      title: c.status === "needs_recapture" ? "Recapture requested" : "Integrity digest missing",
-      message:
-        c.status === "needs_recapture"
-          ? `Claim ${c.id} needs recapture${c.missingAngles?.length ? ` of ${c.missingAngles.join(", ")}` : ""}.`
-          : `Claim ${c.id} has no complete SHA-256 set.`,
-      created_at: c.updatedAt,
-      submission_id: c.id,
-    }));
+  const alerts: Array<{
+    id: string;
+    alert_type: string;
+    severity: string;
+    title: string;
+    message: string;
+    created_at?: string;
+    submission_id?: string;
+  }> = [];
+  for (const c of claims) {
+    const gate = (c as { gate_result?: { gateFailed?: boolean; overridden?: boolean } }).gate_result;
+    if (c.status === "needs_recapture") {
+      alerts.push({
+        id: `alert-recapture-${c.id}`,
+        alert_type: "recapture_required",
+        severity: "medium",
+        title: "Recapture requested",
+        message: `Claim ${c.id} needs recapture${c.missingAngles?.length ? ` of ${c.missingAngles.join(", ")}` : ""}.`,
+        created_at: c.updatedAt,
+        submission_id: c.id,
+      });
+    }
+    if (c.evidenceTrust.integrityScore < 70) {
+      alerts.push({
+        id: `alert-integrity-${c.id}`,
+        alert_type: "integrity_gap",
+        severity: "high",
+        title: "Integrity flag",
+        message: `Claim ${c.id} integrity score is ${c.evidenceTrust.integrityScore}.`,
+        created_at: c.updatedAt,
+        submission_id: c.id,
+      });
+    }
+    if (gate?.gateFailed && !gate.overridden) {
+      alerts.push({
+        id: `alert-gate-${c.id}`,
+        alert_type: "authenticity_blocked",
+        severity: "high",
+        title: "Authenticity gate blocked",
+        message: `Claim ${c.id} failed the vision gate and still needs override or recapture.`,
+        created_at: c.updatedAt,
+        submission_id: c.id,
+      });
+    }
+  }
+  return alerts;
 }
