@@ -132,6 +132,8 @@ export interface FarmerClaim {
   payoutAmountInr?: number;
   plotLat?: number | null;
   plotLon?: number | null;
+  captureLat?: number | null;
+  captureLon?: number | null;
   peril?: string | null;
   intentId?: string | null;
   gateResult?: unknown;
@@ -591,16 +593,18 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     claimId: string,
     recapturedImages: ClaimImageEvidence[],
   ): Promise<FarmerClaim | undefined> => {
-    const existing = getClaimById(claimId);
-    if (!existing) return undefined;
     if (!isSupabaseConfigured()) {
       throw new Error("Supabase is not configured — claim was not stored");
     }
-    const payload = buildRecaptureSubmitInput(claimId, existing, recapturedImages);
+    const existing = getClaimById(claimId);
+    const payload = buildRecaptureSubmitInput(claimId, existing || {}, recapturedImages);
     const result = await submitWebClaim(payload);
     const persisted = await getWebClaim(result.claimId);
     const claim = submissionToClaim(persisted);
-    setClaims((prev) => prev.map((item) => (item.id === claim.id ? claim : item)));
+    setClaims((prev) => {
+      const next = prev.map((item) => (item.id === claim.id ? claim : item));
+      return next.some((item) => item.id === claim.id) ? next : [claim, ...prev];
+    });
     return claim;
   };
 

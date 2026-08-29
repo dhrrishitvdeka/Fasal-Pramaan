@@ -673,9 +673,11 @@ function CaptureStudioContent() {
           }
           if (isTargetedRecapture && recaptureClaimId) {
             const updated = await updateClaimRecapture(recaptureClaimId, imagesList);
-            const id = updated?.id || recaptureClaimId;
-            router.push(`/farmer/claims/${id}?recaptured=true`);
-            return { id };
+            if (!updated) {
+              throw new Error("Could not save recapture — claim was not found. Refresh and try again.");
+            }
+            router.push(`/farmer/claims/${updated.id}?recaptured=true`);
+            return { id: updated.id };
           }
           const newClaim = await createClaim({
             plotId: plot?.id || activeIntent?.plotId || "",
