@@ -7,6 +7,7 @@ export interface ReviewKeyboardShortcutsProps {
   onCorrect: () => void;
   onRequestRecapture: () => void;
   onPhysicalInspection: () => void;
+  onReject?: () => void;
   onReturnToQueue: () => void;
   disabled?: boolean;
 }
@@ -16,6 +17,7 @@ export function ReviewKeyboardShortcuts({
   onCorrect,
   onRequestRecapture,
   onPhysicalInspection,
+  onReject,
   onReturnToQueue,
   disabled = false,
 }: ReviewKeyboardShortcutsProps) {
@@ -61,6 +63,10 @@ export function ReviewKeyboardShortcuts({
           event.preventDefault();
           onPhysicalInspection();
           break;
+        case "x":
+          event.preventDefault();
+          onReject?.();
+          break;
         case "q":
         case "escape":
           event.preventDefault();
@@ -77,7 +83,7 @@ export function ReviewKeyboardShortcuts({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onAccept, onCorrect, onRequestRecapture, onPhysicalInspection, onReturnToQueue, disabled]);
+  }, [onAccept, onCorrect, onRequestRecapture, onPhysicalInspection, onReject, onReturnToQueue, disabled]);
 
   return (
     <>
@@ -151,6 +157,13 @@ export function ReviewKeyboardShortcuts({
                 <span className="text-slate-700">Order Physical Inspection</span>
                 <kbd className="rounded border border-slate-300 bg-white px-2 py-0.5 font-mono text-xs font-bold text-slate-800 shadow-sm">
                   P
+                </kbd>
+              </div>
+
+              <div className="flex items-center justify-between rounded border border-slate-100 bg-slate-50 p-2">
+                <span className="text-slate-700">Reject Claim (reason required)</span>
+                <kbd className="rounded border border-slate-300 bg-white px-2 py-0.5 font-mono text-xs font-bold text-slate-800 shadow-sm">
+                  X
                 </kbd>
               </div>
 

@@ -50,7 +50,11 @@ export async function runVoiceSubmitDraft(input: {
   try {
     const saved = await input.persist();
     return { ok: true, message: "Claim submitted for review.", claimId: saved.id };
-  } catch {
-    return { ok: false, message: "Submission failed. Please try again." };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message.trim() : "";
+    return {
+      ok: false,
+      message: detail ? `Submission failed: ${detail}` : "Submission failed. Please try again.",
+    };
   }
 }

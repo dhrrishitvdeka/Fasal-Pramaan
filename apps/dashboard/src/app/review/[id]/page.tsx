@@ -143,9 +143,15 @@ export default function ReviewDetailPage() {
       setRecaptureModalOpen(false);
     },
     onError: (err: unknown) => {
+      const axiosDetail =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { detail?: string; error?: string } } }).response?.data
+          : undefined;
       const msg =
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (err as any)?.response?.data?.detail || "Action failed";
+        axiosDetail?.detail ||
+        axiosDetail?.error ||
+        (err instanceof Error ? err.message : null) ||
+        "Action failed";
       setMessage(String(msg));
     },
   });
@@ -301,6 +307,19 @@ export default function ReviewDetailPage() {
     });
   };
 
+  const handleReject = () => {
+    const why = (reason || notes || "").trim();
+    if (!why) {
+      setMessage("Add a reason before rejecting this claim.");
+      return;
+    }
+    action.mutate({
+      action: "reject",
+      override_reason: why,
+      notes: notes || why,
+    });
+  };
+
   const handleOverrideGate = () => {
     const cleanReason = (reason || notes || "Reviewer confirmed photo authenticity").slice(0, 500);
     action.mutate({
@@ -382,6 +401,7 @@ export default function ReviewDetailPage() {
           onCorrect={handleCorrect}
           onRequestRecapture={handleOpenRecapture}
           onPhysicalInspection={handleInspection}
+          onReject={handleReject}
           onReturnToQueue={() => router.push("/review")}
         />
       </div>
@@ -433,8 +453,9 @@ export default function ReviewDetailPage() {
         <dl className="grid grid-cols-1 gap-y-1.5 pt-1 text-sm sm:grid-cols-[auto_1fr] sm:gap-x-4">
           <dt className="text-slate-500">GPS Coordinates</dt>
           <dd className="break-all font-mono text-xs tabular-nums">
-            {data.capture_lat?.toFixed(5)}, {data.capture_lon?.toFixed(5)} (±
-            {data.capture_accuracy_m ?? "?"} m)
+            {data.capture_lat != null && data.capture_lon != null
+              ? `${data.capture_lat.toFixed(5)}, ${data.capture_lon.toFixed(5)} (±${data.capture_accuracy_m ?? "?"} m)`
+              : "No GPS on this case — plot-match and satellite checks were skipped"}
           </dd>
           <dt className="text-slate-500">Farmer Notes</dt>
           <dd className="break-words text-slate-700">{data.farmer_observations || "—"}</dd>
@@ -656,7 +677,10 @@ export default function ReviewDetailPage() {
             </dl>
           </>
         ) : (
-          <p className="text-sm text-slate-500">No AI prediction available yet.</p>
+          <p className="text-sm text-slate-600">
+            No AI screening grade yet (Hugging Face Space still warming or timed out). Evidence is saved —
+            you can still <strong>Accept</strong> on the trust scores, or wait and refresh.
+          </p>
         )}
       </section>
 
@@ -764,9 +788,15 @@ export default function ReviewDetailPage() {
             className="fp-btn-primary flex min-h-12 w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 px-6 py-3 text-base font-semibold sm:w-auto"
             disabled={action.isPending || !canAccept}
             onClick={handleAccept}
-            title={hasIntegrityFailure ? "Acceptance disabled due to failed integrity checks" : "Accept AI result (A)"}
+            title={
+              hasIntegrityFailure
+                ? "Acceptance disabled due to failed integrity checks"
+                : pred
+                  ? "Accept AI result (A)"
+                  : "Accept on evidence trust — AI screening still pending (A)"
+            }
           >
-            <span>Accept AI result</span>
+            <span>{pred ? "Accept AI result" : "Accept claim"}</span>
             <kbd className="hidden rounded bg-[var(--ink)] px-1 font-mono text-[10px] text-[var(--surface)] sm:inline">A</kbd>
           </button>
 
@@ -798,6 +828,17 @@ export default function ReviewDetailPage() {
           >
             <span>Physical inspection</span>
             <kbd className="hidden rounded bg-rose-700 px-1 font-mono text-[10px] text-white sm:inline">P</kbd>
+          </button>
+
+          <button
+            type="button"
+            className="fp-btn-danger flex w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 sm:w-auto"
+            disabled={action.isPending}
+            onClick={handleReject}
+            title="Requires a reason in the override box"
+          >
+            <span>Reject claim</span>
+            <kbd className="hidden rounded bg-rose-700 px-1 font-mono text-[10px] text-white sm:inline">X</kbd>
           </button>
         </div>
       </section>

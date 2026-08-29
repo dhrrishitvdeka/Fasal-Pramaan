@@ -14,6 +14,18 @@ import { sanitizeMojibake } from "./name-sanitizer";
 import type { ClaimIntent, Peril } from "./claim-routing";
 import { INTENT_STORAGE_KEY } from "./claim-routing";
 
+export type PlotRegistrationInput = {
+  name: string;
+  cropType: string;
+  khasraNumber?: string;
+  areaHectares?: number;
+  village?: string;
+  district?: string;
+  state?: string;
+  lat?: number | null;
+  lon?: number | null;
+};
+
 export interface FarmerPlot {
   id: string;
   name: string;
@@ -158,6 +170,7 @@ interface FarmerContextType {
   persistError: string | null;
   refresh: () => Promise<void>;
   addPlot: (plot: FarmerPlot) => void;
+  registerPlot: (input: PlotRegistrationInput) => Promise<{ plotId: string }>;
   getClaimById: (id: string) => FarmerClaim | undefined;
   createClaim: (
     claim: Omit<FarmerClaim, "id" | "createdAt" | "updatedAt" | "evidenceTrust" | "aiPrediction"> & {
@@ -267,8 +280,9 @@ function submissionToClaim(item: Awaited<ReturnType<typeof listWebClaims>>[numbe
       sha256: img.sha256 || "",
       qualityPassed: Boolean(img.sha256),
     })),
-    missingAngles: item.latest_evaluation?.coverage?.details?.missing_views,
-    recaptureReason: item.final_assessment_notes || undefined,
+    missingAngles: item.missing_angles || item.latest_evaluation?.coverage?.details?.missing_views,
+    recaptureReason: item.recapture_reason || undefined,
+    recaptureReasonHi: item.recapture_reason_hi || undefined,
     reviewerNotes: item.final_assessment_notes || undefined,
     evidenceTrust: {
       qualityScore: item.latest_evaluation?.quality.score ?? 0,
@@ -419,6 +433,69 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const registerPlot = async (input: PlotRegistrationInput): Promise<{ plotId: string }> => {
+    const name = String(input.name || "").trim() || "Farm Plot";
+    const cropType = String(input.cropType || "wheat").trim() || "wheat";
+    const village = input.village?.trim() || farmerProfile.village || "";
+    const district = input.district?.trim() || farmerProfile.district || "";
+    const state = input.state?.trim() || farmerProfile.state || "";
+    const khasraNumber = input.khasraNumber?.trim() || "";
+    const areaHectares = Number.isFinite(Number(input.areaHectares)) ? Number(input.areaHectares) : 1;
+    const lat = typeof input.lat === "number" && Number.isFinite(input.lat) ? input.lat : undefined;
+    const lon = typeof input.lon === "number" && Number.isFinite(input.lon) ? input.lon : undefined;
+    const sowingDate = new Date().toISOString().slice(0, 10);
+
+    if (isSupabaseConfigured()) {
+      const res = await apiFetch("/api/farmer/plots", {
+        method: "POST",
+        body: JSON.stringify({
+          name,
+          nameHi: name,
+          cropType,
+          khasraNumber,
+          areaHectares,
+          village,
+          district,
+          state,
+          sowingDate,
+          lat,
+          lon,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string; plotId?: string };
+      if (!res.ok) {
+        throw new Error(body.error || "Could not register plot");
+      }
+      await refresh();
+      return { plotId: body.plotId || "" };
+    }
+
+    const plotId = `plot_${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
+    addPlot({
+      id: plotId,
+      name,
+      nameHi: name,
+      khasraNumber,
+      areaHectares,
+      cropType,
+      cropTypeHi: cropType,
+      cropVariety: "",
+      currentStage: "Sowing",
+      currentStageHi: "बुवाई",
+      sowingDate,
+      soilType: "",
+      soilTypeHi: "",
+      irrigationType: "",
+      irrigationTypeHi: "",
+      lat: lat ?? 0,
+      lon: lon ?? 0,
+      village,
+      district,
+      state,
+    });
+    return { plotId };
+  };
+
   const setActiveIntent = (intent: ClaimIntent | null) => {
     setActiveIntentState(intent);
     persistIntent(intent);
@@ -455,14 +532,14 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
       cropTypeHi: claimData.cropTypeHi,
       cropVariety: claimData.cropVariety,
       farmerObservations: claimData.farmerObservations,
-      captureLat: claimData.images[0]?.lat,
-      captureLon: claimData.images[0]?.lon,
-      captureAccuracyM: claimData.images[0]?.accuracyM,
+      captureLat: claimData.images[0]?.lat ?? undefined,
+      captureLon: claimData.images[0]?.lon ?? undefined,
+      captureAccuracyM: claimData.images[0]?.accuracyM ?? undefined,
       peril,
-      intentId,
-      plotLat: claimData.plotLat,
-      plotLon: claimData.plotLon,
-      sowingDate: claimData.sowingDate ?? null,
+      intentId: intentId || undefined,
+      plotLat: claimData.plotLat ?? undefined,
+      plotLon: claimData.plotLon ?? undefined,
+      sowingDate: claimData.sowingDate || undefined,
       images: claimData.images.map((img) => ({
         angleType: img.angleType,
         imageDataUrl: img.imageUrl,
@@ -479,8 +556,27 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         capturedAt: img.timestamp || undefined,
       })),
     });
-    const persisted = await getWebClaim(result.claimId);
-    const claim = submissionToClaim(persisted);
+    let claim: FarmerClaim;
+    try {
+      const persisted = await getWebClaim(result.claimId);
+      claim = submissionToClaim(persisted);
+    } catch {
+      claim = {
+        ...claimData,
+        id: result.claimId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: "under_review",
+        evidenceTrust: claimData.evidenceTrust || {
+          qualityScore: 0,
+          coverageScore: 0,
+          contextScore: 0,
+          integrityScore: 0,
+          overallConfidence: 0,
+        },
+        aiPrediction: claimData.aiPrediction || emptyPrediction(),
+      };
+    }
     setClaims((prev) => [claim, ...prev.filter((item) => item.id !== claim.id)]);
     try {
       sessionStorage.removeItem(STORAGE_KEY_DRAFT);
@@ -604,6 +700,7 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         refresh,
         refreshData: refresh,
         addPlot,
+        registerPlot,
         getClaimById,
         createClaim,
         updateClaimRecapture,

@@ -754,42 +754,65 @@ async function persistAdaptiveResult(
   adaptivePayload: Record<string, unknown>,
   previewMissingAngles: string[],
 ): Promise<void> {
-  if (adaptive.nextStep === "request_missing") {
-    // Auto recapture request: the adaptive engine detected an evidence gap — route the
-    // claim straight to needs_recapture instead of waiting in the reviewer queue.
-    // (escalate_to_human / proceed stay under_review.)
-    const autoPatch = {
-      status: "needs_recapture",
-      missing_angles:
-        adaptive.missingAngles.length > 0 ? adaptive.missingAngles : previewMissingAngles,
-      recapture_reason: adaptive.reasons[0] || "Automated evidence gap detected",
-      recapture_reason_hi: adaptive.reasonsHi[0] || null,
-      adaptive_result: adaptivePayload,
+  // Persist the adaptive verdict for the reviewer badge, but never auto-flip
+  // status to needs_recapture. Auto-routing hid brand-new claims from the
+  // pending queue and looked like a failed submit. Reviewers request recapture.
+  const missing =
+    adaptive.missingAngles.length > 0 ? adaptive.missingAngles : previewMissingAngles;
+  try {
+    await store.updateClaim(claimId, {
+      adaptive_result: adaptivePayload as any,
+      ...(missing.length ? { missing_angles: missing } : {}),
       updated_at: new Date().toISOString(),
+    } as any);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/adaptive_result/i.test(msg)) throw e;
+  }
+}
+
+export type InferRuntimeOptions = {
+  apiToken?: string;
+  fetchImpl?: typeof fetch;
+  spaceUrl?: string;
+  /** Persist + gate + context only; caller schedules HF attach (e.g. Next.js `after()`). */
+  skipInference?: boolean;
+};
+
+export async function inferAndAttachToClaim(
+  store: ClaimStore,
+  claimId: string,
+  images: PersistedImageInput[],
+  cropType: string | undefined,
+  infer: typeof inferCropDisease,
+  inferOptions?: InferRuntimeOptions,
+): Promise<{ prediction: HfPrediction | null; inferError?: string }> {
+  if (imagesAreUnusable(images)) {
+    const prediction = unusablePrediction();
+    await attachHfPrediction(store, claimId, prediction);
+    return { prediction };
+  }
+  const closeup = images.find((img) => img.angleType === "closeup_damage") || images[0];
+  try {
+    const prediction = await infer({
+      imageBytes: requireImageBytes(closeup, closeup.angleType),
+      expectedCrop: cropType,
+      angleType: closeup.angleType,
+      extraImages: images.map((image) => ({
+        angleType: image.angleType,
+        bytes: requireImageBytes(image, image.angleType),
+      })),
+      apiToken: inferOptions?.apiToken,
+      fetchImpl: inferOptions?.fetchImpl,
+      spaceUrl: inferOptions?.spaceUrl,
+    });
+    await attachHfPrediction(store, claimId, prediction);
+    return { prediction };
+  } catch (error) {
+    return {
+      prediction: null,
+      inferError: error instanceof Error ? error.message : "Inference failed",
     };
-    try {
-      await store.updateClaim(claimId, autoPatch as any);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!/adaptive_result|recapture_reason/i.test(msg)) throw e;
-      const {
-        adaptive_result: _ar,
-        recapture_reason: _rr,
-        recapture_reason_hi: _rh,
-        ...fallback
-      } = autoPatch as any;
-      await store.updateClaim(claimId, fallback as any);
-    }
-  } else {
-    try {
-      await store.updateClaim(claimId, {
-        adaptive_result: adaptivePayload as any,
-        updated_at: new Date().toISOString(),
-      } as any);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!/adaptive_result/i.test(msg)) throw e;
-    }
   }
 }
 
@@ -797,8 +820,8 @@ export async function persistAndInfer(
   store: ClaimStore,
   input: PersistClaimInput,
   infer: typeof inferCropDisease = inferCropDisease,
-  inferOptions?: { apiToken?: string; fetchImpl?: typeof fetch; spaceUrl?: string },
-): Promise<{ claimId: string; prediction: HfPrediction | null; inferError?: string }> {
+  inferOptions?: InferRuntimeOptions,
+): Promise<{ claimId: string; prediction: HfPrediction | null; inferError?: string; pendingInference?: boolean }> {
   // ----- Vision gate (computed BEFORE image persistence so each web_claim_images row can
   // carry its own per-angle gate_result; a thrown gate fails CLOSED via runVisionGate) -----
   const gate = await runVisionGate(input.images, input.cropType, input.peril);
@@ -873,35 +896,23 @@ export async function persistAndInfer(
   } catch {
     // adaptive is best-effort; never block pipeline
   }
-  if (imagesAreUnusable(input.images)) {
-    const prediction = unusablePrediction();
-    await attachHfPrediction(store, persisted.claimId, prediction);
-    return { claimId: persisted.claimId, prediction };
+  if (inferOptions?.skipInference) {
+    if (imagesAreUnusable(input.images)) {
+      const prediction = unusablePrediction();
+      await attachHfPrediction(store, persisted.claimId, prediction);
+      return { claimId: persisted.claimId, prediction };
+    }
+    return { claimId: persisted.claimId, prediction: null, pendingInference: true };
   }
-  const closeup =
-    input.images.find((img) => img.angleType === "closeup_damage") || input.images[0];
-  try {
-    const prediction = await infer({
-      imageBytes: requireImageBytes(closeup, closeup.angleType),
-      expectedCrop: input.cropType,
-      angleType: closeup.angleType,
-      extraImages: input.images.map((image) => ({
-        angleType: image.angleType,
-        bytes: requireImageBytes(image, image.angleType),
-      })),
-      apiToken: inferOptions?.apiToken,
-      fetchImpl: inferOptions?.fetchImpl,
-      spaceUrl: inferOptions?.spaceUrl,
-    });
-    await attachHfPrediction(store, persisted.claimId, prediction);
-    return { claimId: persisted.claimId, prediction };
-  } catch (error) {
-    return {
-      claimId: persisted.claimId,
-      prediction: null,
-      inferError: error instanceof Error ? error.message : "Inference failed",
-    };
-  }
+  const inferred = await inferAndAttachToClaim(
+    store,
+    persisted.claimId,
+    input.images,
+    input.cropType,
+    infer,
+    inferOptions,
+  );
+  return { claimId: persisted.claimId, ...inferred };
 }
 
 function rowToPreviewInput(row: WebImageRow): PersistedImageInput {
@@ -931,8 +942,8 @@ export async function recaptureAndInfer(
   store: ClaimStore,
   input: RecaptureInput,
   infer: typeof inferCropDisease = inferCropDisease,
-  inferOptions?: { apiToken?: string; fetchImpl?: typeof fetch; spaceUrl?: string },
-): Promise<{ claimId: string; prediction: HfPrediction | null; inferError?: string }> {
+  inferOptions?: InferRuntimeOptions,
+): Promise<{ claimId: string; prediction: HfPrediction | null; inferError?: string; pendingInference?: boolean }> {
   if (!input.images.length) {
     throw new Error("At least one image is required");
   }
@@ -1022,36 +1033,23 @@ export async function recaptureAndInfer(
     // adaptive is best-effort; never block pipeline
   }
 
-  if (imagesAreUnusable(input.images)) {
-    const prediction = unusablePrediction();
-    await attachHfPrediction(store, input.claimId, prediction);
-    return { claimId: input.claimId, prediction };
+  if (inferOptions?.skipInference) {
+    if (imagesAreUnusable(input.images)) {
+      const prediction = unusablePrediction();
+      await attachHfPrediction(store, input.claimId, prediction);
+      return { claimId: input.claimId, prediction };
+    }
+    return { claimId: input.claimId, prediction: null, pendingInference: true };
   }
-
-  const closeup =
-    input.images.find((img) => img.angleType === "closeup_damage") || input.images[0];
-  try {
-    const prediction = await infer({
-      imageBytes: requireImageBytes(closeup, closeup.angleType),
-      expectedCrop: existing.crop_type || undefined,
-      angleType: closeup.angleType,
-      extraImages: input.images.map((image) => ({
-        angleType: image.angleType,
-        bytes: requireImageBytes(image, image.angleType),
-      })),
-      apiToken: inferOptions?.apiToken,
-      fetchImpl: inferOptions?.fetchImpl,
-      spaceUrl: inferOptions?.spaceUrl,
-    });
-    await attachHfPrediction(store, input.claimId, prediction);
-    return { claimId: input.claimId, prediction };
-  } catch (error) {
-    return {
-      claimId: input.claimId,
-      prediction: null,
-      inferError: error instanceof Error ? error.message : "Inference failed",
-    };
-  }
+  const inferred = await inferAndAttachToClaim(
+    store,
+    input.claimId,
+    input.images,
+    existing.crop_type || undefined,
+    infer,
+    inferOptions,
+  );
+  return { claimId: input.claimId, ...inferred };
 }
 
 export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Submission {
@@ -1073,6 +1071,9 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
     farmer_observations: claim.farmer_observations,
     severity: claim.corrected_grade || claim.corrected_severity || claim.severity_grade,
     final_assessment_notes: claim.reviewer_notes,
+    recapture_reason: claim.recapture_reason ?? null,
+    recapture_reason_hi: claim.recapture_reason_hi ?? null,
+    missing_angles: claim.missing_angles ?? [],
     peril: (claim as any).peril || null,
     intent_id: (claim as any).intent_id || null,
     gate_result: (claim as any).gate_result ?? null,
