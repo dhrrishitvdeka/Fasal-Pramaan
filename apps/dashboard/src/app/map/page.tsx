@@ -15,7 +15,6 @@ export default function MapPage() {
   const [severity, setSeverity] = useState("");
   const [crop, setCrop] = useState("");
   const [damage, setDamage] = useState("");
-  const [district, setDistrict] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -29,7 +28,6 @@ export default function MapPage() {
       if (severity) params.severity = severity;
       if (crop) params.crop = crop;
       if (damage) params.damage = damage;
-      if (district) params.district = district;
       if (dateFrom) {
         const d = new Date(`${dateFrom}T00:00:00`);
         if (!isNaN(d.getTime())) params.date_from = d.toISOString();
@@ -109,10 +107,6 @@ export default function MapPage() {
               <option value="drought_stress">Water stress</option>
               <option value="unknown">Unknown</option>
             </select>
-          </label>
-          <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
-            District
-            <input className="w-full border border-slate-300 px-2 py-1.5 text-sm" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Name or code" />
           </label>
           <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             From
