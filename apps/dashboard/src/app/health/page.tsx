@@ -187,7 +187,7 @@ export default function HealthPage() {
             <span className="text-lg font-bold text-slate-900 sm:text-xl">
               {data?.ok ? "Healthy" : "Offline"}
             </span>
-            <span className="text-xs text-emerald-600 font-medium">99.9% Uptime</span>
+            <span className="text-xs text-slate-500 font-medium">live probe</span>
           </div>
         </div>
 

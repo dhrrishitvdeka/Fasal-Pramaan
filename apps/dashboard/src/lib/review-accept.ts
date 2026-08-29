@@ -5,12 +5,17 @@ export type AcceptablePrediction = {
   affected_area_pct?: number | null;
 } | null | undefined;
 
-/** Reviewer Accept is allowed when a screening grade is present, or a complete legacy prediction exists. */
+/**
+ * Reviewer Accept is allowed when integrity is intact and the screening grade
+ * is not Unusable. A missing prediction (HF Space still warming / timed out)
+ * does not block Accept — the model is assistive, not a settlement gate.
+ */
 export function predictionIsAcceptable(
   pred: AcceptablePrediction,
   integrityFailed = false,
 ): boolean {
-  if (!pred || integrityFailed) return false;
+  if (integrityFailed) return false;
+  if (!pred) return true;
   if (pred.predicted_grade === "U") return false;
   if (
     pred.predicted_grade === "A" ||

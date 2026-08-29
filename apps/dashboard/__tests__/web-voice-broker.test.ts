@@ -152,6 +152,33 @@ describe("web Fasal Saathi broker", () => {
     expect(rem[0].stage_name_hi).toBe("कल्ले फूटना");
   });
 
+  it("persists register_plot through the gateway and returns the plot id", async () => {
+    const plots: Array<{ name: string; cropType: string; village?: string }> = [];
+    const gw = gateway({
+      addPlot: async (input) => {
+        plots.push(input);
+        return { plotId: "plot-saved-1" };
+      },
+    });
+    const broker = new WebVoiceBroker(gw);
+    const result = await broker.execute(
+      "register_plot",
+      { name: "East bund", crop_type: "paddy", village: "Rampur", area_hectares: 2 },
+      1,
+    );
+    expect(result.outcome).toBe("succeeded");
+    expect(plots).toEqual([
+      {
+        name: "East bund",
+        cropType: "paddy",
+        khasraNumber: expect.stringMatching(/^KH-/),
+        areaHectares: 2,
+        village: "Rampur",
+      },
+    ]);
+    expect(result.data?.plot_id).toBe("plot-saved-1");
+  });
+
   it("does not mutate on prepare, mutates on a later yes, and cancel does not submit", async () => {
     const gw = gateway();
     const broker = new WebVoiceBroker(gw);

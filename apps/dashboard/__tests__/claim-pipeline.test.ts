@@ -574,4 +574,10 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(predictionIsAcceptable({ predicted_grade: "B" }, false)).toBe(true);
     expect(predictionIsAcceptable({ predicted_grade: "C" }, false)).toBe(true);
   });
+
+  it("allows Accept when the Space prediction is still missing", () => {
+    expect(predictionIsAcceptable(null, false)).toBe(true);
+    expect(predictionIsAcceptable(undefined, false)).toBe(true);
+    expect(predictionIsAcceptable(null, true)).toBe(false);
+  });
 });

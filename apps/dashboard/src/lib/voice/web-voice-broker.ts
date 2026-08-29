@@ -100,7 +100,7 @@ export type WebVoiceGateway = {
     khasraNumber?: string;
     areaHectares?: number;
     village?: string;
-  }) => void | Promise<void>;
+  }) => void | Promise<{ plotId?: string } | void>;
   capture: VoiceCaptureBridge;
 };
 
@@ -330,7 +330,7 @@ export class WebVoiceBroker {
     };
   }
 
-  private registerPlot(args: Record<string, unknown>): VoiceToolResult {
+  private async registerPlot(args: Record<string, unknown>): Promise<VoiceToolResult> {
     const name = String(args.name || args.plot_name || "Farm Plot").trim();
     const cropType = String(args.crop_type || args.crop || "wheat").trim().toLowerCase();
     const khasra = args.khasra_number ? String(args.khasra_number).trim() : `KH-${Math.floor(100 + Math.random() * 900)}`;
@@ -338,18 +338,26 @@ export class WebVoiceBroker {
     const village = args.village ? String(args.village).trim() : undefined;
 
     if (this.gateway.addPlot) {
-      this.gateway.addPlot({
-        name,
-        cropType,
-        khasraNumber: khasra,
-        areaHectares: isNaN(area) ? 1.0 : area,
-        village,
-      });
-      return {
-        outcome: "succeeded",
-        message: `Registered plot '${name}' with ${cropType} crop.`,
-        data: { name, crop_type: cropType, khasra_number: khasra, area_hectares: area },
-      };
+      try {
+        const saved = await this.gateway.addPlot({
+          name,
+          cropType,
+          khasraNumber: khasra,
+          areaHectares: isNaN(area) ? 1.0 : area,
+          village,
+        });
+        const plotId = saved && typeof saved === "object" ? saved.plotId : undefined;
+        return {
+          outcome: "succeeded",
+          message: `Registered plot '${name}' with ${cropType} crop. It is saved to your farms.`,
+          data: { name, crop_type: cropType, khasra_number: khasra, area_hectares: area, plot_id: plotId },
+        };
+      } catch (error) {
+        return {
+          outcome: "failed",
+          message: `Could not save plot '${name}': ${error instanceof Error ? error.message : "unknown error"}`,
+        };
+      }
     }
     return {
       outcome: "succeeded",

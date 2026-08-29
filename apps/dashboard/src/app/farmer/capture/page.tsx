@@ -356,6 +356,8 @@ function CaptureStudioContent() {
     };
   }, [isCameraActive, currentAngle?.id]);
 
+  const [gpsRetry, setGpsRetry] = useState(0);
+
   useEffect(() => {
     if (!("geolocation" in navigator)) {
       setGpsCoords({ lat: null, lon: null, accuracyM: null, status: "unavailable" });
@@ -373,9 +375,13 @@ function CaptureStudioContent() {
       () => {
         setGpsCoords({ lat: null, lon: null, accuracyM: null, status: "unavailable" });
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
+  }, [gpsRetry]);
+
+  useEffect(() => {
+    void fetch("/api/health", { cache: "no-store" }).catch(() => undefined);
   }, []);
 
   // Web Speech API / Voice Dictation
@@ -611,9 +617,12 @@ function CaptureStudioContent() {
   };
 
   // Check completion
-  const requiredCount = activeAngleDefs.length;
-  const capturedCount = activeAngleDefs.filter((a) => Boolean(capturedImages[a.id])).length;
-  const isAllCaptured = capturedCount === requiredCount;
+  const requiredAngleIds = isTargetedRecapture
+    ? activeAngleDefs.map((a) => a.id)
+    : activeRoute.requiredAngles;
+  const requiredCount = requiredAngleIds.length;
+  const capturedCount = requiredAngleIds.filter((id) => Boolean(capturedImages[id])).length;
+  const isAllCaptured = requiredCount > 0 && capturedCount === requiredCount;
 
   // Handle Save Draft
   const handleSaveDraft = () => {
@@ -865,10 +874,26 @@ function CaptureStudioContent() {
         </div>
       )}
       {!isSupabaseConfigured() && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-xs text-rose-900">
           {lang === "hi"
-            ? "डेटाबेस कॉन्फ़िगर नहीं है — दावा इस सत्र में ही रहेगा।"
-            : "Database is not configured — this claim will stay in the current session only."}
+            ? "डेटाबेस कॉन्फ़िगर नहीं है — दावा सबमिट नहीं होगा। Supabase कनेक्ट करें।"
+            : "Database is not configured — this claim will not be stored. Connect Supabase before submitting."}
+        </div>
+      )}
+      {gpsCoords.status === "unavailable" && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          <span>
+            {lang === "hi"
+              ? "जीपीएस बंद है — सबमिट होगा, पर सैटेलाइट और प्लॉट मिलान नहीं चलेगा। ब्राउज़र में Location Allow करें।"
+              : "GPS is off — you can still submit, but satellite and plot-match checks will be empty. Allow Location in the browser."}
+          </span>
+          <button
+            type="button"
+            className="shrink-0 rounded border border-amber-300 bg-white px-2 py-1 font-semibold text-amber-900"
+            onClick={() => setGpsRetry((n) => n + 1)}
+          >
+            {lang === "hi" ? "फिर से कोशिश" : "Retry GPS"}
+          </button>
         </div>
       )}
 
