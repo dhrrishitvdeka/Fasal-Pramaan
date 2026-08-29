@@ -271,6 +271,8 @@ export function claimFromRow(row: WebClaimRow, images: ClaimImageEvidence[]): Fa
       gate_result: (row as any).gate_result ?? null,
       contextSignals: (row as any).context_signals ?? null,
       context_signals: (row as any).context_signals ?? null,
+      captureLat: row.capture_lat,
+      captureLon: row.capture_lon,
     };
   } catch {
     extra = {};
@@ -704,11 +706,13 @@ export function markersFromClaims(claims: FarmerClaim[]): MapMarker[] {
   const markers: MapMarker[] = [];
   for (const claim of claims) {
     const gps = claim.images.find((img) => img.lat != null && img.lon != null);
-    if (!gps || gps.lat == null || gps.lon == null) continue;
+    const lat = gps?.lat ?? claim.captureLat ?? null;
+    const lon = gps?.lon ?? claim.captureLon ?? null;
+    if (lat == null || lon == null || Number.isNaN(lat) || Number.isNaN(lon)) continue;
     markers.push({
       id: claim.id,
-      lat: gps.lat,
-      lon: gps.lon,
+      lat,
+      lon,
       status: claim.status,
       severity: claim.aiPrediction.severityGrade?.toLowerCase() || null,
       crop_code: claim.cropType || null,

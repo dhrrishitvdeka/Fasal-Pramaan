@@ -37,6 +37,8 @@ const imgSrc = [
   "https://*.tile.openstreetmap.org",
   "https://*.supabase.co",
   "https://*.supabase.in",
+  "https://*.nrsc.gov.in",
+  "https://bhuvan-app1.nrsc.gov.in",
 ]
   .filter(Boolean)
   .join(" ");
@@ -47,13 +49,13 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   `img-src ${imgSrc}`,
   `media-src 'self' blob: data:`,
-  `connect-src ${connectSrc}`,
-  "worker-src 'self' blob:",
+  `connect-src ${connectSrc} https://cdn.jsdelivr.net`,
+  "worker-src 'self' blob: https://cdn.jsdelivr.net",
 ].join("; ");
 
 /** @type {import('next').NextConfig} */
