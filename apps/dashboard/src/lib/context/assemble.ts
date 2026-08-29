@@ -319,8 +319,8 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
               status: "pending",
               labelEn: "Sentinel-2 burn scar",
               labelHi: "सैटेलाइट जला निशान",
-              summaryEn: "Sentinel check queued — burn scar verification will be attached after satellite pass.",
-              summaryHi: "सैटेलाइट जाँच कतार में — जले निशान का सत्यापन बाद में जुड़ेगा।",
+              summaryEn: "Sentinel-2 request did not complete — this is not a live NDVI burn scar yet.",
+              summaryHi: "सैटेलाइट अनुरोध पूरा नहीं हुआ — यह लाइव NDVI जला निशान नहीं है।",
               confidence: 55,
               meta: { lat, lon, bbox, stub: true, httpStatus: res?.status ?? null },
               checkedAt: now,
@@ -332,8 +332,8 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
             status: "pending",
             labelEn: "Sentinel-2 burn scar",
             labelHi: "सैटेलाइट जला निशान",
-            summaryEn: "Sentinel check pending — token configured, awaiting data.",
-            summaryHi: "सैटेलाइट जाँच लंबित।",
+            summaryEn: "Sentinel-2 request failed — token is configured, but no live NDVI result yet.",
+            summaryHi: "सैटेलाइट अनुरोध विफल — टोकन है, लाइव NDVI अभी नहीं।",
             checkedAt: now,
           });
         }
@@ -360,10 +360,10 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
           signals.push({
             source: "sentinel",
             status: "available",
-            labelEn: "Sentinel-2 burn scar",
-            labelHi: "सैटेलाइट जला निशान",
+            labelEn: "Heat-anomaly proxy (not Sentinel NDVI)",
+            labelHi: "गर्मी संकेतक (सैटेलाइट NDVI नहीं)",
             summaryEn:
-              `Free-tier check (no satellite token configured): ${hotDays} extreme-heat day(s) (>40°C) in past 30 days.` +
+              `Not a live Sentinel-2 burn scar. Open-Meteo heat proxy (no SENTINEL_TOKEN): ${hotDays} extreme-heat day(s) (>40°C) in past 30 days.` +
               (hotDays > 0 ? " Heat anomaly plausibly supports the fire claim." : ""),
             summaryHi: `फ्री-टियर जाँच (सैटेलाइट टोकन कॉन्फ़िगर नहीं): पिछले 30 दिनों में ${hotDays} अत्यधिक गर्मी के दिन (>40°C)।`,
             confidence: 55,
@@ -374,9 +374,9 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
           signals.push({
             source: "sentinel",
             status: "pending",
-            labelEn: "Sentinel-2 burn scar",
-            labelHi: "सैटेलाइट जला निशान",
-            summaryEn: "Free-tier burn check unavailable right now (Open-Meteo archive unreachable) — will retry.",
+            labelEn: "Heat-anomaly proxy (not Sentinel NDVI)",
+            labelHi: "गर्मी संकेतक (सैटेलाइट NDVI नहीं)",
+            summaryEn: "Heat-proxy check unavailable (Open-Meteo archive unreachable) — not a live Sentinel NDVI result.",
             summaryHi: "फ्री-टियर जाँच अभी अनुपलब्ध — दोबारा प्रयास होगा।",
             meta: { lat, lon, proxy: "open-meteo-archive", needsToken: true },
             checkedAt: now,

@@ -315,6 +315,9 @@ export type Submission = {
   severity?: string | null;
   final_severity?: string | null;
   final_assessment_notes?: string | null;
+  recapture_reason?: string | null;
+  recapture_reason_hi?: string | null;
+  missing_angles?: string[] | null;
   peril?: string | null;
   intent_id?: string | null;
   gate_result?: unknown;

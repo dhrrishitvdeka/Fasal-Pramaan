@@ -2,5 +2,9 @@
   "framework": "nextjs",
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
-  "regions": ["bom1"]
+  "regions": ["bom1"],
+  "functions": {
+    "src/app/api/claims/route.ts": { "maxDuration": 60 },
+    "src/app/api/claims/[id]/route.ts": { "maxDuration": 60 }
+  }
 }

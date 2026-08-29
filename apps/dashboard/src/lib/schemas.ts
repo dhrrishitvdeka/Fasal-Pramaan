@@ -20,6 +20,24 @@ const trimmedNonEmpty = (max: number) =>
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date");
 
+/** JSON clients send `null` for missing GPS / dates; Zod `.optional()` only allows `undefined`. */
+function absentToUndefined(value: unknown): unknown {
+  if (value == null || value === "") return undefined;
+  return value;
+}
+
+const optionalBounded = (min: number, max: number) =>
+  z.preprocess(absentToUndefined, boundedNumber(min, max).optional());
+
+const optionalIsoDate = z.preprocess((value) => {
+  if (value == null || value === "") return undefined;
+  const day = String(value).trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : undefined;
+}, isoDate.optional());
+
+const optionalTrimmed = (max: number) =>
+  z.preprocess(absentToUndefined, z.string().trim().max(max).optional());
+
 /** Matches the angle ids accepted by /api/saathi/tool (CANONICAL_ANGLES). */
 const ANGLE_IDS = CANONICAL_ANGLES.map((a) => a.id) as [string, ...string[]];
 
@@ -40,9 +58,9 @@ export const claimImageSchema = z.object({
   imageDataUrl: z.string(),
   angleType: z.string().optional().default("closeup_damage"),
   sha256: z.string().optional(),
-  lat: boundedNumber(-90, 90).nullish(),
-  lon: boundedNumber(-180, 180).nullish(),
-  accuracyM: boundedNumber(0, 100000).nullish(),
+  lat: optionalBounded(-90, 90),
+  lon: optionalBounded(-180, 180),
+  accuracyM: optionalBounded(0, 100000),
   lightingScore: z.number().finite().nullish(),
   qualityPassed: z.boolean().nullish(),
   blurScore: z.number().finite().nullish(),
@@ -55,8 +73,8 @@ export const claimImageSchema = z.object({
 /** Body of POST /api/claims (1..6 images; data-URL/MIME/size checks stay in-route). */
 export const claimSubmissionSchema = z.object({
   images: z.array(claimImageSchema).min(1).max(6),
-  id: trimmedNonEmpty(128).optional(),
-  plotId: z.string().optional(),
+  id: optionalTrimmed(128),
+  plotId: z.preprocess(absentToUndefined, z.string().optional()),
   plotName: z.string().optional(),
   plotNameHi: z.string().optional(),
   khasraNumber: z.string().optional(),
@@ -64,15 +82,15 @@ export const claimSubmissionSchema = z.object({
   cropTypeHi: z.string().optional(),
   cropVariety: z.string().optional(),
   farmerObservations: z.string().optional(),
-  captureLat: boundedNumber(-90, 90).optional(),
-  captureLon: boundedNumber(-180, 180).optional(),
-  captureAccuracyM: boundedNumber(0, 100000).optional(),
+  captureLat: optionalBounded(-90, 90),
+  captureLon: optionalBounded(-180, 180),
+  captureAccuracyM: optionalBounded(0, 100000),
   gpsStatus: z.string().optional(),
-  peril: trimmedNonEmpty(64).optional(),
-  intentId: trimmedNonEmpty(128).optional(),
-  plotLat: boundedNumber(-90, 90).optional(),
-  plotLon: boundedNumber(-180, 180).optional(),
-  sowingDate: isoDate.optional(),
+  peril: optionalTrimmed(64),
+  intentId: optionalTrimmed(128),
+  plotLat: optionalBounded(-90, 90),
+  plotLon: optionalBounded(-180, 180),
+  sowingDate: optionalIsoDate,
 });
 
 export type ClaimSubmissionBody = z.infer<typeof claimSubmissionSchema>;

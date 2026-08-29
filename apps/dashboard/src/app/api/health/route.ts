@@ -16,7 +16,7 @@ export async function GET() {
     status: "healthy",
     ok: true,
     latencyMs: Math.round(performance.now() - t0),
-    runtime: "Node.js (Next.js 15 App Router)",
+    runtime: "Node.js (Next.js 16 App Router)",
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.round(process.uptime ? process.uptime() : 0),
   };
@@ -138,27 +138,26 @@ export async function GET() {
     };
   }
 
-  // 4. Google Gemini Live Multimodal AI
-  const geminiKey = process.env.GEMINI_API_KEY;
+  // 4. Google Gemini Live Multimodal AI — key present ≠ a live round-trip
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (geminiKey) {
     services.gemini_ai = {
       id: "gemini_ai",
-      name: "Google Gemini 2.0 & Live Voice",
+      name: "Google Gemini Live Voice & Vision Gate",
       category: "Multimodal AI & Voice",
       status: "healthy",
       ok: true,
       provider: "Google AI",
-      latencyMs: 18,
-      details: "16kHz Duplex Voice & Vision Gate ready",
+      details: "API key present — Live voice and vision gate enabled (not live-probed)",
     };
   } else {
     services.gemini_ai = {
       id: "gemini_ai",
-      name: "Google Gemini 2.0 & Live Voice",
+      name: "Google Gemini Live Voice & Vision Gate",
       category: "Multimodal AI & Voice",
       status: "unconfigured",
       ok: false,
-      note: "GEMINI_API_KEY not configured (local heuristic fallback)",
+      note: "GEMINI_API_KEY not configured (heuristic vision gate; no spoken Live session)",
       latencyMs: 0,
     };
   }
@@ -192,16 +191,28 @@ export async function GET() {
     };
   }
 
-  // 6. Copernicus Sentinel-2 & ISRO Bhuvan Satellite Engine
-  services.satellite_engine = {
-    id: "satellite_engine",
-    name: "Sentinel-2 & ISRO Bhuvan Engine",
-    category: "Earth Observation",
-    status: "healthy",
-    ok: true,
-    latencyMs: 24,
-    details: "10m NDVI, NBR Burn Scars & Water Inundation",
-  };
+  // 6. Copernicus Sentinel-2 & ISRO Bhuvan — token presence only, not a live NDVI probe
+  const sentinelToken = process.env.SENTINEL_TOKEN || process.env.COPERNICUS_TOKEN;
+  if (sentinelToken) {
+    services.satellite_engine = {
+      id: "satellite_engine",
+      name: "Sentinel-2 & ISRO Bhuvan Engine",
+      category: "Earth Observation",
+      status: "healthy",
+      ok: true,
+      details: "SENTINEL_TOKEN present — fire claims request Sentinel-2 NDVI burn-scar (not live-probed here)",
+    };
+  } else {
+    services.satellite_engine = {
+      id: "satellite_engine",
+      name: "Sentinel-2 & ISRO Bhuvan Engine",
+      category: "Earth Observation",
+      status: "unconfigured",
+      ok: false,
+      note: "No SENTINEL_TOKEN — fire claims use an Open-Meteo extreme-heat proxy, not live NDVI",
+      latencyMs: 0,
+    };
+  }
 
   const isCoreOk = services.app_server.ok && (services.supabase.ok || !supabaseConfigured);
   const overallStatus = isCoreOk

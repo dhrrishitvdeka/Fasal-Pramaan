@@ -141,6 +141,47 @@ function parseSsePayload(text: string): unknown {
   return last;
 }
 
+const START_TIMEOUT_MS = 45_000;
+const POLL_TIMEOUT_MS = 60_000;
+const WARMUP_TIMEOUT_MS = 12_000;
+const MAX_INFER_ATTEMPTS = 3;
+
+function abortAfter(ms: number): AbortSignal | undefined {
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(ms);
+  }
+  return undefined;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableInferError(error: Error): boolean {
+  return /503|502|504|408|429|timeout|timed out|cold|sleep|Failed to fetch|network|unreachable|ECONNRESET|UND_ERR/i.test(
+    error.message,
+  );
+}
+
+async function warmupSpace(
+  spaceUrl: string,
+  token: string | undefined,
+  fetchImpl: typeof fetch,
+): Promise<void> {
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    await fetchImpl(`${spaceUrl}/gradio_api/call/health`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ data: [] }),
+      signal: abortAfter(WARMUP_TIMEOUT_MS),
+    });
+  } catch {
+    // Warmup is best-effort — a sleeping Space still proceeds to predict_api retries.
+  }
+}
+
 async function callGradioPredictApi(
   spaceUrl: string,
   token: string | undefined,
@@ -157,7 +198,7 @@ async function callGradioPredictApi(
     method: "POST",
     headers,
     body: JSON.stringify({ data }),
-    signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(12000) : undefined,
+    signal: abortAfter(START_TIMEOUT_MS),
   });
   const startText = await started.text();
   if (!started.ok) {
@@ -177,7 +218,7 @@ async function callGradioPredictApi(
   const stream = await fetchImpl(`${spaceUrl}/gradio_api/call/predict_api/${eventId}`, {
     method: "GET",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
-    signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(12000) : undefined,
+    signal: abortAfter(POLL_TIMEOUT_MS),
   });
   const streamText = await stream.text();
   if (!stream.ok) {
@@ -211,11 +252,25 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
     })),
   );
 
-  const payload = await callGradioPredictApi(
-    spaceUrl,
-    token,
-    [imageB64, input.expectedCrop || "", input.angleType || "closeup_damage", imagesJson],
-    fetchImpl,
-  );
-  return parseSpacePrediction(payload);
+  await warmupSpace(spaceUrl, token, fetchImpl);
+
+  const predictArgs = [imageB64, input.expectedCrop || "", input.angleType || "closeup_damage", imagesJson];
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= MAX_INFER_ATTEMPTS; attempt += 1) {
+    try {
+      const payload = await callGradioPredictApi(spaceUrl, token, predictArgs, fetchImpl);
+      return parseSpacePrediction(payload);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (!isRetryableInferError(lastError) || attempt === MAX_INFER_ATTEMPTS) {
+        throw lastError;
+      }
+      const isTest =
+        process.env.NODE_ENV === "test" ||
+        process.env.VITEST === "true" ||
+        Boolean((globalThis as { __vitest_worker__?: unknown }).__vitest_worker__);
+      if (!isTest) await sleep(2_000 * attempt);
+    }
+  }
+  throw lastError || new Error("Fasal-Pramaan Space inference failed");
 }

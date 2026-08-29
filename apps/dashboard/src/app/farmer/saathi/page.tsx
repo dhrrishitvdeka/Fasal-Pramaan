@@ -50,7 +50,7 @@ type LiveStatus = "idle" | "connecting" | "live";
 
 export default function SaathiIntakePage() {
   const router = useRouter();
-  const { lang, setLang, plots, setActiveIntent, activeIntent } = useFarmerData();
+  const { lang, setLang, plots, setActiveIntent, activeIntent, registerPlot } = useFarmerData();
   const t = getFarmerT(lang);
   const [messages, setMessages] = useState<SaathiMessage[]>(() => [initialSaathiGreeting(lang)]);
   const [slots, setSlots] = useState<SaathiSlot>({});
@@ -76,6 +76,9 @@ export default function SaathiIntakePage() {
   const slotsRef = useRef(slots);
   const langRef = useRef(lang);
   const teardownRef = useRef<() => void>(() => {});
+  const autoStartedRef = useRef(false);
+  const registerPlotRef = useRef(registerPlot);
+  registerPlotRef.current = registerPlot;
 
   slotsRef.current = slots;
   langRef.current = lang;
@@ -403,6 +406,27 @@ export default function SaathiIntakePage() {
       let payload: Record<string, unknown>;
       if (call.name === "classify_claim") {
         payload = applyClassifyClaim(call.arguments);
+      } else if (call.name === "register_plot") {
+        const name = String(call.arguments.name || call.arguments.plot_name || "Farm Plot").trim();
+        const cropType = String(call.arguments.crop_type || call.arguments.crop || "wheat").trim();
+        try {
+          const saved = await registerPlotRef.current({
+            name,
+            cropType,
+            khasraNumber: call.arguments.khasra_number ? String(call.arguments.khasra_number) : undefined,
+            areaHectares: call.arguments.area_hectares != null ? Number(call.arguments.area_hectares) : undefined,
+            village: call.arguments.village ? String(call.arguments.village) : undefined,
+          });
+          payload = {
+            outcome: "ok",
+            data: { action: "register_plot", name, crop_type: cropType, plot_id: saved.plotId },
+          };
+        } catch (err) {
+          payload = {
+            outcome: "failed",
+            message: err instanceof Error ? err.message : "Could not save the plot.",
+          };
+        }
       } else {
         try {
           const res = await apiFetch("/api/saathi/tool", {
@@ -629,6 +653,17 @@ export default function SaathiIntakePage() {
     void startVoiceCore();
   };
 
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    if (typeof window === "undefined" || !("WebSocket" in window)) return;
+    autoStartedRef.current = true;
+    setVoiceMode(true);
+    retryCountRef.current = 0;
+    void startVoiceCore();
+    // Auto-start once on mount so Saathi greets aloud without a mic tap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const canProceed = Boolean(slots.peril);
   const intentPreview = canProceed ? slotsToIntent(slots) : null;
   const route = slots.peril ? routeForPeril(slots.peril) : null;
@@ -707,8 +742,8 @@ export default function SaathiIntakePage() {
         </div>
         <p className="mt-3 text-xs text-slate-600 leading-relaxed border-t border-stone-100 pt-2.5">
           {lang === "hi"
-            ? "माइक दबाकर अपनी फसल समस्या बोलें — साथी आवश्यक फोटो और नियम तैयार करेगा।"
-            : "Tap the microphone below and describe your crop issue — Saathi sets up the damage protocol and camera angles."}
+            ? "साथी खुलते ही बोलकर अभिवादन करता है। फसल की समस्या बताएँ — साथी फोटो और नियम तैयार करेगा।"
+            : "Saathi greets you aloud as this page opens. Describe the crop issue — it prepares the photo protocol."}
         </p>
       </div>
 

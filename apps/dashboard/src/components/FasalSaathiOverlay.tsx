@@ -36,7 +36,7 @@ export default function FasalSaathiOverlay() {
     farmerProfile,
     snoozeMilestone,
     completeMilestone,
-    addPlot,
+    registerPlot,
   } = useFarmerData();
   const t = getFarmerT(lang);
   const [open, setOpen] = useState(false);
@@ -114,33 +114,40 @@ export default function FasalSaathiOverlay() {
         changeLanguage: setLang,
         snoozeReminder: (id, days) => snoozeMilestone(id, days),
         completeReminder: (id) => completeMilestone(id, "", ""),
-        addPlot: (input) => {
-          addPlot({
-            id: `plot-${Date.now()}`,
+        addPlot: async (input) => {
+          let lat: number | null = null;
+          let lon: number | null = null;
+          try {
+            if (typeof navigator !== "undefined" && navigator.geolocation) {
+              const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                  enableHighAccuracy: true,
+                  timeout: 4000,
+                  maximumAge: 60_000,
+                });
+              });
+              lat = pos.coords.latitude;
+              lon = pos.coords.longitude;
+            }
+          } catch {
+            // GPS is optional; plot still persists without it.
+          }
+          const saved = await registerPlot({
             name: input.name,
-            nameHi: input.name,
-            khasraNumber: input.khasraNumber || `KH-${Math.floor(100 + Math.random() * 900)}`,
             cropType: input.cropType,
-            cropTypeHi: input.cropType,
-            cropVariety: "Standard / सामान्य",
-            currentStage: "Vegetative / वानस्पतिक",
-            currentStageHi: "वानस्पतिक अवस्था",
-            sowingDate: new Date().toISOString().split("T")[0],
-            soilType: "Alluvial / जलोढ़",
-            soilTypeHi: "जलोढ़",
-            irrigationType: "Canal / Tube well",
-            irrigationTypeHi: "नहर / नलकूप",
-            areaHectares: input.areaHectares || 1.0,
-            village: input.village || farmerProfile.village || "Rampur",
-            district: farmerProfile.district || "Patna",
-            state: farmerProfile.state || "Bihar",
-            lat: 25.6,
-            lon: 85.1,
+            khasraNumber: input.khasraNumber,
+            areaHectares: input.areaHectares,
+            village: input.village || farmerProfile.village,
+            district: farmerProfile.district,
+            state: farmerProfile.state,
+            lat,
+            lon,
           });
+          return saved;
         },
         capture: webCaptureBridge,
       }),
-    [plots, claims, milestones, farmerProfile, pathname, lang, router, setLang, snoozeMilestone, completeMilestone, addPlot],
+    [plots, claims, milestones, farmerProfile, pathname, lang, router, setLang, snoozeMilestone, completeMilestone, registerPlot],
   );
 
   const brokerRef = useRef(broker);
@@ -401,8 +408,8 @@ export default function FasalSaathiOverlay() {
                       realtimeInput: {
                         text:
                           langRef.current === "hi"
-                            ? "किसान भाई का गर्मजोशी से अभिवादन करें और पूछें कि उनकी फसल में क्या समस्या हुई है।"
-                            : "Greet the farmer warmly and ask what happened to their crop.",
+                            ? "नमस्ते किसान भाई! मैं फसल साथी हूँ। आपके खेत में क्या समस्या हुई है? मुझे बताएं।"
+                            : "Hello! I am Fasal Saathi. What happened to your crop? Tell me in your words.",
                       },
                     }),
                   );

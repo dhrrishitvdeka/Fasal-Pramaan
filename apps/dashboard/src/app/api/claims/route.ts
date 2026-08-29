@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import {
   persistAndInfer,
   recaptureAndInfer,
+  inferAndAttachToClaim,
   claimToSubmission,
   type PersistClaimInput,
 } from "@/lib/claim-pipeline";
@@ -11,6 +12,8 @@ import { createSupabaseClaimStore } from "@/lib/supabase-store";
 import { isReviewerRole, requireWebActor } from "@/lib/web-auth";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { claimSubmissionSchema } from "@/lib/schemas";
+
+export const maxDuration = 60;
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 const MAX_BYTES = 15 * 1024 * 1024;
@@ -159,9 +162,20 @@ export async function POST(request: Request) {
           images,
         },
         inferCropDisease,
-        inferOptions,
+        { ...inferOptions, skipInference: true },
       );
-      return NextResponse.json(result);
+      if (result.pendingInference) {
+        const cropType = existing.crop_type || undefined;
+        after(() =>
+          inferAndAttachToClaim(store, result.claimId, images, cropType, inferCropDisease, inferOptions).then(
+            () => undefined,
+            (err) => {
+              console.error("deferred recapture inference failed:", err instanceof Error ? err.message : err);
+            },
+          ),
+        );
+      }
+      return NextResponse.json({ claimId: result.claimId, prediction: result.prediction ?? null });
     }
     const input: PersistClaimInput = {
       plotId: body.plotId,
@@ -187,8 +201,28 @@ export async function POST(request: Request) {
       createdBy: auth.actor.userId,
       images,
     };
-    const result = await persistAndInfer(store, input, inferCropDisease, inferOptions);
-    return NextResponse.json(result);
+    const result = await persistAndInfer(store, input, inferCropDisease, {
+      ...inferOptions,
+      skipInference: true,
+    });
+    if (result.pendingInference) {
+      after(() =>
+        inferAndAttachToClaim(
+          store,
+          result.claimId,
+          images,
+          input.cropType,
+          inferCropDisease,
+          inferOptions,
+        ).then(
+          () => undefined,
+          (err) => {
+            console.error("deferred claim inference failed:", err instanceof Error ? err.message : err);
+          },
+        ),
+      );
+    }
+    return NextResponse.json({ claimId: result.claimId, prediction: result.prediction ?? null });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Persist failed";
     const status = message === "Claim not found" ? 404 : 500;
