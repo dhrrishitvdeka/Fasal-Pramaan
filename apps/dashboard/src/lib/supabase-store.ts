@@ -10,25 +10,63 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
         return data as WebClaimRow;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (/peril|intent_id|gate_result|context_signals|adaptive_result/i.test(msg)) {
-          const { peril: _p, intent_id: _i, gate_result: _g, context_signals: _c, adaptive_result: _a, ...stripped } = row as any;
+        if (/duplicate|unique|already exists|23505/i.test(msg)) {
+          throw new Error("Claim already exists");
+        }
+        if (/peril|intent_id|gate_result|context_signals|adaptive_result|inference_/i.test(msg)) {
+          const {
+            peril: _p,
+            intent_id: _i,
+            gate_result: _g,
+            context_signals: _c,
+            adaptive_result: _a,
+            inference_status: _s,
+            inference_error: _e,
+            inference_started_at: _t,
+            ...stripped
+          } = row as any;
           const { data, error } = await client.from("web_claims").insert(stripped).select().single();
-          if (error) throw new Error(error.message);
+          if (error) {
+            if (/duplicate|unique|already exists|23505/i.test(error.message)) {
+              throw new Error("Claim already exists");
+            }
+            throw new Error(error.message);
+          }
           return data as WebClaimRow;
         }
         throw err;
       }
     },
-    async updateClaim(id, patch) {
-      try {
-        const { error } = await client.from("web_claims").update(patch).eq("id", id);
+    async updateClaim(id, patch, opts) {
+      const apply = async (body: Partial<WebClaimRow>) => {
+        let query = client.from("web_claims").update(body).eq("id", id);
+        if (opts?.expectedStatus) {
+          query = query.eq("status", opts.expectedStatus);
+        }
+        const { data, error } = await query.select("id");
         if (error) throw new Error(error.message);
+        if (opts?.expectedStatus && (!data || data.length === 0)) {
+          throw new Error("Claim status changed");
+        }
+      };
+      try {
+        await apply(patch);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (/peril|intent_id|gate_result|context_signals|adaptive_result/i.test(msg)) {
-          const { peril: _p, intent_id: _i, gate_result: _g, context_signals: _c, adaptive_result: _a, ...stripped } = patch as any;
-          const { error } = await client.from("web_claims").update(stripped).eq("id", id);
-          if (error) throw new Error(error.message);
+        if (msg === "Claim status changed") throw err;
+        if (/peril|intent_id|gate_result|context_signals|adaptive_result|inference_/i.test(msg)) {
+          const {
+            peril: _p,
+            intent_id: _i,
+            gate_result: _g,
+            context_signals: _c,
+            adaptive_result: _a,
+            inference_status: _s,
+            inference_error: _e,
+            inference_started_at: _t,
+            ...stripped
+          } = patch as any;
+          await apply(stripped);
         } else {
           throw err;
         }
@@ -65,26 +103,17 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
     },
     async replaceAngleImages(claimId, rows) {
       if (!rows.length) return;
+      // Insert first so a failed write cannot delete the farmer's previous evidence.
+      await this.insertImages(rows);
+      const keepIds = rows.map((row) => row.id);
       const angles = [...new Set(rows.map((row) => row.angle_type))];
       const { error: deleteError } = await client
         .from("web_claim_images")
         .delete()
         .eq("claim_id", claimId)
-        .in("angle_type", angles);
+        .in("angle_type", angles)
+        .not("id", "in", `(${keepIds.join(",")})`);
       if (deleteError) throw new Error(deleteError.message);
-      try {
-        const { error } = await client.from("web_claim_images").insert(rows);
-        if (error) throw new Error(error.message);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (/gate_result/i.test(msg)) {
-          const stripped = rows.map(({ gate_result: _g, ...rest }: any) => rest);
-          const { error } = await client.from("web_claim_images").insert(stripped);
-          if (error) throw new Error(error.message);
-        } else {
-          throw err;
-        }
-      }
     },
     async listImages(claimId) {
       const { data, error } = await client.from("web_claim_images").select("*").eq("claim_id", claimId);
@@ -119,6 +148,12 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
         .createSignedUrl(path, 60 * 60 * 24 * 7);
       if (signError) throw new Error(signError.message);
       return { url: signed.signedUrl, storagePath: path };
+    },
+    async downloadImage(path) {
+      const { data, error } = await client.storage.from("fasal-web-evidence").download(path);
+      if (error) throw new Error(error.message);
+      const buf = await data.arrayBuffer();
+      return new Uint8Array(buf);
     },
     async insertReviewAction(row) {
       const { error } = await client.from("web_review_actions").insert(row);

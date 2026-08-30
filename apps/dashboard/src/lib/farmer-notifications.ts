@@ -21,12 +21,15 @@ export function loadSeenNotices(): string[] {
   }
 }
 
+const SEEN_NOTICES_CAP = 200;
+
 export function markSeen(claimId: string): void {
   if (typeof window === "undefined") return;
   try {
-    const seen = new Set(loadSeenNotices());
-    seen.add(claimId);
-    localStorage.setItem(SEEN_RECAPTURE_NOTICES_KEY, JSON.stringify(Array.from(seen)));
+    const seen = loadSeenNotices().filter((id) => id !== claimId);
+    seen.push(claimId);
+    const trimmed = seen.length > SEEN_NOTICES_CAP ? seen.slice(seen.length - SEEN_NOTICES_CAP) : seen;
+    localStorage.setItem(SEEN_RECAPTURE_NOTICES_KEY, JSON.stringify(trimmed));
   } catch {
     // ignore quota / privacy-mode errors
   }

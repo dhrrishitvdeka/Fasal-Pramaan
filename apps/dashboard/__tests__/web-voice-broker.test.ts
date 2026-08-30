@@ -179,6 +179,20 @@ describe("web Fasal Saathi broker", () => {
     expect(result.data?.plot_id).toBe("plot-saved-1");
   });
 
+  it("does not claim plot registration succeeded when addPlot is missing", async () => {
+    const broker = new WebVoiceBroker(gateway());
+    const result = await broker.execute("register_plot", { name: "Ghost plot", crop_type: "wheat" }, 1);
+    expect(result.outcome).toBe("failed");
+    expect(result.message).toMatch(/not available/i);
+  });
+
+  it("does not report a calibrated camera when capture is closed", async () => {
+    const broker = new WebVoiceBroker(gateway());
+    const result = await broker.execute("check_evidence_quality", {}, 1);
+    expect(result.outcome).toBe("failed");
+    expect(result.message.toLowerCase()).not.toMatch(/calibrated/);
+  });
+
   it("does not mutate on prepare, mutates on a later yes, and cancel does not submit", async () => {
     const gw = gateway();
     const broker = new WebVoiceBroker(gw);

@@ -449,6 +449,8 @@ export async function submitWebClaim(input: {
     qualityPassed?: boolean | null;
     blurScore?: number | null;
     greenPct?: number | null;
+    luma?: number | null;
+    cropScore?: number | null;
     facing?: string | null;
     dimensions?: { width: number; height: number } | null;
     capturedAt?: string | null;

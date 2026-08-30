@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { analyzeInWorker } from "@/lib/vision/cv-worker";
-import { classifyAgriculturalPixel, rgbToHsv } from "@/lib/vision/realtime-cv";
+import { analyzeFrame as analyzeInWorker, classifyAgriculturalPixel, rgbToHsv } from "@/lib/vision/cv-core";
 
 describe("Realtime Multi-Spectral Agricultural CV Engine & Guidance", () => {
   const width = 32;

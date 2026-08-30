@@ -104,6 +104,9 @@ export async function mintVoiceSession(input: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+      ? AbortSignal.timeout(15_000)
+      : undefined,
   });
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");

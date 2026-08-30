@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS public.web_claims (
   crop_type text,
   crop_type_hi text,
   crop_variety text,
+  sowing_date date,
   status text NOT NULL DEFAULT 'under_review',
   farmer_observations text,
   missing_angles text[] DEFAULT '{}',
@@ -82,7 +83,10 @@ CREATE TABLE IF NOT EXISTS public.web_claims (
   adaptive_result jsonb,
   created_by text,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  inference_status text,
+  inference_error text,
+  inference_started_at timestamptz
 );
 
 CREATE TABLE IF NOT EXISTS public.web_claim_images (

@@ -68,6 +68,8 @@ export interface ClaimImageEvidence {
   qualityPassed: boolean;
   blurScore?: number;
   lightingScore?: number;
+  luma?: number | null;
+  cropScore?: number | null;
   greenPct?: number | null;
   facing?: string | null;
   dimensions?: { width: number; height: number } | null;
@@ -189,7 +191,7 @@ interface FarmerContextType {
     claimId: string,
     recapturedImages: ClaimImageEvidence[],
   ) => Promise<FarmerClaim | undefined>;
-  saveClaimDraft: (draft: Partial<FarmerClaim>) => string;
+  saveClaimDraft: (draft: Partial<FarmerClaim>) => { id: string; saved: boolean };
   loadClaimDraft: (draftId?: string) => Partial<FarmerClaim> | null;
   refreshData: () => Promise<void>;
   snoozeMilestone: (id: string, days: number) => void | Promise<void>;
@@ -214,6 +216,8 @@ const FarmerContext = createContext<FarmerContextType | null>(null);
 const STORAGE_KEY_LANG = "fp_farmer_lang_v1";
 const STORAGE_KEY_DRAFT = "fp_farmer_active_draft_v1";
 
+const INTENT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
 function loadStoredIntent(): ClaimIntent | null {
   if (typeof window === "undefined") return null;
   try {
@@ -221,6 +225,11 @@ function loadStoredIntent(): ClaimIntent | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ClaimIntent;
     if (!parsed?.id || !parsed?.peril) return null;
+    const created = Date.parse(parsed.createdAt || "");
+    if (Number.isFinite(created) && Date.now() - created > INTENT_MAX_AGE_MS) {
+      sessionStorage.removeItem(INTENT_STORAGE_KEY);
+      return null;
+    }
     return parsed;
   } catch {
     return null;
@@ -445,7 +454,8 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     const areaHectares = Number.isFinite(Number(input.areaHectares)) ? Number(input.areaHectares) : 1;
     const lat = typeof input.lat === "number" && Number.isFinite(input.lat) ? input.lat : undefined;
     const lon = typeof input.lon === "number" && Number.isFinite(input.lon) ? input.lon : undefined;
-    const sowingDate = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const sowingDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
     if (isSupabaseConfigured()) {
       const res = await apiFetch("/api/farmer/plots", {
@@ -553,6 +563,8 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         qualityPassed: img.qualityPassed,
         blurScore: img.blurScore,
         greenPct: img.greenPct,
+        luma: img.luma,
+        cropScore: img.cropScore,
         facing: img.facing,
         dimensions: img.dimensions,
         capturedAt: img.timestamp || undefined,
@@ -585,7 +597,7 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-    // keep intent until navigation leaves — caller clears after success
+    clearActiveIntent();
     return claim;
   };
 
@@ -608,17 +620,28 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     return claim;
   };
 
-  const saveClaimDraft = (draft: Partial<FarmerClaim>): string => {
+  const saveClaimDraft = (draft: Partial<FarmerClaim>): { id: string; saved: boolean } => {
     const draftId = draft.id || `DRAFT-${Date.now()}`;
+    const images = (draft.images || []).map((img) => ({
+      ...img,
+      // data URLs blow the sessionStorage quota; keep metadata only
+      imageUrl: typeof img.imageUrl === "string" && img.imageUrl.startsWith("data:") ? "" : img.imageUrl,
+    }));
     try {
       sessionStorage.setItem(
         STORAGE_KEY_DRAFT,
-        JSON.stringify({ ...draft, id: draftId, status: "draft", updatedAt: new Date().toISOString() }),
+        JSON.stringify({
+          ...draft,
+          images,
+          id: draftId,
+          status: "draft",
+          updatedAt: new Date().toISOString(),
+        }),
       );
+      return { id: draftId, saved: true };
     } catch {
-      // ignore
+      return { id: draftId, saved: false };
     }
-    return draftId;
   };
 
   const loadClaimDraft = (): Partial<FarmerClaim> | null => {

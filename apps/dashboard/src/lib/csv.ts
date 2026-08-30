@@ -1,7 +1,8 @@
 function escapeCell(value: unknown): string {
   if (value == null) return "";
   let s = value instanceof Date ? value.toISOString() : String(value);
-  if (/^[=+\-@\t\r]/.test(s)) {
+  // Prefix formula-injection prefixes, but keep genuine negative numbers intact.
+  if (/^[=+@\t\r]/.test(s) || (/^-/.test(s) && !/^-?\d+(\.\d+)?$/.test(s))) {
     s = `'${s}`;
   }
   if (/[",\r\n]/.test(s)) {

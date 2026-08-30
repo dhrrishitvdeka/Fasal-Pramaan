@@ -201,11 +201,12 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
     // from feeding the assistant's own voice back into Gemini Live.
     const isAssistantSpeaking = ctx.currentTime < playTime + 0.15;
     if (isAssistantSpeaking) {
-      // If below deliberate user interruption threshold, drop acoustic bleed from speaker
-      if (rms < 0.12) {
+      // Speaker bleed on phone loudspeakers routinely exceeds 0.12 RMS and used
+      // to interrupt() the assistant's own audio. Drop residual echo; only
+      // barge-in on a clearly louder user utterance.
+      if (rms < 0.3) {
         return;
       }
-      // User is deliberately speaking over the assistant (barge-in interruption)
       interrupt();
     }
 
@@ -234,7 +235,7 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
         }
       };
       source.connect(workletNode);
-      workletNode.connect(ctx.destination);
+      connectSilentProcessor(workletNode, ctx);
       useWorklet = true;
     } catch {
       useWorklet = false;

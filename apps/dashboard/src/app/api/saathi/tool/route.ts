@@ -16,6 +16,9 @@ const ALLOWED_TOOLS = new Set([
   "set_observation",
   "submit_claim",
   "check_evidence_quality",
+  "check_plot_geofence",
+  "fetch_agro_weather_alerts",
+  "explain_claim_audit",
 ]);
 const ANGLE_IDS = new Set(CANONICAL_ANGLES.map((a) => a.id));
 
@@ -84,6 +87,38 @@ function sanitizeArgs(name: string, raw: unknown): Record<string, unknown> | nul
       const observation = typeof args.observation === "string" ? args.observation.trim().slice(0, 1000) : "";
       return { observation };
     }
+    case "check_plot_geofence": {
+      const out: Record<string, unknown> = {};
+      const lat = clampNumber(args.lat, -90, 90);
+      const lon = clampNumber(args.lon, -180, 180);
+      if (lat != null) out.lat = lat;
+      if (lon != null) out.lon = lon;
+      const accuracyM = clampNumber(args.accuracy_m, 0, 100000);
+      if (accuracyM != null) out.accuracy_m = accuracyM;
+      if (typeof args.plot_id === "string" && args.plot_id.trim()) {
+        out.plot_id = args.plot_id.trim().slice(0, 64);
+      }
+      return out;
+    }
+    case "fetch_agro_weather_alerts": {
+      const out: Record<string, unknown> = {};
+      const lat = clampNumber(args.lat, -90, 90);
+      const lon = clampNumber(args.lon, -180, 180);
+      if (lat != null) out.lat = lat;
+      if (lon != null) out.lon = lon;
+      if (typeof args.plot_id === "string" && args.plot_id.trim()) {
+        out.plot_id = args.plot_id.trim().slice(0, 64);
+      }
+      if (typeof args.location === "string" && args.location.trim()) {
+        out.location = args.location.trim().slice(0, 120);
+      }
+      return out;
+    }
+    case "explain_claim_audit": {
+      const claimId = typeof args.claim_id === "string" ? args.claim_id.trim().slice(0, 64) : "";
+      if (!claimId) return null;
+      return { claim_id: claimId };
+    }
     default:
       return null;
   }
@@ -127,7 +162,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result: SaathiToolResult = await executeSaathiTool(name, args);
+    const result: SaathiToolResult = await executeSaathiTool(name, args, { userId: auth.actor.userId });
     return NextResponse.json(result, { status: result.ok ? 200 : 400 });
   } catch (err) {
     console.error("saathi tool execution failed:", name, err instanceof Error ? err.message : err);
