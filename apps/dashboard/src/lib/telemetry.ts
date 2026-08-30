@@ -54,9 +54,15 @@ function sessionToken(): string | null {
   }
 }
 
+let lastForwardAt = 0;
+const FORWARD_MIN_MS = 5000;
+
 function forward(error: TelemetryError) {
   const token = sessionToken();
   if (!token || typeof navigator === "undefined" || !navigator.onLine) return;
+  const now = Date.now();
+  if (now - lastForwardAt < FORWARD_MIN_MS) return;
+  lastForwardAt = now;
   try {
     void fetch("/api/telemetry/error", {
       method: "POST",
@@ -138,4 +144,5 @@ export function initTelemetry() {
 export function resetTelemetryForTests() {
   ring = [];
   initialized = false;
+  lastForwardAt = 0;
 }

@@ -119,6 +119,24 @@ describe("gemini live parser", () => {
     expect(parsed.events.some((event) => event.type === "toolCalls")).toBe(true);
     expect(parsed.events.some((event) => event.type === "audio")).toBe(true);
     expect(parsed.events.some((event) => event.type === "inputTranscript")).toBe(true);
+    const tools = parsed.events.find((event) => event.type === "toolCalls");
+    if (tools && tools.type === "toolCalls") {
+      expect(tools.calls[0]?.id).toBe("c1");
+    }
+  });
+
+  it("still emits tool calls that omit id so Gemini Live is not left waiting", () => {
+    const parsed = parseGeminiLiveMessage({
+      toolCall: {
+        functionCalls: [{ name: "list_plots", args: { foo: 1 } }],
+      },
+    });
+    const tools = parsed.events.find((event) => event.type === "toolCalls");
+    expect(tools?.type).toBe("toolCalls");
+    if (tools && tools.type === "toolCalls") {
+      expect(tools.calls[0]?.name).toBe("list_plots");
+      expect(tools.calls[0]?.id).toMatch(/^missing-list_plots-/);
+    }
   });
 
   it("decodes browser Blob and ArrayBuffer Live frames instead of String(blob)", async () => {

@@ -13,10 +13,11 @@
  * farmer shell ("/farmer") and static assets open without a network.
  */
 
-const VERSION = "v2"; // bump to invalidate all caches on deploy
+const VERSION = "v3"; // bump to invalidate all caches on deploy
 const SHELL_CACHE = `fp-shell-${VERSION}`;
 const ASSET_CACHE = `fp-assets-${VERSION}`;
 const SHELL_URL = "/farmer";
+const AUTH_HTML_PREFIXES = ["/review", "/admin", "/audit", "/login", "/unlock", "/analytics", "/overview", "/map", "/alerts"];
 
 const SUPABASE_HOST_RE = /\.supabase\.(co|in)$/i;
 
@@ -76,15 +77,29 @@ async function cacheFirst(request) {
   return response;
 }
 
+function isAuthHtmlPath(pathname) {
+  return AUTH_HTML_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
 async function networkFirstNavigation(event) {
+  const requestUrl = new URL(event.request.url);
+  const skipHtmlCache = isAuthHtmlPath(requestUrl.pathname);
   try {
     const response = await fetch(event.request);
-    if (response && response.ok) {
+    if (response && response.ok && !skipHtmlCache) {
       const cache = await caches.open(SHELL_CACHE);
       cache.put(event.request, response.clone());
     }
     return response;
   } catch {
+    if (skipHtmlCache) {
+      return new Response(
+        "<!doctype html><meta charset=\"utf-8\"><title>Offline</title><p style=\"font-family:system-ui;padding:2rem\">This screen is not available offline. Sign in again when you are online.</p>",
+        { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } },
+      );
+    }
     const cachedPage = await caches.match(event.request);
     if (cachedPage) return cachedPage;
     const shell = await caches.match(SHELL_URL);

@@ -82,6 +82,17 @@ export function heuristicGate(
 
   const cv = metadata?.cvAnalysis;
 
+  if (cv?.hintCode === "crop_not_detected" || cv?.hintCode === "screen_detected" || cv?.hintCode === "person_detected") {
+    return {
+      usable: false,
+      reason: cv.hintCode === "screen_detected" ? "screen_replay_detected" : cv.hintCode,
+      crop_detected: null,
+      warnings: [cv.hintCode],
+      confidence: 0.05,
+      fallback: true,
+    };
+  }
+
   if (cv?.isPersonDetected === true) {
     return {
       usable: false,
@@ -107,12 +118,51 @@ export function heuristicGate(
   }
 
   const luma = cv?.luma;
-  if (luma != null && luma < 12) {
+  // Keep in lockstep with cv-core DARK_LUMA_MIN (14). Fire perils use 5.
+  const darkFloor = peril === "fire_burn" ? 5 : 14;
+  if (luma != null && luma < darkFloor) {
     return {
       usable: false,
       reason: "too_dark",
       crop_detected: null,
       warnings: ["too_dark"],
+      confidence: 0.2,
+      fallback: true,
+    };
+  }
+
+  const blur = cv?.blurScore;
+  if (blur != null && blur > 0 && blur < 18 && peril !== "fire_burn") {
+    return {
+      usable: false,
+      reason: "too_blurry",
+      crop_detected: expectedCrop || null,
+      warnings: ["too_blurry"],
+      confidence: 0.25,
+      fallback: true,
+    };
+  }
+
+  const cropScore = cv?.cropScore;
+  if (cropScore != null && cropScore < 75 && peril !== "fire_burn") {
+    return {
+      usable: false,
+      reason: "crop_not_detected",
+      crop_detected: expectedCrop || null,
+      visual_reason: `On-device crop score ${cropScore}% is below the 75% lock`,
+      warnings: ["crop_not_detected"],
+      confidence: 0.2,
+      fallback: true,
+    };
+  }
+
+  const greenPct = cv?.greenPct;
+  if (greenPct != null && greenPct < 8 && peril !== "fire_burn") {
+    return {
+      usable: false,
+      reason: "not_crop",
+      crop_detected: null,
+      warnings: ["not_crop"],
       confidence: 0.2,
       fallback: true,
     };
@@ -132,16 +182,16 @@ export function heuristicGate(
     };
   }
 
-  // If expectedCrop provided, assume gate passes in heuristic mode
-  if (expectedCrop) {
+  // Without CV measurements, fail closed — expectedCrop must not auto-pass.
+  const hasQualitySignal =
+    cropScore != null || luma != null || blur != null || greenPct != null || cv?.hintCode != null;
+  if (!hasQualitySignal) {
     return {
-      usable: true,
-      reason: "ok",
-      crop_detected: expectedCrop,
-      peril_match: true,
-      metadata_verified: Boolean(metadata?.lat != null && metadata?.lon != null),
-      warnings: [],
-      confidence: 0.65,
+      usable: false,
+      reason: "heuristic_unverified",
+      crop_detected: expectedCrop || null,
+      warnings: ["heuristic_unverified"],
+      confidence: 0.15,
       fallback: true,
     };
   }
@@ -149,11 +199,11 @@ export function heuristicGate(
   return {
     usable: true,
     reason: "ok",
-    crop_detected: "unknown",
+    crop_detected: expectedCrop || "unknown",
     peril_match: true,
     metadata_verified: Boolean(metadata?.lat != null && metadata?.lon != null),
     warnings: [],
-    confidence: 0.6,
+    confidence: expectedCrop ? 0.65 : 0.6,
     fallback: true,
   };
 }

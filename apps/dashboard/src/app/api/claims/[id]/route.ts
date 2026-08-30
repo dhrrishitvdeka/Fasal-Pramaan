@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import { claimToSubmission } from "@/lib/claim-pipeline";
+import { after, NextResponse } from "next/server";
+import { claimNeedsInferenceRetry, claimToSubmission, retryPendingInference } from "@/lib/claim-pipeline";
+import { inferCropDisease } from "@/lib/hf-infer";
 import { createServerSupabase } from "@/lib/supabase";
 import { createSupabaseClaimStore } from "@/lib/supabase-store";
 import { isReviewerRole, requireWebActor } from "@/lib/web-auth";
@@ -19,6 +20,17 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
   if (!isReviewerRole(auth.actor.role) && claim.created_by !== auth.actor.userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  if (claimNeedsInferenceRetry(claim)) {
+    const inferOptions = { apiToken: process.env.HF_TOKEN || process.env.HUGGINGFACE_API_TOKEN };
+    after(() =>
+      retryPendingInference(store, id, inferCropDisease, inferOptions).then(
+        () => undefined,
+        (err) => {
+          console.error("reconcile inference failed:", err instanceof Error ? err.message : err);
+        },
+      ),
+    );
   }
   return NextResponse.json(claimToSubmission(claim, await store.listImages(id)));
 }

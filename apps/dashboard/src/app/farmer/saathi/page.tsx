@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Mic,
@@ -43,6 +43,8 @@ import {
   type GeminiToolInvocation,
 } from "@/lib/voice/gemini-live-parse";
 import { startLiveAudio, type LiveAudioSession } from "@/lib/voice/live-audio";
+import { WebVoiceBroker } from "@/lib/voice/web-voice-broker";
+import { webCaptureBridge } from "@/lib/voice/capture-bridge";
 import clsx from "clsx";
 
 type ContextSignalLite = { source: string; status: string; labelEn: string; summaryEn: string };
@@ -50,7 +52,20 @@ type LiveStatus = "idle" | "connecting" | "live";
 
 export default function SaathiIntakePage() {
   const router = useRouter();
-  const { lang, setLang, plots, setActiveIntent, activeIntent, registerPlot } = useFarmerData();
+  const pathname = usePathname();
+  const {
+    lang,
+    setLang,
+    plots,
+    claims,
+    milestones,
+    farmerProfile,
+    setActiveIntent,
+    activeIntent,
+    registerPlot,
+    snoozeMilestone,
+    completeMilestone,
+  } = useFarmerData();
   const t = getFarmerT(lang);
   const [messages, setMessages] = useState<SaathiMessage[]>(() => [initialSaathiGreeting(lang)]);
   const [slots, setSlots] = useState<SaathiSlot>({});
@@ -79,6 +94,7 @@ export default function SaathiIntakePage() {
   const autoStartedRef = useRef(false);
   const registerPlotRef = useRef(registerPlot);
   registerPlotRef.current = registerPlot;
+  const userTurnRef = useRef(1);
 
   slotsRef.current = slots;
   langRef.current = lang;
@@ -406,36 +422,99 @@ export default function SaathiIntakePage() {
       let payload: Record<string, unknown>;
       if (call.name === "classify_claim") {
         payload = applyClassifyClaim(call.arguments);
-      } else if (call.name === "register_plot") {
-        const name = String(call.arguments.name || call.arguments.plot_name || "Farm Plot").trim();
-        const cropType = String(call.arguments.crop_type || call.arguments.crop || "wheat").trim();
-        try {
-          const saved = await registerPlotRef.current({
-            name,
-            cropType,
-            khasraNumber: call.arguments.khasra_number ? String(call.arguments.khasra_number) : undefined,
-            areaHectares: call.arguments.area_hectares != null ? Number(call.arguments.area_hectares) : undefined,
-            village: call.arguments.village ? String(call.arguments.village) : undefined,
-          });
-          payload = {
-            outcome: "ok",
-            data: { action: "register_plot", name, crop_type: cropType, plot_id: saved.plotId },
-          };
-        } catch (err) {
-          payload = {
-            outcome: "failed",
-            message: err instanceof Error ? err.message : "Could not save the plot.",
-          };
-        }
       } else {
         try {
-          const res = await apiFetch("/api/saathi/tool", {
-            method: "POST",
-            body: JSON.stringify({ name: call.name, args: call.arguments }),
+          const broker = new WebVoiceBroker({
+            plots: plots.map((plot) => ({
+              id: plot.id,
+              name: plot.name,
+              nameHi: plot.nameHi,
+              cropType: plot.cropType,
+              cropTypeHi: plot.cropTypeHi,
+              khasraNumber: plot.khasraNumber,
+              areaHectares: plot.areaHectares,
+              currentStage: plot.currentStage,
+              village: plot.village,
+              district: plot.district,
+              state: plot.state,
+            })),
+            claims: claims.map((claim) => ({
+              id: claim.id,
+              status: claim.status,
+              plotName: claim.plotName,
+              cropType: claim.cropType,
+              missingAngles: claim.missingAngles,
+              recaptureReason: claim.recaptureReason,
+              imageCount: claim.images?.length ?? 0,
+              createdAt: claim.createdAt,
+              reviewerNotes: claim.reviewerNotes,
+            })),
+            reminders: milestones.map((item) => ({
+              id: item.id,
+              stageName: item.stageName,
+              stageNameHi: item.stageNameHi,
+              dueDate: item.dueDate,
+              completed: item.completed,
+              isOverdue: item.isOverdue,
+              plotId: item.plotId,
+              cropName: item.cropName,
+            })),
+            farmerProfile: {
+              name: farmerProfile.name,
+              nameHi: farmerProfile.nameHi,
+              kisanId: farmerProfile.kisanId,
+              phone: farmerProfile.phone,
+              village: farmerProfile.village,
+              district: farmerProfile.district,
+              state: farmerProfile.state,
+            },
+            currentPath: pathname,
+            language: lang,
+            navigate: (path) => router.push(path),
+            changeLanguage: setLang,
+            snoozeReminder: (id, days) => snoozeMilestone(id, days),
+            completeReminder: (id) => completeMilestone(id, "", ""),
+            addPlot: async (input) => {
+              let lat: number | null = null;
+              let lon: number | null = null;
+              try {
+                if (typeof navigator !== "undefined" && navigator.geolocation) {
+                  const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                      enableHighAccuracy: true,
+                      timeout: 4000,
+                      maximumAge: 60_000,
+                    });
+                  });
+                  lat = pos.coords.latitude;
+                  lon = pos.coords.longitude;
+                }
+              } catch {
+                // GPS is optional; plot still persists without it.
+              }
+              return await registerPlotRef.current({
+                name: input.name,
+                cropType: input.cropType,
+                khasraNumber: input.khasraNumber,
+                areaHectares: input.areaHectares,
+                village: input.village || farmerProfile.village,
+                district: farmerProfile.district,
+                state: farmerProfile.state,
+                lat,
+                lon,
+              });
+            },
+            capture: webCaptureBridge,
           });
-          const body = (await res.json().catch(() => null)) as { ok?: boolean; data?: unknown; error?: string } | null;
-          if (!res.ok || !body?.ok) throw new Error(body?.error || `Tool ${call.name} unavailable (${res.status}).`);
-          payload = { outcome: "ok", data: (body.data ?? {}) as Record<string, unknown> };
+          const result = await broker.execute(call.name, call.arguments, userTurnRef.current);
+          payload =
+            result.outcome === "failed"
+              ? { outcome: "failed", message: result.message }
+              : {
+                  outcome: "ok",
+                  message: result.message,
+                  data: { ...(result.data ?? {}), ...(result.message ? { message: result.message } : {}) },
+                };
         } catch (err) {
           payload = { outcome: "failed", message: err instanceof Error ? err.message : "The app action failed." };
         }
@@ -453,6 +532,7 @@ export default function SaathiIntakePage() {
 
   /** Silent heuristic merge once a spoken turn settles. */
   const processFinalSpokenTurn = (spoken: string) => {
+    userTurnRef.current += 1;
     const extracted = extractSlotsFromText(spoken, plots as any);
     if (Object.keys(extracted).length) setSlots((s) => mergeSlots(s, extracted));
   };
@@ -523,15 +603,20 @@ export default function SaathiIntakePage() {
       await new Promise<void>((resolve, reject) => {
         const timer = window.setTimeout(() => reject(new Error("Voice connection timed out")), 15000);
         socket.onopen = () => {
-          window.clearTimeout(timer);
-          socket.send(
-            JSON.stringify({
-              setup: {
-                model: `models/${body.model}`,
-              },
-            }),
-          );
-          resolve();
+          try {
+            socket.send(
+              JSON.stringify({
+                setup: {
+                  model: `models/${body.model}`,
+                },
+              }),
+            );
+            window.clearTimeout(timer);
+            resolve();
+          } catch (err) {
+            window.clearTimeout(timer);
+            reject(err instanceof Error ? err : new Error("Voice setup failed"));
+          }
         };
         socket.onerror = () => {
           window.clearTimeout(timer);

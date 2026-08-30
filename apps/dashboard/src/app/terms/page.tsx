@@ -72,12 +72,12 @@ const SECTIONS = [
     enTitle: "5. Platform Availability, Offline Sync & Disclaimers",
     hiTitle: "5. पोर्टल उपलब्धता, ऑफ़लाइन कार्यप्रणाली एवं अस्वीकरण",
     en: [
-      "Progressive Web App & Offline Mode: The platform supports local offline caching of evidence when cellular connectivity is intermittent. Captures sync automatically once a network connection is re-established.",
+      "Progressive Web App & Offline Mode: The farmer shell and static assets can open without a network. Captures are not queued for later upload; submit the claim when connectivity is restored.",
       "Alternative Support: In the event of device malfunction or connectivity loss, evidence collection should be performed as soon as device functionality is restored.",
       "No Warranty of Payout: Submission of evidence through this platform serves as verified assessment documentation and does not guarantee insurance indemnity or claim approval.",
     ],
     hi: [
-      "ऑफ़लाइन कार्यप्रणाली: नेटवर्क न होने पर भी तस्वीरें और GPS डेटा फ़ोन में सुरक्षित रहता है और इंटरनेट आते ही स्वतः सर्वर पर अपलोड हो जाता है।",
+      "ऑफ़लाइन कार्यप्रणाली: किसान स्क्रीन और स्थिर फ़ाइलें बिना नेटवर्क के खुल सकती हैं। कैप्चर बाद में अपलोड के लिए कतार में नहीं जाते; कनेक्शन लौटने पर दावा जमा करें।",
       "वैकल्पिक सहायता: यदि किसी कारणवश तकनीकी समस्या आए, तो उपकरण ठीक होते ही साक्ष्य संकलन पूरा किया जाना चाहिए।",
       "दावा स्वीकृति की गारंटी नहीं: केवल साक्ष्य जमा करने से दावा स्वीकृति की गारंटी नहीं होती; निर्णय सत्यापन और नुकसान के नियमों के अनुसार ही तय होता है।",
     ],

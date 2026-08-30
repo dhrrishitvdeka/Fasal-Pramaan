@@ -74,6 +74,7 @@ function CaptureStudioContent() {
     milestones,
     persistError,
     activeIntent,
+    clearActiveIntent,
   } = useFarmerData();
   const t = getFarmerT(lang);
 
@@ -91,7 +92,9 @@ function CaptureStudioContent() {
   const targetAngleIds = requestedAnglesParam
     ? requestedAnglesParam.split(",").map((s) => s.trim())
     : [];
-  const requestedPeril = normalizePeril(perilParam || activeIntent?.peril || "normal");
+  const requestedPeril = normalizePeril(
+    perilParam || (intentIdParam ? activeIntent?.peril : undefined) || "normal",
+  );
   const intentAngles = anglesForPeril(requestedPeril);
   const baseAngleDefs = intentAngles.length ? intentAngles : ANGLE_DEFS;
 
@@ -112,6 +115,15 @@ function CaptureStudioContent() {
   useEffect(() => {
     if (milestone?.plotId) setSelectedPlotId(milestone.plotId);
   }, [milestone?.plotId]);
+
+  // A leftover Saathi intent must not silently hijack a fresh capture (e.g. drought
+  // 3-angle route on a later general claim). Only honor it when the URL carries it.
+  useEffect(() => {
+    if (!perilParam && !intentIdParam && !recaptureClaimId) {
+      clearActiveIntent();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perilParam, intentIdParam, recaptureClaimId]);
 
   // Active step in stepper
   const [currentAngleIndex, setCurrentAngleIndex] = useState<number>(0);
@@ -450,7 +462,16 @@ function CaptureStudioContent() {
 
   const capturePhotoFromCamera = async () => {
     const isDryOrCharredPeril = requestedPeril === "fire_burn" || requestedPeril === "drought";
-    
+
+    if (!cvResult && !isDryOrCharredPeril) {
+      const msg =
+        lang === "hi"
+          ? "गुणवत्ता जाँच अभी तैयार नहीं है — फसल फ्रेम में आने तक प्रतीक्षा करें।"
+          : "Quality check is not ready — wait until the crop is framed before capturing.";
+      showToast(msg);
+      return { ok: false as const, message: msg };
+    }
+
     // Anti-Screen Fraud Rejection
     if (cvResult?.isScreenDetected) {
       const msg = lang === "hi" ? "स्क्रीन / डिस्प्ले पहचानी गई — कृपया असली खेत व फसल की फोटो लें।" : "Screen / display detected — photograph real outdoor crop.";
@@ -508,6 +529,8 @@ function CaptureStudioContent() {
       lightingScore,
       blurScore: cvResult?.blurScore ?? undefined,
       greenPct: cvResult?.greenPct ?? undefined,
+      luma: cvResult?.luma ?? undefined,
+      cropScore: cvResult?.cropScore ?? undefined,
       facing: cameraFacing,
       dimensions,
       farmerObservation: observations || undefined,
@@ -627,7 +650,7 @@ function CaptureStudioContent() {
   // Handle Save Draft
   const handleSaveDraft = () => {
     const imagesList = Object.values(capturedImages);
-    saveClaimDraft({
+    const result = saveClaimDraft({
       plotId: selectedPlot?.id,
       plotName: selectedPlot?.name,
       plotNameHi: selectedPlot?.nameHi,
@@ -638,7 +661,7 @@ function CaptureStudioContent() {
       farmerObservations: observations,
       images: imagesList,
     });
-    showToast(t.draftSavedMsg);
+    showToast(result.saved ? t.draftSavedMsg : t.draftSaveFailedMsg);
   };
 
   const handleSubmitClaim = async () => {
@@ -784,9 +807,9 @@ function CaptureStudioContent() {
         const currentLang = langRef.current;
         if (!cv) {
           return {
-            ok: true,
-            message: "Camera active, analyzing live crop frame…",
-            shutterReady: true,
+            ok: false,
+            message: "Camera is open but crop quality is still measuring — wait for the live score.",
+            shutterReady: false,
           };
         }
         return {
@@ -1165,6 +1188,12 @@ function CaptureStudioContent() {
                     </span>
                   )}
 
+                  {cvModelStatus === "unavailable" && (
+                    <span className="rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      {lang === "hi" ? "ह्यूरिस्टिक मोड" : "Heuristic only"}
+                    </span>
+                  )}
+
                   {/* Crop Score & 75%+ Requirement Badge */}
                   {cvResult && cvResult.cropScore > 0 && !cvResult.isPersonDetected && (
                     <span
@@ -1246,7 +1275,8 @@ function CaptureStudioContent() {
               const isLocked =
                 isCameraActive &&
                 !capturedImages[currentAngle.id] &&
-                (cvResult?.isPersonDetected === true ||
+                ((cvResult == null && !isDryOrCharred) ||
+                  cvResult?.isPersonDetected === true ||
                   cvResult?.isScreenDetected === true ||
                   (cvResult != null && cvResult.cropScore < 75 && !isDryOrCharred) ||
                   (cvResult?.shouldBlockShutter === true && !isDryOrCharred));
@@ -1265,6 +1295,8 @@ function CaptureStudioContent() {
                         ? (lang === "hi" ? "व्यक्ति / चेहरा लॉक (फसल दिखाएँ)" : "Person in Frame (Aim at real crop)")
                         : cvResult?.isScreenDetected
                         ? (lang === "hi" ? "स्क्रीन लॉक (असली फसल दिखाएँ)" : "Screen Blocked (Aim at real crop)")
+                        : cvResult == null
+                        ? (lang === "hi" ? "गुणवत्ता जाँच चल रही है…" : "Quality check running…")
                         : (lang === "hi"
                           ? `कैमरा लॉक (${cvResult?.cropScore ?? 0}% / 75% आवश्यक)`
                           : `Locked (${cvResult?.cropScore ?? 0}% / 75% Crop Needed)`)}

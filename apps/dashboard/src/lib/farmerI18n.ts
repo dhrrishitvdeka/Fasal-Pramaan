@@ -141,7 +141,7 @@ export const farmerTranslations = {
     reminders: "Timeline",
     captureStudio: "Guided 5-Angle Studio",
     switchLanguage: "हिन्दी",
-    offlineNotice: "Working in Offline Mode. Captures will auto-sync when online.",
+    offlineNotice: "You are offline. Claims cannot be submitted until you are back online.",
     onlineNotice: "Connected to PMFBY / State Insurance Network",
     pmfbyBanner: "PMFBY · Digital evidence",
     reviewerSignIn: "Reviewer sign in",
@@ -248,7 +248,8 @@ export const farmerTranslations = {
     submitClaimBtn: "Submit Verified Claim",
     submitting: "Submitting & Hashing Evidence...",
     captureAllRequired: "Please capture all required angles before final submission.",
-    draftSavedMsg: "Draft saved to this device successfully!",
+    draftSavedMsg: "Draft notes saved in this browser tab (photos are not stored in the draft).",
+    draftSaveFailedMsg: "Could not save the draft on this device (storage full). Photos were not queued.",
 
     // Reminders & Timeline
     remindersTitle: "30-Day Crop Growth Timeline",
@@ -390,7 +391,7 @@ export const farmerTranslations = {
     reminders: "समय सीमा",
     captureStudio: "मार्गदर्शित 5-कोण स्टूडियो",
     switchLanguage: "English",
-    offlineNotice: "ऑफ़लाइन मोड में कार्य कर रहे हैं। इंटरनेट आने पर स्वचालित रूप से सिंक होगा।",
+    offlineNotice: "आप ऑफ़लाइन हैं। ऑनलाइन होने तक दावा जमा नहीं होगा।",
     onlineNotice: "पीएमएफबीवाई / राज्य बीमा नेटवर्क से जुड़ा हुआ है",
     pmfbyBanner: "प्रधानमंत्री फसल बीमा योजना",
     reviewerSignIn: "समीक्षक प्रवेश",
@@ -497,7 +498,8 @@ export const farmerTranslations = {
     submitClaimBtn: "सत्यापित दावा जमा करें",
     submitting: "साक्ष्य हैश व जमा हो रहा है...",
     captureAllRequired: "कृपया अंतिम सबमिशन से पहले सभी आवश्यक कोणों की फोटो लें।",
-    draftSavedMsg: "प्रारूप इस डिवाइस पर सुरक्षित सहेज लिया गया है!",
+    draftSavedMsg: "प्रारूप नोट इस टैब में सहेजे गए (फ़ोटो प्रारूप में नहीं रहते)।",
+    draftSaveFailedMsg: "प्रारूप सहेजा नहीं जा सका (स्टोरेज भर गया)। फ़ोटो कतार में नहीं गईं।",
 
     // Reminders & Timeline
     remindersTitle: "30-दिवसीय फसल विकास समय-सीमा",
