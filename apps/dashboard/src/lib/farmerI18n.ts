@@ -336,6 +336,7 @@ export const farmerTranslations = {
     saathiAnglesRequired: "Photo angles required",
     saathiProceedToCamera: "Open Camera for Capture",
     saathiGreeting: "Hi, I am Fasal Saathi. What happened to your crop? Tell me in your words — e.g., fire/burn, animal grazing, flood, pest/disease, hail, lodging.",
+    saathiReset: "Reset Fasal Saathi",
 
     // Perils & Quick phrases
     perilFire: "Fire in Field",
@@ -586,6 +587,7 @@ export const farmerTranslations = {
     saathiAnglesRequired: "फोटो कोण आवश्यक",
     saathiProceedToCamera: "फोटो लेने हेतु कैमरा खोलें",
     saathiGreeting: "नमस्ते! मैं फसल साथी हूँ। आपकी फसल को क्या नुकसान हुआ है? अपने शब्दों में बताएँ — जैसे: आग/जलना, जानवर क्षति, बाढ़/जलभराव, कीट/रोग, ओलावृष्टि, या फसल गिरना।",
+    saathiReset: "फसल साथी रीसेट करें",
 
     // Perils & Quick phrases
     perilFire: "खेत में आग",
