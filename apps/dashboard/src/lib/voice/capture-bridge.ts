@@ -147,8 +147,8 @@ class WebCaptureBridge {
     }
     if (!this.handlers.checkEvidenceQuality) {
       return Promise.resolve({
-        ok: true,
-        message: "Camera active and calibrated.",
+        ok: false,
+        message: "Camera is not open, so evidence quality cannot be checked.",
       });
     }
     return this.handlers.checkEvidenceQuality();

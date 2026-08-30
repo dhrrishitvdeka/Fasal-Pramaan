@@ -158,7 +158,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 function isRetryableInferError(error: Error): boolean {
-  return /503|502|504|408|429|timeout|timed out|cold|sleep|Failed to fetch|network|unreachable|ECONNRESET|UND_ERR/i.test(
+  return /503|502|504|408|429|timeout|timed out|cold|sleep|Failed to fetch|network|unreachable|ECONNRESET|UND_ERR|queue is full|queue full|too many requests|capacity|overloaded|gradio/i.test(
     error.message,
   );
 }

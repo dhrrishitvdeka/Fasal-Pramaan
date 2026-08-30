@@ -43,8 +43,25 @@ describe("vision authenticity gate (heuristic, no network)", () => {
     expect(withCrop.crop_detected).toBe("Wheat");
   });
 
-  it("passes expected-crop frames via fallback confidence ~0.65", () => {
+  it("does not auto-pass expected-crop frames without CV quality signals", () => {
     const res = heuristicGate(bigJpegDataUrl(), "Wheat");
+    expect(res.usable).toBe(false);
+    expect(res.reason).toBe("heuristic_unverified");
+    expect(res.fallback).toBe(true);
+  });
+
+  it("rejects low on-device crop scores instead of trusting expectedCrop", () => {
+    const res = heuristicGate(bigJpegDataUrl(), "Wheat", "normal", {
+      cvAnalysis: { luma: 50, greenPct: 40, blurScore: 40, cropScore: 20 },
+    });
+    expect(res.usable).toBe(false);
+    expect(res.reason).toBe("crop_not_detected");
+  });
+
+  it("passes expected-crop frames when CV quality signals are present", () => {
+    const res = heuristicGate(bigJpegDataUrl(), "Wheat", "normal", {
+      cvAnalysis: { luma: 50, greenPct: 40, blurScore: 40, cropScore: 80 },
+    });
     expect(res.usable).toBe(true);
     expect(res.reason).toBe("ok");
     expect(res.crop_detected).toBe("Wheat");

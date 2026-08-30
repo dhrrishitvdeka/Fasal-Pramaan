@@ -108,8 +108,8 @@ export function parseGeminiLiveMessage(message: Record<string, unknown>): Gemini
         if (!raw || typeof raw !== "object") continue;
         const call = raw as { id?: unknown; name?: unknown; args?: unknown };
         const name = String(call.name || "");
-        const id = String(call.id || "");
-        if (!name || !id) continue;
+        if (!name) continue;
+        const id = String(call.id || "").trim() || `missing-${name}-${calls.length}`;
         calls.push({
           id,
           name,

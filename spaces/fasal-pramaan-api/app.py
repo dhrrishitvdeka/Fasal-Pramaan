@@ -48,6 +48,10 @@ CROP_ALIASES = {
     "wheat": "wheat",
 }
 CACHE_DIR = Path(os.environ.get("FASAL_MODEL_CACHE", "/tmp/fasal-pramaan-model"))
+MAX_IMAGES = 6
+MAX_IMAGE_BYTES = 15 * 1024 * 1024
+MAX_JSON_CHARS = 20 * 1024 * 1024
+MAX_PIXELS = 4096 * 4096
 
 
 def _softmax(values: np.ndarray, temperature: float) -> np.ndarray:
@@ -163,29 +167,59 @@ def load_runtime() -> dict[str, Any]:
     }
 
 
+def _authorize(request: Any) -> None:
+    expected = (os.environ.get("SPACE_API_TOKEN") or "").strip()
+    if not expected:
+        return
+    header = ""
+    if request is not None:
+        headers = getattr(request, "headers", None) or {}
+        try:
+            header = headers.get("authorization") or headers.get("Authorization") or ""
+        except Exception:
+            header = ""
+    token = header[7:].strip() if header.lower().startswith("bearer ") else str(header).strip()
+    if token != expected:
+        raise PermissionError("Unauthorized")
+
+
 def _decode_image(raw: Any) -> Image.Image | None:
     if raw is None:
         return None
     try:
         if isinstance(raw, Image.Image):
-            return raw.convert("RGB")
-        if isinstance(raw, np.ndarray):
-            return Image.fromarray(raw.astype("uint8")).convert("RGB")
-        if isinstance(raw, (bytes, bytearray)):
-            return Image.open(io.BytesIO(bytes(raw))).convert("RGB")
-        if isinstance(raw, str):
+            image = raw.convert("RGB")
+        elif isinstance(raw, np.ndarray):
+            image = Image.fromarray(raw.astype("uint8")).convert("RGB")
+        elif isinstance(raw, (bytes, bytearray)):
+            if len(raw) > MAX_IMAGE_BYTES:
+                raise ValueError("image exceeds size limit")
+            image = Image.open(io.BytesIO(bytes(raw))).convert("RGB")
+        elif isinstance(raw, str):
             text = raw.strip()
+            if len(text) > MAX_IMAGE_BYTES * 2:
+                raise ValueError("image exceeds size limit")
             if text.startswith("data:"):
                 text = text.split(",", 1)[1]
-            return Image.open(io.BytesIO(base64.b64decode(text))).convert("RGB")
-        if hasattr(raw, "read"):
-            return Image.open(raw).convert("RGB")
-        path = Path(str(raw))
-        if path.is_file():
-            return Image.open(path).convert("RGB")
+            decoded = base64.b64decode(text, validate=False)
+            if len(decoded) > MAX_IMAGE_BYTES:
+                raise ValueError("image exceeds size limit")
+            image = Image.open(io.BytesIO(decoded)).convert("RGB")
+        elif hasattr(raw, "read"):
+            blob = raw.read()
+            if isinstance(blob, (bytes, bytearray)) and len(blob) > MAX_IMAGE_BYTES:
+                raise ValueError("image exceeds size limit")
+            image = Image.open(io.BytesIO(bytes(blob))).convert("RGB")
+        else:
+            path = Path(str(raw))
+            if not path.is_file():
+                return None
+            image = Image.open(path).convert("RGB")
+        if image.size[0] * image.size[1] > MAX_PIXELS:
+            raise ValueError("image resolution exceeds limit")
+        return image
     except Exception:
         return None
-    return None
 
 
 def _is_unusable_image(image: Image.Image) -> bool:
@@ -386,10 +420,14 @@ def analyze(
 
 def _parse_images_json(images_json: str | None, fallback_image: Any, angle_type: str) -> list[dict[str, Any]]:
     text = (images_json or "").strip()
+    if len(text) > MAX_JSON_CHARS:
+        raise ValueError("images_json exceeds size limit")
     if text:
         payload = json.loads(text)
         if not isinstance(payload, list) or not payload:
             raise ValueError("images_json must be a non-empty JSON array")
+        if len(payload) > MAX_IMAGES:
+            raise ValueError(f"at most {MAX_IMAGES} images are allowed")
         return payload
     return [{"image": fallback_image, "angle_type": angle_type or "closeup_damage"}]
 
@@ -417,11 +455,15 @@ def predict_api(
     expected_crop: str = "",
     angle_type: str = "closeup_damage",
     images_json: str = "",
+    request: gr.Request | None = None,
 ) -> dict[str, Any]:
     """Stable JSON API used by the Fasal-Pramaan Next.js hosted path."""
     try:
+        _authorize(request)
         images = _parse_images_json(images_json, image_b64, angle_type)
         return analyze(images, expected_crop=expected_crop)
+    except PermissionError as exc:
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 

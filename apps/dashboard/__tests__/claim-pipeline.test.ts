@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyReviewerAction,
+  attachHfPrediction,
   buildRecaptureSubmitInput,
   computeEvidencePreview,
   createMemoryClaimStore,
@@ -9,6 +10,8 @@ import {
   persistAndInfer,
   persistFarmerSubmission,
   recaptureAndInfer,
+  retryPendingInference,
+  safeStorageSegment,
   sanitizeHfPrediction,
   type PersistedImageInput,
 } from "../src/lib/claim-pipeline";
@@ -20,6 +23,21 @@ function jpegLikeBytes(): Uint8Array {
   const bytes = new Uint8Array(8192);
   bytes.set([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1]);
   return bytes;
+}
+
+function usableImage(overrides: Partial<PersistedImageInput> = {}): PersistedImageInput {
+  return {
+    angleType: "closeup_damage",
+    bytes: jpegLikeBytes(),
+    sha256: "b".repeat(64),
+    lightingScore: 50,
+    luma: 50,
+    cropScore: 80,
+    blurScore: 40,
+    greenPct: 40,
+    qualityPassed: true,
+    ...overrides,
+  };
 }
 
 const spaceSuccess = {
@@ -95,13 +113,11 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
         captureLat: 27.89,
         captureLon: 76.28,
         images: [
-          {
-            angleType: "closeup_damage",
+          usableImage({
             bytes,
-            sha256: "b".repeat(64),
             lat: 27.89,
             lon: 76.28,
-          },
+          }),
         ],
       },
       inferCropDisease,
@@ -165,7 +181,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
       {
         plotName: "East terrace",
         farmerObservations: "Leaf rust",
-        images: [{ angleType: "closeup_damage", bytes, sha256: "c".repeat(64) }],
+        images: [usableImage({ bytes, sha256: "c".repeat(64) })],
       },
       inferCropDisease,
       {
@@ -210,13 +226,11 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
         cropType: "Wheat",
         createdBy: "user-farmer-1",
         images: [
-          {
-            angleType: "closeup_damage",
+          usableImage({
             bytes: closeup,
-            sha256: "b".repeat(64),
             lat: 27.89,
             lon: 76.28,
-          },
+          }),
         ],
       },
       inferCropDisease,
@@ -330,13 +344,13 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
       {
         claimId,
         images: [
-          {
+          usableImage({
             angleType: "wide_field",
             bytes: wide,
             sha256: "d".repeat(64),
             lat: 27.9,
             lon: 76.3,
-          },
+          }),
         ],
       },
       inferCropDisease,
@@ -594,5 +608,101 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(predictionIsAcceptable(null, false)).toBe(true);
     expect(predictionIsAcceptable(undefined, false)).toBe(true);
     expect(predictionIsAcceptable(null, true)).toBe(false);
+  });
+
+  it("does not let late inference overwrite a reviewer's verified grade", async () => {
+    const { store, claimId } = await persistSeed();
+    await applyReviewerAction(store, claimId, { action: "accept", notes: "ok" });
+    await attachHfPrediction(store, claimId, {
+      modelId: "late-model",
+      label: "maize__healthy",
+      score: 0.99,
+      predictedCrop: "maize",
+      cropConfidence: 0.99,
+      predictedGrade: "A",
+      primaryDamage: "healthy",
+      plantDiseaseClass: "maize__healthy",
+      raw: {},
+    });
+    const stored = store.claims.get(claimId);
+    expect(stored?.status).toBe("verified");
+    expect(stored?.severity_grade).toBe("C");
+    expect(stored?.crop_identified).toBe("wheat");
+    expect(stored?.model_id).toBe("late-model");
+    expect(stored?.inference_status).toBe("complete");
+  });
+
+  it("refuses recapture of a verified claim", async () => {
+    const { store, claimId } = await persistSeed();
+    await applyReviewerAction(store, claimId, { action: "accept", notes: "ok" });
+    await expect(
+      recaptureAndInfer(
+        store,
+        { claimId, images: [{ angleType: "wide_field", bytes: jpegLikeBytes() }] },
+        inferCropDisease,
+        { fetchImpl: spaceFetchImpl() },
+      ),
+    ).rejects.toThrow(/verified/i);
+  });
+
+  it("surfaces client-chosen claim id collisions as Claim already exists", async () => {
+    const store = createMemoryClaimStore();
+    await persistFarmerSubmission(store, {
+      id: "claim-fixed",
+      images: [{ angleType: "closeup_damage", bytes: jpegLikeBytes() }],
+    });
+    await expect(
+      persistFarmerSubmission(store, {
+        id: "claim-fixed",
+        images: [{ angleType: "closeup_damage", bytes: jpegLikeBytes() }],
+      }),
+    ).rejects.toThrow(/already exists/i);
+  });
+
+  it("does not insert a claim when an image upload fails mid-loop", async () => {
+    const store = createMemoryClaimStore();
+    const original = store.uploadImage.bind(store);
+    let n = 0;
+    store.uploadImage = async (path, bytes, contentType) => {
+      n += 1;
+      if (n === 2) throw new Error("upload boom");
+      return original(path, bytes, contentType);
+    };
+    await expect(
+      persistFarmerSubmission(store, {
+        images: [
+          { angleType: "closeup_damage", bytes: jpegLikeBytes() },
+          { angleType: "wide_field", bytes: jpegLikeBytes() },
+        ],
+      }),
+    ).rejects.toThrow(/upload boom/);
+    expect(store.claims.size).toBe(0);
+  });
+
+  it("sanitizes storage path segments against traversal", () => {
+    expect(safeStorageSegment("../../etc/passwd", "claim")).toBe("passwd");
+    expect(safeStorageSegment("wide_field", "angle")).toBe("wide_field");
+    expect(safeStorageSegment("..", "fallback")).toBe("fallback");
+  });
+
+  it("retries pending inference from stored blobs", async () => {
+    const store = createMemoryClaimStore();
+    const persisted = await persistAndInfer(
+      store,
+      {
+        cropType: "Wheat",
+        images: [usableImage()],
+      },
+      inferCropDisease,
+      { fetchImpl: spaceFetchImpl(), skipInference: true },
+    );
+    expect(persisted.pendingInference).toBe(true);
+    expect(store.claims.get(persisted.claimId)?.hf_label).toBeFalsy();
+    store.claims.get(persisted.claimId)!.inference_started_at = new Date(Date.now() - 120_000).toISOString();
+    const retried = await retryPendingInference(store, persisted.claimId, inferCropDisease, {
+      fetchImpl: spaceFetchImpl(),
+    });
+    expect(retried?.prediction?.predictedGrade).toBe("C");
+    expect(store.claims.get(persisted.claimId)?.inference_status).toBe("complete");
   });
 });

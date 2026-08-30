@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
 import { isReviewerRole, requireWebActor } from "@/lib/web-auth";
 import { checkRateLimit } from "@/lib/server/rate-limit";
+import { milestoneSchema } from "@/lib/schemas";
 
 const RATE_LIMIT_MAX = 30;
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -30,17 +31,29 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!isReviewerRole(auth.actor.role) && existing.data.created_by !== auth.actor.userId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const payload = await request.json().catch(() => ({}));
+  const parsed = milestoneSchema.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message || "Invalid request body" },
+      { status: 400 },
+    );
+  }
+  const payload = parsed.data;
+  // Only patch fields the client actually sent — an absent completedDate must
+  // not wipe the stored value.
+  const updates: Record<string, unknown> = {};
+  if (payload.dueDate !== undefined) updates.due_date = payload.dueDate;
+  if (payload.completed !== undefined) updates.completed = payload.completed;
+  if (payload.completedDate !== undefined) updates.completed_date = payload.completedDate;
+  if (payload.evidenceImageUrl !== undefined) updates.evidence_image_url = payload.evidenceImageUrl;
+  if (payload.notes !== undefined) updates.notes = payload.notes;
+  if (payload.isOverdue !== undefined) updates.is_overdue = payload.isOverdue;
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ ok: true });
+  }
   const { error } = await supabase
     .from("web_milestones")
-    .update({
-      due_date: payload.dueDate ?? undefined,
-      completed: payload.completed ?? undefined,
-      completed_date: payload.completedDate ?? null,
-      evidence_image_url: payload.evidenceImageUrl ?? undefined,
-      notes: payload.notes ?? undefined,
-      is_overdue: payload.isOverdue ?? undefined,
-    })
+    .update(updates)
     .eq("id", id);
   if (error) {
     console.error("milestone update failed:", error.message);

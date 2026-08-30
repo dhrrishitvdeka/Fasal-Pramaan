@@ -26,17 +26,20 @@ describe("toCsv", () => {
     expect(toCsv([{ a: null, b: undefined, c: 0 }])).toBe("a,b,c\r\n,,0");
   });
 
-  it("neutralizes formula injection characters (=, +, -, @, tab, cr)", () => {
+  it("neutralizes formula injection characters (=, +, @, tab, cr) without corrupting negative numbers", () => {
     const csv = toCsv([
       { val: "=cmd|' /C calc'!A0" },
       { val: "+12345" },
       { val: "-100" },
+      { val: "-cmd" },
       { val: "@SUM(1,2)" },
       { val: "\ttabbed" },
     ]);
     expect(csv).toContain("'=cmd");
     expect(csv).toContain("'+12345");
-    expect(csv).toContain("'-100");
+    expect(csv).toContain("\r\n-100\r\n");
+    expect(csv).not.toContain("'-100");
+    expect(csv).toContain("'-cmd");
     expect(csv).toContain("'@SUM(1,2)");
     expect(csv).toContain("'\ttabbed");
   });

@@ -643,7 +643,8 @@ export function emptyOverview(): Overview {
 
 export function overviewFromClaims(claims: FarmerClaim[]): Overview {
   const base = emptyOverview();
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const total = claims.length;
   const todayCount = claims.filter((c) => c.createdAt.startsWith(today)).length;
   const pending = claims.filter((c) => c.status === "under_review" || c.status === "submitted").length;

@@ -66,6 +66,8 @@ export const claimImageSchema = z.object({
   qualityPassed: z.boolean().nullish(),
   blurScore: z.number().finite().nullish(),
   greenPct: z.number().finite().nullish(),
+  luma: z.number().finite().nullish(),
+  cropScore: z.number().finite().nullish(),
   facing: z.string().nullish(),
   dimensions: z.object({ width: z.number().finite(), height: z.number().finite() }).nullish(),
   capturedAt: z.string().nullish(),
@@ -178,10 +180,10 @@ export const plotTimelineSchema = z.object({}).passthrough();
 export const milestoneSchema = z.object({
   dueDate: isoDate.optional(),
   completed: z.boolean().optional(),
-  /** Route stores null explicitly when absent, so undefined stays optional. */
+  /** Stored only when the client explicitly sends it (null clears it). */
   completedDate: z.union([isoDate, z.null()]).optional(),
-  evidenceImageUrl: z.string().optional(),
-  notes: z.string().optional(),
+  evidenceImageUrl: z.string().max(2048).optional(),
+  notes: z.string().max(2000).optional(),
   isOverdue: z.boolean().optional(),
 });
 

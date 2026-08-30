@@ -1,4 +1,5 @@
 import { nativeLabelForLang, parseAppLang, type AppLang } from "../live-indian-languages";
+import { apiFetch } from "@/lib/auth-headers";
 
 export type VoiceOutcome = "succeeded" | "failed" | "confirmation_required" | "cancelled";
 
@@ -277,7 +278,7 @@ export class WebVoiceBroker {
           return this.fromCapture(
             this.gateway.capture.checkEvidenceQuality
               ? await this.gateway.capture.checkEvidenceQuality()
-              : { ok: true, message: "Camera active and calibrated." }
+              : { ok: false, message: "Guided capture is not open, so evidence quality cannot be checked." }
           );
         case "set_capture_observation":
           return this.setObservation(args);
@@ -360,8 +361,8 @@ export class WebVoiceBroker {
       }
     }
     return {
-      outcome: "succeeded",
-      message: `Recorded plot '${name}' with ${cropType}. You can see registered plots on the Home screen.`,
+      outcome: "failed",
+      message: "Plot registration is not available in this view. Open Home or Profile to add a plot.",
       data: { name, crop_type: cropType },
     };
   }
@@ -565,7 +566,31 @@ export class WebVoiceBroker {
     return { outcome: "succeeded", message: `Opened the ${screen} screen.`, data: { screen, path } };
   }
 
-  private checkPlotGeofence(args: Record<string, unknown>): VoiceToolResult {
+  private async serverTool(name: string, args: Record<string, unknown>): Promise<VoiceToolResult | null> {
+    try {
+      const res = await apiFetch("/api/saathi/tool", {
+        method: "POST",
+        body: JSON.stringify({ name, args }),
+      });
+      if (!res.ok) return null;
+      const body = (await res.json().catch(() => null)) as
+        | { ok?: boolean; data?: Record<string, unknown>; error?: string }
+        | null;
+      if (!body?.ok || typeof body.data !== "object" || body.data == null) return null;
+      const data = body.data;
+      return {
+        outcome: "succeeded",
+        message: typeof data.message === "string" && data.message ? data.message : "Done.",
+        data,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private async checkPlotGeofence(args: Record<string, unknown>): Promise<VoiceToolResult> {
+    const server = await this.serverTool("check_plot_geofence", args);
+    if (server) return server;
     const plotId = String(args.plot_id || "").trim();
     const plot = plotId
       ? this.gateway.plots.find((p) => p.id === plotId || p.id.startsWith(plotId))
@@ -581,36 +606,34 @@ export class WebVoiceBroker {
 
     return {
       outcome: "succeeded",
-      message: `Verified parcel boundaries for plot '${plot.name}' (${plot.cropType || "crop"}). GPS lock confirmed within registered village ${plot.village || "area"}.`,
+      message: `Found plot '${plot.name}' (${plot.cropType || "crop"}), khasra ${plot.khasraNumber || "n/a"}, village ${plot.village || "unknown"}. Live GPS boundary check is unavailable right now, so the position was not verified.`,
       data: {
         plot_id: plot.id,
         plot_name: plot.name,
         village: plot.village,
         khasra: plot.khasraNumber,
-        geofence_status: "verified_inside",
+        geofence_status: "unverified",
       },
     };
   }
 
-  private fetchAgroWeatherAlerts(args: Record<string, unknown>): VoiceToolResult {
+  private async fetchAgroWeatherAlerts(args: Record<string, unknown>): Promise<VoiceToolResult> {
+    const server = await this.serverTool("fetch_agro_weather_alerts", args);
+    if (server) return server;
     const plotId = String(args.plot_id || "").trim();
     const plot = plotId ? this.gateway.plots.find((p) => p.id === plotId) : this.gateway.plots[0];
     const village = plot?.village || this.gateway.farmerProfile?.village || "local area";
 
     return {
-      outcome: "succeeded",
-      message: `Agro-Weather Radar for ${village}: 72-hour precipitation normal, moderate humidity, no destructive wind alerts. Historical IMD rainfall logged.`,
-      data: {
-        location: village,
-        precipitation_72h_mm: 12.4,
-        hail_probability_pct: 0,
-        temp_celsius: 28,
-        satellite_ndvi_health: "normal",
-      },
+      outcome: "failed",
+      message: `Live agro-weather radar for ${village} is unavailable right now. Please try again shortly.`,
+      data: { location: village, source: "unavailable" },
     };
   }
 
-  private explainClaimAudit(args: Record<string, unknown>): VoiceToolResult {
+  private async explainClaimAudit(args: Record<string, unknown>): Promise<VoiceToolResult> {
+    const server = await this.serverTool("explain_claim_audit", args);
+    if (server) return server;
     const rawId = String(args.claim_id || "").trim();
     const found = rawId ? this.findClaim(rawId) : this.gateway.claims[0];
     if (!found || found === "ambiguous") {
@@ -620,7 +643,7 @@ export class WebVoiceBroker {
     const isRecapture = found.status === "needs_recapture";
     const statusMsg = isRecapture
       ? `Claim ${found.id} needs recapture for missing angle(s): ${(found.missingAngles || []).join(", ")}. Reason: ${found.recaptureReason || "Angle clarity needed"}.`
-      : `Claim ${found.id} status is '${found.status}'. Stage 1 Vision Gate authentic, Stage 2 DINOv2 AI confidence high, Stage 3 Sentinel-2 radar verified.`;
+      : `Claim ${found.id} status is '${found.status}'. The detailed 3-stage AI audit breakdown is unavailable right now.`;
 
     return {
       outcome: "succeeded",
@@ -628,9 +651,9 @@ export class WebVoiceBroker {
       data: {
         claim_id: found.id,
         status: found.status,
-        stage_1_gate: "passed",
-        stage_2_dinov2_model: "verified",
-        stage_3_sentinel_crosscheck: "completed",
+        stage_1_gate: null,
+        stage_2_dinov2_model: null,
+        stage_3_sentinel_crosscheck: null,
         missing_angles: found.missingAngles || [],
         reviewer_notes: found.reviewerNotes || null,
       },

@@ -66,10 +66,11 @@ async function gateSingleImage(
     facing: input.facing,
     dimensions: input.dimensions,
     cvAnalysis: {
+      cropScore: input.cropScore,
       greenPct: input.greenPct,
-      luma: input.lightingScore,
+      luma: input.luma ?? null,
       blurScore: input.blurScore,
-      hintCode: input.qualityPassed ? "ok" : undefined,
+      hintCode: input.qualityPassed === false ? "crop_not_detected" : input.qualityPassed ? "ok" : undefined,
     },
     sha256: input.sha256,
     farmerObservation: input.farmerObservation,
@@ -216,7 +217,9 @@ export type PersistedImageInput = {
   qualityPassed?: boolean | null;
   blurScore?: number | null;
   lightingScore?: number | null;
+  luma?: number | null;
   greenPct?: number | null;
+  cropScore?: number | null;
   facing?: string | null;
   dimensions?: { width: number; height: number } | null;
   farmerObservation?: string | null;
@@ -255,6 +258,7 @@ export type WebClaimRow = {
   crop_type?: string | null;
   crop_type_hi?: string | null;
   crop_variety?: string | null;
+  sowing_date?: string | null;
   status: string;
   farmer_observations?: string | null;
   missing_angles?: string[] | null;
@@ -296,6 +300,9 @@ export type WebClaimRow = {
   created_by?: string | null;
   created_at?: string;
   updated_at?: string;
+  inference_status?: "pending" | "complete" | "failed" | null;
+  inference_error?: string | null;
+  inference_started_at?: string | null;
   corrected_crop?: string | null;
   corrected_grade?: string | null;
   corrected_severity?: string | null;
@@ -339,6 +346,8 @@ export type RecaptureClientImage = {
   qualityPassed?: boolean | null;
   blurScore?: number | null;
   greenPct?: number | null;
+  luma?: number | null;
+  cropScore?: number | null;
   facing?: string | null;
   dimensions?: { width: number; height: number } | null;
   timestamp?: string | null;
@@ -386,6 +395,8 @@ export function buildRecaptureSubmitInput(
       qualityPassed: img.qualityPassed,
       blurScore: img.blurScore,
       greenPct: img.greenPct,
+      luma: img.luma,
+      cropScore: img.cropScore,
       facing: img.facing,
       dimensions: img.dimensions,
       capturedAt: img.timestamp || undefined,
@@ -410,15 +421,21 @@ export type WebImageRow = {
   gate_result?: unknown;
 };
 
+export type ClaimUpdateOptions = {
+  /** Compare-and-swap: fail if the stored status is no longer this value. */
+  expectedStatus?: string;
+};
+
 export type ClaimStore = {
   insertClaim(row: WebClaimRow): Promise<WebClaimRow>;
-  updateClaim(id: string, patch: Partial<WebClaimRow>): Promise<void>;
+  updateClaim(id: string, patch: Partial<WebClaimRow>, opts?: ClaimUpdateOptions): Promise<void>;
   getClaim(id: string): Promise<WebClaimRow | null>;
   listClaims(): Promise<WebClaimRow[]>;
   insertImages(rows: WebImageRow[]): Promise<void>;
   replaceAngleImages(claimId: string, rows: WebImageRow[]): Promise<void>;
   listImages(claimId: string): Promise<WebImageRow[]>;
   uploadImage(path: string, bytes: Uint8Array, contentType: string): Promise<{ url: string; storagePath: string }>;
+  downloadImage(path: string): Promise<Uint8Array>;
   insertReviewAction(row: {
     id: string;
     claim_id: string;
@@ -558,6 +575,31 @@ function requireImageBytes(image: PersistedImageInput, label: string): Uint8Arra
   return image.bytes;
 }
 
+/** Sanitize client-controlled strings before they become Storage object keys. */
+export function safeStorageSegment(value: string, fallback: string): string {
+  const last = String(value || "")
+    .replace(/\\/g, "/")
+    .split("/")
+    .pop() || "";
+  const stripped = last.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^\.+/, "").slice(0, 80);
+  return stripped || fallback;
+}
+
+function isDuplicateKeyError(message: string): boolean {
+  return /duplicate|unique|already exists|23505/i.test(message);
+}
+
+const REVIEWER_LOCKED_STATUSES = new Set(["verified", "rejected"]);
+const RECAPTURE_ALLOWED_STATUSES = new Set(["needs_recapture"]);
+const INFERENCE_RETRY_AFTER_MS = 90_000;
+
+function isReviewerLocked(claim: WebClaimRow): boolean {
+  return (
+    REVIEWER_LOCKED_STATUSES.has(claim.status) ||
+    Boolean(claim.corrected_grade || claim.corrected_crop)
+  );
+}
+
 /** Upload every frame and build persisted image rows (shared by submit + recapture paths). */
 async function buildImageRows(
   store: ClaimStore,
@@ -568,9 +610,9 @@ async function buildImageRows(
 ): Promise<WebImageRow[]> {
   const imageRows: WebImageRow[] = [];
   for (const image of images) {
-    const imageId = image.id || newId("img");
+    const imageId = safeStorageSegment(image.id || newId("img"), "img");
     const ext = (image.contentType || "image/jpeg").includes("png") ? "png" : "jpg";
-    const path = `${claimId}/${image.angleType}-${imageId}.${ext}`;
+    const path = `${safeStorageSegment(claimId, "claim")}/${safeStorageSegment(image.angleType, "angle")}-${imageId}.${ext}`;
     const uploaded = await store.uploadImage(
       path,
       requireImageBytes(image, image.angleType),
@@ -607,8 +649,17 @@ export async function persistFarmerSubmission(
     throw new Error("Each new image must include bytes");
   }
   const claimId = input.id || newId("claim");
+  if (input.id) {
+    const existing = await store.getClaim(claimId);
+    if (existing) {
+      throw new Error("Claim already exists");
+    }
+  }
   const preview = computeEvidencePreview(input.images, input.peril);
   const now = new Date().toISOString();
+  // Upload blobs BEFORE inserting the claim so a mid-loop failure cannot leave
+  // an imageless row. Orphaned storage objects are preferable to lost evidence.
+  const imageRows = await buildImageRows(store, claimId, input.images, now, gate?.perImage);
   const claim: WebClaimRow = {
     id: claimId,
     plot_id: normalizePlotId(input.plotId),
@@ -618,6 +669,7 @@ export async function persistFarmerSubmission(
     crop_type: input.cropType,
     crop_type_hi: input.cropTypeHi,
     crop_variety: input.cropVariety,
+    sowing_date: input.sowingDate ?? null,
     status: "under_review",
     farmer_observations: input.farmerObservations || "",
     missing_angles: preview.missingAngles,
@@ -641,21 +693,41 @@ export async function persistFarmerSubmission(
     created_by: input.createdBy ?? null,
     created_at: now,
     updated_at: now,
+    inference_status: "pending",
+    inference_started_at: now,
   };
   // Insert with try/catch to allow missing column gracefully (e.g., before migration)
   try {
     await store.insertClaim(claim);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (/context_signals|peril|intent_id|gate_result/i.test(msg)) {
-      const { context_signals: _cs, peril: _peril, intent_id: _intent, gate_result: _gate, ...fallback } = claim as any;
-      await store.insertClaim(fallback as WebClaimRow);
+    if (isDuplicateKeyError(msg)) {
+      throw new Error("Claim already exists");
+    }
+    if (/context_signals|peril|intent_id|gate_result|sowing_date|inference_/i.test(msg)) {
+      const {
+        context_signals: _cs,
+        peril: _peril,
+        intent_id: _intent,
+        gate_result: _gate,
+        sowing_date: _sowing,
+        inference_status: _inf,
+        inference_error: _inferr,
+        inference_started_at: _infat,
+        ...fallback
+      } = claim as any;
+      try {
+        await store.insertClaim(fallback as WebClaimRow);
+      } catch (inner) {
+        const innerMsg = inner instanceof Error ? inner.message : String(inner);
+        if (isDuplicateKeyError(innerMsg)) throw new Error("Claim already exists");
+        throw inner;
+      }
     } else {
       throw err;
     }
   }
 
-  const imageRows = await buildImageRows(store, claimId, input.images, now, gate?.perImage);
   await store.insertImages(imageRows);
   return { claimId, claim };
 }
@@ -665,24 +737,40 @@ export async function attachHfPrediction(
   claimId: string,
   prediction: HfPrediction,
 ): Promise<void> {
+  const current = await store.getClaim(claimId);
+  if (!current) throw new Error("Claim not found");
   const safe = sanitizeHfPrediction(prediction);
   const warningNote = (safe.qualityWarnings || []).join(", ");
-  await store.updateClaim(claimId, {
+  const modelPatch: Partial<WebClaimRow> = {
     model_id: safe.modelId,
     hf_label: safe.plantDiseaseClass || safe.label,
     hf_score: safe.score,
-    disease_detected: safe.plantDiseaseClass || safe.primaryDamage || safe.label,
     model_confidence: Math.round(safe.score * 1000) / 10,
-    crop_identified: safe.predictedCrop || null,
     crop_confidence:
       safe.cropConfidence == null ? null : Math.round(safe.cropConfidence * 1000) / 10,
-    severity_grade: safe.predictedGrade || null,
-    severity_percentage: null,
-    affected_area_hectares: null,
-    estimated_loss_inr: null,
-    ...(warningNote ? { quality_notes: warningNote } : {}),
+    inference_status: "complete",
+    inference_error: null,
     updated_at: new Date().toISOString(),
-  });
+  };
+  // Late inference must never clobber a reviewer's accept/correct/reject.
+  if (isReviewerLocked(current)) {
+    await store.updateClaim(claimId, modelPatch);
+    return;
+  }
+  await store.updateClaim(
+    claimId,
+    {
+      ...modelPatch,
+      disease_detected: safe.plantDiseaseClass || safe.primaryDamage || safe.label,
+      crop_identified: safe.predictedCrop || null,
+      severity_grade: safe.predictedGrade || null,
+      severity_percentage: null,
+      affected_area_hectares: null,
+      estimated_loss_inr: null,
+      ...(warningNote ? { quality_notes: warningNote } : {}),
+    },
+    { expectedStatus: current.status },
+  );
 }
 
 /** Stamp a blocking gate verdict onto the claim (kept under_review so a reviewer can adjudicate). */
@@ -779,6 +867,18 @@ export type InferRuntimeOptions = {
   skipInference?: boolean;
 };
 
+async function markInferenceFailed(store: ClaimStore, claimId: string, inferError: string): Promise<void> {
+  try {
+    await store.updateClaim(claimId, {
+      inference_status: "failed",
+      inference_error: inferError.slice(0, 500),
+      updated_at: new Date().toISOString(),
+    } as Partial<WebClaimRow>);
+  } catch {
+    // column may be missing pre-migration
+  }
+}
+
 export async function inferAndAttachToClaim(
   store: ClaimStore,
   claimId: string,
@@ -789,19 +889,33 @@ export async function inferAndAttachToClaim(
 ): Promise<{ prediction: HfPrediction | null; inferError?: string }> {
   if (imagesAreUnusable(images)) {
     const prediction = unusablePrediction();
-    await attachHfPrediction(store, claimId, prediction);
+    try {
+      await attachHfPrediction(store, claimId, prediction);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (/status changed|Claim not found/i.test(msg)) return { prediction: null, inferError: msg };
+      throw error;
+    }
     return { prediction };
   }
   const closeup = images.find((img) => img.angleType === "closeup_damage") || images[0];
+  let prediction: HfPrediction | null = null;
   try {
-    const prediction = await infer({
+    const uniqueAngles = new Map<string, { angleType: string; bytes: Uint8Array }>();
+    for (const image of images) {
+      if (!uniqueAngles.has(image.angleType)) {
+        uniqueAngles.set(image.angleType, {
+          angleType: image.angleType,
+          bytes: requireImageBytes(image, image.angleType),
+        });
+      }
+    }
+    const extras = [...uniqueAngles.values()];
+    prediction = await infer({
       imageBytes: requireImageBytes(closeup, closeup.angleType),
       expectedCrop: cropType,
       angleType: closeup.angleType,
-      extraImages: images.map((image) => ({
-        angleType: image.angleType,
-        bytes: requireImageBytes(image, image.angleType),
-      })),
+      extraImages: extras,
       apiToken: inferOptions?.apiToken,
       fetchImpl: inferOptions?.fetchImpl,
       spaceUrl: inferOptions?.spaceUrl,
@@ -809,11 +923,77 @@ export async function inferAndAttachToClaim(
     await attachHfPrediction(store, claimId, prediction);
     return { prediction };
   } catch (error) {
-    return {
-      prediction: null,
-      inferError: error instanceof Error ? error.message : "Inference failed",
-    };
+    const inferError = error instanceof Error ? error.message : "Inference failed";
+    if (prediction && /status changed/i.test(inferError)) {
+      try {
+        await attachHfPrediction(store, claimId, prediction);
+        return { prediction };
+      } catch {
+        return { prediction: null, inferError };
+      }
+    }
+    await markInferenceFailed(store, claimId, inferError);
+    return { prediction: null, inferError };
   }
+}
+
+export function claimNeedsInferenceRetry(claim: WebClaimRow, nowMs: number = Date.now()): boolean {
+  if (claim.inference_status === "complete") return false;
+  if (REVIEWER_LOCKED_STATUSES.has(claim.status) && claim.hf_label) return false;
+  if (claim.inference_status === "failed") return true;
+  if (claim.hf_label && claim.model_id) return false;
+  const started = claim.inference_started_at || claim.updated_at || claim.created_at;
+  if (!started) return true;
+  const startedMs = Date.parse(started);
+  if (!Number.isFinite(startedMs)) return true;
+  return nowMs - startedMs >= INFERENCE_RETRY_AFTER_MS;
+}
+
+export async function retryPendingInference(
+  store: ClaimStore,
+  claimId: string,
+  infer: typeof inferCropDisease = inferCropDisease,
+  inferOptions?: InferRuntimeOptions,
+): Promise<{ prediction: HfPrediction | null; inferError?: string } | null> {
+  const claim = await store.getClaim(claimId);
+  if (!claim || !claimNeedsInferenceRetry(claim)) return null;
+  try {
+    await store.updateClaim(claimId, {
+      inference_status: "pending",
+      inference_started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Partial<WebClaimRow>);
+  } catch {
+    // ignore missing columns
+  }
+  const rows = await store.listImages(claimId);
+  const images: PersistedImageInput[] = [];
+  for (const row of rows) {
+    const path = row.storage_path;
+    if (!path) continue;
+    try {
+      const bytes = await store.downloadImage(path);
+      if (bytes.byteLength === 0) continue;
+      images.push({
+        angleType: row.angle_type,
+        bytes,
+        sha256: row.sha256 || undefined,
+        lat: row.lat,
+        lon: row.lon,
+        accuracyM: row.accuracy_m,
+        blurScore: row.blur_score,
+        lightingScore: row.lighting_score,
+        qualityPassed: row.quality_passed,
+      });
+    } catch {
+      // skip unreadable blobs
+    }
+  }
+  if (!images.length) {
+    await markInferenceFailed(store, claimId, "no_image_bytes");
+    return { prediction: null, inferError: "no_image_bytes" };
+  }
+  return inferAndAttachToClaim(store, claimId, images, claim.crop_type || undefined, infer, inferOptions);
 }
 
 export async function persistAndInfer(
@@ -954,6 +1134,11 @@ export async function recaptureAndInfer(
   if (!existing) {
     throw new Error("Claim not found");
   }
+  if (!RECAPTURE_ALLOWED_STATUSES.has(existing.status)) {
+    throw new Error(
+      `Cannot recapture a ${existing.status} case. Recapture is only allowed after a reviewer request.`,
+    );
+  }
   // ----- Vision gate for recapture (computed BEFORE image persistence so each new
   // web_claim_images row carries its own per-angle gate_result; throws fail CLOSED) -----
   const gate = await runVisionGate(
@@ -985,8 +1170,11 @@ export async function recaptureAndInfer(
     capture_accuracy_m: input.captureAccuracyM ?? existing.capture_accuracy_m,
     gps_status: input.gpsStatus ?? existing.gps_status,
     payout_status: existing.payout_status || "pending_review",
+    inference_status: "pending",
+    inference_started_at: now,
+    inference_error: null,
     updated_at: now,
-  });
+  }, { expectedStatus: existing.status });
 
   // ----- Vision gate blocking for recapture (uses the gate computed early above) -----
   if (gate.gateFailed) {
@@ -1324,13 +1512,13 @@ export async function applyReviewerAction(
   }
 
   try {
-    await store.updateClaim(id, patch);
+    await store.updateClaim(id, patch, { expectedStatus: existing.status });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (payload.action === "override_gate" && /gate_result/i.test(msg)) {
       // legacy DB without web_claims.gate_result — persist everything except the gate blob
       const { gate_result: _g, ...rest } = patch as any;
-      await store.updateClaim(id, rest as Partial<WebClaimRow>);
+      await store.updateClaim(id, rest as Partial<WebClaimRow>, { expectedStatus: existing.status });
     } else {
       throw err;
     }
@@ -1381,12 +1569,16 @@ export function createMemoryClaimStore(): ClaimStore & {
     blobs,
     reviewActions,
     async insertClaim(row) {
+      if (claims.has(row.id)) throw new Error("Claim already exists");
       claims.set(row.id, { ...row });
       return row;
     },
-    async updateClaim(id, patch) {
+    async updateClaim(id, patch, opts) {
       const current = claims.get(id);
       if (!current) throw new Error("Claim not found");
+      if (opts?.expectedStatus && current.status !== opts.expectedStatus) {
+        throw new Error("Claim status changed");
+      }
       claims.set(id, { ...current, ...patch });
     },
     async getClaim(id) {
@@ -1415,6 +1607,11 @@ export function createMemoryClaimStore(): ClaimStore & {
     async uploadImage(path, bytes) {
       blobs.set(path, bytes);
       return { url: `memory://${path}`, storagePath: path };
+    },
+    async downloadImage(path) {
+      const bytes = blobs.get(path);
+      if (!bytes) throw new Error("Image not found");
+      return bytes;
     },
     async insertReviewAction(row) {
       reviewActions.push({ ...row });

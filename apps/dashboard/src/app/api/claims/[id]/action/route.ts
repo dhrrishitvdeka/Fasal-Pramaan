@@ -66,7 +66,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json(updated);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Action failed";
-    const status = message === "Claim not found" ? 404 : message.startsWith("Cannot accept claim") ? 400 : 500;
+    const status =
+      message === "Claim not found"
+        ? 404
+        : message === "Claim status changed" || /Cannot recapture/i.test(message)
+          ? 409
+          : message.startsWith("Cannot accept claim") || message.startsWith("Cannot ")
+            ? 400
+            : 500;
     return NextResponse.json(
       { error: message },
       { status },

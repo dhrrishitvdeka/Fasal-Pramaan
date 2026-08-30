@@ -360,9 +360,14 @@ export default function FasalSaathiOverlay() {
       await new Promise<void>((resolve, reject) => {
         const timer = window.setTimeout(() => reject(new Error("Voice connection timed out")), 30000);
         socket.onopen = () => {
-          window.clearTimeout(timer);
-          socket.send(JSON.stringify({ setup: { model: `models/${body.model}` } }));
-          resolve();
+          try {
+            socket.send(JSON.stringify({ setup: { model: `models/${body.model}` } }));
+            window.clearTimeout(timer);
+            resolve();
+          } catch (err) {
+            window.clearTimeout(timer);
+            reject(err instanceof Error ? err : new Error("Voice setup failed"));
+          }
         };
         socket.onerror = () => {
           window.clearTimeout(timer);

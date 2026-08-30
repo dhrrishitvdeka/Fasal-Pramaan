@@ -25,8 +25,8 @@ export default function OfflineBanner() {
       className="fixed inset-x-0 top-0 z-[60] bg-amber-400 px-3 py-1.5 text-center text-xs font-semibold text-slate-900 shadow-sm sm:text-sm"
     >
       {lang === "hi"
-        ? "ऑफ़लाइन — कैप्चर इस सत्र में कतार में रहेंगे · ऑनलाइन होने पर जमा करें"
-        : "Offline — captures will queue in this session · submit when back online"}
+        ? "ऑफ़लाइन — दावा जमा नहीं होगा। प्रारूप इस सत्र में डिवाइस पर रह सकता है; कैप्चर कतार में नहीं जाते।"
+        : "Offline — claims cannot be submitted. A draft may stay on this device for this session; captures are not queued."}
     </div>
   );
 }

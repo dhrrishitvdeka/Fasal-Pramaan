@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { after, NextResponse } from "next/server";
 import {
   persistAndInfer,
@@ -106,16 +107,21 @@ export async function POST(request: Request) {
           qualityPassed?: boolean | null;
           blurScore?: number | null;
           greenPct?: number | null;
+          luma?: number | null;
+          cropScore?: number | null;
           facing?: string | null;
           dimensions?: { width: number; height: number } | null;
           capturedAt?: string | null;
         }) => {
           const decoded = decodeDataUrl(String(img.imageDataUrl || ""));
+          // Always recompute the digest from the actual bytes — a client-sent
+          // sha256 is untrusted and would let stale gate results be replayed.
+          const sha256 = createHash("sha256").update(decoded.bytes).digest("hex");
           return {
             angleType: String(img.angleType || "closeup_damage"),
             bytes: decoded.bytes,
             contentType: decoded.contentType,
-            sha256: img.sha256,
+            sha256,
             lat: img.lat,
             lon: img.lon,
             accuracyM: img.accuracyM,
@@ -123,6 +129,8 @@ export async function POST(request: Request) {
             qualityPassed: img.qualityPassed,
             blurScore: img.blurScore,
             greenPct: img.greenPct,
+            luma: img.luma,
+            cropScore: img.cropScore,
             facing: img.facing,
             dimensions: img.dimensions,
             capturedAt: img.capturedAt || undefined,
@@ -140,6 +148,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Send at least one new image as a data URL" }, { status: 400 });
   }
   const store = createSupabaseClaimStore(supabase);
+  // Reject claims referencing a plot the caller does not own (cross-tenant guard).
+  const requestedPlotId =
+    typeof body.plotId === "string" && body.plotId.trim() ? body.plotId.trim() : null;
+  if (requestedPlotId) {
+    const plotRow = await supabase
+      .from("web_plots")
+      .select("id, created_by")
+      .eq("id", requestedPlotId)
+      .maybeSingle();
+    if (plotRow.error) {
+      console.error("plot lookup failed:", plotRow.error.message);
+      return NextResponse.json({ error: "Persist failed" }, { status: 500 });
+    }
+    if (!plotRow.data || plotRow.data.created_by !== auth.actor.userId) {
+      return NextResponse.json({ error: "Unknown plot" }, { status: 400 });
+    }
+  }
   const inferOptions = { apiToken: process.env.HF_TOKEN || process.env.HUGGINGFACE_API_TOKEN };
   try {
     if (claimId) {
@@ -225,7 +250,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ claimId: result.claimId, prediction: result.prediction ?? null });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Persist failed";
-    const status = message === "Claim not found" ? 404 : 500;
-    return NextResponse.json({ error: status === 404 ? "Claim not found" : "Persist failed" }, { status });
+    if (message === "Claim not found") {
+      return NextResponse.json({ error: "Claim not found" }, { status: 404 });
+    }
+    if (message === "Claim already exists") {
+      return NextResponse.json({ error: "Claim already exists" }, { status: 409 });
+    }
+    if (/Cannot recapture|status changed/i.test(message)) {
+      return NextResponse.json({ error: message }, { status: 409 });
+    }
+    return NextResponse.json({ error: "Persist failed" }, { status: 500 });
   }
 }
