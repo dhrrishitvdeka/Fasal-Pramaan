@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan-main/releases">
-    <img src="https://img.shields.io/badge/Release-v2.6.0-blue?style=for-the-badge" alt="Latest Release v2.6.0" />
+    <img src="https://img.shields.io/badge/Release-v2.6.1-blue?style=for-the-badge" alt="Latest Release v2.6.1" />
   </a>
   <img src="https://img.shields.io/badge/Next.js%2016-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
   <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />

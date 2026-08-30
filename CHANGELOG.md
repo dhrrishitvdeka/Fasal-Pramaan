@@ -2,6 +2,30 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1] — 2026-08-30
+
+### Fixed — Production blockers
+- **On-device MobileNet / CV worker**: module workers now load TF.js and MobileNet via ESM `import()` instead of classic `importScripts`. Live frames fall back to main-thread analysis on timeout. Live preview and captured stills share `cv-core.analyzeFrame` (same 64×64 path, including screen detection).
+- **Deferred HF inference**: claims stamp `inference_status` (`pending` / `complete` / `failed`). If Vercel cuts off `after()`, `GET /api/claims/[id]` requeues inference from stored blobs. Gradio queue-full is retryable.
+- **Late inference vs reviewer**: `attachHfPrediction` will not overwrite `severity_grade` / `crop_identified` on verified, rejected, or corrected claims. Reviewer writes are compare-and-swap on status.
+- **Evidence loss on recapture**: images upload before the claim row is inserted. Recapture inserts new rows then deletes the old ones. Recapture is only allowed from `needs_recapture`.
+- **Hugging Face Space**: 6-image / 15 MB / 20 MB JSON caps, optional `SPACE_API_TOKEN` Bearer check, pinned `spaces` and `huggingface_hub`.
+
+### Fixed — Integrity and UX
+- Stale Saathi claim intent is cleared after submit, on a capture URL with no `peril`/`intentId`, and after 12 hours.
+- Service worker no longer caches `/review`, `/admin`, `/audit`, `/login`, `/unlock`, `/analytics`, `/overview`, `/map`, `/alerts` (cache `v3`).
+- Shutter fails closed while CV is null (except fire/drought). HUD shows heuristic-only when MobileNet is unavailable.
+- Heuristic vision gate no longer auto-passes on `expectedCrop`. It reads crop score, blur, luma (floor 14), and green %; fail-closed `heuristic_unverified` when Gemini is down and there are no CV signals. Gate luma is real CV luma, not lighting score.
+- Offline banner, farmer notice, draft toast, and terms no longer claim a capture outbox or auto-sync.
+- Voice: barge-in threshold 0.30 RMS; AudioWorklet muted like ScriptProcessor; reconnect `setup` send cannot deadlock `connectingRef`; tool calls without `id` get a synthetic id.
+- Storage object keys are sanitized. `register_plot` / `check_evidence_quality` no longer report success with no camera and no persistence.
+- CSV keeps genuine negative numbers. Client telemetry forwards at most every 5s. `markSeen` is capped at 200. “Today” uses the local calendar. Gemini token mint times out at 15s. Claim-id collisions return 409.
+
+### Schema
+- `web_claims.inference_status`, `inference_error`, `inference_started_at` (apply `scripts/setup_web_schema_peril.sql`; the app still runs if those columns are missing).
+
+---
+
 ## [2.6.0] — 2026-08-24
 
 ### Fasal Saathi v3.0 Multimodal Voice & Live Video Co-Pilot
