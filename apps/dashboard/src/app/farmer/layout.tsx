@@ -9,6 +9,7 @@ import { getFarmerT } from "@/lib/farmerI18n";
 import { useOnlineStatus } from "@/lib/use-online-status";
 import FasalSaathiOverlay from "@/components/FasalSaathiOverlay";
 import OfflineBanner from "@/components/offline-banner";
+import { SaathiSessionProvider } from "@/lib/saathi/session-provider";
 import { LanguageSelect } from "@/components/LanguageSelect";
 import { getFarmerNavLabel } from "@/lib/name-sanitizer";
 import clsx from "clsx";
@@ -244,7 +245,9 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
 export default function FarmerLayout({ children }: { children: React.ReactNode }) {
   return (
     <FarmerProvider>
-      <FarmerLayoutContent>{children}</FarmerLayoutContent>
+      <SaathiSessionProvider>
+        <FarmerLayoutContent>{children}</FarmerLayoutContent>
+      </SaathiSessionProvider>
     </FarmerProvider>
   );
 }
