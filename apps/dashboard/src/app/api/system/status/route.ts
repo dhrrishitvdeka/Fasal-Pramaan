@@ -5,7 +5,7 @@ import { getHfSpaceUrl } from "@/lib/hf-model";
 
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60_000;
-export const VERSION = "2.6.0";
+export const VERSION = "2.6.1";
 
 /**
  * Honest configuration summary for the admin System Status page.
