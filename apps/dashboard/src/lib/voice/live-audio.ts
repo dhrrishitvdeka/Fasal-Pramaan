@@ -1,4 +1,4 @@
-// Gemini Live duplex audio plumbing shared by FasalSaathiOverlay and the Saathi intake page.
+// Gemini Live duplex audio plumbing used by the shared farmer Saathi session.
 // Uplink: microphone -> 16 kHz mono PCM16 over WebSocket. Downlink: 24 kHz PCM16 base64 -> scheduled playback.
 
 import { connectSilentProcessor } from "./mic-graph";
