@@ -53,6 +53,9 @@ export default function SaathiIntakePage() {
     if (liveStatus === "idle" || liveStatus === "error") void connectVoice();
     // Share the layout-level session — do not start a second socket if already live.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      autoStartedRef.current = false;
+    };
   }, []);
 
   const canProceed = Boolean(slots.peril);

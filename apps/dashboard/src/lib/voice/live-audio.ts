@@ -172,8 +172,10 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
   let processor: ScriptProcessorNode | null = null;
   let source: MediaStreamAudioSourceNode | null = null;
   let stream: MediaStream | null = null;
+  let isStopped = false;
 
   const stop = () => {
+    isStopped = true;
     interrupt();
     workletNode?.disconnect();
     processor?.disconnect();
@@ -183,7 +185,10 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
     source = null;
     stream?.getTracks().forEach((track) => track.stop());
     stream = null;
-    void ctx.close();
+    const toClose = ctx;
+    void toClose.close().finally(() => {
+      if (activeAudioContext === toClose) activeAudioContext = null;
+    });
   };
 
   let mediaStream: MediaStream;
@@ -199,6 +204,17 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
   } catch {
     void ctx.close();
     throw new Error(micPermissionMessage || "Microphone permission is required.");
+  }
+  // Guard: stop() was called while getUserMedia was pending
+  if (isStopped) {
+    mediaStream.getTracks().forEach((t) => t.stop());
+    return {
+      context: ctx,
+      stop,
+      playPcm24k() {},
+      sendVideoFrame() {},
+      interrupt() {},
+    } satisfies LiveAudioSession;
   }
   stream = mediaStream;
   source = ctx.createMediaStreamSource(mediaStream);
