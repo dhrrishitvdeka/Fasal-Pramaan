@@ -175,6 +175,7 @@ interface FarmerContextType {
   persistError: string | null;
   refresh: () => Promise<void>;
   addPlot: (plot: FarmerPlot) => void;
+  addMilestones: (milestones: GrowthTimelineMilestone[]) => void;
   registerPlot: (input: PlotRegistrationInput) => Promise<{ plotId: string }>;
   getClaimById: (id: string) => FarmerClaim | undefined;
   createClaim: (
@@ -194,6 +195,7 @@ interface FarmerContextType {
   ) => Promise<FarmerClaim | undefined>;
   saveClaimDraft: (draft: Partial<FarmerClaim>) => { id: string; saved: boolean };
   loadClaimDraft: (draftId?: string) => Partial<FarmerClaim> | null;
+  clearClaimDraft: () => void;
   refreshData: () => Promise<void>;
   snoozeMilestone: (id: string, days: number) => void | Promise<void>;
   completeMilestone: (id: string, imageUrl: string, notes?: string) => void | Promise<void>;
@@ -455,6 +457,10 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const addMilestones = (newMilestones: GrowthTimelineMilestone[]) => {
+    setMilestones((prev) => [...prev, ...newMilestones]);
+  };
+
   const registerPlot = async (input: PlotRegistrationInput): Promise<{ plotId: string }> => {
     const name = String(input.name || "").trim() || "Farm Plot";
     const cropType = String(input.cropType || "wheat").trim() || "wheat";
@@ -666,6 +672,14 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const clearClaimDraft = () => {
+    try {
+      sessionStorage.removeItem(STORAGE_KEY_DRAFT);
+    } catch {
+      // ignore
+    }
+  };
+
   const snoozeMilestone = async (id: string, days: number) => {
     const updated = milestones.map((m) => {
       if (m.id !== id) return m;
@@ -740,12 +754,14 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         refresh,
         refreshData: refresh,
         addPlot,
+        addMilestones,
         registerPlot,
         getClaimById,
         createClaim,
         updateClaimRecapture,
         saveClaimDraft,
         loadClaimDraft,
+        clearClaimDraft,
         snoozeMilestone,
         completeMilestone,
         farmerProfile,

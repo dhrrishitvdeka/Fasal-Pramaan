@@ -186,7 +186,7 @@ function FarmerClaimDetailContent() {
 
           {/* Right Payout / CTA Box */}
           <div className="shrink-0 flex flex-col items-start md:items-end justify-center">
-            {isVerified && claim.payoutAmountInr && (
+            {isVerified && typeof claim.payoutAmountInr === "number" && claim.payoutAmountInr > 0 && (
               <div className="fp-panel p-4 text-left md:text-right">
                 <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   {t.recommendedPayout}

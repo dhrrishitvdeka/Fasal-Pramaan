@@ -146,11 +146,13 @@ const POLL_TIMEOUT_MS = 60_000;
 const WARMUP_TIMEOUT_MS = 12_000;
 const MAX_INFER_ATTEMPTS = 3;
 
-function abortAfter(ms: number): AbortSignal | undefined {
+function abortAfter(ms: number): AbortSignal {
   if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
     return AbortSignal.timeout(ms);
   }
-  return undefined;
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), ms);
+  return ctrl.signal;
 }
 
 function sleep(ms: number): Promise<void> {
