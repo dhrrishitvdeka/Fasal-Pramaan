@@ -18,16 +18,26 @@ export function checkRateLimit(
   windowMs = 60_000,
   forceEnforce = false,
 ): RateLimitResult {
-  if (!RATE_LIMIT_ENABLED && !forceEnforce) {
+  // Rate limiting is kept completely off by default for hackathon demonstrations.
+  if ((!RATE_LIMIT_ENABLED && !forceEnforce) || process.env.DISABLE_RATE_LIMIT === "true") {
     return { ok: true };
   }
   const now = Date.now();
   const bucket = buckets.get(key);
   if (!bucket || now - bucket.windowStart >= windowMs) {
     if (buckets.size >= MAX_BUCKETS) {
+      let evicted = 0;
       for (const [k, b] of buckets) {
-        if (now - b.windowStart >= windowMs) buckets.delete(k);
+        if (now - b.windowStart >= windowMs) {
+          buckets.delete(k);
+          evicted += 1;
+        }
         if (buckets.size < MAX_BUCKETS) break;
+      }
+      // If all buckets are within active window, force LRU delete of oldest map entries
+      if (buckets.size >= MAX_BUCKETS && evicted === 0) {
+        const firstKey = buckets.keys().next().value;
+        if (firstKey) buckets.delete(firstKey);
       }
     }
     buckets.set(key, { count: 1, windowStart: now });

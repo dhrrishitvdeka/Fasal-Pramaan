@@ -191,6 +191,10 @@ if (inWorkerContext()) {
   void ensureMobilenet();
 }
 
+let cachedSrcCanvas: OffscreenCanvas | null = null;
+let cachedDstCanvas: OffscreenCanvas | null = null;
+let cachedBitmapCanvas: OffscreenCanvas | null = null;
+
 function buildClassifyCanvas(
   data: Uint8ClampedArray,
   width: number,
@@ -201,18 +205,29 @@ function buildClassifyCanvas(
     const Ctor: any = (self as unknown as { OffscreenCanvas?: unknown }).OffscreenCanvas;
     if (typeof Ctor !== "function") return null;
     if (!(width > 0 && height > 0) || data.length < width * height * 4) return null;
-    const src = new Ctor(width, height) as OffscreenCanvas;
-    const srcCtx = src.getContext("2d") as unknown as CanvasRenderingContext2D | null;
+
+    if (!cachedSrcCanvas) {
+      cachedSrcCanvas = new Ctor(width, height) as OffscreenCanvas;
+    } else if (cachedSrcCanvas.width !== width || cachedSrcCanvas.height !== height) {
+      cachedSrcCanvas.width = width;
+      cachedSrcCanvas.height = height;
+    }
+
+    const srcCtx = cachedSrcCanvas.getContext("2d") as unknown as CanvasRenderingContext2D | null;
     if (!srcCtx) return null;
     const srcImage = srcCtx.createImageData(width, height);
     if (!srcImage) return null;
     srcImage.data.set(data.subarray(0, Math.min(data.length, width * height * 4)));
     srcCtx.putImageData(srcImage, 0, 0);
-    const dst = new Ctor(CLASSIFY_INPUT, CLASSIFY_INPUT) as OffscreenCanvas;
-    const dstCtx = dst.getContext("2d") as unknown as CanvasRenderingContext2D | null;
+
+    if (!cachedDstCanvas) {
+      cachedDstCanvas = new Ctor(CLASSIFY_INPUT, CLASSIFY_INPUT) as OffscreenCanvas;
+    }
+    const dstCtx = cachedDstCanvas.getContext("2d") as unknown as CanvasRenderingContext2D | null;
     if (!dstCtx) return null;
-    dstCtx.drawImage(src as unknown as CanvasImageSource, 0, 0, CLASSIFY_INPUT, CLASSIFY_INPUT);
-    return dst;
+    dstCtx.clearRect(0, 0, CLASSIFY_INPUT, CLASSIFY_INPUT);
+    dstCtx.drawImage(cachedSrcCanvas as unknown as CanvasImageSource, 0, 0, CLASSIFY_INPUT, CLASSIFY_INPUT);
+    return cachedDstCanvas;
   } catch {
     return null;
   }
@@ -318,9 +333,12 @@ if (inWorkerContext()) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const OffscreenCanvasCtor: any = (self as unknown as { OffscreenCanvas?: unknown }).OffscreenCanvas;
             if (OffscreenCanvasCtor) {
-              const off = new OffscreenCanvasCtor(w, h) as OffscreenCanvas;
-              const ctx = off.getContext("2d") as unknown as CanvasRenderingContext2D | null;
+              if (!cachedBitmapCanvas) {
+                cachedBitmapCanvas = new OffscreenCanvasCtor(w, h) as OffscreenCanvas;
+              }
+              const ctx = cachedBitmapCanvas.getContext("2d") as unknown as CanvasRenderingContext2D | null;
               if (ctx) {
+                ctx.clearRect(0, 0, w, h);
                 ctx.drawImage(bitmap as unknown as CanvasImageSource, 0, 0, w, h);
                 const imageData = ctx.getImageData(0, 0, w, h);
                 data = imageData.data;

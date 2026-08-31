@@ -95,6 +95,13 @@ export interface WebClaimRow {
   created_at: string | null;
   updated_at: string | null;
   created_by: string | null;
+  sowing_date?: string | null;
+  model_id?: string | null;
+  hf_label?: string | null;
+  hf_score?: number | null;
+  inference_status?: string | null;
+  inference_error?: string | null;
+  inference_started_at?: string | null;
   corrected_crop?: string | null;
   corrected_grade?: string | null;
   corrected_severity?: string | null;
@@ -149,6 +156,7 @@ export interface WebReviewActionRow {
 
 export interface WebProfileRow {
   id: string;
+  email?: string | null;
   name?: string | null;
   name_hi?: string | null;
   full_name?: string | null;
@@ -644,9 +652,15 @@ export function emptyOverview(): Overview {
 export function overviewFromClaims(claims: FarmerClaim[]): Overview {
   const base = emptyOverview();
   const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayStr = now.toDateString();
   const total = claims.length;
-  const todayCount = claims.filter((c) => c.createdAt.startsWith(today)).length;
+  const todayCount = claims.filter((c) => {
+    try {
+      return new Date(c.createdAt).toDateString() === todayStr;
+    } catch {
+      return false;
+    }
+  }).length;
   const pending = claims.filter((c) => c.status === "under_review" || c.status === "submitted").length;
   const verified = claims.filter((c) => c.status === "verified").length;
   const recapture = claims.filter((c) => c.status === "needs_recapture").length;

@@ -275,9 +275,14 @@ def analyze(
             continue
         if min(image.size) < 96:
             warnings.append("very_low_resolution")
+        pixel_values = _preprocess(image, runtime)
+        try:
+            image.close()
+        except Exception:
+            pass
         logits = session.run(
             ["conditioned_logits"],
-            {"pixel_values": _preprocess(image, runtime)},
+            {"pixel_values": pixel_values},
         )[0][0]
         probabilities = _softmax(np.asarray(logits), runtime["temperature"])
         predicted_crop, crop_confidence, _ = _head_summary(probabilities, crops)
