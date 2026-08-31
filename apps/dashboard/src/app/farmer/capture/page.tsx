@@ -307,9 +307,11 @@ function CaptureStudioContent() {
   useEffect(() => {
     let active = true;
     let unsubscribe: (() => void) | null = null;
+    let realtimeCv: typeof import("@/lib/vision/realtime-cv") | null = null;
     void import("@/lib/vision/realtime-cv")
       .then((m) => {
         if (!active) return;
+        realtimeCv = m;
         m.ensureCvWorker();
         setCvModelStatus(m.getModelStatus());
         unsubscribe = m.onModelStatus(setCvModelStatus);
@@ -318,6 +320,7 @@ function CaptureStudioContent() {
     return () => {
       active = false;
       if (unsubscribe) unsubscribe();
+      if (realtimeCv) realtimeCv.terminateCvWorker();
     };
   }, []);
 
@@ -699,6 +702,7 @@ function CaptureStudioContent() {
             if (!updated) {
               throw new Error("Could not save recapture — claim was not found. Refresh and try again.");
             }
+            clearActiveIntent();
             router.push(`/farmer/claims/${updated.id}?recaptured=true`);
             return { id: updated.id };
           }
