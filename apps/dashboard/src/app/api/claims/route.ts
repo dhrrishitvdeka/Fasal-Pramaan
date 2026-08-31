@@ -85,59 +85,41 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const rawImages = Array.isArray(body.images) ? body.images : [];
-  const claimId =
-    typeof body.id === "string" && body.id.trim().length > 0 ? body.id.trim() : undefined;
+  const data = parsedBody.data;
+  const rawImages = data.images;
+  const claimId = data.id?.trim() || undefined;
   if (!rawImages.length || rawImages.length > MAX_IMAGES) {
     return NextResponse.json({ error: `Send between 1 and ${MAX_IMAGES} images` }, { status: 400 });
   }
   let images: PersistClaimInput["images"];
   try {
     images = rawImages
-      .filter((img: { imageDataUrl?: string }) => String(img.imageDataUrl || "").startsWith("data:"))
-      .map(
-        (img: {
-          imageDataUrl: string;
-          angleType: string;
-          sha256?: string;
-          lat?: number;
-          lon?: number;
-          accuracyM?: number;
-          lightingScore?: number | null;
-          qualityPassed?: boolean | null;
-          blurScore?: number | null;
-          greenPct?: number | null;
-          luma?: number | null;
-          cropScore?: number | null;
-          facing?: string | null;
-          dimensions?: { width: number; height: number } | null;
-          capturedAt?: string | null;
-        }) => {
-          const decoded = decodeDataUrl(String(img.imageDataUrl || ""));
-          // Always recompute the digest from the actual bytes — a client-sent
-          // sha256 is untrusted and would let stale gate results be replayed.
-          const sha256 = createHash("sha256").update(decoded.bytes).digest("hex");
-          return {
-            angleType: String(img.angleType || "closeup_damage"),
-            bytes: decoded.bytes,
-            contentType: decoded.contentType,
-            sha256,
-            lat: img.lat,
-            lon: img.lon,
-            accuracyM: img.accuracyM,
-            lightingScore: img.lightingScore,
-            qualityPassed: img.qualityPassed,
-            blurScore: img.blurScore,
-            greenPct: img.greenPct,
-            luma: img.luma,
-            cropScore: img.cropScore,
-            facing: img.facing,
-            dimensions: img.dimensions,
-            capturedAt: img.capturedAt || undefined,
-            farmerObservation: typeof body.farmerObservations === "string" ? body.farmerObservations : undefined,
-          };
-        },
-      );
+      .filter((img) => String(img.imageDataUrl || "").startsWith("data:"))
+      .map((img) => {
+        const decoded = decodeDataUrl(String(img.imageDataUrl || ""));
+        // Always recompute the digest from the actual bytes — a client-sent
+        // sha256 is untrusted and would let stale gate results be replayed.
+        const sha256 = createHash("sha256").update(decoded.bytes).digest("hex");
+        return {
+          angleType: String(img.angleType || "closeup_damage"),
+          bytes: decoded.bytes,
+          contentType: decoded.contentType,
+          sha256,
+          lat: img.lat,
+          lon: img.lon,
+          accuracyM: img.accuracyM,
+          lightingScore: img.lightingScore,
+          qualityPassed: img.qualityPassed,
+          blurScore: img.blurScore,
+          greenPct: img.greenPct,
+          luma: img.luma,
+          cropScore: img.cropScore,
+          facing: img.facing,
+          dimensions: img.dimensions ?? undefined,
+          capturedAt: img.capturedAt || undefined,
+          farmerObservation: data.farmerObservations?.trim() || undefined,
+        };
+      });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Invalid image" },
@@ -149,8 +131,7 @@ export async function POST(request: Request) {
   }
   const store = createSupabaseClaimStore(supabase);
   // Reject claims referencing a plot the caller does not own (cross-tenant guard).
-  const requestedPlotId =
-    typeof body.plotId === "string" && body.plotId.trim() ? body.plotId.trim() : null;
+  const requestedPlotId = data.plotId?.trim() || null;
   if (requestedPlotId) {
     const plotRow = await supabase
       .from("web_plots")
@@ -179,11 +160,11 @@ export async function POST(request: Request) {
         store,
         {
           claimId,
-          farmerObservations: body.farmerObservations,
-          captureLat: clampNumber(body.captureLat, -90, 90) ?? null,
-          captureLon: clampNumber(body.captureLon, -180, 180) ?? null,
-          captureAccuracyM: clampNumber(body.captureAccuracyM, 0, 100000) ?? null,
-          gpsStatus: body.gpsStatus,
+          farmerObservations: data.farmerObservations,
+          captureLat: clampNumber(data.captureLat, -90, 90) ?? null,
+          captureLon: clampNumber(data.captureLon, -180, 180) ?? null,
+          captureAccuracyM: clampNumber(data.captureAccuracyM, 0, 100000) ?? null,
+          gpsStatus: data.gpsStatus,
           images,
         },
         inferCropDisease,
@@ -203,26 +184,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ claimId: result.claimId, prediction: result.prediction ?? null });
     }
     const input: PersistClaimInput = {
-      plotId: body.plotId,
-      plotName: body.plotName,
-      plotNameHi: body.plotNameHi,
-      khasraNumber: body.khasraNumber,
-      cropType: body.cropType,
-      cropTypeHi: body.cropTypeHi,
-      cropVariety: body.cropVariety,
-      farmerObservations: body.farmerObservations,
-      captureLat: clampNumber(body.captureLat, -90, 90) ?? null,
-      captureLon: clampNumber(body.captureLon, -180, 180) ?? null,
-      captureAccuracyM: clampNumber(body.captureAccuracyM, 0, 100000) ?? null,
-      gpsStatus: body.gpsStatus,
-      peril: typeof body.peril === "string" ? body.peril.trim().toLowerCase() : undefined,
-      intentId: typeof body.intentId === "string" ? body.intentId.trim() : undefined,
-      plotLat: clampNumber(body.plotLat, -90, 90) ?? null,
-      plotLon: clampNumber(body.plotLon, -180, 180) ?? null,
-      sowingDate:
-        typeof body.sowingDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.sowingDate.trim())
-          ? body.sowingDate.trim()
-          : undefined,
+      plotId: data.plotId,
+      plotName: data.plotName,
+      plotNameHi: data.plotNameHi,
+      khasraNumber: data.khasraNumber,
+      cropType: data.cropType,
+      cropTypeHi: data.cropTypeHi,
+      cropVariety: data.cropVariety,
+      farmerObservations: data.farmerObservations,
+      captureLat: clampNumber(data.captureLat, -90, 90) ?? null,
+      captureLon: clampNumber(data.captureLon, -180, 180) ?? null,
+      captureAccuracyM: clampNumber(data.captureAccuracyM, 0, 100000) ?? null,
+      gpsStatus: data.gpsStatus,
+      peril: typeof data.peril === "string" ? data.peril.trim().toLowerCase() : undefined,
+      intentId: typeof data.intentId === "string" ? data.intentId.trim() : undefined,
+      plotLat: clampNumber(data.plotLat, -90, 90) ?? null,
+      plotLon: clampNumber(data.plotLon, -180, 180) ?? null,
+      sowingDate: data.sowingDate,
       createdBy: auth.actor.userId,
       images,
     };

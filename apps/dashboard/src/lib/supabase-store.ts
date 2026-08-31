@@ -10,10 +10,11 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
         return data as WebClaimRow;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (/duplicate|unique|already exists|23505/i.test(msg)) {
+        const code = (err as { code?: string })?.code;
+        if (/duplicate|unique|already exists|23505/i.test(msg) || code === "23505") {
           throw new Error("Claim already exists");
         }
-        if (/peril|intent_id|gate_result|context_signals|adaptive_result|inference_/i.test(msg)) {
+        if (code === "42703" || /column.*does not exist/i.test(msg)) {
           const {
             peril: _p,
             intent_id: _i,
@@ -36,6 +37,10 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
         }
         throw err;
       }
+    },
+    async deleteClaim(id) {
+      const { error } = await client.from("web_claims").delete().eq("id", id);
+      if (error) throw new Error(error.message);
     },
     async updateClaim(id, patch, opts) {
       const apply = async (body: Partial<WebClaimRow>) => {

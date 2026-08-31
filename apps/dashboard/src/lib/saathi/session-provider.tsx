@@ -112,15 +112,8 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     completeMilestone,
   } = useFarmerData();
 
-  const stored = useRef<StoredSession | null>(null);
-  if (stored.current === null && typeof window !== "undefined") {
-    stored.current = loadStored();
-  }
-
-  const [messages, setMessages] = useState<SaathiMessage[]>(
-    () => stored.current?.messages ?? [initialSaathiGreeting(lang)],
-  );
-  const [slots, setSlots] = useState<SaathiSlot>(() => stored.current?.slots ?? {});
+  const [messages, setMessages] = useState<SaathiMessage[]>(() => [initialSaathiGreeting(lang)]);
+  const [slots, setSlots] = useState<SaathiSlot>({});
   const [liveStatus, setLiveStatus] = useState<SaathiLiveStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -147,12 +140,24 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
   const registerPlotRef = useRef(registerPlot);
   const mountedRef = useRef(true);
   const connectVoiceRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const hasGreetedRef = useRef(false);
 
   statusRef.current = liveStatus;
   langRef.current = lang;
   slotsRef.current = slots;
   pathnameRef.current = pathname;
   registerPlotRef.current = registerPlot;
+
+  useEffect(() => {
+    const s = loadStored();
+    if (s && s.messages.length > 0) {
+      setMessages(s.messages);
+      if (s.slots && Object.keys(s.slots).length > 0) {
+        setSlots(s.slots);
+      }
+      hasGreetedRef.current = s.messages.length > 1;
+    }
+  }, []);
 
   useEffect(() => {
     persistStored(messages, slots);
@@ -451,7 +456,14 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
       const socket = new WebSocket(`${body.websocketUrl}?access_token=${encodeURIComponent(body.token)}`);
       socketRef.current = socket;
       await new Promise<void>((resolve, reject) => {
-        const timer = window.setTimeout(() => reject(new Error("Voice connection timed out")), 15000);
+        const timer = window.setTimeout(() => {
+          try {
+            socket.close();
+          } catch {
+            // ignore
+          }
+          reject(new Error("Voice connection timed out"));
+        }, 15000);
         socket.onopen = () => {
           try {
             socket.send(JSON.stringify({ setup: { model: `models/${body.model}` } }));
@@ -459,11 +471,21 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
             resolve();
           } catch (err) {
             window.clearTimeout(timer);
+            try {
+              socket.close();
+            } catch {
+              // ignore
+            }
             reject(err instanceof Error ? err : new Error("Voice setup failed"));
           }
         };
         socket.onerror = () => {
           window.clearTimeout(timer);
+          try {
+            socket.close();
+          } catch {
+            // ignore
+          }
           reject(new Error(langRef.current === "hi" ? "Gemini Live नहीं खुला।" : "Could not open Gemini Live."));
         };
       });
@@ -509,19 +531,24 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
                 setLiveStatus("live");
                 retryCountRef.current = 0;
                 pushPortalContext("session_start");
-                try {
-                  socket.send(
-                    JSON.stringify({
-                      realtimeInput: {
-                        text:
-                          langRef.current === "hi"
-                            ? "नमस्ते किसान भाई! मैं फसल साथी हूँ। आपके खेत में क्या समस्या हुई है? मुझे बताएं।"
-                            : "Hello! I am Fasal Saathi. What happened to your crop? Tell me in your words.",
-                      },
-                    }),
-                  );
-                } catch {
-                  // ignore
+                if (!hasGreetedRef.current) {
+                  hasGreetedRef.current = true;
+                  try {
+                    socket.send(
+                      JSON.stringify({
+                        realtimeInput: {
+                          text:
+                            langRef.current === "hi"
+                              ? "नमस्ते किसान भाई! मैं फसल साथी हूँ। आपके खेत में क्या समस्या हुई है? मुझे बताएं।"
+                              : "Hello! I am Fasal Saathi. What happened to your crop? Tell me in your words.",
+                        },
+                      }),
+                    );
+                  } catch {
+                    // ignore
+                  }
+                } else {
+                  pushPortalContext("resume");
                 }
               }
               if (item.type === "inputTranscript") {
@@ -602,6 +629,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
 
   const resetSession = useCallback(() => {
     disconnectVoice();
+    hasGreetedRef.current = false;
     setSlots({});
     setLastTool(null);
     setError(null);
@@ -619,6 +647,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     async (raw: string, source: "text" | "voice" = "text") => {
       const text = raw.trim();
       if (!text) return;
+      hasGreetedRef.current = true;
       setMessages((m) => [
         ...m,
         { id: newId("f"), role: "farmer", text, at: new Date().toISOString() },
@@ -633,8 +662,9 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
         if (action.type === "open_camera") {
           const intent = slotsToIntent(res.slots, source === "voice" ? "saathi_voice" : "saathi_text");
           setActiveIntent(intent);
-          const peril = action.peril || "normal";
-          const cameraUrl = `/farmer/capture?peril=${encodeURIComponent(peril)}${
+          webCaptureBridge.setIntent(intent);
+          const peril = action.peril || intent.peril || "normal";
+          const cameraUrl = `/farmer/capture?intentId=${encodeURIComponent(intent.id)}&peril=${encodeURIComponent(peril)}${
             res.slots.plotId ? `&plotId=${encodeURIComponent(res.slots.plotId)}` : ""
           }${res.slots.crop ? `&crop=${encodeURIComponent(res.slots.crop)}` : ""}`;
           setTimeout(() => router.push(cameraUrl), 800);
@@ -688,6 +718,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     if (!s.peril) return;
     const intent = slotsToIntent(s);
     setActiveIntent(intent);
+    webCaptureBridge.setIntent(intent);
     const params = new URLSearchParams({ intentId: intent.id, peril: intent.peril });
     if (s.plotId) params.set("plotId", s.plotId);
     if (intent.crop) params.set("crop", intent.crop);
