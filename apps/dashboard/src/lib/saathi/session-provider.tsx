@@ -443,6 +443,11 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     setLiveStatus("connecting");
     try {
       const minted = await apiFetch("/api/voice/session", { method: "POST" });
+      // Guard: disconnect or unmount happened while minting the token
+      if (intentionalCloseRef.current || !mountedRef.current) {
+        connectingRef.current = false;
+        return;
+      }
       const body = (await minted.json()) as {
         error?: string;
         token?: string;
@@ -605,6 +610,12 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
             : "Microphone permission is required. Allow the mic in the browser prompt.",
         onSpeakingChange: setIsSpeaking,
       });
+      // Guard: disconnect or unmount while mic was initialising
+      if (intentionalCloseRef.current || !mountedRef.current) {
+        liveAudio.stop();
+        connectingRef.current = false;
+        return;
+      }
       liveAudioRef.current = liveAudio;
       connectingRef.current = false;
       retryCountRef.current = 0;

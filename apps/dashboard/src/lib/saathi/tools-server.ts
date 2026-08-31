@@ -25,63 +25,69 @@ export async function executeSaathiTool(
   args: Record<string, unknown>,
   context: SaathiToolContext,
 ): Promise<SaathiToolResult> {
-  switch (name) {
-    case "request_evidence_angles":
-      return requestEvidenceAngles(args);
-    case "call_context_signal":
-      return callContextSignal(args);
-    case "guide_capture":
-      return guideCapture(args);
-    case "classify_claim":
-      return classifyClaim(args);
-    case "take_photo":
-      return {
-        ok: true,
-        data: { action: "take_photo", message: "Dispatched camera shutter capture command to active studio." },
-      };
-    case "switch_camera":
-      return {
-        ok: true,
-        data: { action: "switch_camera", message: "Dispatched camera flip command to active studio." },
-      };
-    case "select_angle":
-      return {
-        ok: true,
-        data: { action: "select_angle", angle: args.angle, message: `Switched active angle to ${args.angle}.` },
-      };
-    case "retake_angle":
-      return {
-        ok: true,
-        data: { action: "retake_angle", angle: args.angle, message: `Cleared ${args.angle} for recapture.` },
-      };
-    case "set_observation":
-      return {
-        ok: true,
-        data: { action: "set_observation", observation: args.observation, message: "Observation saved to draft." },
-      };
-    case "submit_claim":
-      return {
-        ok: true,
-        data: { action: "submit_claim", message: "Dispatched claim submission command." },
-      };
-    case "register_plot":
-      return {
-        ok: false,
-        error: "Plot registration must run in the farmer app so the plot is actually saved.",
-      };
-    case "check_plot_geofence":
-      return checkPlotGeofence(args, context);
-    case "fetch_agro_weather_alerts":
-      return fetchAgroWeatherAlerts(args, context);
-    case "explain_claim_audit":
-      return explainClaimAudit(args, context);
-    case "check_evidence_quality":
-      return {
-        ok: false,
-        error: "Evidence quality is measured on the live camera, not on the server.",
-      };
-    default:
-      return { ok: false, error: `Unknown tool: ${name}` };
+  try {
+    switch (name) {
+      case "request_evidence_angles":
+        return requestEvidenceAngles(args);
+      case "call_context_signal":
+        return callContextSignal(args);
+      case "guide_capture":
+        return guideCapture(args);
+      case "classify_claim":
+        return classifyClaim(args);
+      case "take_photo":
+        return {
+          ok: true,
+          data: { action: "take_photo", message: "Dispatched camera shutter capture command to active studio." },
+        };
+      case "switch_camera":
+        return {
+          ok: true,
+          data: { action: "switch_camera", message: "Dispatched camera flip command to active studio." },
+        };
+      case "select_angle":
+        return {
+          ok: true,
+          data: { action: "select_angle", angle: args.angle, message: `Switched active angle to ${args.angle}.` },
+        };
+      case "retake_angle":
+        return {
+          ok: true,
+          data: { action: "retake_angle", angle: args.angle, message: `Cleared ${args.angle} for recapture.` },
+        };
+      case "set_observation":
+        return {
+          ok: true,
+          data: { action: "set_observation", observation: args.observation, message: "Observation saved to draft." },
+        };
+      case "submit_claim":
+        return {
+          ok: true,
+          data: { action: "submit_claim", message: "Dispatched claim submission command." },
+        };
+      case "register_plot":
+        return {
+          ok: false,
+          error: "Plot registration must run in the farmer app so the plot is actually saved.",
+        };
+      case "check_plot_geofence":
+        return checkPlotGeofence(args, context);
+      case "fetch_agro_weather_alerts":
+        return fetchAgroWeatherAlerts(args, context);
+      case "explain_claim_audit":
+        return explainClaimAudit(args, context);
+      case "check_evidence_quality":
+        return {
+          ok: false,
+          error: "Evidence quality is measured on the live camera, not on the server.",
+        };
+      default:
+        return { ok: false, error: `Unknown tool: ${name}` };
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[saathi-tool] ${name} threw:`, msg);
+    return { ok: false, error: msg };
   }
 }
 

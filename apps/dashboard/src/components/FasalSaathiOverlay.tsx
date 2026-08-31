@@ -35,6 +35,14 @@ export default function FasalSaathiOverlay() {
   } = useSaathiSession();
   const transcriptRef = useRef<HTMLDivElement | null>(null);
 
+  // Reset overlay when navigating TO the full Saathi intake page so it doesn't
+  // ghost-open when the user returns to another farmer route.
+  useEffect(() => {
+    if (pathname.startsWith("/farmer/saathi")) {
+      setOverlayOpen(false);
+    }
+  }, [pathname, setOverlayOpen]);
+
   useEffect(() => {
     const el = transcriptRef.current;
     if (!el) return;
