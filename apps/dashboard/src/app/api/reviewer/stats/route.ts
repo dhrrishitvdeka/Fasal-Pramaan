@@ -36,12 +36,16 @@ export async function GET(request: Request) {
   const ids = claims.map((claim) => claim.id);
   const imageRows: WebClaimImageRow[] = [];
   if (ids.length) {
-    const imagesRes = await supabase.from("web_claim_images").select("*").in("claim_id", ids);
-    if (imagesRes.error) {
-      console.error("reviewer images query failed:", imagesRes.error.message);
-      return NextResponse.json({ error: "Request failed" }, { status: 500 });
+    const chunkSize = 200;
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const imagesRes = await supabase.from("web_claim_images").select("*").in("claim_id", chunk);
+      if (imagesRes.error) {
+        console.error("reviewer images query failed:", imagesRes.error.message);
+        return NextResponse.json({ error: "Request failed" }, { status: 500 });
+      }
+      imageRows.push(...((imagesRes.data || []) as WebClaimImageRow[]));
     }
-    imageRows.push(...((imagesRes.data || []) as WebClaimImageRow[]));
   }
   const grouped = new Map<string, ReturnType<typeof imageFromRow>[]>();
   for (const row of imageRows) {

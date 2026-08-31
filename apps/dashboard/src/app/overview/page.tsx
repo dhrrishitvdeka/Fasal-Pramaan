@@ -123,7 +123,7 @@ export default function OverviewPage() {
       gate_failed:
         (s.gate_result as { gateFailed?: boolean } | null | undefined)?.gateFailed ? "yes" : "no",
       status: s.status,
-      created_at: s.latest_evaluation?.created_at ?? "",
+      created_at: s.createdAt || s.latest_evaluation?.created_at || "",
     }));
     downloadCsv(`fasal-pramaan-peril-${csvTimestamp()}.csv`, toCsv(rows));
   };

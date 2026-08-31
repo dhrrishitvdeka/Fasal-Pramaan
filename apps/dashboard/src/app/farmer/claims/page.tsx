@@ -322,7 +322,7 @@ function FarmerClaimsContent() {
                     )}
 
                     {/* Verified Payout Banner */}
-                    {isVerified && claim.payoutAmountInr && (
+                    {isVerified && typeof claim.payoutAmountInr === "number" && claim.payoutAmountInr > 0 && (
                       <div className="fp-panel mt-2 flex items-center justify-between p-2.5 text-xs">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-emerald-700" />
