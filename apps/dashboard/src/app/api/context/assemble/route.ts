@@ -9,8 +9,8 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 
 function toCoordinate(value: unknown, min: number, max: number): number | null {
   const n = typeof value === "number" ? value : value != null && String(value).trim() !== "" ? Number(value) : NaN;
-  if (!Number.isFinite(n)) return null;
-  return Math.max(min, Math.min(max, n));
+  if (!Number.isFinite(n) || n < min || n > max) return null;
+  return n;
 }
 
 export async function POST(request: Request) {

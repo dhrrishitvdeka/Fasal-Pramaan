@@ -38,6 +38,8 @@ import {
   getAreaBreakdown,
   type AreaUnit,
 } from "@/lib/land-units";
+import { buildDefaultMilestones } from "@/lib/growth-stages";
+import { milestoneFromRow } from "@/lib/web-db";
 import clsx from "clsx";
 
 const INDIAN_STATES = [
@@ -92,7 +94,7 @@ const IRRIGATION_TYPES = [
 ];
 
 export default function FarmerRemindersPage() {
-  const { lang, milestones, plots, snoozeMilestone, refresh, addPlot, persistError } = useFarmerData();
+  const { lang, milestones, plots, snoozeMilestone, refresh, addPlot, addMilestones, persistError } = useFarmerData();
   const t = getFarmerT(lang);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -205,12 +207,24 @@ export default function FarmerRemindersPage() {
   const seedTimeline = async (plotId: string) => {
     setBusy(true);
     try {
-      const res = await apiFetch(`/api/farmer/plots/${encodeURIComponent(plotId)}/timeline`, {
-        method: "POST",
-      });
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(body.error || "Could not start timeline");
-      await refresh();
+      if (isSupabaseConfigured()) {
+        const res = await apiFetch(`/api/farmer/plots/${encodeURIComponent(plotId)}/timeline`, {
+          method: "POST",
+        });
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) throw new Error(body.error || "Could not start timeline");
+        await refresh();
+      } else {
+        const targetPlot = plots.find((p) => p.id === plotId);
+        const defaults = buildDefaultMilestones({
+          plotId,
+          cropName: targetPlot?.cropType || "wheat",
+          cropNameHi: targetPlot?.cropTypeHi || "गेहूं",
+          sowingDate: targetPlot?.sowingDate || todayIsoDate(),
+          createdBy: "farmer",
+        }).map((m) => milestoneFromRow(m as any));
+        addMilestones(defaults);
+      }
       showToast(lang === "hi" ? "समय-सीमा शुरू हो गई।" : "Timeline started.");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Could not start timeline");
