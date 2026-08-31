@@ -31,10 +31,17 @@ export async function siteLockToken(password = siteLockPassword()): Promise<stri
 
 export async function isValidSiteLockToken(value: string | undefined): Promise<boolean> {
   const expected = await siteLockToken();
-  if (!expected || !value || expected.length !== value.length) return false;
+  if (!expected || !value) return false;
+  const enc = new TextEncoder();
+  const [hashExpected, hashValue] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(expected)),
+    crypto.subtle.digest("SHA-256", enc.encode(value)),
+  ]);
+  const u8Expected = new Uint8Array(hashExpected);
+  const u8Value = new Uint8Array(hashValue);
   let mismatch = 0;
-  for (let i = 0; i < expected.length; i += 1) {
-    mismatch |= expected.charCodeAt(i) ^ value.charCodeAt(i);
+  for (let i = 0; i < u8Expected.length; i += 1) {
+    mismatch |= u8Expected[i] ^ u8Value[i];
   }
   return mismatch === 0;
 }

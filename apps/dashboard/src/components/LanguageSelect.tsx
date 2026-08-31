@@ -23,7 +23,7 @@ export function LanguageSelect({
   const currentLang = GEMINI_LIVE_INDIAN_LANGUAGES.find((l) => l.code === selected);
 
   return (
-    <div className={clsx("relative inline-flex items-center", className)}>
+    <div className={clsx("relative inline-flex items-center rounded-md focus-within:ring-2 focus-within:ring-emerald-500 focus-within:ring-offset-1", className)}>
       {/* Visual representation: Globe icon on mobile, Globe + Text on desktop */}
       <div className="flex items-center gap-1 rounded border border-[var(--line)] bg-[var(--surface)] px-1.5 py-1 text-xs font-medium text-[var(--ink)] shadow-2xs transition-colors hover:border-[var(--ink-muted)] hover:bg-[var(--canvas)] sm:gap-1.5 sm:px-2">
         <Globe className="h-3.5 w-3.5 shrink-0 text-[var(--ink-muted)]" aria-hidden="true" />

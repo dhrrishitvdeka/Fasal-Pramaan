@@ -428,6 +428,7 @@ export type ClaimUpdateOptions = {
 
 export type ClaimStore = {
   insertClaim(row: WebClaimRow): Promise<WebClaimRow>;
+  deleteClaim?(id: string): Promise<void>;
   updateClaim(id: string, patch: Partial<WebClaimRow>, opts?: ClaimUpdateOptions): Promise<void>;
   getClaim(id: string): Promise<WebClaimRow | null>;
   listClaims(): Promise<WebClaimRow[]>;
@@ -728,7 +729,18 @@ export async function persistFarmerSubmission(
     }
   }
 
-  await store.insertImages(imageRows);
+  try {
+    await store.insertImages(imageRows);
+  } catch (imgErr) {
+    if (typeof store.deleteClaim === "function") {
+      try {
+        await store.deleteClaim(claimId);
+      } catch {
+        // best effort rollback
+      }
+    }
+    throw imgErr;
+  }
   return { claimId, claim };
 }
 
@@ -1572,6 +1584,10 @@ export function createMemoryClaimStore(): ClaimStore & {
       if (claims.has(row.id)) throw new Error("Claim already exists");
       claims.set(row.id, { ...row });
       return row;
+    },
+    async deleteClaim(id) {
+      claims.delete(id);
+      images.delete(id);
     },
     async updateClaim(id, patch, opts) {
       const current = claims.get(id);

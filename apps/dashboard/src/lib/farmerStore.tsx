@@ -13,6 +13,7 @@ import { buildDefaultMilestones } from "./growth-stages";
 import { sanitizeMojibake } from "./name-sanitizer";
 import type { ClaimIntent, Peril } from "./claim-routing";
 import { INTENT_STORAGE_KEY } from "./claim-routing";
+import { webCaptureBridge } from "./voice/capture-bridge";
 
 export type PlotRegistrationInput = {
   name: string;
@@ -316,16 +317,19 @@ function submissionToClaim(item: Awaited<ReturnType<typeof listWebClaims>>[numbe
 }
 
 export function FarmerProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<FarmerLang>(() => {
-    if (typeof window === "undefined") return "hi";
+  const [lang, setLangState] = useState<FarmerLang>("hi");
+
+  useEffect(() => {
     try {
       const stored = localStorage.getItem("fasal_lang") || localStorage.getItem(STORAGE_KEY_LANG);
-      return persistAppLang(stored, "hi");
+      const parsed = persistAppLang(stored, "hi");
+      if (parsed && parsed !== lang) {
+        setLangState(parsed);
+      }
     } catch {
       // ignore
     }
-    return "hi";
-  });
+  }, []);
 
   useEffect(() => {
     const handleSync = (e: Event) => {
@@ -349,7 +353,14 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   const [farmerProfile, setFarmerProfile] = useState(EMPTY_FARMER_PROFILE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeIntent, setActiveIntentState] = useState<ClaimIntent | null>(() => loadStoredIntent());
+  const [activeIntent, setActiveIntentState] = useState<ClaimIntent | null>(null);
+
+  useEffect(() => {
+    const storedIntent = loadStoredIntent();
+    if (storedIntent) {
+      setActiveIntentState(storedIntent);
+    }
+  }, []);
   const [newRecaptureNotices, setNewRecaptureNotices] = useState<RecaptureNotice[]>([]);
 
   const refresh = async () => {
@@ -511,10 +522,12 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   const setActiveIntent = (intent: ClaimIntent | null) => {
     setActiveIntentState(intent);
     persistIntent(intent);
+    webCaptureBridge.setIntent(intent);
   };
   const clearActiveIntent = () => {
     setActiveIntentState(null);
     persistIntent(null);
+    webCaptureBridge.setIntent(null);
   };
 
   const getClaimById = (id: string) => claims.find((c) => c.id.toLowerCase() === id.toLowerCase());

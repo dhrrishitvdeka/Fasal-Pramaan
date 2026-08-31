@@ -83,9 +83,19 @@ class FasalAudioProcessor extends AudioWorkletProcessor {
 registerProcessor('fasal-audio-processor', FasalAudioProcessor);
 `;
 
+let activeAudioContext: AudioContext | null = null;
+
 export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSession> {
   const { socket, micPermissionMessage, onSpeakingChange, onVolumeChange } = options;
+  if (activeAudioContext && activeAudioContext.state !== "closed") {
+    try {
+      void activeAudioContext.close();
+    } catch {
+      // ignore
+    }
+  }
   const ctx = new AudioContext();
+  activeAudioContext = ctx;
   if (ctx.state === "suspended") await ctx.resume();
 
   let playTime = ctx.currentTime;

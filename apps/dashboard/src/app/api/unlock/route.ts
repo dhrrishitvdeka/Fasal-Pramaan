@@ -17,12 +17,18 @@ function cookieOptions() {
   };
 }
 
-/** Constant-time string compare (mirrors site-lock.ts isValidSiteLockToken). */
-function timingSafeEqualStrings(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
+/** Constant-time string compare via fixed-length SHA-256 digests. */
+async function timingSafeEqualStrings(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const [hashA, hashB] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(a)),
+    crypto.subtle.digest("SHA-256", enc.encode(b)),
+  ]);
+  const u8A = new Uint8Array(hashA);
+  const u8B = new Uint8Array(hashB);
   let mismatch = 0;
-  for (let i = 0; i < a.length; i += 1) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (let i = 0; i < u8A.length; i += 1) {
+    mismatch |= u8A[i] ^ u8B[i];
   }
   return mismatch === 0;
 }
@@ -43,7 +49,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Site lock is not configured" }, { status: 503 });
   }
   const body = (await request.json().catch(() => ({}))) as { password?: string };
-  if (!timingSafeEqualStrings(String(body.password || ""), expected)) {
+  if (!(await timingSafeEqualStrings(String(body.password || ""), expected))) {
     return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
   }
   const response = NextResponse.json({ ok: true });
