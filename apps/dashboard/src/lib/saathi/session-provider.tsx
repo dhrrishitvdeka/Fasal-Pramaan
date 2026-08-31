@@ -146,6 +146,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
   const pathnameRef = useRef(pathname);
   const registerPlotRef = useRef(registerPlot);
   const mountedRef = useRef(true);
+  const connectVoiceRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   statusRef.current = liveStatus;
   langRef.current = lang;
@@ -480,7 +481,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
               : `Reconnecting… (${retryCountRef.current}/2)`,
           );
           reconnectTimerRef.current = window.setTimeout(() => {
-            void connectVoice();
+            void connectVoiceRef.current();
           }, 1200 * retryCountRef.current);
           return;
         }
@@ -586,6 +587,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
       failSession(err instanceof Error ? err.message : "Could not start Fasal Saathi");
     }
   }, [failSession, handleTools, plots, pushNote, pushPortalContext, stopAudio, upsertTranscript]);
+  connectVoiceRef.current = connectVoice;
 
   const toggleVoice = useCallback(() => {
     if (statusRef.current === "live" || statusRef.current === "connecting") {
