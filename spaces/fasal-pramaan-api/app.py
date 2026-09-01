@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
 import io
 import json
 import os
@@ -170,7 +171,9 @@ def load_runtime() -> dict[str, Any]:
 def _authorize(request: Any) -> None:
     expected = (os.environ.get("SPACE_API_TOKEN") or "").strip()
     if not expected:
-        return
+        # Fail closed: without a configured token the hosted API is disabled
+        # rather than open to anonymous callers on the public Space.
+        raise PermissionError("Service not configured with SPACE_API_TOKEN")
     header = ""
     if request is not None:
         headers = getattr(request, "headers", None) or {}
@@ -179,7 +182,7 @@ def _authorize(request: Any) -> None:
         except Exception:
             header = ""
     token = header[7:].strip() if header.lower().startswith("bearer ") else str(header).strip()
-    if token != expected:
+    if not token or not hmac.compare_digest(token, expected):
         raise PermissionError("Unauthorized")
 
 
@@ -454,7 +457,6 @@ def predict_ui(image: Any, expected_crop: str, angle_type: str) -> tuple[dict[st
     return result, summary
 
 
-@spaces.GPU(duration=30)
 def predict_api(
     image_b64: str,
     expected_crop: str = "",
@@ -462,13 +464,29 @@ def predict_api(
     images_json: str = "",
     request: gr.Request | None = None,
 ) -> dict[str, Any]:
-    """Stable JSON API used by the Fasal-Pramaan Next.js hosted path."""
+    """Stable JSON API used by the Fasal-Pramaan Next.js hosted path.
+
+    Authorization runs here — before the GPU-allocated core — so
+    unauthenticated callers never consume GPU quota on the Space.
+    """
     try:
         _authorize(request)
-        images = _parse_images_json(images_json, image_b64, angle_type)
-        return analyze(images, expected_crop=expected_crop)
     except PermissionError as exc:
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    return _predict_api_gpu(image_b64, expected_crop, angle_type, images_json)
+
+
+@spaces.GPU(duration=30)
+def _predict_api_gpu(
+    image_b64: str,
+    expected_crop: str = "",
+    angle_type: str = "closeup_damage",
+    images_json: str = "",
+) -> dict[str, Any]:
+    """GPU-allocated inference core. Auth is enforced by predict_api() before entry."""
+    try:
+        images = _parse_images_json(images_json, image_b64, angle_type)
+        return analyze(images, expected_crop=expected_crop)
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 

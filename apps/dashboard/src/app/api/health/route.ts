@@ -1,10 +1,28 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import { getHfModelId, getHfSpaceId, getHfSpaceUrl } from "@/lib/hf-model";
+import { requireWebActor } from "@/lib/web-auth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+/**
+ * Public liveness probe. Full per-service telemetry (which secrets are
+ * configured, HF Space URL, live claim counts, probe errors) is only exposed
+ * to reviewer/administrator sessions — anonymous callers get a minimal
+ * response and never trigger a Space wake-up or leak configuration state.
+ */
+export async function GET(request: Request) {
+  const auth = await requireWebActor(request);
+  const isStaff =
+    auth.ok && (auth.actor.role === "reviewer" || auth.actor.role === "administrator");
+  if (!isStaff) {
+    return NextResponse.json({
+      ok: true,
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   const t0 = performance.now();
   const services: Record<string, any> = {};
 

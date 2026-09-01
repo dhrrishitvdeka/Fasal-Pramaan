@@ -23,6 +23,7 @@ import {
   Zap,
 } from "lucide-react";
 import clsx from "clsx";
+import { apiFetch } from "@/lib/auth-headers";
 
 type ServiceCheck = {
   id?: string;
@@ -56,7 +57,7 @@ export default function HealthPage() {
   const { data, isLoading, isFetching, error, refetch, dataUpdatedAt } = useQuery<HealthResponse>({
     queryKey: ["system-health-telemetry"],
     queryFn: async () => {
-      const res = await fetch("/api/health", { cache: "no-store" });
+      const res = await apiFetch("/api/health", { cache: "no-store" });
       if (!res.ok) throw new Error(`Health probe failed with HTTP ${res.status}`);
       return res.json();
     },
@@ -180,6 +181,16 @@ export default function HealthPage() {
       </div>
 
       {/* KPI Overview Summary */}
+      {Object.keys(checks).length === 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          The service is online. Full per-service telemetry is restricted to reviewer/administrator
+          sessions —{" "}
+          <a href="/login" className="font-semibold underline">
+            sign in
+          </a>{" "}
+          to view detailed probes.
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="fp-panel p-3.5 sm:p-4">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Gateway Status</span>
