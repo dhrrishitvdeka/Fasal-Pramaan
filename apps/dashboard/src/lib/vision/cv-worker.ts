@@ -34,10 +34,16 @@ const PLANT_CLASS_RE =
   /plant|leaf|foliage|flora|crop|grass|hay|straw|tree|branch|flower|blossom|bloom|daisy|sunflower|rose|dahlia|petunia|marigold|produce|vegetable|field|meadow|pasture|farmland|agricultur|maize|corn|ear|wheat|grain|rye|oat|barley|sorghum|millet|rice|paddy|mustard|rapeseed|canola|soybean|cotton|legume|chickpea|lentil|pea|bean|stalk|stem|garden|orchard|vineyard|bush|shrub|herb|moss|lichen|acorn|cardoon|cabbage|broccoli|cauliflower|zucchini|squash|cucumber|artichoke|pepper|greenhouse|flowerpot/i;
 const NON_PLANT_RE =
   /person|human|man|woman|boy|girl|face|head|groom|bride|suit|tuxedo|jersey|jean|t-shirt|shirt|sweatshirt|cardigan|sweater|cloak|coat|jacket|pajama|apron|wig|hair|neck|room|wall|window|ceiling|door|desk|table|chair|couch|bed|pillow|quilt|blanket|wardrobe|bookcase|television|monitor|screen|laptop|computer|keyboard|mouse|cellular|phone|telephone|ipod|radio|speaker|cup|mug|bottle|beaker|carton|envelope|binder|notebook|towel|pen|remote|wallet|handbag|backpack|luggage|shoe|sneaker|sock|glove|seat belt|sunglass/i;
+const PERSON_CLASS_RE = /person|human|man|woman|boy|girl|face|head|portrait|selfie/i;
+const NON_CROP_OBJECT_RE =
+  /desk|table|chair|couch|bed|pillow|wardrobe|bookcase|television|monitor|screen|laptop|computer|keyboard|mouse|cellular|phone|telephone|ipod|radio|speaker|cup|mug|bottle|beaker|carton|binder|notebook|remote|wallet|handbag|backpack|luggage|shoe|sneaker|sock|glove|sunglass/i;
 const CLASSIFY_INTERVAL_MS = 500;
 const CLASSIFY_INPUT = 224;
 const CLASSIFY_PROB_MIN = 0.16;
 const CLASSIFY_MAX_FAILURES = 3;
+const PERSON_CONFIRM_PROB_MIN = 0.2;
+const NON_CROP_OBJECT_PROB_MIN = 0.3;
+const NON_CROP_OBJECT_SECONDARY_PROB_MIN = 0.45;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let tf: any = null;
@@ -233,6 +239,47 @@ function buildClassifyCanvas(
   }
 }
 
+/**
+ * Classify canvas built straight from a full-resolution source (ImageBitmap /
+ * video frame), so MobileNet sees real detail instead of the 64×64 analysis
+ * downsample used for the agronomic pixel math.
+ */
+function buildClassifyCanvasFromSource(
+  source: CanvasImageSource,
+  sourceWidth: number,
+  sourceHeight: number,
+): OffscreenCanvas | null {
+  try {
+    if (!(sourceWidth > 0 && sourceHeight > 0)) return null;
+    if (!cachedDstCanvas) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const Ctor: any = (self as unknown as { OffscreenCanvas?: unknown }).OffscreenCanvas;
+      if (typeof Ctor !== "function") return null;
+      cachedDstCanvas = new Ctor(CLASSIFY_INPUT, CLASSIFY_INPUT) as OffscreenCanvas;
+    }
+    const dstCtx = cachedDstCanvas.getContext("2d") as unknown as CanvasRenderingContext2D | null;
+    if (!dstCtx) return null;
+    dstCtx.clearRect(0, 0, CLASSIFY_INPUT, CLASSIFY_INPUT);
+    dstCtx.drawImage(source, 0, 0, sourceWidth, sourceHeight, 0, 0, CLASSIFY_INPUT, CLASSIFY_INPUT);
+    return cachedDstCanvas;
+  } catch {
+    return null;
+  }
+}
+
+async function classifyFromSource(
+  source: CanvasImageSource,
+  sourceWidth: number,
+  sourceHeight: number,
+): Promise<ModelVerdict | null> {
+  const canvas = buildClassifyCanvasFromSource(source, sourceWidth, sourceHeight);
+  if (!canvas) return null;
+  const ctx = canvas.getContext("2d") as unknown as CanvasRenderingContext2D | null;
+  if (!ctx) return null;
+  const imageData = ctx.getImageData(0, 0, CLASSIFY_INPUT, CLASSIFY_INPUT);
+  return classifySample(imageData.data, CLASSIFY_INPUT, CLASSIFY_INPUT);
+}
+
 async function classifySample(
   data: Uint8ClampedArray,
   width: number,
@@ -275,6 +322,29 @@ async function classifySample(
       isExplicitNonPlant = true;
     }
 
+    const saysPerson = !!(
+      topLabel &&
+      topProb >= PERSON_CONFIRM_PROB_MIN &&
+      PERSON_CLASS_RE.test(topLabel)
+    );
+
+    let saysNonCropObject = !!(
+      topLabel &&
+      topProb >= NON_CROP_OBJECT_PROB_MIN &&
+      NON_CROP_OBJECT_RE.test(topLabel)
+    );
+    if (!saysNonCropObject && !saysPerson) {
+      for (const p of preds.slice(1, 3)) {
+        const cls = typeof p?.className === "string" ? p.className : "";
+        const prob = Number(p?.probability ?? NaN);
+        if (!cls || !Number.isFinite(prob)) continue;
+        if (prob >= NON_CROP_OBJECT_SECONDARY_PROB_MIN && NON_CROP_OBJECT_RE.test(cls)) {
+          saysNonCropObject = true;
+          break;
+        }
+      }
+    }
+
     for (const p of preds.slice(0, 3)) {
       const cls = typeof p?.className === "string" ? p.className : "";
       const prob = Number(p?.probability ?? NaN);
@@ -289,6 +359,8 @@ async function classifySample(
       label: matchedLabel ?? topLabel,
       prob: matchedLabel != null ? matchedProb : topProb,
       saysPlant: !isExplicitNonPlant && matchedLabel != null,
+      saysPerson,
+      saysNonCropObject,
     };
     lastVerdict = verdict;
     return verdict;
@@ -305,7 +377,16 @@ async function classifySample(
 
 type WorkerRequest =
   | { id: string; angleId?: string; bitmap: ImageBitmap }
-  | { id: string; angleId?: string; width: number; height: number; buffer: ArrayBuffer };
+  | {
+      id: string;
+      angleId?: string;
+      width: number;
+      height: number;
+      buffer: ArrayBuffer;
+      classifyWidth?: number;
+      classifyHeight?: number;
+      classifyBuffer?: ArrayBuffer;
+    };
 
 type WorkerResponse = {
   id: string;
@@ -348,7 +429,7 @@ if (inWorkerContext()) {
             // ignore
           }
           if (data) {
-            const verdict = await classifySample(data, w, h);
+            const verdict = await classifyFromSource(bitmap, bitmap.width, bitmap.height);
             result = analyzeFrame(data, w, h, angleId, verdict);
           }
         } finally {
@@ -359,14 +440,28 @@ if (inWorkerContext()) {
           }
         }
       } else if ((req as { buffer?: unknown }).buffer) {
-        const { width, height, buffer, angleId } = req as {
-          width: number;
-          height: number;
-          buffer: ArrayBuffer;
-          angleId?: string;
-        };
+        const { width, height, buffer, angleId, classifyWidth, classifyHeight, classifyBuffer } =
+          req as {
+            width: number;
+            height: number;
+            buffer: ArrayBuffer;
+            angleId?: string;
+            classifyWidth?: number;
+            classifyHeight?: number;
+            classifyBuffer?: ArrayBuffer;
+          };
         const clamped = new Uint8ClampedArray(buffer);
-        const verdict = await classifySample(clamped, width, height);
+        // Prefer the separate higher-resolution classify sample when the main
+        // thread provides one; the 64×64 analysis buffer is too small for
+        // reliable object identification.
+        const verdict =
+          classifyBuffer && classifyWidth && classifyHeight
+            ? await classifySample(
+                new Uint8ClampedArray(classifyBuffer),
+                classifyWidth,
+                classifyHeight,
+              )
+            : await classifySample(clamped, width, height);
         result = analyzeFrame(clamped, width, height, angleId, verdict);
       }
 

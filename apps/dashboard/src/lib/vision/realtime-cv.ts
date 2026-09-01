@@ -33,6 +33,9 @@ export type CropPhenologyBreakdown = {
 
 const SAMPLE_W = 64;
 const SAMPLE_H = 64;
+/** Dedicated MobileNet classification sample — real detail, not the 64×64 analysis downsample. */
+const CLASSIFY_W = 224;
+const CLASSIFY_H = 224;
 
 export type CvModelLoadStatus = "loading" | "ready" | "unavailable";
 
@@ -52,24 +55,29 @@ export function onModelStatus(listener: (status: CvModelLoadStatus) => void): ()
   };
 }
 
-let scratchCanvas: HTMLCanvasElement | null = null;
-let scratchCtx: CanvasRenderingContext2D | null = null;
+const scratchCanvases = new Map<string, HTMLCanvasElement>();
+const scratchContexts = new Map<string, CanvasRenderingContext2D>();
 
 function getScratchCanvas(
   w: number,
   h: number,
 ): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
   if (typeof document === "undefined") return null;
-  if (!scratchCanvas) {
-    scratchCanvas = document.createElement("canvas");
+  const key = `${w}x${h}`;
+  let canvas = scratchCanvases.get(key);
+  if (!canvas) {
+    canvas = document.createElement("canvas");
+    scratchCanvases.set(key, canvas);
   }
-  if (scratchCanvas.width !== w) scratchCanvas.width = w;
-  if (scratchCanvas.height !== h) scratchCanvas.height = h;
-  if (!scratchCtx) {
-    scratchCtx = scratchCanvas.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D | null;
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
+  let ctx = scratchContexts.get(key) as CanvasRenderingContext2D | null;
+  if (!ctx) {
+    ctx = canvas.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D | null;
+    if (ctx) scratchContexts.set(key, ctx);
   }
-  if (!scratchCtx) return null;
-  return { canvas: scratchCanvas, ctx: scratchCtx };
+  if (!ctx) return null;
+  return { canvas, ctx };
 }
 
 function sampleToImageData(
@@ -182,6 +190,17 @@ export async function analyzeVideoFrameAsync(
     const imageData = ctx.getImageData(0, 0, SAMPLE_W, SAMPLE_H);
     const buffer = imageData.data.buffer.slice(0);
 
+    // Separate higher-resolution sample dedicated to MobileNet classification.
+    // The 64×64 analysis buffer is too small for reliable desk/laptop/person
+    // discrimination, which caused false "person in frame" shutter blocks.
+    const classify = getScratchCanvas(CLASSIFY_W, CLASSIFY_H);
+    let classifyBuffer: ArrayBuffer | undefined;
+    if (classify) {
+      classify.ctx.drawImage(video, 0, 0, vw, vh, 0, 0, CLASSIFY_W, CLASSIFY_H);
+      const classifyImage = classify.ctx.getImageData(0, 0, CLASSIFY_W, CLASSIFY_H);
+      classifyBuffer = classifyImage.data.buffer.slice(0);
+    }
+
     const worker = getCvWorker();
     if (!worker) {
       return analyzeFrame(new Uint8ClampedArray(buffer), SAMPLE_W, SAMPLE_H, angleId);
@@ -220,7 +239,21 @@ export async function analyzeVideoFrameAsync(
           cleanup();
           resolve(null);
         }, 900);
-        worker.postMessage({ id, width: SAMPLE_W, height: SAMPLE_H, buffer, angleId }, [buffer]);
+        const transfer: ArrayBuffer[] = [buffer];
+        if (classifyBuffer) transfer.push(classifyBuffer);
+        worker.postMessage(
+          {
+            id,
+            width: SAMPLE_W,
+            height: SAMPLE_H,
+            buffer,
+            angleId,
+            ...(classifyBuffer
+              ? { classifyBuffer, classifyWidth: CLASSIFY_W, classifyHeight: CLASSIFY_H }
+              : {}),
+          },
+          transfer,
+        );
       });
       if (result) return result;
       return analyzeVideoFrame(video, angleId);

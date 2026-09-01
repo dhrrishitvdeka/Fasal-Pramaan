@@ -235,6 +235,80 @@ describe("Realtime Multi-Spectral Agricultural CV Engine & Guidance", () => {
       expect(result.cropScore).toBe(0);
     });
 
+    it("does not flag grainy warm-brown wooden desks/tables as persons (no model)", () => {
+      const data = new Uint8ClampedArray(pixelCount * 4);
+      // Full-frame wooden desk: skin-like hue but visible wood-grain texture
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const idx = (y * width + x) * 4;
+          const grain = ((x * 11 + y * 17) % 25) - 12;
+          data[idx] = Math.max(0, Math.min(255, 150 + grain));
+          data[idx + 1] = Math.max(0, Math.min(255, 110 + grain));
+          data[idx + 2] = Math.max(0, Math.min(255, 70 + grain));
+          data[idx + 3] = 255;
+        }
+      }
+      const result = analyzeInWorker(data, width, height, "overview_north");
+      expect(result.isPersonDetected).toBe(false);
+      expect(result.hintCode).not.toBe("person_detected");
+      expect(result.shouldBlockShutter).toBe(true);
+    });
+
+    it("lets a confident MobileNet desk/laptop verdict veto the skin-color person flag", () => {
+      const data = new Uint8ClampedArray(pixelCount * 4);
+      // Flat warm-brown surface (desk) that matches the skin-tone rule
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = 170;
+        data[i + 1] = 120;
+        data[i + 2] = 90;
+        data[i + 3] = 255;
+      }
+      const modelVerdict = {
+        label: "laptop",
+        prob: 0.55,
+        saysPlant: false,
+        saysPerson: false,
+        saysNonCropObject: true,
+      };
+      const result = analyzeInWorker(data, width, height, "overview_north", modelVerdict);
+      expect(result.isPersonDetected).toBe(false);
+      expect(result.hintCode).not.toBe("person_detected");
+      // Still blocked — it is not crop — but with the correct reason.
+      expect(result.shouldBlockShutter).toBe(true);
+      expect(result.hintCode).toBe("crop_not_detected");
+    });
+
+    it("still blocks a real person when MobileNet confirms a human subject at low skin coverage", () => {
+      const data = new Uint8ClampedArray(pixelCount * 4);
+      // Only ~6% of frame is skin (edge of frame) — below the strong heuristic
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const idx = (y * width + x) * 4;
+          if (x < width * 0.06) {
+            data[idx] = 170;
+            data[idx + 1] = 120;
+            data[idx + 2] = 90;
+          } else {
+            data[idx] = 165;
+            data[idx + 1] = 175;
+            data[idx + 2] = 165;
+          }
+          data[idx + 3] = 255;
+        }
+      }
+      const modelVerdict = {
+        label: "face",
+        prob: 0.5,
+        saysPlant: false,
+        saysPerson: true,
+        saysNonCropObject: false,
+      };
+      const result = analyzeInWorker(data, width, height, "overview_north", modelVerdict);
+      expect(result.isPersonDetected).toBe(true);
+      expect(result.hintCode).toBe("person_detected");
+      expect(result.shouldBlockShutter).toBe(true);
+    });
+
     it("rejects pale green-tinted indoor painted walls with low chromatic saturation", () => {
       const data = new Uint8ClampedArray(pixelCount * 4);
       // Pale lime/green painted room wall: R=160, G=178, B=160 (low saturation S=0.10)

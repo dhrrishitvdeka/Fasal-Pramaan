@@ -43,13 +43,35 @@ export type CvFrameResult = {
   modelProb?: number | null;
 };
 
-export type ModelVerdict = { label: string | null; prob: number | null; saysPlant: boolean };
+export type ModelVerdict = {
+  label: string | null;
+  prob: number | null;
+  saysPlant: boolean;
+  /** Model top label explicitly describes a person/human subject. */
+  saysPerson?: boolean;
+  /** Model confidently sees furniture/electronics (desk, laptop, …) — vetoes skin-only person flags. */
+  saysNonCropObject?: boolean;
+};
 
 /** Preview + still + gate: luma 0-100. Fire perils use FIRE_DARK_LUMA_MIN. */
 export const DARK_LUMA_MIN = 14;
 export const FIRE_DARK_LUMA_MIN = 5;
 export const CROP_LOCK_SCORE = 75;
 export const BLUR_HOLD_STEADY = 18;
+
+/**
+ * Person detection thresholds. The skin-tone pixel ratio alone cannot separate
+ * people from warm-brown surfaces (wooden desks, cardboard, tan laptops), so:
+ *  - a *suspect* ratio only flags a person when the model confirms one,
+ *  - a *strong* ratio flags a person heuristically, unless the skin region is
+ *    grainy (wood grain) or the model vetoes with a confident object label.
+ */
+export const PERSON_SKIN_SUSPECT_RATIO = 0.04;
+export const PERSON_SKIN_STRONG_RATIO = 0.12;
+/** Per-pixel Laplacian above which a skin-classified pixel reads as textured (wood grain), not smooth skin. */
+export const SKIN_WOOD_GRAIN_LAPLACIAN = 5;
+/** Fraction of textured skin-classified pixels required to treat the region as wood grain (robust to subject/background boundaries). */
+export const SKIN_WOOD_GRAIN_FRACTION = 0.5;
 
 export function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
@@ -428,6 +450,8 @@ export function analyzeFrame(
   let laplacianCount = 0;
   let canopyLaplacianSum = 0;
   let canopyLaplacianCount = 0;
+  let skinGrainCount = 0;
+  let skinLaplacianCount = 0;
 
   const isFireRelax = isFireRelaxAngle(angleId);
   const pixelCount = width * height;
@@ -486,6 +510,11 @@ export function analyzeFrame(
         laplacianSum += lap;
         laplacianCount += 1;
 
+        if (classification.isSkin) {
+          skinLaplacianCount += 1;
+          if (lap > SKIN_WOOD_GRAIN_LAPLACIAN) skinGrainCount += 1;
+        }
+
         if (classification.isCanopy) {
           canopyLaplacianSum += lap;
           canopyLaplacianCount += 1;
@@ -504,7 +533,24 @@ export function analyzeFrame(
   const syntheticRatio = total ? syntheticCount / total : 0;
   const skinRatio = total ? skinCount / total : 0;
 
-  const isPersonDetected = skinRatio > 0.04;
+  // Skin-tone color alone matches warm-brown surfaces (wooden desks/tables,
+  // cardboard, tan laptop lids). Require a strong ratio, exclude grainy
+  // wood-like texture, and let the model confirm or veto.
+  const skinSuspect = skinRatio > PERSON_SKIN_SUSPECT_RATIO;
+  const skinStrong = skinRatio > PERSON_SKIN_STRONG_RATIO;
+  // Grain FRACTION (not mean) — a person against a contrasting background has
+  // a small high-gradient boundary ring that a mean would overweight.
+  const skinGrainy =
+    skinLaplacianCount > 30 &&
+    skinGrainCount / skinLaplacianCount > SKIN_WOOD_GRAIN_FRACTION;
+  const modelConfirmsPerson = modelVerdict?.saysPerson === true;
+  const modelVetoesPerson =
+    modelVerdict?.saysNonCropObject === true || modelVerdict?.saysPlant === true;
+  const isPersonDetected = modelConfirmsPerson
+    ? skinSuspect
+    : modelVetoesPerson
+      ? false
+      : skinStrong && !skinGrainy;
 
   const screenCheck = detectScreenArtifacts(data, width, height, luma);
   const isScreenDetected = screenCheck.isScreen;
