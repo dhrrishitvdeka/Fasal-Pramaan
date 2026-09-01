@@ -33,7 +33,8 @@ The default `crop_health_v4` DINOv2 ViT-S/14 model provides **assisted optical l
 
 ## 4. Signal & Tooling Limits (v1.6.0 wave)
 
-- **Sentinel burn-scar needs a token**: real NDVI `burnRatio` detection requires `SENTINEL_TOKEN`/`COPERNICUS_TOKEN`; without one, fire claims fall back to an honest Open-Meteo extreme-heat proxy (>40 °C days over 30 d) that plausibility-checks but does not image the burn scar.
+- **Sentinel burn-scar needs a token**: real NDVI `burnRatio` detection requires `SENTINEL_TOKEN`/`COPERNICUS_TOKEN`; without one, fire claims fall back to an honest Open-Meteo extreme-heat proxy (>40 °C days over 30 d) that plausibility-checks but does not image the burn scar. The same token also powers the review-page NDVI trend sparkline (`/api/claims/{id}/satellite-trend`) — without it the card renders nothing.
+- **NDVI trend is cloud-gated and conservative**: 5-day intervals whose dataMask mean is < 0.5 (mostly cloud / no scene) are dropped, and the `vegetation_collapse` verdict requires ≥ 2 clean baseline points plus a ≥ 20% mean NDVI drop — overcast monsoon windows can legitimately yield `insufficient_data`.
 - **Bhuvan WMS reachability**: the ISRO Bhuvan tile service may be unreachable from the server; claims then carry a manual-check link (`status:"pending"`) instead of a fetched land-use tile in the Satellite Cross-Check card.
 - **MobileNet weights first download**: the CV worker's TF.js + MobileNet v2 weights (~9 MB) are fetched from CDN on first use per browser; the capture page prefetches them on mount and shows a warmup badge, but offline/blocked-CDN devices degrade to heuristic-only crop detection.
 - **Gate re-run is a manual reviewer action**: re-running the authenticity gate on stored photos happens only when a reviewer clicks the button on the review detail Authenticity card (client-orchestrated `/api/vision/gate` calls); there is no scheduled or automatic re-gating.

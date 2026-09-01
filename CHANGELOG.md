@@ -2,6 +2,17 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed — CV person false positives
+- **Live capture no longer blocks on desks/tables/laptops**: `person_detected` previously fired from a skin-tone pixel ratio alone (>4%), which warm-brown wooden furniture and laptops also match. The decision is now tiered — a MobileNet person/human label (probability ≥ 0.2) confirms at the low ratio, a confident furniture/electronics or plant label vetoes the flag, and the heuristic fallback (model unavailable) requires a strong ratio (> 12%) plus a wood-grain exclusion (grain fraction of skin-classified pixels with Laplacian > 5; skin is smooth, wood has grain, and the fraction is robust to subject/background boundary rings).
+- MobileNet classification now runs on a dedicated 224×224 sample taken directly from the full-resolution video frame instead of the 64×64 analysis downsample used for agronomic pixel math (`realtime-cv.ts` ships both buffers to the worker; the ImageBitmap path classifies straight from the source).
+
+### Added — Review trust tooling
+- **Sentinel-2 NDVI trend sparkline per claim** (`NdviTrendCard` on `/review/[id]`): vegetation health across the 90 days before → 30 days after the loss event, from one Copernicus Statistical API request (5-day intervals, cloud-masked intervals with dataMask mean < 0.5 dropped). Conservative verdict: `vegetation_collapse` requires ≥ 2 baseline points and a ≥ 20% mean NDVI drop. Backed by the reviewer-gated `GET /api/claims/{id}/satellite-trend` (30-min per-claim cache, explicit degradation reasons). Renders nothing unless `SENTINEL_TOKEN`/`COPERNICUS_TOKEN` is set.
+
+---
+
 ## [2.6.1] — 2026-08-30
 
 ### Fixed — Production blockers

@@ -109,6 +109,7 @@ Persisted columns: `peril`, `intent_id` (`web_claims`). `claimToSubmission` expo
 | `GET` | `/api/claims/{id}` | Reviewer / Farmer | Retrieve the full case dossier including images, trust scores, AI prediction, gate result, and context signals. |
 | `POST` | `/api/claims/{id}/action` | Reviewer | Execute an adjudication action (`accept`, `correct`, `reject`, `request_recapture`, `physical_inspection`); recorded in `web_review_actions`. |
 | `GET` | `/api/claims/{id}/actions` | Reviewer | Inspect the chronological audit log of human overrides and state changes. |
+| `GET` | `/api/claims/{id}/satellite-trend` | Reviewer / Owner | Sentinel-2 NDVI time series around the loss event (90 d before → 30 d after `created_at`) with a trend verdict. Degrades with `available:false` + `reason` (`no_gps_coordinates`, `satellite_credentials_missing`, `satellite_unavailable`) instead of errors; needs `SENTINEL_TOKEN`/`COPERNICUS_TOKEN`. Results cached 30 min per claim. |
 
 ### Adjudication Action Payload (`POST /api/claims/{id}/action`)
 
@@ -285,6 +286,7 @@ Mints an ephemeral token for direct browser-to-Gemini Live WebSocket streaming.
 
 - **Sentinel Data Space Ecosystem** — `https://dataspace.copernicus.eu/` (Copernicus Data Space Ecosystem)
 - **Sentinel Hub Process API** — `POST https://sh.dataspace.copernicus.eu/api/v1/process` (Tier 1 burn-scar NDVI JSON raster; needs `SENTINEL_TOKEN`)
+- **Sentinel Hub Statistical API** — `POST https://sh.dataspace.copernicus.eu/api/v1/statistics` (per-claim NDVI trend series for `GET /api/claims/{id}/satellite-trend`; one request returns the full 5-day-interval aggregate; needs `SENTINEL_TOKEN`)
 - **Open-Meteo** — forecast `https://api.open-meteo.com/v1/forecast` (IMD rainfall proxy, hail weathercodes, wind gusts) and archive `https://archive-api.open-meteo.com/v1/archive` (Tier 2 extreme-heat fire proxy) — free, no key
 - **OpenStreetMap Overpass API** — `https://overpass-api.de/api/interpreter` (wildlife forest proximity ≤10 km, farmland-parcel count ≤2 km) — free, no key
 - **Copernicus Sentinel-2** (ESA open data) — MSI L1C/L2A for burn scar / water extent
