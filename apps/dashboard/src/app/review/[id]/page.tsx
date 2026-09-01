@@ -12,6 +12,7 @@ import { AiConfidenceBreakdown } from "@/components/AiConfidenceBreakdown";
 import { ReviewKeyboardShortcuts } from "@/components/ReviewKeyboardShortcuts";
 import { EvidenceConfidenceSection, resolveEvidenceEvaluation } from "@/components/EvidenceConfidenceSection";
 import { SatelliteCrossCheckCard } from "@/components/SatelliteCrossCheckCard";
+import { NdviTrendCard } from "@/components/NdviTrendCard";
 import ModalShell from "@/components/ModalShell";
 import { predictionIsAcceptable } from "@/lib/review-accept";
 import { normalizePeril } from "@/lib/claim-routing";
@@ -543,6 +544,8 @@ export default function ReviewDetailPage() {
           bhuvanTileUrl={bhuvanThumbnailUrl}
           burnMapUrl={burnMapUrl}
         />
+
+        <NdviTrendCard claimId={id} />
       </section>
         </div>
 
