@@ -67,6 +67,15 @@ const nextConfig = {
     process.env.DOCKER_BUILD === "true" || process.env.OUTPUT_STANDALONE === "true"
       ? "standalone"
       : undefined,
+  async redirects() {
+    return [
+      {
+        source: "/analytics",
+        destination: "/overview#analytics",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

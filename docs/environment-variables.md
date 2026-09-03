@@ -55,4 +55,4 @@ Confirm these **names** exist (values stay secret):
 4. `SITE_LOCK_PASSWORD` (for a public demo URL)
 5. Optional: `SENTINEL_TOKEN` (CDSE Process API bearer), `GEMINI_VISION_MODEL=gemini-3.8-flash`
 
-SQL already applied: `scripts/setup_supabase.sql`, `setup_web_schema.sql`, `setup_web_schema_peril.sql`, `lock_web_rls.sql`. Private bucket `fasal-web-evidence`.
+SQL already applied: `scripts/setup_supabase.sql`, `setup_web_schema.sql`. Private bucket `fasal-web-evidence`.

@@ -63,10 +63,8 @@ Never commit `.env.local`. Server-only keys must never be named `NEXT_PUBLIC_*`.
 
 In the Supabase dashboard open **SQL Editor** and run these files in order (all in `scripts/`):
 
-1. `scripts/setup_supabase.sql` — base project setup (storage bucket, roles).
-2. `scripts/setup_web_schema.sql` — `web_*` tables for claims, plots, evaluations.
-3. `scripts/setup_web_schema_peril.sql` — peril-aware columns/updates for adaptive routing.
-4. `scripts/lock_web_rls.sql` — Row Level Security policies locking `web_*` tables down.
+1. `scripts/setup_supabase.sql` — base project setup (extensions, storage bucket, storage policies).
+2. `scripts/setup_web_schema.sql` — `web_*` tables, peril routing columns, and complete Row Level Security lockdown.
 
 Then create Auth users for yourself (and reviewers). Emails listed in `REVIEWER_EMAILS` get the reviewer role at `/review`; everyone else is a farmer.
 

@@ -86,7 +86,13 @@ CREATE TABLE IF NOT EXISTS public.web_claims (
   updated_at timestamptz NOT NULL DEFAULT now(),
   inference_status text,
   inference_error text,
-  inference_started_at timestamptz
+  inference_started_at timestamptz,
+  corrected_crop text,
+  corrected_grade text,
+  corrected_severity text,
+  corrected_damage_codes text[],
+  corrected_affected_area_pct double precision,
+  corrected_growth_stage text
 );
 
 CREATE TABLE IF NOT EXISTS public.web_claim_images (
@@ -154,17 +160,23 @@ ALTER TABLE public.web_milestones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.web_review_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.web_profiles ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS created_by text;
+ALTER TABLE public.web_milestones ADD COLUMN IF NOT EXISTS created_by text;
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_crop text;
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_grade text;
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_severity text;
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_damage_codes text[];
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_affected_area_pct double precision;
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_growth_stage text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS sowing_date date;
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS peril text DEFAULT 'normal';
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS intent_id text;
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS gate_result jsonb;
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS context_signals jsonb;
 ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS adaptive_result jsonb;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS inference_status text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS inference_error text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS inference_started_at timestamptz;
 ALTER TABLE public.web_claim_images ADD COLUMN IF NOT EXISTS gate_result jsonb;
 
 DROP POLICY IF EXISTS web_plots_anon_all ON public.web_plots;

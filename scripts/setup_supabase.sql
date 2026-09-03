@@ -29,7 +29,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- 4. Storage Security Policies — service_role upload only.
 -- All app uploads go through server routes using the service-role client
 -- (src/lib/supabase.ts); browsers never write to the bucket directly.
--- Deny-by-default posture matches scripts/lock_web_rls.sql.
+-- Deny-by-default posture matches scripts/setup_web_schema.sql.
 DROP POLICY IF EXISTS "Public Read Access for Evidence" ON storage.objects;
 DROP POLICY IF EXISTS "Service Role Upload Access" ON storage.objects;
 DROP POLICY IF EXISTS "Authenticated User Upload Access" ON storage.objects;

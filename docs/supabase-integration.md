@@ -15,7 +15,7 @@ SITE_LOCK_PASSWORD=
 
 ## Tables
 
-Created by `scripts/setup_web_schema.sql` (+ peril columns). RLS closed by `scripts/lock_web_rls.sql`. Browser keys cannot read claims; Next.js routes use the service role after verifying the user JWT.
+Created by `scripts/setup_web_schema.sql` (including peril columns and complete RLS lockdown). Browser keys cannot read claims; Next.js routes use the service role after verifying the user JWT.
 
 - `web_plots`, `web_claims`, `web_claim_images`, `web_milestones`, `web_review_actions`, `web_profiles`
 

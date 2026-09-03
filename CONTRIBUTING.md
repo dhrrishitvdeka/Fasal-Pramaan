@@ -40,7 +40,7 @@ npm test
 npm run build
 ```
 
-If your change touches Supabase schema or RLS, update the SQL in `scripts/` (`setup_supabase.sql`, `setup_web_schema.sql`, `setup_web_schema_peril.sql`, `lock_web_rls.sql`) rather than editing tables ad hoc, and document the migration path in the PR.
+If your change touches Supabase schema or RLS, update the SQL in `scripts/` (`setup_supabase.sql`, `setup_web_schema.sql`) rather than editing tables ad hoc, and document the migration path in the PR.
 
 ---
 

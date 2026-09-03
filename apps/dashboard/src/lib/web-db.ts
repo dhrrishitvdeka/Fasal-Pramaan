@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseClient } from "./supabase";
 import { isRealSha256 } from "./evidence";
-import { getHfModelId } from "./hf-model";
+import { resolveGeminiVisionModel } from "./gemini-models";
 import type {
   ClaimAiPrediction,
   ClaimImageEvidence,
@@ -605,7 +605,7 @@ export function submissionFromClaim(claim: FarmerClaim): Submission {
     })),
     latest_prediction: hasPrediction
       ? {
-          model_version: getHfModelId(),
+          model_version: resolveGeminiVisionModel(),
           adapter_type: "gemini_vision",
           is_production_validated: false,
           predicted_crop: pred.cropIdentified || null,

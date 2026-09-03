@@ -41,7 +41,7 @@ npm run dev                  # http://localhost:3000
 - `SENTINEL_TOKEN` (optional upgrade — with it, fire checks run the real Sentinel-2 burn-scar NDVI process API; without it a free Open-Meteo extreme-heat proxy answers instead) / `IMD_API_KEY` (reserved hook for paid IMD weather; free open-meteo rain/hail/gust works without it)
 - `REVIEWER_EMAILS` (comma-separated reviewer emails; everyone else is a farmer)
 
-Apply the Supabase SQL files in order: [scripts/setup_supabase.sql](../../scripts/setup_supabase.sql), [scripts/setup_web_schema.sql](../../scripts/setup_web_schema.sql), [scripts/setup_web_schema_peril.sql](../../scripts/setup_web_schema_peril.sql), then harden with [scripts/lock_web_rls.sql](../../scripts/lock_web_rls.sql). See [docs/supabase-integration.md](../../docs/supabase-integration.md).
+Apply the Supabase SQL files in order: [scripts/setup_supabase.sql](../../scripts/setup_supabase.sql) then [scripts/setup_web_schema.sql](../../scripts/setup_web_schema.sql) (which includes schema, peril columns, and RLS lockdown). See [docs/supabase-integration.md](../../docs/supabase-integration.md).
 
 ---
 
