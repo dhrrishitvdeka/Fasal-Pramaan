@@ -85,33 +85,6 @@ export function measureLightingScore(imageData: ImageData): number {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
-export async function measureLightingScoreFromDataUrl(
-  dataUrl: string,
-): Promise<number | undefined> {
-  if (typeof document === "undefined") return undefined;
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.min(img.naturalWidth || 64, 128);
-      canvas.height = Math.min(img.naturalHeight || 64, 128);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        resolve(undefined);
-        return;
-      }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      try {
-        resolve(measureLightingScore(ctx.getImageData(0, 0, canvas.width, canvas.height)));
-      } catch {
-        resolve(undefined);
-      }
-    };
-    img.onerror = () => resolve(undefined);
-    img.src = dataUrl;
-  });
-}
-
 export function qualityPassedFromSignals(opts: {
   lightingScore?: number | null;
   blurScore?: number | null;

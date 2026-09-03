@@ -1,6 +1,0 @@
-gradio>=5.20.0,<6
-huggingface_hub>=0.26.0,<1
-numpy>=1.26.0,<3
-onnxruntime>=1.18.0,<2
-pillow>=10.4.0,<12
-spaces>=0.30.0,<1

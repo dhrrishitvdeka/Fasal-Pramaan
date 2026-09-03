@@ -19,8 +19,6 @@ Run in the SQL editor, in order:
 
 1. `scripts/setup_supabase.sql`
 2. `scripts/setup_web_schema.sql`
-3. `scripts/setup_web_schema_peril.sql`
-4. `scripts/lock_web_rls.sql`
 
 Create/keep the private bucket `fasal-web-evidence` (JPEG/PNG/WebP, 15 MB).
 
