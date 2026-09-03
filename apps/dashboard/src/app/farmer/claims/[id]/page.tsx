@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Suspense, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -45,6 +46,11 @@ function FarmerClaimDetailContent() {
   const claim = getClaimById(claimId);
   const justRecaptured = searchParams.get("recaptured") === "true";
   const justSubmitted = searchParams.get("submitted") === "true";
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [selectedImage, setSelectedImage] = useState<ClaimImageEvidence | null>(null);
 
@@ -602,28 +608,33 @@ function FarmerClaimDetailContent() {
         </div>
       </div>
 
-      {/* Lightbox Image Modal Preview */}
-      {selectedImage && (
+      {/* Lightbox Image Modal Preview — Portaled to body with full screen blur & AMOLED black theme */}
+      {selectedImage && mounted && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-2 sm:p-4 md:p-6 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 md:p-6 transition-all duration-200"
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.70)",
+            backdropFilter: "blur(24px) saturate(180%)",
+            WebkitBackdropFilter: "blur(24px) saturate(180%)",
+          }}
           onClick={() => setSelectedImage(null)}
           role="dialog"
           aria-modal="true"
           aria-label={lang === "hi" ? "फोटो पूर्वावलोकन" : "Photo preview"}
         >
           <div
-            className="relative flex flex-col w-full max-w-4xl max-h-[92vh] sm:max-h-[88vh] overflow-hidden rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl"
+            className="relative flex flex-col w-full max-w-4xl max-h-[92vh] sm:max-h-[88vh] overflow-hidden rounded-2xl bg-black border border-neutral-800 shadow-2xl shadow-black"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-3 text-white">
+            {/* Pure AMOLED Black Modal Header */}
+            <div className="flex items-center justify-between border-b border-neutral-800 bg-black px-4 py-3 text-white">
               <div className="flex items-center gap-2.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-emerald-300 border border-emerald-500/30">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950/70 px-3 py-1 font-mono text-xs font-bold uppercase tracking-wider text-emerald-400 border border-emerald-500/30">
                   <Camera className="h-3.5 w-3.5" aria-hidden="true" />
                   {selectedImage.angleType.replaceAll("_", " ")}
                 </span>
                 {selectedIndex >= 0 && (
-                  <span className="text-xs text-slate-400 font-mono">
+                  <span className="text-xs text-neutral-400 font-mono">
                     ({selectedIndex + 1} / {claim.images.length})
                   </span>
                 )}
@@ -635,7 +646,7 @@ function FarmerClaimDetailContent() {
                   onClick={showPrevImage}
                   disabled={!hasPrev}
                   aria-label={lang === "hi" ? "पिछली फोटो" : "Previous photo"}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
                   title={lang === "hi" ? "पिछली फोटो (←)" : "Previous (←)"}
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -645,19 +656,19 @@ function FarmerClaimDetailContent() {
                   onClick={showNextImage}
                   disabled={!hasNext}
                   aria-label={lang === "hi" ? "अगली फोटो" : "Next photo"}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
                   title={lang === "hi" ? "अगली फोटो (→)" : "Next (→)"}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
 
-                <div className="mx-1 h-4 w-px bg-slate-700" />
+                <div className="mx-1 h-4 w-px bg-neutral-800" />
 
                 <button
                   type="button"
                   onClick={() => setSelectedImage(null)}
                   aria-label={lang === "hi" ? "बंद करें" : "Close photo preview"}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white transition-colors"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-rose-950/60 hover:border-rose-700/60 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white transition-colors"
                   title={lang === "hi" ? "बंद करें (Esc)" : "Close (Esc)"}
                 >
                   <X className="h-4 w-4" aria-hidden="true" />
@@ -665,16 +676,16 @@ function FarmerClaimDetailContent() {
               </div>
             </div>
 
-            {/* Stage: Contained Image with Optional Arrow Overlays */}
-            <div className="relative flex-1 min-h-[260px] max-h-[58vh] sm:max-h-[64vh] bg-slate-950 flex items-center justify-center p-3 sm:p-4 overflow-hidden select-none">
+            {/* Pure AMOLED Black Stage: Contained Image with Optional Arrow Overlays */}
+            <div className="relative flex-1 min-h-[260px] max-h-[58vh] sm:max-h-[64vh] bg-black flex items-center justify-center p-3 sm:p-4 overflow-hidden select-none">
               {safeDisplayUrl(selectedImage.imageUrl) ? (
                 <img
                   src={safeDisplayUrl(selectedImage.imageUrl)}
                   alt={selectedImage.angleType}
-                  className="max-h-full max-w-full object-contain rounded-lg shadow-lg"
+                  className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center text-slate-500 text-xs">
+                <div className="flex flex-col items-center justify-center text-neutral-500 text-xs">
                   <Camera className="h-10 w-10 mb-2 opacity-40" />
                   <span>{lang === "hi" ? "फोटो लोड नहीं हो सकी" : "Photo could not be loaded"}</span>
                 </div>
@@ -688,7 +699,7 @@ function FarmerClaimDetailContent() {
                     e.stopPropagation();
                     showPrevImage();
                   }}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 hidden sm:flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-105 backdrop-blur-sm border border-white/10 transition-all shadow-lg"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 hidden sm:flex h-10 w-10 items-center justify-center rounded-full bg-black/80 text-white hover:bg-neutral-900 hover:scale-105 backdrop-blur-md border border-neutral-800 transition-all shadow-xl"
                   aria-label={lang === "hi" ? "पिछली फोटो" : "Previous photo"}
                 >
                   <ChevronLeft className="h-5 w-5" />
@@ -701,7 +712,7 @@ function FarmerClaimDetailContent() {
                     e.stopPropagation();
                     showNextImage();
                   }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-105 backdrop-blur-sm border border-white/10 transition-all shadow-lg"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex h-10 w-10 items-center justify-center rounded-full bg-black/80 text-white hover:bg-neutral-900 hover:scale-105 backdrop-blur-md border border-neutral-800 transition-all shadow-xl"
                   aria-label={lang === "hi" ? "अगली फोटो" : "Next photo"}
                 >
                   <ChevronRight className="h-5 w-5" />
@@ -711,12 +722,12 @@ function FarmerClaimDetailContent() {
               {/* Quality indicator badge */}
               <div className="absolute bottom-3 left-3">
                 {selectedImage.qualityPassed ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-950/80 border border-emerald-600/40 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400 backdrop-blur-sm">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-black/85 border border-emerald-500/40 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400 backdrop-blur-md">
                     <CheckCircle2 className="h-3 w-3" />
                     {lang === "hi" ? "गुणवत्ता सत्यापित" : "Quality Verified"}
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-950/80 border border-amber-600/40 px-2.5 py-0.5 text-[10px] font-semibold text-amber-400 backdrop-blur-sm">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-black/85 border border-amber-500/40 px-2.5 py-0.5 text-[10px] font-semibold text-amber-400 backdrop-blur-md">
                     <AlertTriangle className="h-3 w-3" />
                     {lang === "hi" ? "पुनः लें (गुणवत्ता अस्पष्ट)" : "Retake Requested"}
                   </span>
@@ -724,11 +735,11 @@ function FarmerClaimDetailContent() {
               </div>
             </div>
 
-            {/* Modal Footer Metadata Drawer */}
-            <div className="border-t border-slate-800 bg-slate-900 px-4 py-3 text-xs text-slate-300">
+            {/* Pure AMOLED Black Modal Footer Metadata Drawer */}
+            <div className="border-t border-neutral-800 bg-black px-4 py-3 text-xs text-neutral-300">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-slate-400">
-                  <div className="flex items-center gap-1.5 text-slate-300">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-neutral-400">
+                  <div className="flex items-center gap-1.5 text-neutral-200">
                     <MapPin className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                     <span>
                       {selectedImage.lat != null && selectedImage.lon != null
@@ -736,19 +747,19 @@ function FarmerClaimDetailContent() {
                         : "GPS N/A"}
                     </span>
                     {selectedImage.accuracyM != null && (
-                      <span className="text-[10px] text-slate-500">(±{selectedImage.accuracyM}m)</span>
+                      <span className="text-[10px] text-neutral-500">(±{selectedImage.accuracyM}m)</span>
                     )}
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <Clock className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
                     <span>{new Date(selectedImage.timestamp).toLocaleString()}</span>
                   </div>
                 </div>
 
                 {selectedImage.sha256 && (
                   <div
-                    className="flex items-center gap-1.5 rounded bg-slate-800/80 border border-slate-700/60 px-2 py-1 font-mono text-[10px] text-slate-400 max-w-full sm:max-w-xs truncate"
+                    className="flex items-center gap-1.5 rounded bg-neutral-900 border border-neutral-800 px-2 py-1 font-mono text-[10px] text-neutral-400 max-w-full sm:max-w-xs truncate"
                     title={`SHA-256: ${selectedImage.sha256}`}
                   >
                     <ShieldCheck className="h-3 w-3 text-emerald-400 shrink-0" />
@@ -758,7 +769,8 @@ function FarmerClaimDetailContent() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
