@@ -30,7 +30,7 @@ This guide provides a structured, presentation-ready script and walkthrough for 
 
 1. **Automatic Spoken Greeting**: Open `/farmer/saathi` and toggle voice or open `FasalSaathiOverlay`. Notice Saathi automatically speaks the welcome greeting aloud immediately on connection.
 2. **Spoken Plot Registration**: Say *"मेरा नया गेहूँ का खेत जोड़ो"* (or *"Register a new wheat plot in Rampur"*). Saathi executes `register_plot` and confirms the cadastral landholding is saved.
-3. **Multimodal 1-FPS Live Camera Co-Pilot**: Tap **Guided Capture** (`/farmer/capture`). While framing the crop, Saathi visually inspects the camera feed in real time over WebSocket, advising the farmer aloud on canopy framing, lighting, and foliage angles.
+3. **Guided capture**: Tap **Guided Capture** (`/farmer/capture`). On-device OpenCV locks the shutter until the frame looks like a real crop (not a screen). After submit, Gemini writes the reviewer analysis.
 4. **Hands-Free Shutter**: Say *"फोटो खींचो"* (*"Take the photo"*). The camera triggers, passes the anti-screen authenticity gate, and guides the next angle smoothly.
 
 ---
@@ -46,7 +46,7 @@ sequenceDiagram
   Farmer->>Farmer Web: 2. Captures all Canonical Angles
   Farmer Web->>API: 3. POST /api/claims (in-request processing)
   Pipeline->>Evidence Engine: 4. Evaluates: Q=94, C=100, X=85, I=100 -> Final = 92.6
-  Pipeline->>HF Space: 5. DINOv2 ViT-S/14 -> Grade C (Paddy Blast)
+  Pipeline->>Gemini: 5. Field analysis -> Grade C + written rationale
   Reviewer->>Dashboard: 6. Inspects Review Queue (High Confidence 92.6/100)
   Reviewer->>Dashboard: 7. Clicks 'Accept & Verify' -> Status = VERIFIED
 ```
@@ -55,7 +55,7 @@ sequenceDiagram
 2. **Reviewer Action**: In the Command Centre (`:3000/review`), open **Review Queue**. Click the case to show:
    - **Final Evidence Confidence**: `92.6 / 100` (Evidence Sufficient).
    - **Component Breakdown**: Quality `94.0`, Coverage `100.0`, Context `85.0`, Integrity `100.0`.
-   - **DINOv2 AI Screening**: Grade `C` (*Disease Pattern Detected*).
+   - **Gemini field analysis**: Grade `C` plus a written rationale (assistive).
    - **GIS Overlay**: Plot polygon boundary matching the GPS capture pin.
 3. Click **Accept & Verify**. Show the updated status and immutable audit record.
 
@@ -95,7 +95,7 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   Fraudster->>API: Submits duplicate image bytes across angles
-  Pipeline->>Evidence Engine: Computes SHA-256 & pHash collisions
+  Pipeline->>Evidence Engine: Stores SHA-256; Gemini flags screen/AI fakes
   Evidence Engine->>Evidence Engine: Deducts Integrity Score (-65.0) -> Final Confidence = 35.0
   Evidence Engine->>API: Uncertainty: 'Integrity' (Critical) -> Action: 'human_review'
   API->>Dashboard: Enqueues directly to Anti-Fraud Reviewer Queue

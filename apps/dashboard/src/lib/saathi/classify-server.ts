@@ -6,6 +6,7 @@ import {
   type ClaimIntent,
 } from "@/lib/claim-routing";
 import { buildSystemPrompt } from "@/lib/saathi-agent";
+import { resolveGeminiApiKey, resolveGeminiVisionModel } from "@/lib/gemini-models";
 
 /**
  * SERVER-ONLY: reads process.env.GEMINI_API_KEY. Must never be imported from
@@ -22,23 +23,11 @@ export type ClassifyPerilLLMOptions = {
 };
 
 function getGeminiApiKey(): string {
-  try {
-    const env = (typeof process !== "undefined" ? (process as unknown as { env?: Record<string, string> }).env : undefined) as Record<string, string> | undefined;
-    if (!env) return "";
-    return (env.GEMINI_API_KEY || env.GOOGLE_API_KEY || "").trim();
-  } catch {
-    return "";
-  }
+  return resolveGeminiApiKey();
 }
 
 function getGeminiModel(): string {
-  try {
-    const env = (typeof process !== "undefined" ? (process as unknown as { env?: Record<string, string> }).env : undefined) as Record<string, string> | undefined;
-    const raw = env?.GEMINI_MODEL || env?.GEMINI_VISION_MODEL || "gemini-3.7-flash";
-    return String(raw).replace(/^models\//, "").trim() || "gemini-3.7-flash";
-  } catch {
-    return "gemini-3.7-flash";
-  }
+  return resolveGeminiVisionModel();
 }
 
 /** Strip characters that break out of the """...""" data fence or forge newlines in the prompt. */

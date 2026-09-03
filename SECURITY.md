@@ -4,7 +4,7 @@
 
 Security updates and vulnerability patches are actively maintained and applied to the default `main` branch.
 
-The security scope of this repository is the **webapp only**: the Next.js dashboard (`apps/dashboard`, deployed on Vercel), its Supabase backend (Auth, Postgres `web_*` tables, storage bucket), the Hugging Face inference Space (`spaces/fasal-pramaan-api`), and outbound calls to Gemini and external context signals.
+The security scope of this repository is the **webapp only**: the Next.js dashboard (`apps/dashboard` on Vercel), Supabase (Auth, Postgres `web_*`, storage), and outbound Gemini / Open-Meteo / Copernicus / Bhuvan / Overpass calls. The Hugging Face Space is retired and not in scope.
 
 ---
 
@@ -27,7 +27,7 @@ Please include:
 ## 3. Security Guidelines & Best Practices
 
 - **Never Commit Secrets**: Ensure `.env` / `.env.local` and sensitive API keys are excluded from version control. Copy `apps/dashboard/.env.example` locally only.
-- **Server-Only Credentials**: High-privilege tokens (`SUPABASE_SERVICE_ROLE_KEY`, `HF_TOKEN`, `GEMINI_API_KEY`, `SENTINEL_TOKEN`, `IMD_API_KEY`) must reside exclusively on the server (Next.js API routes) and never be named `NEXT_PUBLIC_*`. Only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are browser-safe.
+- **Server-Only Credentials**: High-privilege tokens (`SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `SENTINEL_TOKEN`, `IMD_API_KEY`) must reside exclusively on the server and never be named `NEXT_PUBLIC_*`. Only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are browser-safe.
 - **Row Level Security**: All `web_*` tables are locked down with RLS policies. Apply [`scripts/lock_web_rls.sql`](scripts/lock_web_rls.sql) in the Supabase SQL editor after `setup_supabase.sql`, `setup_web_schema.sql`, and `setup_web_schema_peril.sql`. Evidence photos live in a private storage bucket; uploads go through server routes using the service role.
 - **Role Separation**: Users whose email appears in `REVIEWER_EMAILS` can access reviewer routes; everyone else is a farmer. Server-side API routes verify the Supabase JWT before any read or write — no client-trusted roles.
 - **Site Lock**: On Vercel, setting `SITE_LOCK_PASSWORD` gates the entire deployment behind a password check (`/api/unlock`). Leave it empty for local development only.

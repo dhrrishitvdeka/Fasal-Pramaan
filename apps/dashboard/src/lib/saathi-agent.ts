@@ -431,6 +431,7 @@ export const SAATHI_FUNCTION_DECLARATIONS = [
   },
 ] as const;
 
-// For Gemini Live bidiGenerateContentSetup.tools you can pass SAATHI_FUNCTION_DECLARATIONS directly.
-// The classify_claim tool is also used server-side by classifyPerilWithLLM in
-// src/lib/saathi/classify-server.ts for one-shot classification.
+// Gemini Live uses WEB_FUNCTION_DECLARATIONS (voice/function-declarations.ts).
+// This list is the text-intake / overlay catalog. Names are aliased to Live tools
+// in saathi/tool-catalog.ts so take_photo === capture_current_angle, etc.
+// classify_claim is also used server-side by classifyPerilWithLLM.

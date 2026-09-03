@@ -1,6 +1,8 @@
 # System Architecture & Technical Specifications
 
-Fasal-Pramaan is architected as a decoupled, web-first platform (Next.js on Vercel + Supabase + a Hugging Face model Space) designed for agricultural evidence verification and claims adjudication. The platform features adaptive evidence collection: Fasal Saathi autonomous intake, variable routing per peril, on-device vision + LLM authenticity gate, adaptive confidence engine, and multi-signal context validation with a transparent dashboard.
+Fasal-Pramaan is a web-first platform (Next.js on Vercel + Supabase + Gemini vision) for agricultural evidence verification and claims adjudication. Capture is guided on-device; submitted stills are analysed by Gemini; a human reviewer decides.
+
+**Authoritative MVP (2026-09):** on-device OpenCV shutter lock (no MobileNet/TF.js); Gemini Live audio-only (`gemini-3.1-flash-live-preview`); submitted stills use `gemini-3.8-flash` for authenticity + written analysis; no Hugging Face Space; no live viewfinder streaming. Older diagrams in this file that mention DINOv2, MobileNet, or 1-FPS video are historical.
 
 ---
 
@@ -10,8 +12,8 @@ Fasal-Pramaan is architected as a decoupled, web-first platform (Next.js on Verc
 flowchart TB
   subgraph ExperienceLayer["Experience Layer"]
     direction TB
-    SaathiWeb["Fasal Saathi Multimodal Assistant v3.0\n(Next.js /farmer/saathi + FasalSaathiOverlay)\n• AudioWorkletNode 16kHz PCM duplex stream\n• 1-FPS Live Viewfinder Video Streaming\n• Proactive Opening Spoken Greeting\n• Soothing Natural Voice (Aoede)\n• Multi-Agent Context & Parcel Geofence\n• 15 Indian Languages Dynamic i18n"]
-    CaptureWeb["Peril-Aware Capture Studio\n(Next.js /farmer/capture)\n• claim-routing.ts ROUTE_CONFIG\n• Realtime CV worker (TF.js MobileNet v2 α0.5)\n• Gemini 3.7 Vision Gate (Anti-Screen & Species)\n• Hands-Free Voice Directed Shutter"]
+    SaathiWeb["Fasal Saathi voice co-pilot\n(Next.js /farmer/saathi + FasalSaathiOverlay)\n• AudioWorkletNode 16kHz PCM duplex stream\n• Audio-only Live (no camera frames)\n• Multi-Agent tools + 15 Indian languages"]
+    CaptureWeb["Peril-Aware Capture Studio\n(Next.js /farmer/capture)\n• claim-routing.ts ROUTE_CONFIG\n• OpenCV shutter lock (no CDN model)\n• Gemini 3.8 vision gate on stills"]
     Dashboard["Reviewer Command Centre\n(Next.js TypeScript :3000)\n• Role-gated pages (useRequireRole + AccessGate)\n• GIS Plot Boundary Map\n• EvidenceConfidenceSection\n  (adaptive level + multi-signal strip)\n• Satellite cross-check card\n• Authenticity Gate card + override_gate\n• Review Queue & Audit Log\n• Per-peril analytics + CSV export"]
     TelemetryPath["Client Error Telemetry\n(src/lib/telemetry.ts · initTelemetry)\n• window.onerror + unhandledrejection\n• 50-entry in-memory ring buffer + console log\n• forwards authed errors only"]
     PwaShell["PWA Service Worker\n(public/sw.js · prod-only via PwaRegister)\n• cache-first: /_next/static, /icons, fonts\n• network-first: navigations → cached\n  /farmer shell when offline\n• NEVER caches /api/* or Supabase domains"]
@@ -23,14 +25,14 @@ flowchart TB
     SaathiTool["Saathi Tool Route\n(/api/saathi/tool)\n• Server-side dispatcher tools-server.ts\n• classify_claim, register_plot, check_geofence\n• weather_alerts, explain_audit\n• Arg clamps, ≤64KB body, allowlist"]
     VoiceSession["Voice Session Minter\n(/api/voice/session)\n• Ephemeral Token Minter (v1alpha)\n• Model: gemini-3.1-flash-live-preview\n• Voice: Aoede, Indian Languages allowlist"]
     ContextAssemble["Context Assemble Route\n(/api/context/assemble)\n• Sentinel Tier1 NDVI burn-scar / Tier2 heat proxy\n• IMD open-meteo rain+hail+gust\n• plot_match haversine containment (200 m default)\n• Bhuvan WMS probe · Overpass wildlife/nearby"]
-    SystemStatus["Admin System Status Route\n(GET /api/system/status)\n• administrator-only + 10 req/min/user\n• config booleans only (supabase, gemini,\n  sentinel, imdKey) + public hfSpaceUrl + version"]
+    SystemStatus["Admin System Status Route\n(GET /api/system/status)\n• administrator-only\n• config booleans only (supabase, gemini, sentinel, imdKey)"]
   end
 
   subgraph AIServiceTier["Assistive AI Inference Tier"]
-    GeminiLive["Gemini 3.1 Flash Live (v1alpha)\n• Duplex 16kHz PCM16 audio + 1-FPS video\n• Proactive spoken guidance & auto greeting"]
-    HF["Hugging Face Space (HF_SPACE_URL)\nfasal-pramaan-api → fasal-pramaan-model\n• DINOv2 ViT-S/14 crop screening\n• A/B/C/U signal via /api/claims"]
-    OnDeviceCV["On-Device Vision Worker\n(vision/cv-worker.ts)\n• TF.js 4 + MobileNet v2 alpha 0.5 from CDN\n• Plant-class verdict ≥0.18 prob, 500ms throttle\n• Strict 75%+ crop quality shutter lock"]
-    GeminiLLM["Gemini LLM Gate\n(gemini-3.7-flash)\n• Authenticity + crop + peril consistency"]
+    GeminiLive["Gemini Live (v1alpha)\n• Duplex 16kHz PCM16 audio (no video frames)\n• Spoken guidance"]
+    GeminiAnalysis["Gemini field analysis\n• Authenticity (screen/AI/indoor)\n• Crop, damage, written rationale"]
+    OnDeviceCV["On-Device OpenCV Worker\n(vision/cv-worker.ts)\n• ExG/GLI/ExR + Laplacian texture\n• Scanline / moiré screen lock\n• No CDN neural net on the viewfinder"]
+    GeminiLLM["Gemini vision gate\n(gemini-3.8-flash)\n• Authenticity + crop + peril"]
   end
 
   subgraph StorageTier["Persistence & Evidence Storage Tier"]
@@ -39,7 +41,8 @@ flowchart TB
     ExternalSignals[("External Free-Tier Signals\n• Sentinel process API (token) / open-meteo archive\n• Open-meteo forecast (rain, hail codes, gusts)\n• Bhuvan WMS GetMap probe\n• Overpass: forest 10km + farmland 2km")]
   end
 
-  SaathiWeb <== "Duplex 16kHz Audio + 1-FPS Video" ==> GeminiLive
+  SaathiWeb <== "Duplex 16kHz audio (no live video frames)" ==> GeminiLive
+  API --> GeminiAnalysis
   SaathiWeb -->|"Mint Session"| VoiceSession
   SaathiWeb -->|"Intent → ?peril&intentId"| CaptureWeb
   SaathiWeb -->|"toolCall {name,args}"| SaathiTool
@@ -74,7 +77,7 @@ flowchart TB
   - **Screen & Display Anti-Spoofing Detector (`detectScreenArtifacts`)**: Analyzes pixel gradient orientation histograms to calculate the ratio of orthogonal ($0^\circ, 90^\circ, 180^\circ, 270^\circ$) vs diagonal gradients, detecting digital display raster scanlines, pixel subgrids, and Moiré interference (orthogonal ratio $> 0.80$) along with rectilinear bezel edges to prevent screen fraud (`⚠️ Screen Detected`).
   - **Strict 75%+ Crop Quality Shutter Lock & Person / Screen Protection**: Prevents shutter actuation unless the live frame achieves $\ge 75\%$ crop match (or $\ge 40\%$ under fire burn perils), eliminating false captures, non-field images, indoor walls, selfies/human presence (`person_detected`), and digital monitor screen fraud (`screen_detected`) before upload.
   - **Organic Micro-Texture & Anti-Spoofing Filter**: Evaluates 2D spatial Laplacian variance strictly across candidate canopy pixels ($STD = \frac{1}{|Canopy|} \sum |\nabla^2 I|$). Flat artificial surfaces (green plastic tarps, clothes, painted walls with $STD < 0.6$) are immediately suppressed, while cellular living plant matter ($STD \ge 1.5$) is verified. Automatically filters atmospheric sky, asphalt/concrete, and human skin locus (Fitzpatrick I-VI).
-  - **On-Device Semantic Plant Classification & MobileNet v2 Gating**: The worker lazily loads **TF.js 4 plus `@tensorflow-models/mobilenet@2.1.1` (`load({ version: 2, alpha: 0.5 })`) from the jsdelivr CDN**; every ≤500 ms it classifies a 224×224 upscale of the frame (top-3 predictions). Partitions ImageNet-1k classes into flora/crops vs. anthropogenic objects (suits, jerseys, t-shirts, rooms, walls, furniture, electronics); non-plant classes immediately trigger zeroed crop scores and shutter lock, while confirmed plant classes ($\ge 0.16$ probability) fuse with bio-optical micro-texture. Hints include `ok`/`too_dark`/`too_bright`/`hold_steady`/`crop_not_detected`/`too_close`/`too_far`/`screen_detected`/`person_detected`.
+  - **On-device OpenCV shutter lock**: `cv-worker.ts` runs `analyzeFrame` (ExG/GLI/ExR, Laplacian texture, scanline/moiré, skin). No CDN neural net. Hints: `ok` / `too_dark` / `screen_detected` / `person_detected` / `crop_not_detected`.
   - **Dynamic Autofocus Reticles & Viewfinder Glass HUD**: Renders corner reticles that dynamically track crop canopies (emerald glow when ready, amber when adjusting), a translucent glassmorphism HUD chip with live pulse dot indicator, real-time phenology tags (e.g. `🌾 Ripe Golden`, `🌼 Yellow Bloom`, `🌿 Vegetative`), and an interactive shutter ring with capture feedback.
   - **Sensor-Only Field GPS Geo-Tagging**: Field coordinates are locked strictly to device hardware sensors (`navigator.geolocation`) without manual text overrides, ensuring authentic geo-spatial baseline tracking compliant with PMFBY regulations.
   - **Authenticity Filter Integration**: After shutter, `POST /api/vision/gate` validates each image before upload (see Gateway layer). Rejected frames require retake.
@@ -111,7 +114,7 @@ flowchart TB
   - **Vision Gate Route** (`src/app/api/vision/gate/route.ts`): `POST { imageDataUrl, angleType, expectedCrop, peril }` → `{ usable, reason, crop_detected, warnings, confidence, fallback? }`. If `GEMINI_API_KEY`/`GOOGLE_API_KEY` set, calls `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` with `inlineData` and JSON prompt (rejects `ai_generated`/`not_crop`/`wrong_crop`/`too_dark`/`too_blurry`/`unusable`); enforces `expectedCrop` vs `crop_detected` for non-fire perils. Otherwise `heuristicGate` (size/type, fire pass-through at 0.7 confidence). Verdicts persist per image into `web_claim_images.gate_result`.
   - **Saathi Tool Route** (`src/app/api/saathi/tool/route.ts`): `POST { name, args }` executes the Saathi function tools server-side (`src/lib/saathi/tools-server.ts`) so secrets and the LLM peril classifier never reach the browser: `request_evidence_angles` (peril → ROUTE_CONFIG angles/checks/threshold), `call_context_signal` (clamped lat/lon → compact context signals), `guide_capture` (canonical-angle guidance EN/HI), and `classify_claim` (Gemini `classifyPerilWithLLM` function-call classification of free text, ≤1000 chars). Auth-gated + rate-limited; unknown tools or malformed args return 400.
   - **Context Assemble Route** (`src/app/api/context/assemble/route.ts`): `POST { lat, lon, peril, sowingDate }` → `AssembledContext { signals, overall, imdRainfallMm, sentinelThumbnailUrl }`. Builds live `ContextSignal[]`: `sentinel` Tier 1 (with `SENTINEL_TOKEN`/`COPERNICUS_TOKEN`: NDVI burn-scar JSON raster from `sh.dataspace.copernicus.eu` process API, burn when >5% of valid pixels have NDVI < 0.2) or Tier 2 (without token: free Open-Meteo archive extreme-heat days >40 °C over past 30 days as an honest proxy), `imd` (open-meteo forecast proxy for 7-day `precipitation_sum` plus hail days from WMO codes 96/99 and max wind gusts supporting lodging; **sowing-date-aware**: drought ≥30 days since sowing adds cumulative archive rainfall since sowing — window starts at `max(sowing, now−180d)` — with weak corroboration below ~25 mm per 30 days, and hailstorm summaries append an estimated growth stage at 30/60/100-day thresholds), `bhuvan` (WMS GetMap reachability probe), `wildlife` (Overpass forest/protected area within 10 km, `animal_damage` only), `nearby` (Overpass farmland parcels within 2 km), `gps`, and `plot_match` (haversine containment of the capture point vs registered plot center; radius defaults to 200 m via `plotProximityMeters`, clamped 10–5000). Overall via `contextOverall()` (`strong`/`mixed`/`weak`/`pending`).
-  - **System Status Route** (`src/app/api/system/status/route.ts`): `GET /api/system/status` — administrator-only configuration summary powering the `/admin` page. Rate-limited to 10 req/min/user; returns booleans/public URLs only (`supabase`, `gemini`, `sentinel`, `imdKey`, public `hfSpaceUrl`, `version`) and never secret values.
+  - **System Status Route** (`src/app/api/system/status/route.ts`): `GET /api/system/status` — administrator-only configuration summary powering the `/admin` page. Rate-limited to 10 req/min/user; returns booleans only (`supabase`, `gemini`, `sentinel`, `imdKey`, `version`) and never secret values.
   - **Telemetry Error Intake** (`src/app/api/telemetry/error/route.ts`): `POST /api/telemetry/error` — auth-gated client error sink (5 req/min/user). Fields are clamped server-side (message ≤500 chars, stack ≤2000, URL ≤2048, UA ≤512) and printed as structured JSON to the server console for log-drain collection; **no persistence by design** in v1.
 
 #### B. In-Request Claim Processing Pipeline (`POST /api/claims`)
@@ -120,21 +123,21 @@ flowchart TB
   - **Server-Side Evidence Verification**: Validates declared SHA-256 checksums, MIME types, and byte sizes before writing to storage; flags duplicates across angles.
   - **Evidence Trust & Confidence Engine**: Calculates the 4-component scores ($0.4Q + 0.3C + 0.2X + 0.1I$) and classifies deterministic uncertainty.
   - **Adaptive Confidence Engine** (`src/lib/context/adaptive-engine.ts`): Wraps evidence scores with peril-specific `ROUTE_CONFIG.minConfidence` and `ContextSignal[]`. Returns `{ level: high|medium|low, nextStep: proceed|request_missing|retake|escalate_to_human, threshold, overall, reasons, reasonsHi, missingAngles }`. Rules: `gateFailed` → `low/retake`, `integrity<50` → `escalate`, `fire_burn` without `sentinel==available` → `medium` until satellite, `animal_damage` without GPS → `medium` (request location), else tiered by `overall` vs `threshold` and `coverage`/`quality`. When `nextStep == request_missing`, the pipeline **auto-creates the recapture request**: the claim is patched straight to status `needs_recapture` with `missing_angles` plus bilingual `recapture_reason`/`recapture_reason_hi` taken from the adaptive reasons — no reviewer round-trip. The persisted `adaptive_result` also carries `previousConfidence` and `confidence_delta` for re-submissions.
-  - **AI Dispatcher**: Calls the Hugging Face Space (`HF_SPACE_URL`) with the server-only `HF_TOKEN` for crop screening.
+  - **AI Dispatcher**: Calls Gemini vision with the submitted stills (`GEMINI_API_KEY`) for authenticity plus a written field analysis.
 
 ---
 
-### 2.3 Assistive AI Inference Tier (Hugging Face Space + Web Vision)
+### 2.3 Assistive AI Inference Tier (Gemini vision + on-device OpenCV)
 
-- **Technology**: Hugging Face Space (`dhrrishitvdeka/fasal-pramaan-api`, serving `dhrrishitvdeka/fasal-pramaan-model`) + Web vision worker (`src/lib/vision/cv-worker.ts`: TF.js MobileNet v2 α0.5 + canvas heuristics) + Gemini vision gate (`gemini-2.0-flash`).
-- **Default Model**: `crop_health_v4` — **DINOv2 ViT-S/14** (Vision Transformer, Small, 14×14 patch size, ~87 MB ONNX artifact).
+- **Technology**: Gemini vision (`GEMINI_VISION_MODEL`, default `gemini-3.8-flash`) for submitted stills + on-device OpenCV worker for the live shutter lock. No Hugging Face Space.
+- **Default Model**: Gemini 2.0 Flash — authenticity, crop, damage description, and reviewer rationale. A/B/C/U remain workflow buckets, not payout.
 - **Supported Crops**: Maize (*Zea mays*), Paddy / Rice (*Oryza sativa*), Potato (*Solanum tuberosum*), Wheat (*Triticum aestivum*).
 - **Classification Output**: Crop-conditioned $A/B/C/U$ screening signal:
   - `A`: Confident healthy leaf signal.
   - `B`: Borderline / uncertain signal requiring human inspection.
   - `C`: Confident disease/damage pattern.
   - `U`: Unusable image, unsupported crop, or out-of-domain input.
-- **On-Device Vision (web)** (`src/lib/vision/cv-worker.ts` in a Web Worker): 64×64 sampling + luma/blur/green heuristics at 2–4 fps, upgraded with **TF.js MobileNet v2 (alpha 0.5)** loaded from jsdelivr — plant-class verdicts (≥0.18 probability, 500 ms throttle, top-3 scan) union with the green-pixel heuristic for `cropDetected`; hints `ok`/`crop_not_detected`/`too_dark`/`too_bright`/`hold_steady`/`too_close`/`too_far`/`center_crop`; `shouldBlockShutter`. Fire/burn relaxes the green check; CDN/model failure degrades to heuristic-only without throwing.
+- **On-Device Vision (web)** (`src/lib/vision/cv-worker.ts`): 128×128 OpenCV heuristics (ExG/GLI/ExR, Laplacian, scanline/moiré). No TF.js. Fire/burn relaxes the green check.
 - **Authenticity LLM Gate** (`src/app/api/vision/gate/route.ts`): Gemini `generateContent` JSON `{ usable, reason, crop_detected, warnings, confidence }`; prompt checks expected crop, rejects AI-generated/screenshot/meme/blurry/no-field/wrong angle; heuristic fallback when no key.
 - **Architectural Isolation**: The AI models are strictly assistive; model probabilities are isolated from the Evidence Trust calculation and cannot approve financial payouts. Gate failures force `adaptiveConfidence → retake`, never auto-approval.
 
@@ -194,9 +197,9 @@ otherwise  (coverage<40||quality<30 → retake else escalate) → low
   - Triggered at capture (`POST /api/vision/gate`) and validated during claim ingestion (`gateSingleImage` in `claim-pipeline.ts`).
   - Evaluates raw image bytes along with complete sensory and agronomic metadata: GPS (`lat`, `lon`, `accuracyM`), capture timestamp, camera facing mode, resolution (`width x height`), edge CV scores (ExG/GLI/ExR canopy %, luma, blur), and farmer observations.
   - Verifies peril congruence (e.g. fire charred ash, flood standing water, hailstorm shredding, lodging flattening, drought chlorosis), rejects screen captures, synthetic AI images, printed photos, and non-agricultural artifacts.
-- **Stage 2 (Hugging Face Foundation Model Inference)**:
-  - Only images that pass the Gemini Multimodal Verification Gate advance to the Hugging Face Space (`dhrrishitvdeka/fasal-pramaan-api`, DINOv2 ViT-S/14) for deep neural crop screening and foliar damage grading ($A/B/C/U$).
-  - If Gemini flags an image as unusable/fraudulent, Hugging Face model inference is bypassed immediately with an explicit `unusablePrediction`, saving compute quota and logging clear guidance for targeted recapture.
+- **Stage 2 (Gemini field analysis)**:
+  - Only images that pass the authenticity gate are sent to Gemini for a written analysis (crop, visible damage, severity estimate, per-angle notes).
+  - Screen replays, AI images, and indoor fakes are graded `U` and never treated as healthy/diseased canopy.
 
 **Fasal Saathi Autonomous Agentic Control:**
 - Equipped with a complete agentic tool suite: `take_photo`, `switch_camera`, `select_angle`, `retake_angle`, `set_observation`, `submit_claim`, `check_evidence_quality`, `read_capture_guidance`, and `read_capture_progress`.
@@ -224,7 +227,7 @@ sequenceDiagram
   participant API as Next.js API Routes (/api/*)
   participant Store as Supabase Storage (fasal-web-evidence)
   participant Pipeline as In-Request Claim Pipeline
-  participant AI as HF Space (DINOv2)
+  participant AI as Gemini 3.8 Flash
   actor Reviewer as Reviewer
 
   Farmer->>Saathi: 1. Saathi Intake — text/voice → peril + ClaimIntent
@@ -238,7 +241,7 @@ sequenceDiagram
   Pipeline->>Pipeline: Verify bytes/MIME/hash
   Pipeline->>Pipeline: 4. Adaptive Confidence — threshold per peril, High/Medium/Low
   Pipeline->>Pipeline: 5. Multi-signal Context — /api/context/assemble (IMD/Sentinel/Bhuvan/nearby/GPS)
-  Pipeline->>AI: 6. Analyze & Score — DINOv2 A/B/C/U + 0.4Q+0.3C+0.2X+0.1I
+  Pipeline->>AI: 6. Analyze & Score — Gemini write-up + 0.4Q+0.3C+0.2X+0.1I
   Pipeline->>API: Persist Evaluation + AdaptiveResult + Signals
   Reviewer->>API: 7. Human Review — adaptive badge, signal strip, GIS
   Reviewer->>API: Adjudicate (Accept/Correct/Request_specific_recapture/Escalate)

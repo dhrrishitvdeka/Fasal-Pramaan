@@ -35,7 +35,6 @@ test.describe("smoke", () => {
         checks: {
           next: { ok: true },
           supabase: { ok: true },
-          huggingface_space: { ok: true },
           gemini: { configured: false },
         },
       }),

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireWebActor } from "@/lib/web-auth";
 import { checkRateLimit } from "@/lib/server/rate-limit";
-import { getHfSpaceUrl } from "@/lib/hf-model";
 
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -24,13 +23,11 @@ export async function GET(request: Request) {
       { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
     );
   }
-  const spaceUrl = getHfSpaceUrl();
   return NextResponse.json({
     supabase: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
-    gemini: Boolean(process.env.GEMINI_API_KEY),
+    gemini: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
     sentinel: Boolean(process.env.SENTINEL_TOKEN || process.env.COPERNICUS_TOKEN),
     imdKey: Boolean(process.env.IMD_API_KEY || process.env.OPENWEATHER_KEY),
-    hfSpaceUrl: spaceUrl || null,
     version: VERSION,
   });
 }

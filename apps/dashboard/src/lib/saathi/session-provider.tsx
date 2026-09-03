@@ -742,14 +742,8 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     return () => window.clearTimeout(timer);
   }, [liveStatus, pathname, lang, plots, claims, milestones, pushPortalContext]);
 
-  useEffect(() => {
-    if (liveStatus !== "live" || !pathname?.startsWith("/farmer/capture")) return;
-    const interval = window.setInterval(() => {
-      const frame = webCaptureBridge.getVideoFrame();
-      if (frame && liveAudioRef.current) liveAudioRef.current.sendVideoFrame(frame);
-    }, 1800);
-    return () => window.clearInterval(interval);
-  }, [liveStatus, pathname]);
+  // Voice is audio-only. Live camera frames stay on-device for the OpenCV shutter
+  // lock; Gemini sees stills only when the farmer submits a claim.
 
   useEffect(() => {
     mountedRef.current = true;

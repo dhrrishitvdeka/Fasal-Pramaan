@@ -644,22 +644,22 @@ export default function ReviewDetailPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">
-              AI Model Prediction & Screening (Assistive Only)
+              Gemini field analysis (assistive)
             </h3>
             <p className="mt-0.5 text-xs text-slate-500">
-              Model inference findings · Does not equal evidence confidence
+              Written rationale from the submitted stills · not a payout decision
             </p>
           </div>
           {pred && (
             <span className="font-mono text-[11px] text-slate-500">
-              Model: {pred.adapter_type} ({pred.model_version})
+              {pred.model_version}
             </span>
           )}
         </div>
 
         {pred ? (
           <>
-            <AiConfidenceBreakdown prediction={pred} images={data.images} />
+            <AiConfidenceBreakdown prediction={pred} images={data.images} peril={data.peril} />
             <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2 text-xs pt-2 border-t border-slate-100">
               <div>
                 <dt className="text-slate-500">Predicted Crop</dt>
@@ -697,8 +697,8 @@ export default function ReviewDetailPage() {
           </>
         ) : (
           <p className="text-sm text-slate-600">
-            No AI screening grade yet (Hugging Face Space still warming or timed out). Evidence is saved —
-            you can still <strong>Accept</strong> on the trust scores, or wait and refresh.
+            Gemini has not finished analysing these photos yet. Evidence is saved — refresh in a few seconds,
+            or review the stills yourself.
           </p>
         )}
       </section>

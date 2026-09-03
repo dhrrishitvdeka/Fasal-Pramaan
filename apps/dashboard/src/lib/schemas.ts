@@ -199,12 +199,21 @@ export const SAATHI_TOOL_NAMES = [
   "guide_capture",
   "classify_claim",
   "take_photo",
+  "capture_current_angle",
   "switch_camera",
   "select_angle",
+  "select_capture_angle",
   "retake_angle",
+  "retake_capture_angle",
   "set_observation",
+  "set_capture_observation",
   "submit_claim",
+  "prepare_submit_claim",
   "check_evidence_quality",
+  "check_plot_geofence",
+  "fetch_agro_weather_alerts",
+  "explain_claim_audit",
+  "register_plot",
 ] as const;
 
 /** Tool name enum + free-form args object; per-tool arg rules stay in sanitizeArgs. */

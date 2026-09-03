@@ -168,7 +168,7 @@ describe("Realtime Multi-Spectral Agricultural CV Engine & Guidance", () => {
       expect(result.shouldBlockShutter).toBe(false);
     });
 
-    it("incorporates MobileNet v2 plant classification verdict when available", () => {
+    it("does not treat a gray non-crop frame as crop even if a model label is passed", () => {
       const data = new Uint8ClampedArray(pixelCount * 4);
       for (let i = 0; i < data.length; i += 4) {
         data[i] = 100;
@@ -176,15 +176,13 @@ describe("Realtime Multi-Spectral Agricultural CV Engine & Guidance", () => {
         data[i + 2] = 100;
         data[i + 3] = 255;
       }
-      const modelVerdict = {
+      const result = analyzeInWorker(data, width, height, "overview_north", {
         label: "corn, maize",
         prob: 0.88,
         saysPlant: true,
-      };
-      const result = analyzeInWorker(data, width, height, "overview_north", modelVerdict);
-      expect(result.cropDetected).toBe(true);
-      expect(result.modelLabel).toBe("corn, maize");
-      expect(result.modelProb).toBe(0.88);
+      });
+      expect(result.cropDetected).toBe(false);
+      expect(result.shouldBlockShutter).toBe(true);
     });
 
     it("detects and rejects screen / monitor pixel grid artifacts", () => {

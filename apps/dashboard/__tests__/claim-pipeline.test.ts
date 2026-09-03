@@ -15,7 +15,7 @@ import {
   sanitizeHfPrediction,
   type PersistedImageInput,
 } from "../src/lib/claim-pipeline";
-import { inferCropDisease, parseSpacePrediction } from "../src/lib/hf-infer";
+import { inferCropDisease, parseGeminiAnalysis } from "../src/lib/gemini-analyze";
 import { predictionIsAcceptable } from "../src/lib/review-accept";
 import { resolveClaimClientPath } from "../src/lib/claim-routes";
 
@@ -40,11 +40,7 @@ function usableImage(overrides: Partial<PersistedImageInput> = {}): PersistedIma
   };
 }
 
-const spaceSuccess = {
-  ok: true,
-  model_id: "dhrrishitvdeka/fasal-pramaan-model",
-  model_version: "4.0.0-dinov2-v14",
-  adapter_type: "crop_health_v4",
+const geminiSuccess = {
   predicted_crop: "wheat",
   crop_confidence: 0.88,
   predicted_grade: "C",
@@ -54,25 +50,38 @@ const spaceSuccess = {
   score: 0.81,
   primary_damage: "disease",
   severity: null,
-  estimated_affected_area_pct: null,
+  affected_area_pct: null,
   overall_confidence: 0.81,
-  human_review_recommendation: "normal_human_review",
+  reasoning: "Close-up shows yellow pustules on a wheat flag leaf consistent with rust.",
+  visual_findings: "Wheat canopy with foliar rust pustules.",
+  authenticity: {
+    authentic: true,
+    screen_replay: false,
+    ai_generated: false,
+    printed_photo: false,
+    indoor_scene: false,
+    reason: "Outdoor field photograph",
+  },
+  per_image: [
+    {
+      angle_type: "closeup_damage",
+      usable: true,
+      crop: "wheat",
+      damage_visible: true,
+      findings: "Yellow pustules on flag leaf",
+    },
+  ],
+  human_review_recommendation: "human_review",
 };
 
-function spaceFetchImpl(): typeof fetch {
-  return async (input) => {
-    const url = String(input);
-    if (url.includes("/gradio_api/call/predict_api/") && !url.endsWith("predict_api")) {
-      return new Response(`data: ${JSON.stringify([spaceSuccess])}\n\n`, {
-        status: 200,
-        headers: { "Content-Type": "text/event-stream" },
-      });
-    }
-    return new Response(JSON.stringify({ event_id: "evt-1" }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  };
+function geminiFetchImpl(payload: unknown = geminiSuccess): typeof fetch {
+  return async () =>
+    new Response(
+      JSON.stringify({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
 }
 
 describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
@@ -87,16 +96,13 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(preview.missingAngles).toEqual(["left_context", "mid_canopy", "right_context"]);
   });
 
-  it("parses the Space contract and rejects the retired placeholder classifier", () => {
-    const parsed = parseSpacePrediction(spaceSuccess);
-    expect(parsed.modelId).toBe("dhrrishitvdeka/fasal-pramaan-model");
+  it("parses Gemini analysis JSON and rejects empty payloads", () => {
+    const parsed = parseGeminiAnalysis(geminiSuccess);
     expect(parsed.predictedGrade).toBe("C");
     expect(parsed.plantDiseaseClass).toBe("wheat__disease");
     expect(parsed.score).toBe(0.81);
-    expect(parseSpacePrediction(spaceSuccess).raw).toMatchObject({ severity: null });
-    expect(() =>
-      parseSpacePrediction([{ label: "Tomato_Late_blight", score: 0.91 }]),
-    ).toThrow(/placeholder/i);
+    expect(parsed.reasoning).toMatch(/pustules/i);
+    expect(() => parseGeminiAnalysis({})).toThrow(/class or grade/i);
   });
 
   it("persists a photo, runs the shipped Space client, and lists the same id for review", async () => {
@@ -121,12 +127,12 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
         ],
       },
       inferCropDisease,
-      { fetchImpl: spaceFetchImpl() },
+      { fetchImpl: geminiFetchImpl() },
     );
 
     expect(store.claims.get(result.claimId)?.created_by).toBe("user-farmer-1");
     expect(result.prediction).not.toBeNull();
-    expect(result.prediction!.modelId).toBe("dhrrishitvdeka/fasal-pramaan-model");
+    expect(result.prediction!.modelId).toMatch(/gemini/i);
     expect(result.prediction!.label).toBe("wheat__disease");
     expect(result.prediction!.predictedGrade).toBe("C");
     expect(result.prediction!.score).toBe(0.81);
@@ -136,8 +142,8 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
 
     const detail = await getReviewerClaim(store, result.claimId);
     expect(detail).not.toBeNull();
-    expect(detail!.latest_prediction?.model_version).toBe("dhrrishitvdeka/fasal-pramaan-model");
-    expect(detail!.latest_prediction?.adapter_type).toBe("crop_health_v4");
+    expect(detail!.latest_prediction?.model_version).toMatch(/gemini/i);
+    expect(detail!.latest_prediction?.adapter_type).toBe("gemini_vision");
     expect(detail!.latest_prediction?.primary_damage).toBe("wheat__disease");
     expect(detail!.latest_prediction?.predicted_crop).toBe("wheat");
     expect(detail!.latest_prediction?.predicted_grade).toBe("C");
@@ -201,21 +207,13 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(detail!.latest_prediction).toBeNull();
   });
 
-  it("rejects Space payloads that have no class or grade", async () => {
-    const fetchImpl: typeof fetch = async () =>
-      new Response(JSON.stringify({ event_id: "evt-empty" }), { status: 200 });
-    const poll: typeof fetch = async (input) => {
-      if (String(input).includes("evt-empty")) {
-        return new Response(JSON.stringify({ error: "Model is currently loading" }), { status: 200 });
-      }
-      return fetchImpl(input);
-    };
+  it("rejects Gemini payloads that have no class or grade", async () => {
     await expect(
       inferCropDisease({
         imageBytes: jpegLikeBytes(),
-        fetchImpl: poll,
+        fetchImpl: geminiFetchImpl({}),
       }),
-    ).rejects.toThrow(/loading|class|grade|Space/i);
+    ).rejects.toThrow(/class or grade/i);
   });
 
   async function persistSeed(store = createMemoryClaimStore()) {
@@ -234,7 +232,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
         ],
       },
       inferCropDisease,
-      { fetchImpl: spaceFetchImpl() },
+      { fetchImpl: geminiFetchImpl() },
     );
     return { store, claimId: result.claimId, closeup };
   }
@@ -354,7 +352,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
         ],
       },
       inferCropDisease,
-      { fetchImpl: spaceFetchImpl() },
+      { fetchImpl: geminiFetchImpl() },
     );
 
     expect(recaptured.claimId).toBe(claimId);
@@ -519,7 +517,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
         inferCalls += 1;
         throw new Error("Space should never be called when the gate is unavailable");
       },
-      { fetchImpl: spaceFetchImpl() },
+      { fetchImpl: geminiFetchImpl() },
     );
 
     // B1 regression: gate error → unusable gate_unavailable prediction, no ungated HF call.
@@ -569,7 +567,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
         inferCalls += 1;
         throw new Error("Space should never be called when the gate is unavailable");
       },
-      { fetchImpl: spaceFetchImpl() },
+      { fetchImpl: geminiFetchImpl() },
     );
 
     expect(inferCalls).toBe(0);
@@ -640,7 +638,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
         store,
         { claimId, images: [{ angleType: "wide_field", bytes: jpegLikeBytes() }] },
         inferCropDisease,
-        { fetchImpl: spaceFetchImpl() },
+        { fetchImpl: geminiFetchImpl() },
       ),
     ).rejects.toThrow(/verified/i);
   });
@@ -694,13 +692,13 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
         images: [usableImage()],
       },
       inferCropDisease,
-      { fetchImpl: spaceFetchImpl(), skipInference: true },
+      { fetchImpl: geminiFetchImpl(), skipInference: true },
     );
     expect(persisted.pendingInference).toBe(true);
     expect(store.claims.get(persisted.claimId)?.hf_label).toBeFalsy();
     store.claims.get(persisted.claimId)!.inference_started_at = new Date(Date.now() - 120_000).toISOString();
     const retried = await retryPendingInference(store, persisted.claimId, inferCropDisease, {
-      fetchImpl: spaceFetchImpl(),
+      fetchImpl: geminiFetchImpl(),
     });
     expect(retried?.prediction?.predictedGrade).toBe("C");
     expect(store.claims.get(persisted.claimId)?.inference_status).toBe("complete");

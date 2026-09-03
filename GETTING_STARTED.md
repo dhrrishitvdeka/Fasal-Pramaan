@@ -12,8 +12,7 @@ This guide walks you through setting up and running the Next.js webapp (`apps/da
 - **A Supabase account** (free tier works): you will create one project for auth, Postgres tables, and evidence storage.
 - **Git**: for cloning the repository.
 - **Optional API keys**:
-  - `GEMINI_API_KEY` — enables the Gemini vision gate on `POST /api/vision/gate` and Saathi Live voice; without it the gate falls back to a size/type heuristic.
-  - Hugging Face token (`HF_TOKEN`) — used for crop-model inference via the Space when claims are submitted.
+  - `GEMINI_API_KEY` — vision gate, post-submit field analysis, Saathi classify, and Live voice. Default vision model is `gemini-3.8-flash`. If Vercel still has `GEMINI_VISION_MODEL=gemini-2.0-flash`, change or delete it (that model is shut down).
   - `SENTINEL_TOKEN` / `IMD_API_KEY` — optional external context signals; without them signals return `pending` (IMD rainfall still works through the open-meteo proxy with no key).
 
 ---
@@ -49,10 +48,9 @@ Fill in at minimum:
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Your Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes | Browser-safe publishable key |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Server-only; never expose to the client |
-| `HF_TOKEN` | recommended | Hugging Face inference token |
-| `HF_SPACE_URL` | no | Defaults to `https://dhrrishitvdeka-fasal-pramaan-api.hf.space` |
+
 | `SITE_LOCK_PASSWORD` | no | Leave empty locally; set on Vercel to password-lock the site |
-| `GEMINI_API_KEY` | optional | Vision gate + Saathi Live voice |
+| `GEMINI_API_KEY` | recommended | Vision gate, field analysis, Saathi Live voice |
 | `GEMINI_LIVE_MODEL` / `GEMINI_LIVE_VOICE` / `GEMINI_LIVE_SESSION_MINUTES` | optional | Saathi Live tuning (defaults provided) |
 | `SENTINEL_TOKEN` / `IMD_API_KEY` | optional | External context signals |
 | `REVIEWER_EMAILS` | yes | Comma-separated reviewer emails; everyone else is a farmer |

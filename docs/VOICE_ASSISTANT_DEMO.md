@@ -11,8 +11,8 @@
    - Built-in in-worklet 16 kHz PCM16 downsampling and RMS noise-floor calculation.
    - Automatic half-duplex acoustic echo suppression prevents speaker audio from looping back into the microphone, while detecting deliberate user speech for instant barge-in interruptions.
 
-2. **1-FPS Live Viewfinder Multimodal Video Streaming:**
-   - While on the `/farmer/capture` camera studio, the client streams 1-FPS live viewfinder frames (`realtimeInput: { video: { mimeType: "image/jpeg", data: base64 } }`) directly to Gemini Live over WebSocket.
+2. **Audio-only Live (no viewfinder streaming):**
+   - Camera frames stay on-device for the OpenCV shutter lock. Gemini Live is microphone + speaker only. Submitted stills are analysed after capture.
    - Saathi **sees what the farmer sees in real-time** and provides proactive agronomic guidance on framing, foliage coverage, and pest/disease symptoms aloud.
 
 3. **Proactive Spoken Opening Greeting:**
@@ -83,16 +83,12 @@ sequenceDiagram
 All secrets are **server-only** (configured in Vercel or `apps/dashboard/.env.local`):
 
 ```dotenv
-VOICE_ASSISTANT_ENABLED=true
 GEMINI_API_KEY=your_google_ai_studio_key
 GEMINI_LIVE_MODEL=gemini-3.1-flash-live-preview
-GEMINI_VISION_MODEL=gemini-3.7-flash
-GEMINI_LIVE_VOICE=Aoede
-GEMINI_LIVE_SESSION_MINUTES=30
-# optional external signals
-SENTINEL_TOKEN=your_dataspace_copernicus_token
-IMD_API_KEY=optional
-HF_TOKEN=hf_...
+GEMINI_VISION_MODEL=gemini-3.8-flash
+GEMINI_LIVE_VOICE=Kore
+GEMINI_LIVE_SESSION_MINUTES=15
+SENTINEL_TOKEN=optional_cdse_process_api_bearer
 ```
 
 ---
