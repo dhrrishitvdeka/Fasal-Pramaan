@@ -331,7 +331,10 @@ export type Submission = {
     download_url?: string | null;
     sha256?: string | null;
     quality_flags?: Record<string, unknown> | null;
+    gate_result?: unknown;
   }>;
+  inference_status?: string | null;
+  inference_error?: string | null;
   latest_prediction?: {
     model_version: string;
     adapter_type: string;

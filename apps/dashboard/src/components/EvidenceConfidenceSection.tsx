@@ -141,7 +141,7 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
 
   const integrityDetails: EvidenceIntegrityDetails = {
     sha256_verified: uploaded.some((img) => Boolean(img.sha256)),
-    authenticity_verified: anomalies.length === 0,
+    authenticity_verified: Boolean(submission.latest_prediction) && anomalies.length === 0,
     flags: anomalies.map(String),
   };
 
@@ -666,7 +666,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
               </dd>
               <dt className="text-slate-500">Gemini authenticity:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {iDetails.authenticity_verified !== false ? "Passed vision gate" : "Rejected / unverified"}
+                {iDetails.authenticity_verified ? "Passed vision gate" : "Not run"}
               </dd>
               <dt className="text-slate-500">Integrity flags:</dt>
               <dd className="font-mono text-slate-800 font-medium">
