@@ -21,9 +21,9 @@ flowchart TB
 
   subgraph GatewayLayer["Gateway & Routing Layer"]
     API["Next.js API Routes (/api/*)\n• Supabase Auth JWT via requireWebActor\n• Per-user rate limits (rate-limit.ts)\n• Spatial Jurisdiction Scoping\n• Claims, Milestones, Reviewer Stats"]
-    VisionGate["Vision Gate Route\n(/api/vision/gate)\n• Gemini 3.7 Flash generateContent inlineData\n• Anti-Screen & Crop Species Verification\n• {usable, reason, crop_detected}"]
+    VisionGate["Vision Gate Route\n(/api/vision/gate)\n• Gemini 3.8 Flash generateContent inlineData\n• Anti-Screen & Crop Species Verification\n• {usable, reason, crop_detected}"]
     SaathiTool["Saathi Tool Route\n(/api/saathi/tool)\n• Server-side dispatcher tools-server.ts\n• classify_claim, register_plot, check_geofence\n• weather_alerts, explain_audit\n• Arg clamps, ≤64KB body, allowlist"]
-    VoiceSession["Voice Session Minter\n(/api/voice/session)\n• Ephemeral Token Minter (v1alpha)\n• Model: gemini-3.1-flash-live-preview\n• Voice: Aoede, Indian Languages allowlist"]
+    VoiceSession["Voice Session Minter\n(/api/voice/session)\n• Ephemeral Token Minter (v1alpha)\n• Model: gemini-3.1-flash-live-preview\n• Voice: Kore, Indian Languages allowlist"]
     ContextAssemble["Context Assemble Route\n(/api/context/assemble)\n• Sentinel Tier1 NDVI burn-scar / Tier2 heat proxy\n• IMD open-meteo rain+hail+gust\n• plot_match haversine containment (200 m default)\n• Bhuvan WMS probe · Overpass wildlife/nearby"]
     SystemStatus["Admin System Status Route\n(GET /api/system/status)\n• administrator-only\n• config booleans only (supabase, gemini, sentinel, imdKey)"]
   end

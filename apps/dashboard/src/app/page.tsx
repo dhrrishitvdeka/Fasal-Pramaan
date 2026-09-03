@@ -16,6 +16,7 @@ import { useLanguage } from "@/lib/LanguageContext";
 import { getLandingT } from "@/lib/landing-locales";
 import { TableSkeleton } from "@/components/LoadingAnimation";
 import ErrorMessage from "@/components/ErrorMessage";
+import ContributorAvatars from "@/components/ContributorAvatars";
 import {
   Sprout,
   Camera,
@@ -30,7 +31,6 @@ import {
   SunMedium,
   Wind,
   Layers,
-  ArrowRight,
   ArrowDown,
 } from "lucide-react";
 
@@ -452,6 +452,10 @@ export default function HomePage() {
             </table>
           </div>
         )}
+      </section>
+
+      <section className="border-t border-[var(--line)] pt-10 pb-4 sm:pt-14">
+        <ContributorAvatars size="lg" />
       </section>
     </div>
   );

@@ -338,7 +338,7 @@ Returns: { usable: boolean, reason: string, crop_detected: string|null, warnings
 
 ### 8.2 Gemini Path (`geminiGate`)
 
-Activated if `GEMINI_API_KEY` or `GOOGLE_API_KEY` present; otherwise heuristic fallback (`route.ts:26-27`). Model default `gemini-2.0-flash` (`route.ts:47`), override via `GEMINI_LIVE_MODEL`/`GEMINI_VISION_MODEL`.
+Activated if `GEMINI_API_KEY` or `GOOGLE_API_KEY` present; otherwise heuristic fallback. Vision model default `gemini-3.8-flash` (`resolveGeminiVisionModel`), override via `GEMINI_VISION_MODEL`.
 
 * Parses base64 (`route.ts:28-32`), builds prompt (`route.ts:34-45`):
 

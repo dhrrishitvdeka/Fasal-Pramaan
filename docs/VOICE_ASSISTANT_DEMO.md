@@ -1,6 +1,6 @@
 # Farmer Voice Assistant (Fasal Saathi v3.0)
 
-**Fasal Saathi (*फसल साथी*)** is a multimodal, full-duplex spoken and visual AI companion built for the Fasal-Pramaan agricultural platform. Powered by **Google Gemini Live (Gemini 3.1 Flash / v1alpha)** and **Gemini 3.7 Flash Vision**, it delivers zero-friction, hands-free operation across 15 Indian languages for smallholder farmers and field officers.
+**Fasal Saathi (*फसल साथी*)** is a full-duplex spoken companion for Fasal-Pramaan. Powered by **Google Gemini Live (`gemini-3.1-flash-live-preview`)** for microphone + speaker, and **Gemini 3.8 Flash** for submitted stills. Live does not stream the camera.
 
 ---
 
@@ -13,19 +13,19 @@
 
 2. **Audio-only Live (no viewfinder streaming):**
    - Camera frames stay on-device for the OpenCV shutter lock. Gemini Live is microphone + speaker only. Submitted stills are analysed after capture.
-   - Saathi **sees what the farmer sees in real-time** and provides proactive agronomic guidance on framing, foliage coverage, and pest/disease symptoms aloud.
+   - Saathi guides framing by voice and capture tools; it does not receive live video.
 
 3. **Proactive Spoken Opening Greeting:**
    - As soon as the WebSocket connection completes its handshake (`setupComplete`), Saathi automatically greets the farmer aloud without waiting for the user to speak first (*"नमस्ते किसान भाई! मैं फसल साथी हूँ। आपके खेत में क्या समस्या हुई है? मुझे बताएं।"*).
 
-4. **Soothing Natural Voice (`Aoede`):**
-   - Configured with Google's warm, natural `Aoede` voice timbre tailored for accessible agricultural dialogue.
+4. **Voice (`Kore`):**
+   - Default Gemini Live voice is `Kore` (`GEMINI_LIVE_VOICE`).
 
 5. **Hierarchical Multi-Agent Tools:**
    - `register_plot`: Spoken parcel registration with automatic khasra/crop assignment.
    - `check_plot_geofence`: GPS boundary validation against cadastral survey records.
    - `fetch_agro_weather_alerts`: Live 72-hour precipitation, hail probability, and temperature stress.
-   - `explain_claim_audit`: Plain-language explanation of the 3-stage AI confidence breakdown (Gemini Vision Gate + DINOv2 Disease Classifier + Sentinel-2 Satellite Cross-Check).
+   - `explain_claim_audit`: Plain-language explanation of the 3-stage breakdown (Gemini vision gate + Gemini field analysis + Sentinel-2 / weather cross-check).
 
 ---
 
@@ -46,34 +46,33 @@
 
 ---
 
-## 2. AudioWorklet & Multimodal Live Stream Protocol
+## 2. AudioWorklet & Audio-only Live Protocol
 
 ```mermaid
 sequenceDiagram
   autonumber
-  actor Farmer as 👨‍🌾 Farmer
-  participant Client as 📱 AudioWorklet + WebVoiceBroker
-  participant Socket as ⚡ Gemini Live WebSocket (v1alpha)
-  participant Camera as 📸 Viewfinder (1 FPS)
-  participant Gate as 🛡️ Gemini 3.7 Vision Gate
+  actor Farmer as Farmer
+  participant Client as AudioWorklet + WebVoiceBroker
+  participant Socket as Gemini Live WebSocket (v1alpha)
+  participant Camera as On-device viewfinder
+  participant Gate as Gemini 3.8 Vision Gate
 
   Client->>Socket: Connect wss://... + Setup Frame
   Socket-->>Client: setupComplete
   Client->>Socket: Kickoff Prompt (Proactive Spoken Greeting)
-  Socket-->>Farmer: 🔊 "नमस्ते किसान भाई! मैं फसल साथी हूँ। क्या समस्या हुई है?"
-  
+  Socket-->>Farmer: "नमस्ते किसान भाई! मैं फसल साथी हूँ। क्या समस्या हुई है?"
+
   rect rgb(240, 248, 255)
-    Note over Client,Camera: Live Multimodal Co-Pilot
-    Camera->>Socket: 1-FPS JPEG Video Frames (realtimeInput.video)
-    Farmer->>Client: 🎙️ Speaks (16kHz PCM downsampled via AudioWorklet)
+    Note over Client,Socket: Audio-only Live (no camera frames)
+    Farmer->>Client: Speaks (16kHz PCM downsampled via AudioWorklet)
     Client->>Socket: realtimeInput.audio (16kHz PCM16)
-    Socket-->>Farmer: 🔊 "पत्तियों पर पीले धब्बे दिख रहे हैं। कैमरा थोड़ा और पास ले जाएँ।"
+    Socket-->>Farmer: Spoken guidance
   end
 
   Farmer->>Client: "फोटो खींचो" (Take photo)
-  Client->>Camera: Trigger Shutter (5-Angle Capture)
-  Camera->>Gate: POST /api/vision/gate (Anti-Screen & Species Check)
-  Gate-->>Client: usable: true, crop_detected: "wheat", peril_match: true
+  Client->>Camera: Trigger shutter (peril-required angles)
+  Camera->>Gate: POST /api/vision/gate (anti-screen and crop check)
+  Gate-->>Client: usable: true, crop_detected: "wheat"
 ```
 
 ---
