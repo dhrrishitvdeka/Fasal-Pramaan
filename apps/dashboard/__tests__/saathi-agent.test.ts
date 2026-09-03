@@ -22,6 +22,12 @@ describe("saathi agent", () => {
     expect(slots.farmerNote).toBe("fire burnt my wheat field");
   });
 
+  it("does not lock a peril on a short prompt such as बताइए", () => {
+    expect(extractSlotsFromText("बताइए।", emptyPlots).peril).toBeUndefined();
+    expect(extractSlotsFromText("ok", emptyPlots).peril).toBeUndefined();
+    expect(extractSlotsFromText("hello", emptyPlots).peril).toBeUndefined();
+  });
+
   it("mergeSlots keeps the newest farmer note from b over a", () => {
     const a: SaathiSlot = { peril: "fire_burn", farmerNote: "older note" };
     const merged = mergeSlots(a, { crop: "Wheat", farmerNote: "newer note" });

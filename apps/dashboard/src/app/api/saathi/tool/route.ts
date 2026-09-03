@@ -2,14 +2,11 @@ import { NextResponse } from "next/server";
 import { requireWebActor } from "@/lib/web-auth";
 import { executeSaathiTool, type SaathiToolResult } from "@/lib/saathi/tools-server";
 import { CANONICAL_ANGLES } from "@/lib/farmerI18n";
-import { checkRateLimit } from "@/lib/server/rate-limit";
 import { SAATHI_SERVER_TOOLS, resolveSaathiToolName } from "@/lib/saathi/tool-catalog";
 
 const ALLOWED_TOOLS = new Set<string>(SAATHI_SERVER_TOOLS);
 const ANGLE_IDS = new Set(CANONICAL_ANGLES.map((a) => a.id));
 
-const RATE_LIMIT_MAX = 30;
-const RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_BODY_CHARS = 64 * 1024;
 
 function clampNumber(value: unknown, min: number, max: number): number | null {
@@ -135,14 +132,6 @@ function sanitizeArgs(name: string, raw: unknown): Record<string, unknown> | nul
 export async function POST(request: Request) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
-
-  const limit = checkRateLimit(`saathi-tool:${auth.actor.userId}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
-  if (!limit.ok) {
-    return NextResponse.json(
-      { ok: false, error: "Too many Saathi tool requests. Try again shortly." },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
-    );
-  }
 
   const declaredLength = Number(request.headers.get("content-length") || "0");
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_CHARS) {

@@ -43,7 +43,9 @@ export function extractSlotsFromText(text: string, plots: Array<{ id: string; na
   const t = text.toLowerCase();
   const slots: Partial<SaathiSlot> = {};
   const { peril, confidence } = classifyPerilHeuristic(text);
-  if (confidence >= 0.55) {
+  // Default heuristic is 0.2 ("normal"). Do not lock a peril on short prompts
+  // like "बताइए" or on the canned greeting that lists example perils.
+  if (confidence >= 0.7 && text.trim().length >= 8) {
     slots.peril = peril;
     slots.perilConfidence = confidence;
   }

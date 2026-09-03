@@ -114,6 +114,7 @@ function requestEvidenceAngles(args: Record<string, unknown>): SaathiToolResult 
       minConfidence: cfg.minConfidence,
       needsSatellite: cfg.needsSatellite,
       contextChecks: cfg.contextChecks,
+      message: `${cfg.labelEn}: ${cfg.requiredAngles.length} required angles (${cfg.requiredAngles.join(", ")}).`,
     },
   };
 }
@@ -184,8 +185,9 @@ async function classifyClaim(args: Record<string, unknown>): Promise<SaathiToolR
         ok: true,
         data: {
           peril: normalizePeril(args.peril),
-          confidence: Number.isFinite(Number(args.confidence)) ? Number(args.confidence) : 0.8,
-          reasoning: String(args.reasoning || "Classified by Fasal Saathi."),
+          // Suggestion only — do not rubber-stamp a model-chosen peril with no farmer words.
+          confidence: Math.min(0.35, Number.isFinite(Number(args.confidence)) ? Number(args.confidence) : 0.35),
+          reasoning: "No farmer text provided; peril is a model suggestion, not a confirmed classification.",
         },
       };
     }

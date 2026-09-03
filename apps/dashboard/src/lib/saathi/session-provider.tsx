@@ -406,7 +406,8 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
           };
         }
         setLastTool(`${call.name} · ${result.outcome}`);
-        pushNote(result.message);
+        // Tool ACKs stay off the transcript — Gemini already speaks the farmer-facing reply.
+        // Dumping result.message here produced English "Done." bubbles after every classify/angles call.
         responses.push({
           id: call.id,
           name: call.name,
@@ -421,7 +422,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
         // model may retry the tool
       }
     },
-    [pushNote],
+    [],
   );
 
   const connectVoice = useCallback(async () => {
