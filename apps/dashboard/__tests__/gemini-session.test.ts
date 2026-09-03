@@ -74,6 +74,8 @@ describe("voice session mint", () => {
     if (result.ok) {
       expect(result.token).toBe("auth_tokens/ephemeral-demo");
       expect(result.websocketUrl).toMatch(/^wss:\/\//);
+      expect(result.websocketUrl).toContain("v1beta");
+      expect(result.websocketUrl).toContain("BidiGenerateContentConstrained");
       expect(result.model).toBeTruthy();
       expect(result.sessionId).toBeTruthy();
       expect(JSON.stringify(result)).not.toMatch(/server-only-key|GEMINI_API_KEY/i);
@@ -87,6 +89,34 @@ describe("voice session mint", () => {
     expect(body).toContain("begin_recapture");
     expect(body).toContain("get_claim_detail");
     expect(body).toContain("needs_recapture");
+    expect(body).toContain("liveConnectConstraints");
+    expect(body).toContain("inputAudioTranscription");
+    expect(JSON.stringify(request.legacyBody)).toContain("bidiGenerateContentSetup");
+  });
+
+  it("retries legacy bidiGenerateContentSetup when liveConnectConstraints is rejected", async () => {
+    let calls = 0;
+    const result = await mintVoiceSession({
+      lockActive: false,
+      unlocked: true,
+      apiKey: "server-only-key",
+      fetchImpl: async (_url, init) => {
+        calls += 1;
+        const raw = String(init && "body" in init ? init.body : "");
+        if (calls === 1) {
+          expect(raw).toContain("liveConnectConstraints");
+          return new Response("bad constraint", { status: 400 });
+        }
+        expect(raw).toContain("bidiGenerateContentSetup");
+        return new Response(JSON.stringify({ name: "auth_tokens/legacy-ok" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      },
+    });
+    expect(calls).toBe(2);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.token).toBe("auth_tokens/legacy-ok");
   });
 
   it("second locked call still rejects without leaking secrets", async () => {

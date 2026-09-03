@@ -460,6 +460,74 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
       }
       const socket = new WebSocket(`${body.websocketUrl}?access_token=${encodeURIComponent(body.token)}`);
       socketRef.current = socket;
+
+      const consumeFrame = async (event: MessageEvent) => {
+        try {
+          const frame = await decodeGeminiLiveFrame(event.data);
+          if (!frame) return false;
+          const parsed = parseGeminiLiveMessage(frame);
+          for (const item of parsed.events) {
+            if (item.type === "setupComplete") {
+              setupCompleteRef.current = true;
+              setLiveStatus("live");
+              retryCountRef.current = 0;
+              pushPortalContext("session_start");
+              if (!hasGreetedRef.current) {
+                hasGreetedRef.current = true;
+                try {
+                  socket.send(
+                    JSON.stringify({
+                      realtimeInput: {
+                        text:
+                          langRef.current === "hi"
+                            ? "किसान अभी जुड़े हैं। संक्षेप में नमस्ते कहें और पूछें कि फसल का क्या नुकसान हुआ।"
+                            : "The farmer just joined. Greet them briefly and ask what happened to their crop.",
+                      },
+                    }),
+                  );
+                } catch {
+                  // ignore
+                }
+              } else {
+                pushPortalContext("resume");
+              }
+            }
+            if (item.type === "inputTranscript") {
+              inputBufRef.current += item.text;
+              upsertTranscript("farmer", inputBufRef.current);
+            }
+            if (item.type === "outputTranscript") {
+              outputBufRef.current += item.text;
+              upsertTranscript("saathi", outputBufRef.current);
+            }
+            if (item.type === "interrupted") liveAudioRef.current?.interrupt();
+            if (item.type === "audio") liveAudioRef.current?.playPcm24k(item.bytesBase64);
+            if (item.type === "toolCalls") void handleTools(item.calls);
+            if (item.type === "turnComplete") {
+              const spoken = inputBufRef.current.trim();
+              if (spoken) {
+                userTurnRef.current += 1;
+                const extracted = extractSlotsFromText(spoken, plots as never);
+                if (Object.keys(extracted).length) setSlots((s) => mergeSlots(s, extracted));
+              }
+              inputBufRef.current = "";
+              outputBufRef.current = "";
+            }
+            if (item.type === "error") {
+              failSession(
+                langRef.current === "hi"
+                  ? `आवाज़ सत्र त्रुटि: ${item.message}`
+                  : `Voice session error: ${item.message}`,
+              );
+            }
+          }
+          return parsed.setupComplete;
+        } catch {
+          console.warn("Ignored a non-JSON Gemini Live frame");
+          return false;
+        }
+      };
+
       await new Promise<void>((resolve, reject) => {
         const timer = window.setTimeout(() => {
           try {
@@ -472,8 +540,6 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
         socket.onopen = () => {
           try {
             socket.send(JSON.stringify({ setup: { model: `models/${body.model}` } }));
-            window.clearTimeout(timer);
-            resolve();
           } catch (err) {
             window.clearTimeout(timer);
             try {
@@ -493,7 +559,25 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
           }
           reject(new Error(langRef.current === "hi" ? "Gemini Live नहीं खुला।" : "Could not open Gemini Live."));
         };
+        socket.onclose = () => {
+          window.clearTimeout(timer);
+          reject(
+            new Error(
+              langRef.current === "hi"
+                ? "Gemini Live सेटअप से पहले बंद हो गया।"
+                : "Gemini Live closed before setup completed.",
+            ),
+          );
+        };
+        socket.onmessage = (event) => {
+          void consumeFrame(event).then((ready) => {
+            if (!ready) return;
+            window.clearTimeout(timer);
+            resolve();
+          });
+        };
       });
+
       socket.onclose = (ev) => {
         if (intentionalCloseRef.current || !mountedRef.current) return;
         if (socketRef.current === socket) socketRef.current = null;
@@ -525,70 +609,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
         // onclose drives retry
       };
       socket.onmessage = (event) => {
-        void (async () => {
-          try {
-            const frame = await decodeGeminiLiveFrame(event.data);
-            if (!frame) return;
-            const parsed = parseGeminiLiveMessage(frame);
-            for (const item of parsed.events) {
-              if (item.type === "setupComplete") {
-                setupCompleteRef.current = true;
-                setLiveStatus("live");
-                retryCountRef.current = 0;
-                pushPortalContext("session_start");
-                if (!hasGreetedRef.current) {
-                  hasGreetedRef.current = true;
-                  try {
-                    socket.send(
-                      JSON.stringify({
-                        realtimeInput: {
-                          text:
-                            langRef.current === "hi"
-                              ? "नमस्ते किसान भाई! मैं फसल साथी हूँ। आपके खेत में क्या समस्या हुई है? मुझे बताएं।"
-                              : "Hello! I am Fasal Saathi. What happened to your crop? Tell me in your words.",
-                        },
-                      }),
-                    );
-                  } catch {
-                    // ignore
-                  }
-                } else {
-                  pushPortalContext("resume");
-                }
-              }
-              if (item.type === "inputTranscript") {
-                inputBufRef.current += item.text;
-                upsertTranscript("farmer", inputBufRef.current);
-              }
-              if (item.type === "outputTranscript") {
-                outputBufRef.current += item.text;
-                upsertTranscript("saathi", outputBufRef.current);
-              }
-              if (item.type === "interrupted") liveAudioRef.current?.interrupt();
-              if (item.type === "audio") liveAudioRef.current?.playPcm24k(item.bytesBase64);
-              if (item.type === "toolCalls") void handleTools(item.calls);
-              if (item.type === "turnComplete") {
-                const spoken = inputBufRef.current.trim();
-                if (spoken) {
-                  userTurnRef.current += 1;
-                  const extracted = extractSlotsFromText(spoken, plots as never);
-                  if (Object.keys(extracted).length) setSlots((s) => mergeSlots(s, extracted));
-                }
-                inputBufRef.current = "";
-                outputBufRef.current = "";
-              }
-              if (item.type === "error") {
-                failSession(
-                  langRef.current === "hi"
-                    ? `आवाज़ सत्र त्रुटि: ${item.message}`
-                    : `Voice session error: ${item.message}`,
-                );
-              }
-            }
-          } catch {
-            console.warn("Ignored a non-JSON Gemini Live frame");
-          }
-        })();
+        void consumeFrame(event);
       };
       if (body.expiresAt) {
         const remain = new Date(body.expiresAt).getTime() - Date.now() - 15_000;
@@ -602,21 +623,25 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
           }, remain);
         }
       }
-      const liveAudio = await startLiveAudio({
-        socket,
-        micPermissionMessage:
-          langRef.current === "hi"
-            ? "माइक्रोफ़ोन अनुमति चाहिए। ब्राउज़र में Allow दबाएँ।"
-            : "Microphone permission is required. Allow the mic in the browser prompt.",
-        onSpeakingChange: setIsSpeaking,
-      });
-      // Guard: disconnect or unmount while mic was initialising
-      if (intentionalCloseRef.current || !mountedRef.current) {
-        liveAudio.stop();
-        connectingRef.current = false;
-        return;
+      const micPermissionMessage =
+        langRef.current === "hi"
+          ? "माइक्रोफ़ोन अनुमति चाहिए। ब्राउज़र में Allow दबाएँ। तब तक टाइप कर सकते हैं।"
+          : "Microphone permission is required. Allow the mic in the browser prompt. You can keep typing until then.";
+      try {
+        const liveAudio = await startLiveAudio({
+          socket,
+          micPermissionMessage,
+          onSpeakingChange: setIsSpeaking,
+        });
+        if (intentionalCloseRef.current || !mountedRef.current) {
+          liveAudio.stop();
+          connectingRef.current = false;
+          return;
+        }
+        liveAudioRef.current = liveAudio;
+      } catch (micErr) {
+        pushNote(micErr instanceof Error ? micErr.message : micPermissionMessage);
       }
-      liveAudioRef.current = liveAudio;
       connectingRef.current = false;
       retryCountRef.current = 0;
       setLiveStatus("live");
@@ -663,11 +688,25 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
         ...m,
         { id: newId("f"), role: "farmer", text, at: new Date().toISOString() },
       ]);
+      const liveSocket = socketRef.current;
+      const liveOpen =
+        Boolean(liveSocket) &&
+        liveSocket?.readyState === WebSocket.OPEN &&
+        setupCompleteRef.current;
+      if (liveOpen && liveSocket) {
+        try {
+          liveSocket.send(JSON.stringify({ realtimeInput: { text } }));
+        } catch {
+          // fall through to local reply
+        }
+      }
       const res = resolveAgenticAction(text, slotsRef.current, plots as never, langRef.current);
       setSlots(res.slots);
-      setTimeout(() => {
-        setMessages((m) => [...m, res.replyMessage]);
-      }, 350);
+      if (!liveOpen) {
+        setTimeout(() => {
+          setMessages((m) => [...m, res.replyMessage]);
+        }, 350);
+      }
       if (res.action) {
         const action = res.action;
         if (action.type === "open_camera") {
@@ -684,7 +723,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
         } else if (action.type === "switch_language") {
           setLang(action.lang);
         }
-      } else {
+      } else if (!liveOpen) {
         const q = nextQuestion(res.slots, langRef.current);
         if (q) setTimeout(() => setMessages((m) => [...m, q]), 900);
       }
