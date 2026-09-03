@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
+import { CANONICAL_GITHUB_REPO, resolveGithubRepo } from "@/lib/github-repo";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300; // 5 minutes cache
 
-const DEFAULT_REPO = "dhrrishitvdeka/Fasal-Pramaan";
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const repo = (searchParams.get("repo") || process.env.NEXT_PUBLIC_GITHUB_REPO || DEFAULT_REPO).trim();
+  const repo = resolveGithubRepo(
+    searchParams.get("repo") || process.env.NEXT_PUBLIC_GITHUB_REPO || CANONICAL_GITHUB_REPO
+  );
 
   // Validate repo format: owner/name
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {

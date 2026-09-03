@@ -2,18 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { Star } from "lucide-react";
+import { CANONICAL_GITHUB_REPO, resolveGithubRepo } from "@/lib/github-repo";
 
 interface GitHubStarsBadgeProps {
   className?: string;
   repo?: string;
 }
 
-const DEFAULT_REPO = "dhrrishitvdeka/Fasal-Pramaan";
 const CACHE_KEY = "fp_gh_stars_v2";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export function GitHubStarsBadge({ className = "", repo }: GitHubStarsBadgeProps) {
-  const targetRepo = repo || process.env.NEXT_PUBLIC_GITHUB_REPO || DEFAULT_REPO;
+  const targetRepo = resolveGithubRepo(repo || process.env.NEXT_PUBLIC_GITHUB_REPO || CANONICAL_GITHUB_REPO);
   const repoUrl = `https://github.com/${targetRepo}`;
   const [stars, setStars] = useState<number | null>(() => {
     if (typeof window === "undefined") return null;

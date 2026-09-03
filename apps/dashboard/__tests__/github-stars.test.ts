@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { CANONICAL_GITHUB_REPO, resolveGithubRepo } from "../src/lib/github-repo";
 
 describe("GitHub Stars formatting and validation", () => {
+  it("rewrites the zip-folder repo name to the real GitHub repo", () => {
+    expect(resolveGithubRepo(undefined)).toBe(CANONICAL_GITHUB_REPO);
+    expect(resolveGithubRepo("dhrrishitvdeka/Fasal-Pramaan")).toBe(CANONICAL_GITHUB_REPO);
+    expect(resolveGithubRepo("dhrrishitvdeka/Fasal-Pramaan-main")).toBe(CANONICAL_GITHUB_REPO);
+    expect(resolveGithubRepo("Fasal-Pramaan-main")).toBe(CANONICAL_GITHUB_REPO);
+  });
+
   it("validates repository format correctly", () => {
     const validRepoRegex = /^[\w.-]+\/[\w.-]+$/;
     expect(validRepoRegex.test("dhrrishitvdeka/Fasal-Pramaan")).toBe(true);
