@@ -36,7 +36,6 @@ const reviewerNavGroups: Array<{ label: string; items: ReviewerNavItem[] }> = [
     label: "Cases",
     items: [
       { href: "/review", key: "review", icon: ClipboardList },
-      { href: "/overview", key: "overview", icon: LayoutDashboard },
       { href: "/alerts", key: "alerts", icon: AlertTriangle },
     ],
   },
@@ -85,7 +84,7 @@ function ReviewerNav({
 }) {
   return (
     <>
-      <div className="border-b border-[var(--line)] px-4 py-3">
+      <div className="shrink-0 border-b border-[var(--line)] px-4 py-3">
         <Link href="/" onClick={onNavigate} className="block">
           <div className="text-sm tracking-tight text-[var(--ink)]">Fasal-Pramaan</div>
           <div className="mt-0.5 text-xs text-[var(--ink-muted)]">
@@ -94,7 +93,7 @@ function ReviewerNav({
         </Link>
       </div>
 
-      <div className="border-b border-[var(--line)] p-3">
+      <div className="shrink-0 border-b border-[var(--line)] p-3">
         <div className="fp-kicker mb-2">{t("portalKicker")}</div>
         <div className="fp-ui grid grid-cols-2 text-xs">
           <Link
@@ -114,17 +113,18 @@ function ReviewerNav({
         </div>
       </div>
 
-      <nav className="fp-ui flex-1 space-y-0.5 overflow-y-auto p-2" aria-label="Main Navigation">
+      <nav className="fp-ui flex-1 min-h-0 space-y-0.5 overflow-y-auto p-2" aria-label="Main Navigation">
+        {/* Overview as the Reviewer Centre Home */}
         <Link
-          href="/"
+          href="/overview"
           onClick={onNavigate}
-          title={t("portalShowcase")}
-          aria-label={t("portalShowcase")}
-          aria-current={pathname === "/" ? "page" : undefined}
-          className={navLinkClasses(pathname === "/")}
+          title={t("overview")}
+          aria-label={t("overview")}
+          aria-current={pathname === "/overview" ? "page" : undefined}
+          className={navLinkClasses(pathname === "/overview")}
         >
           <Home className="h-4 w-4 shrink-0 opacity-70" aria-hidden strokeWidth={1.5} />
-          <span aria-hidden className="hidden lg:inline">{t("portalShowcase")}</span>
+          <span aria-hidden className="hidden lg:inline">{t("overview")}</span>
         </Link>
 
         {reviewerNavGroups.map((group) => {
@@ -158,11 +158,8 @@ function ReviewerNav({
         })}
       </nav>
 
-      <div className="fp-ui space-y-2 border-t border-[var(--line)] p-3">
+      <div className="fp-ui shrink-0 space-y-2 border-t border-[var(--line)] p-3">
         <LanguageSelect value={lang} onChange={setLang} className="w-full max-w-none" />
-        <Link href="/" onClick={onNavigate} className="fp-btn-secondary w-full text-xs">
-          {t("portalShowcase")}
-        </Link>
         <button type="button" onClick={onLogout} className="fp-btn-secondary w-full text-xs">
           {t("logout")}
         </button>
@@ -332,7 +329,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--surface)] md:flex">
+      <aside className="sticky top-0 hidden h-screen self-start w-56 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--surface)] md:flex">
         <ReviewerNav
           pathname={pathname}
           roles={roles}
