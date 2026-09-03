@@ -121,7 +121,7 @@ export default function OverviewPage() {
     for (const s of claims || []) {
       const p = String(s.peril || "normal");
       const entry = grouped.get(p) || { count: 0, confSum: 0, recaptures: 0 };
-      const conf = resolveEvidenceEvaluation(s).confidence.final;
+      const conf = resolveEvidenceEvaluation(s)?.confidence?.final ?? 0;
       entry.count += 1;
       entry.confSum += conf;
       if (s.status === "needs_recapture") entry.recaptures += 1;
@@ -191,7 +191,7 @@ export default function OverviewPage() {
     let medium = 0; // 65 - 79%
     let low = 0; // < 65%
     for (const c of claims || []) {
-      const conf = resolveEvidenceEvaluation(c).confidence.final;
+      const conf = resolveEvidenceEvaluation(c)?.confidence?.final ?? 0;
       if (conf >= 80) high += 1;
       else if (conf >= 65) medium += 1;
       else low += 1;
@@ -226,7 +226,7 @@ export default function OverviewPage() {
       id: s.id,
       peril: s.peril || "normal",
       crop: s.crop_type || "unspecified",
-      overall_confidence: resolveEvidenceEvaluation(s).confidence.final,
+      overall_confidence: resolveEvidenceEvaluation(s)?.confidence?.final ?? 0,
       gate_failed:
         (s.gate_result as { gateFailed?: boolean } | null | undefined)?.gateFailed ? "yes" : "no",
       status: s.status,
@@ -244,7 +244,13 @@ export default function OverviewPage() {
         <ErrorMessage
           title="Something went wrong loading overview metrics"
           message={error instanceof Error ? error.message : "Unable to retrieve operational metrics. Please confirm reviewer credentials and API availability."}
-          onRetry={() => void refetch()}
+          onRetry={() => {
+            if (typeof window !== "undefined") {
+              window.location.reload();
+            } else {
+              void refetch();
+            }
+          }}
           actionHref="/review"
           actionLabel="Go to Review Queue"
         />
@@ -349,11 +355,11 @@ export default function OverviewPage() {
             />
             <MetricCard
               label={t("pendingReview")}
-              href={reviewerCardHref("pending_review", bucketIds.pending_review)}
-              value={claims ? bucketIds.pending_review.length : data.pending_human_review}
-              hint={bucketIds.pending_review.length === 1 ? t("openCase") : t("openQueue")}
+              href={reviewerCardHref("pending_review", bucketIds?.pending_review || [])}
+              value={claims ? (bucketIds?.pending_review?.length ?? 0) : data.pending_human_review}
+              hint={(bucketIds?.pending_review?.length ?? 0) === 1 ? t("openCase") : t("openQueue")}
               tone={
-                (claims ? bucketIds.pending_review.length : data.pending_human_review) > 0
+                (claims ? (bucketIds?.pending_review?.length ?? 0) : data.pending_human_review) > 0
                   ? "warn"
                   : undefined
               }
@@ -386,11 +392,11 @@ export default function OverviewPage() {
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
             <MetricCard
               label={t("lowConfidenceCases")}
-              href={reviewerCardHref("low_confidence", bucketIds.low_confidence)}
-              value={claims ? bucketIds.low_confidence.length : (data.low_evidence_confidence_cases ?? 0)}
-              hint={bucketIds.low_confidence.length === 1 ? t("openCase") : t("openQueue")}
+              href={reviewerCardHref("low_confidence", bucketIds?.low_confidence || [])}
+              value={claims ? (bucketIds?.low_confidence?.length ?? 0) : (data.low_evidence_confidence_cases ?? 0)}
+              hint={(bucketIds?.low_confidence?.length ?? 0) === 1 ? t("openCase") : t("openQueue")}
               tone={
-                (claims ? bucketIds.low_confidence.length : (data.low_evidence_confidence_cases ?? 0)) > 0
+                (claims ? (bucketIds?.low_confidence?.length ?? 0) : (data.low_evidence_confidence_cases ?? 0)) > 0
                   ? "warn"
                   : undefined
               }
