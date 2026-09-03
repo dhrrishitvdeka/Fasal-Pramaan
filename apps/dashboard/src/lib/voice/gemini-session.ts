@@ -45,32 +45,64 @@ export function geminiLiveSessionMinutes(): number {
   return Math.max(5, Math.min(Math.round(raw), 60));
 }
 
+function rfc3339(value: Date): string {
+  return value.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function liveSessionConfig() {
+  return {
+    responseModalities: ["AUDIO"],
+    speechConfig: {
+      voiceConfig: { prebuiltVoiceConfig: { voiceName: geminiLiveVoice() } },
+    },
+    systemInstruction: { parts: [{ text: WEB_VOICE_SYSTEM_INSTRUCTION }] },
+    tools: [{ functionDeclarations: WEB_FUNCTION_DECLARATIONS }],
+    inputAudioTranscription: {},
+    outputAudioTranscription: {},
+    sessionResumption: {},
+  };
+}
+
 export function buildAuthTokenRequest(now = new Date()): {
   body: Record<string, unknown>;
+  legacyBody: Record<string, unknown>;
   expiresAt: Date;
   model: string;
 } {
   const duration = geminiLiveSessionMinutes();
   const expiresAt = new Date(now.getTime() + duration * 60_000);
+  // Window to *start* the Live socket — keep short; session length is expireTime.
+  const newSessionExpireAt = new Date(now.getTime() + 2 * 60_000);
   const model = geminiLiveModel();
-  const rfc = (value: Date) => value.toISOString().replace(/\.\d{3}Z$/, "Z");
+  const liveConfig = liveSessionConfig();
+  const shared = {
+    uses: 20,
+    expireTime: rfc3339(expiresAt),
+    newSessionExpireTime: rfc3339(newSessionExpireAt),
+  };
   return {
     model,
     expiresAt,
     body: {
-      uses: 20,
-      expireTime: rfc(expiresAt),
-      newSessionExpireTime: rfc(expiresAt),
+      ...shared,
+      liveConnectConstraints: {
+        model: `models/${model}`,
+        config: liveConfig,
+      },
+    },
+    // v1alpha-era field name; retried on 400 so older Gemini endpoints still mint.
+    legacyBody: {
+      ...shared,
       bidiGenerateContentSetup: {
         model: `models/${model}`,
         generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: geminiLiveVoice() } },
-          },
+          responseModalities: liveConfig.responseModalities,
+          speechConfig: liveConfig.speechConfig,
         },
-        systemInstruction: { parts: [{ text: WEB_VOICE_SYSTEM_INSTRUCTION }] },
-        tools: [{ functionDeclarations: WEB_FUNCTION_DECLARATIONS }],
+        systemInstruction: liveConfig.systemInstruction,
+        tools: liveConfig.tools,
+        inputAudioTranscription: liveConfig.inputAudioTranscription,
+        outputAudioTranscription: liveConfig.outputAudioTranscription,
       },
     },
   };
@@ -97,19 +129,27 @@ export async function mintVoiceSession(input: {
   if (input.voiceEnabled === false) {
     return { ok: false, status: 503, error: "Voice assistant is not configured" };
   }
-  const { body, expiresAt, model } = buildAuthTokenRequest(input.now);
+  const { body, legacyBody, expiresAt, model } = buildAuthTokenRequest(input.now);
   const fetchImpl = input.fetchImpl ?? fetch;
-  const response = await fetchImpl(GEMINI_AUTH_TOKENS_URL, {
-    method: "POST",
-    headers: {
-      "x-goog-api-key": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-    signal: typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
-      ? AbortSignal.timeout(15_000)
-      : undefined,
-  });
+  const postToken = (payload: Record<string, unknown>) =>
+    fetchImpl(GEMINI_AUTH_TOKENS_URL, {
+      method: "POST",
+      headers: {
+        "x-goog-api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal:
+        typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+          ? AbortSignal.timeout(15_000)
+          : undefined,
+    });
+  let response = await postToken(body);
+  if (!response.ok && (response.status === 400 || response.status === 404)) {
+    const firstError = await response.text().catch(() => "");
+    console.warn("Gemini Live auth_tokens v1beta body rejected, retrying legacy setup:", response.status, firstError);
+    response = await postToken(legacyBody);
+  }
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
     console.error("Gemini Live auth_tokens failed:", response.status, errorText);

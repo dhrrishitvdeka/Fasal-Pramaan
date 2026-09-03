@@ -96,7 +96,7 @@ export async function classifyPerilWithLLM(
     };
 
     const controller = typeof AbortSignal !== "undefined" && typeof (AbortSignal as unknown as { timeout?: (ms: number) => AbortSignal }).timeout === "function"
-      ? (AbortSignal as unknown as { timeout: (ms: number) => AbortSignal }).timeout(5000)
+      ? (AbortSignal as unknown as { timeout: (ms: number) => AbortSignal }).timeout(15000)
       : undefined;
 
     const res = await fetch(url, {
