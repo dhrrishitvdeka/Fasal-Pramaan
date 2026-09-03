@@ -230,7 +230,7 @@ export function plotFromRow(row: WebPlotRow): FarmerPlot {
     hissaNumber: row.hissa_number || "",
     tehsil: row.tehsil || "",
     ownershipType: row.ownership_type || "owner",
-    season: row.season || "Rabi",
+    season: row.season || "",
     areaHectares: hectares,
     areaKattha: kattha,
     cropType: row.crop_type || "",

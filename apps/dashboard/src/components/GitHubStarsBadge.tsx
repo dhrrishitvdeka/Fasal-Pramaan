@@ -15,6 +15,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export function GitHubStarsBadge({ className = "", repo }: GitHubStarsBadgeProps) {
   const targetRepo = resolveGithubRepo(repo || process.env.NEXT_PUBLIC_GITHUB_REPO || CANONICAL_GITHUB_REPO);
   const repoUrl = `https://github.com/${targetRepo}`;
+  const [loaded, setLoaded] = useState(false);
   const [stars, setStars] = useState<number | null>(() => {
     if (typeof window === "undefined") return null;
     try {
@@ -32,6 +33,10 @@ export function GitHubStarsBadge({ className = "", repo }: GitHubStarsBadgeProps
   });
 
   useEffect(() => {
+    if (stars !== null) setLoaded(true);
+  }, [stars]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function fetchStars() {
@@ -42,6 +47,7 @@ export function GitHubStarsBadge({ className = "", repo }: GitHubStarsBadgeProps
           const data = (await res.json()) as { stars?: number };
           if (!cancelled && typeof data.stars === "number") {
             setStars(data.stars);
+            setLoaded(true);
             try {
               localStorage.setItem(
                 `${CACHE_KEY}_${targetRepo}`,
@@ -66,6 +72,7 @@ export function GitHubStarsBadge({ className = "", repo }: GitHubStarsBadgeProps
           const data = (await res.json()) as { stargazers_count?: number };
           if (!cancelled && typeof data.stargazers_count === "number") {
             setStars(data.stargazers_count);
+            setLoaded(true);
             try {
               localStorage.setItem(
                 `${CACHE_KEY}_${targetRepo}`,
@@ -80,6 +87,7 @@ export function GitHubStarsBadge({ className = "", repo }: GitHubStarsBadgeProps
       } catch {
         // Graceful ignore
       }
+      if (!cancelled) setLoaded(true);
     }
 
     void fetchStars();
@@ -122,7 +130,7 @@ export function GitHubStarsBadge({ className = "", repo }: GitHubStarsBadgeProps
 
       <span className="flex items-center gap-1 text-xs">
         <Star className="h-3 w-3 fill-amber-400 text-amber-500" aria-hidden="true" />
-        <span className="font-semibold">{stars !== null ? formatCount(stars) : "…"}</span>
+        <span className="font-semibold">{stars !== null ? formatCount(stars) : loaded ? "—" : "…"}</span>
       </span>
     </a>
   );

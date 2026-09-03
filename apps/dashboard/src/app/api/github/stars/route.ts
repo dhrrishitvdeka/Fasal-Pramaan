@@ -69,17 +69,18 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      stars: 7,
+      stars: null,
       repo,
       url: `https://github.com/${repo}`,
-      source: "fallback",
+      source: "unavailable",
       updatedAt: new Date().toISOString(),
     });
   } catch (err) {
     return NextResponse.json({
-      stars: 7,
+      stars: null,
       repo,
       url: `https://github.com/${repo}`,
+      source: "unavailable",
       error: err instanceof Error ? err.message : "Fetch error",
     });
   }
