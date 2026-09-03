@@ -228,7 +228,10 @@ export function parseGeminiAnalysis(payload: unknown, modelId = geminiVisionMode
     (grade === "U" ? 0 : 0.6);
 
   const reasoning = asString(record.reasoning || record.visual_reason, "");
-  const visualFindings = asString(record.visual_findings || record.summary, reasoning);
+  let visualFindings = asString(record.visual_findings || record.summary, "");
+  if (!visualFindings && reasoning) {
+    visualFindings = reasoning.split(/(?<=[.।])\s+/).slice(0, 2).join(" ").trim();
+  }
 
   return {
     modelId: asString(record.model_id, modelId),
@@ -294,13 +297,15 @@ Hard authenticity rules (fail closed):
 - AI-generated, stock, meme, or printed paper photo → ai_generated or printed_photo, predicted_grade="U".
 - Indoor room, selfie, person, wall, floor, or non-field object as the subject → indoor_scene=true, predicted_grade="U".
 - Completely black, blank, or unreadable → predicted_grade="U".
+- Ornamental hedge, garden shrub, lawn, houseplant, potted plant, or decorative foliage that is NOT a farm crop stand (wheat/paddy/maize/mustard/potato/etc.) → predicted_grade="U", primary_damage="unknown", indoor_scene may be false if outdoors. Set predicted_crop to what you actually see (e.g. "ornamental hedge"), NOT the declared crop.
 
-Then, only if the photos look like a real outdoor field:
-- Identify the crop (declared crop is "${crop}").
+Then, only if the photos look like a real outdoor agricultural field:
+- Identify the crop you see (declared crop is "${crop}"). If it is a different species, say so — do not rubber-stamp the declared crop.
 - Describe damage visible (or healthy canopy) and whether it matches peril "${peril}".
 - Estimate severity as none|low|medium|high and affected_area_pct 0-100 if you can see a plot; otherwise null.
-- Screening grade: A healthy, B uncertain, C clear damage/disease pattern, U unusable.
-- reasoning: 4–8 sentences a reviewer can read aloud. Mention each angle you were given.
+- Screening grade: A healthy field crop, B uncertain, C clear damage/disease pattern, U unusable or not a farm crop.
+- visual_findings: EXACTLY 1–2 short sentences a reviewer can read in five seconds (what plant, field vs garden, damage or not).
+- reasoning: 4–8 sentences. Mention each angle you were given.
 
 Return ONLY JSON:
 {
@@ -400,6 +405,19 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
     throw new Error("Gemini vision returned an empty analysis");
   }
   const parsed = parseGeminiAnalysis(rawOut, model);
+  const declared = (input.expectedCrop || "").trim().toLowerCase();
+  const seen = (parsed.predictedCrop || "").trim().toLowerCase();
+  if (
+    declared &&
+    seen &&
+    seen !== "unknown" &&
+    !seen.includes(declared) &&
+    !declared.includes(seen)
+  ) {
+    parsed.qualityWarnings = [...new Set([...(parsed.qualityWarnings || []), "crop_mismatch"])];
+    if (parsed.predictedGrade === "A") parsed.predictedGrade = "B";
+    parsed.perilMatch = false;
+  }
   return { ...parsed, modelId: model };
 }
 

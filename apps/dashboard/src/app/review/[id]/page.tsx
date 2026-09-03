@@ -161,9 +161,11 @@ export default function ReviewDetailPage() {
   // Parse the persisted authenticity-gate result (defensive — shape is JSONB)
   const gateInfo = useMemo(() => {
     const raw = data?.gate_result as Record<string, unknown> | null | undefined;
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-    const perImageRaw = Array.isArray(raw.perImage) ? (raw.perImage as unknown[]) : [];
-    const perImage = perImageRaw
+    const fromClaim =
+      raw && typeof raw === "object" && !Array.isArray(raw)
+        ? (Array.isArray(raw.perImage) ? (raw.perImage as unknown[]) : [])
+        : [];
+    const mappedFromClaim = fromClaim
       .filter(
         (item): item is Record<string, unknown> =>
           Boolean(item) && typeof item === "object" && !Array.isArray(item),
@@ -173,12 +175,27 @@ export default function ReviewDetailPage() {
         usable: item.usable === true,
         reason: typeof item.reason === "string" ? item.reason : "unknown",
       }));
+    const fromImages = (data?.images || []).flatMap((img) => {
+      const g = img.gate_result;
+      if (!g || typeof g !== "object" || Array.isArray(g)) return [];
+      const row = g as Record<string, unknown>;
+      return [
+        {
+          angleType: img.angle_type || "",
+          usable: row.usable === true,
+          reason: typeof row.reason === "string" ? row.reason : "unknown",
+        },
+      ];
+    });
+    const perImage = mappedFromClaim.length ? mappedFromClaim : fromImages;
+    if ((!raw || typeof raw !== "object" || Array.isArray(raw)) && perImage.length === 0) return null;
+    const claimRaw = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
     return {
-      gateFailed: raw.gateFailed === true,
-      blockingReason: typeof raw.blockingReason === "string" ? raw.blockingReason : null,
-      overridden: raw.overridden === true,
-      overriddenBy: typeof raw.overriddenBy === "string" ? raw.overriddenBy : null,
-      overriddenAt: typeof raw.overriddenAt === "string" ? raw.overriddenAt : null,
+      gateFailed: claimRaw.gateFailed === true || perImage.some((item) => !item.usable),
+      blockingReason: typeof claimRaw.blockingReason === "string" ? claimRaw.blockingReason : null,
+      overridden: claimRaw.overridden === true,
+      overriddenBy: typeof claimRaw.overriddenBy === "string" ? claimRaw.overriddenBy : null,
+      overriddenAt: typeof claimRaw.overriddenAt === "string" ? claimRaw.overriddenAt : null,
       perImage,
     };
   }, [data]);
@@ -546,8 +563,61 @@ export default function ReviewDetailPage() {
       </section>
         </div>
 
-        {/* RIGHT MAIN — confidence → gate → AI → decision flow */}
+        {/* RIGHT MAIN — Gemini note → confidence → gate → AI → decision flow */}
         <div className="min-w-0 space-y-4">
+          {(() => {
+            const explanation = (pred?.explanation || {}) as Record<string, unknown>;
+            const visual = String(explanation.visual_findings || "").trim();
+            const reasoning = String(explanation.reasoning || "").trim();
+            const oneLiner =
+              visual ||
+              reasoning
+                .split(/(?<=[.।])\s+/)
+                .slice(0, 2)
+                .join(" ")
+                .trim();
+            const declared = (data.crop_type || "").trim();
+            const detected = (pred?.predicted_crop || "").trim();
+            const mismatch =
+              Boolean(declared) &&
+              Boolean(detected) &&
+              detected.toLowerCase() !== "unknown" &&
+              !detected.toLowerCase().includes(declared.toLowerCase().split(/\s+/)[0] || "\0") &&
+              !declared.toLowerCase().includes(detected.toLowerCase());
+            return (
+              <section className="fp-panel space-y-2 p-4 border-l-4 border-l-blue-600">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">
+                    Gemini assessment
+                  </h3>
+                  <span className="text-[11px] text-slate-500">
+                    {pred?.predicted_grade ? `Grade ${pred.predicted_grade}` : data.inference_status || "pending"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600">
+                  Saathi peril: <strong className="capitalize">{data.peril || "normal"}</strong>
+                  {" · "}Declared crop: <strong>{declared || "—"}</strong>
+                  {detected ? <> {" · "}Gemini crop: <strong>{detected}</strong></> : null}
+                  {" · "}Farmer notes: <strong>{data.farmer_observations?.trim() || "—"}</strong>
+                </p>
+                {oneLiner ? (
+                  <p className="text-sm leading-relaxed text-slate-900">{oneLiner}</p>
+                ) : (
+                  <p className="text-sm text-slate-600">
+                    {data.inference_status === "failed"
+                      ? `Gemini analysis failed${data.inference_error ? `: ${data.inference_error}` : ""}. Refresh to retry.`
+                      : "Gemini has not finished the 1–2 line field note yet. This page retries automatically."}
+                  </p>
+                )}
+                {mismatch ? (
+                  <p className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-950">
+                    Crop mismatch: farmer declared {declared}, Gemini sees {detected}. Treat as garden/non-crop evidence until a reviewer confirms.
+                  </p>
+                ) : null}
+              </section>
+            );
+          })()}
+
           {/* 1. Evidence Confidence & Trust Assessment Section */}
           <EvidenceConfidenceSection submission={data} />
 

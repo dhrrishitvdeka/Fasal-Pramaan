@@ -269,7 +269,7 @@ ${perilInstruction}
 ${metaContextLines}
 
 Evaluate:
-1. Visual Authenticity (fail closed): Reject photographs OF a phone, laptop, monitor, TV, or any second screen (bezels, status bar, moiré, pixel grid, UI chrome) with reason='screen_replay'. Reject AI-generated, stock, meme, or printed paper with reason='ai_generated'. Reject indoor rooms, selfies, and non-field objects with reason='not_crop' or 'no_field'.
+1. Visual Authenticity (fail closed): Reject photographs OF a phone, laptop, monitor, TV, or any second screen (bezels, status bar, moiré, pixel grid, UI chrome) with reason='screen_replay'. Reject AI-generated, stock, meme, or printed paper with reason='ai_generated'. Reject indoor rooms, selfies, and non-field objects with reason='not_crop' or 'no_field'. Ornamental hedge, garden shrub, lawn, houseplant, or decorative foliage that is not a farm crop stand → reason='not_crop' (or 'wrong_crop' if a crop was declared), usable=false.
 2. Exposure & Focus: Reject if completely pitch dark or washed out (reason='too_dark' or 'too_blurry').
 3. Angle Compliance: Verify canonical framing (${angleType}).
 4. Peril Consistency: Confirm if visual loss indicators match declared peril '${peril || "normal"}'.

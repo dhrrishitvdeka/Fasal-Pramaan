@@ -592,7 +592,7 @@ function isDuplicateKeyError(message: string): boolean {
 
 const REVIEWER_LOCKED_STATUSES = new Set(["verified", "rejected"]);
 const RECAPTURE_ALLOWED_STATUSES = new Set(["needs_recapture"]);
-const INFERENCE_RETRY_AFTER_MS = 90_000;
+const INFERENCE_RETRY_AFTER_MS = 8_000;
 
 function isReviewerLocked(claim: WebClaimRow): boolean {
   return (
@@ -1364,8 +1364,11 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
         blur_score: img.blur_score,
         lighting_score: img.lighting_score,
       },
+      gate_result: (img as { gate_result?: unknown }).gate_result ?? null,
     })),
-    latest_prediction: claim.hf_label
+    inference_status: (claim as { inference_status?: string | null }).inference_status ?? null,
+    inference_error: (claim as { inference_error?: string | null }).inference_error ?? null,
+    latest_prediction: claim.hf_label || geminiAnalysisFromGate(claim.gate_result)
       ? (() => {
           const analysis = geminiAnalysisFromGate(claim.gate_result);
           const unusable = workflowGrade(claim.severity_grade) === "U";
