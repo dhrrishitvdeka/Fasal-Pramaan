@@ -11,7 +11,6 @@ import {
   Map,
   Settings,
   Shield,
-  BarChart3,
   Home,
   Menu,
   X,
@@ -42,7 +41,6 @@ const reviewerNavGroups: Array<{ label: string; items: ReviewerNavItem[] }> = [
   {
     label: "Insights",
     items: [
-      { href: "/analytics", key: "analytics", icon: BarChart3 },
       { href: "/map", key: "map", icon: Map },
     ],
   },
