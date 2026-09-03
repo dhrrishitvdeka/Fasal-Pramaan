@@ -138,7 +138,7 @@ const EN_BASE: LandingTranslation = {
       n: "02",
       title: "Real-time CV & Authenticity Gate",
       desc: "On-device OpenCV checks blur, lighting, crop canopy, and screen replay in the viewfinder. Gemini vision gate blocks synthetic or indoor stills after capture.",
-      badge: "TF.js + Gemini Gate",
+      badge: "OpenCV + Gemini Gate",
     },
     {
       n: "03",
@@ -283,7 +283,7 @@ const HI_BASE: LandingTranslation = {
       n: "02",
       title: "रीयल-टाइम विज़न व प्रामाणिकता जाँच",
       desc: "ऑन-डिवाइस OpenCV रोशनी, धुंधलापन, फसल और स्क्रीन रीप्ले जाँचता है। जेमिनी गेट नकली/इनडोर फोटो रोकता है।",
-      badge: "TF.js + जेमिनी गेट",
+      badge: "OpenCV + जेमिनी गेट",
     },
     {
       n: "03",

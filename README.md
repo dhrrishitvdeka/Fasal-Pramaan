@@ -54,7 +54,7 @@ flowchart TB
   subgraph T_SERVICES["Multi-Model AI & Ground-Truth Infrastructure"]
     direction LR
     S_GEMINI["<b>Google Gemini</b><br/>• Live voice (audio only)<br/>• Vision gate + field analysis"]
-    S_SIGNALS["<b>Earth Observation & Radar</b><br/>• Copernicus Sentinel-2 10m NDVI/NBR<br/>• ISRO Bhuvan WMS Land-Use<br/>• IMD 72h Doppler Precipitation"]
+    S_SIGNALS["<b>Earth Observation & Weather</b><br/>• Copernicus Sentinel-2 NDVI (fire)<br/>• ISRO Bhuvan WMS probe<br/>• Open-Meteo rain / hail / gust"]
   end
 
   %% Reviewer Tier
@@ -64,7 +64,7 @@ flowchart TB
 
   %% Persistence
   subgraph T_STORAGE["Secure Storage & Ledger"]
-    S_SUPABASE[("<b>Supabase Postgres & Storage</b><br/>• RLS Security Policies<br/>• Private Encrypted Evidence Blobs<br/>• Immutable Audit Action Log")]
+    S_SUPABASE[("<b>Supabase Postgres & Storage</b><br/>• RLS Security Policies<br/>• Private evidence bucket<br/>• Immutable Audit Action Log")]
   end
 
   %% Flow Connections
@@ -86,15 +86,15 @@ flowchart TB
 - **Hierarchical Multi-Agent Tools:** Spoken plot registration (`register_plot`), GPS parcel geofencing (`check_plot_geofence`), 72-hour agro-weather radar (`fetch_agro_weather_alerts`), and plain-language AI audit explanations (`explain_claim_audit`).
 - **15 Indian Languages:** Dynamic native translation across Hindi, Bengali, Tamil, Telugu, Marathi, Gujarati, Punjabi, Kannada, Malayalam, Odia, Assamese, and more.
 
-### 2. 5-Angle Precision Capture Studio & Edge CV
+### 2. Peril-Aware Capture Studio & Edge CV
 - **Real-Time On-Device OpenCV:** Excess Green / GLI / Excess Red, Laplacian texture, skin rejection, and scanline/moiré screen detection at a few FPS in a Web Worker. No cloud model on the live viewfinder.
 - **Anti-Screen & Anti-Spoofing Filter:** Detects digital display scanlines, pixel subgrids, and Moiré interference patterns ($0^\circ/90^\circ$ gradient ratio $> 0.80$) to reject monitor re-captures and fake images before upload.
 - **Strict 75%+ Crop Quality Shutter Lock:** Disables the shutter button unless the live frame achieves $\ge 75\%$ crop match (relaxed to $\ge 40\%$ for charred fire burn scars).
 
 ### 3. 3-Stage Ground Truth Verification Pipeline
-1. **Stage 1 — Gemini 3.7 Flash Vision Gate:** Evaluates raw image bytes + GPS EXIF metadata + peril congruence, rejecting AI-generated images, screen displays, and mismatched crop species.
+1. **Stage 1 — Gemini 3.8 Flash Vision Gate:** Evaluates submitted stills for authenticity and peril congruence, rejecting AI-generated images, screen displays, and mismatched crop species.
 2. **Stage 2 — Gemini field analysis:** On the submitted stills, Gemini writes crop identity, visible damage, severity, authenticity (screen / AI / indoor), and a reviewer-readable rationale. Assistive only.
-3. **Stage 3 — Earth Observation Cross-Check:** Fetches Sentinel-2 10m NDVI & NBR burn scars, ISRO Bhuvan cadastral land boundaries, and IMD Doppler rainfall data for orbital corroboration.
+3. **Stage 3 — Earth Observation Cross-Check:** Fire claims can run Sentinel-2 NDVI burn-scar when a Copernicus token is set; weather is Open-Meteo (rain / hail / gust); Bhuvan is a WMS reachability probe.
 
 ### 4. PMFBY Reviewer Command Centre
 - **Explainable 4-Pillar Trust Score:** Bounded mathematical formula ($C_{\text{final}} = 0.4 S_Q + 0.3 S_C + 0.2 S_X + 0.1 S_I$) evaluating Quality, Coverage, Context, and Integrity.
@@ -123,25 +123,12 @@ Comprehensive architectural, mathematical, API, and deployment documentation is 
 
 ## Core Contributors
 
-<p align="left">
-  <a href="https://github.com/dhrrishitvdeka">
-    <img src="https://github.com/dhrrishitvdeka.png?size=100" width="72" height="72" alt="Dhrrishit V Deka" style="border-radius:50%; margin-right: 8px;" />
-  </a>
-  <a href="https://github.com/parasdwivedi26">
-    <img src="https://github.com/parasdwivedi26.png?size=100" width="72" height="72" alt="Paras Dwivedi" style="border-radius:50%; margin-right: 8px;" />
-  </a>
-  <a href="https://github.com/vedantparashar25">
-    <img src="https://github.com/vedantparashar25.png?size=100" width="72" height="72" alt="Vedant Parashar" style="border-radius:50%; margin-right: 8px;" />
-  </a>
-  <a href="https://github.com/sandeepkumargupta1">
-    <img src="https://github.com/sandeepkumargupta1.png?size=100" width="72" height="72" alt="Sandeep Kumar Gupta" style="border-radius:50%; margin-right: 8px;" />
-  </a>
+<p align="center">
+  <a href="https://github.com/dhrrishitvdeka"><img src="https://github.com/dhrrishitvdeka.png?size=160" width="88" height="88" alt="" style="border-radius:50%; object-fit:cover;" /></a>&nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/parasdwivedi26"><img src="https://github.com/parasdwivedi26.png?size=160" width="88" height="88" alt="" style="border-radius:50%; object-fit:cover;" /></a>&nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/vedantparashar25"><img src="https://github.com/vedantparashar25.png?size=160" width="88" height="88" alt="" style="border-radius:50%; object-fit:cover;" /></a>&nbsp;&nbsp;&nbsp;
+  <a href="https://github.com/sandeepkumargupta1"><img src="https://github.com/sandeepkumargupta1.png?size=160" width="88" height="88" alt="" style="border-radius:50%; object-fit:cover;" /></a>
 </p>
-
-- **Dhrrishit V Deka** ([@dhrrishitvdeka](https://github.com/dhrrishitvdeka)) — Project Lead, Architecture & Core Systems
-- **Paras Dwivedi** ([@parasdwivedi26](https://github.com/parasdwivedi26)) — Core Contributor, Modeling & Evaluation
-- **Vedant Parashar** ([@vedantparashar25](https://github.com/vedantparashar25)) — Core Contributor
-- **Sandeep Kumar Gupta** ([@sandeepkumargupta1](https://github.com/sandeepkumargupta1)) — Core Contributor
 
 ---
 

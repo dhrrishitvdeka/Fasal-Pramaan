@@ -274,7 +274,7 @@ Mints an ephemeral token for direct browser-to-Gemini Live WebSocket streaming.
   "token": "ephemeral_auth_token_xyz...",
   "websocketUrl": "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained",
   "model": "gemini-3.1-flash-live-preview",
-  "voice": "Aoede",
+  "voice": "Kore",
   "expiresAt": "2026-08-24T11:00:00.000Z"
 }
 ```
