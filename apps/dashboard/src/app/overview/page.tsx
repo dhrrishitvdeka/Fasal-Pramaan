@@ -197,7 +197,7 @@ export default function OverviewPage() {
           </h3>
           <span className="hidden text-[11px] font-medium text-slate-500 sm:inline">{t("independentFromModel")}</span>
         </div>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <MetricCard
             label={t("avgEvidenceConfidence")}
             value={
@@ -237,25 +237,6 @@ export default function OverviewPage() {
                   ).toFixed(1)}%`
             }
           />
-          <MetricCard
-            label={t("integrityFlags")}
-            href={reviewerCardHref("integrity", bucketIds.integrity)}
-            value={claims ? bucketIds.integrity.length : (data.integrity_flags ?? 0)}
-            hint={bucketIds.integrity.length === 1 ? t("openCase") : t("openQueue")}
-            tone={(claims ? bucketIds.integrity.length : (data.integrity_flags ?? 0)) > 0 ? "danger" : "ok"}
-          />
-          <MetricCard
-            label={t("resolutionRate")}
-            value={
-              data.evidence_resolution_rate != null
-                ? `${(data.evidence_resolution_rate * 100).toFixed(1)}%`
-                : `${(
-                    (data.verified_assessments / Math.max(data.total_submissions, 1)) *
-                    100
-                  ).toFixed(1)}%`
-            }
-            tone="ok"
-          />
         </div>
       </section>
 
@@ -266,10 +247,8 @@ export default function OverviewPage() {
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
           {t("workload")}
         </h3>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <MetricCard label={t("totalSubmissions")} value={data.total_submissions} />
-          <MetricCard label={t("submissionsToday")} value={data.submissions_today} />
-          <MetricCard label={t("pendingAi")} value={data.pending_ai_processing} tone="warn" />
           <MetricCard
             label={t("pendingReview")}
             href={reviewerCardHref("pending_review", bucketIds.pending_review)}
@@ -287,19 +266,9 @@ export default function OverviewPage() {
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
           {t("outcomes")}
         </h3>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <MetricCard label={t("verified")} value={data.verified_assessments} tone="ok" />
-          <MetricCard
-            label={t("recaptureRequests")}
-            href={reviewerCardHref("needs_recapture", bucketIds.needs_recapture)}
-            value={claims ? bucketIds.needs_recapture.length : data.recapture_requests}
-            hint={bucketIds.needs_recapture.length === 1 ? t("openCase") : t("openQueue")}
-          />
           <MetricCard label={t("highSeverity")} value={data.high_severity_cases} tone="danger" />
-          <MetricCard
-            label={t("avgProcessing")}
-            value={data.average_processing_seconds.toFixed(1)}
-          />
         </div>
       </section>
 
@@ -310,17 +279,8 @@ export default function OverviewPage() {
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
           {t("contextSection")}
         </h3>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <MetricCard label={t("mostAffectedCrop")} value={data.most_affected_crop || "—"} />
-          <MetricCard label={t("mostAffectedDistrict")} value={data.most_affected_district || "—"} />
-          <MetricCard
-            label={t("lowConfidenceRate")}
-            value={`${(data.low_confidence_rate * 100).toFixed(1)}%`}
-          />
-          <MetricCard
-            label={t("failureRate")}
-            value={`${(data.submission_failure_rate * 100).toFixed(1)}%`}
-          />
         </div>
       </section>
 
