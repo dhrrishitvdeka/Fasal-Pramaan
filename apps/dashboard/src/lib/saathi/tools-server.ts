@@ -3,6 +3,7 @@ import { normalizePeril, routeForPeril } from "@/lib/claim-routing";
 import { CANONICAL_ANGLES } from "@/lib/farmerI18n";
 import { classifyPerilWithLLM } from "@/lib/saathi/classify-server";
 import { createServerSupabase } from "@/lib/supabase";
+import { resolveSaathiToolName } from "@/lib/saathi/tool-catalog";
 
 export type SaathiToolResult = {
   ok: boolean;
@@ -26,7 +27,7 @@ export async function executeSaathiTool(
   context: SaathiToolContext,
 ): Promise<SaathiToolResult> {
   try {
-    switch (name) {
+    switch (resolveSaathiToolName(name)) {
       case "request_evidence_angles":
         return requestEvidenceAngles(args);
       case "call_context_signal":
@@ -35,35 +36,40 @@ export async function executeSaathiTool(
         return guideCapture(args);
       case "classify_claim":
         return classifyClaim(args);
+      case "capture_current_angle":
       case "take_photo":
         return {
           ok: true,
-          data: { action: "take_photo", message: "Dispatched camera shutter capture command to active studio." },
+          data: { action: "capture_current_angle", message: "Dispatched camera shutter capture command to active studio." },
         };
       case "switch_camera":
         return {
           ok: true,
           data: { action: "switch_camera", message: "Dispatched camera flip command to active studio." },
         };
+      case "select_capture_angle":
       case "select_angle":
         return {
           ok: true,
-          data: { action: "select_angle", angle: args.angle, message: `Switched active angle to ${args.angle}.` },
+          data: { action: "select_capture_angle", angle: args.angle, message: `Switched active angle to ${args.angle}.` },
         };
+      case "retake_capture_angle":
       case "retake_angle":
         return {
           ok: true,
-          data: { action: "retake_angle", angle: args.angle, message: `Cleared ${args.angle} for recapture.` },
+          data: { action: "retake_capture_angle", angle: args.angle, message: `Cleared ${args.angle} for recapture.` },
         };
+      case "set_capture_observation":
       case "set_observation":
         return {
           ok: true,
-          data: { action: "set_observation", observation: args.observation, message: "Observation saved to draft." },
+          data: { action: "set_capture_observation", observation: args.observation, message: "Observation saved to draft." },
         };
+      case "prepare_submit_claim":
       case "submit_claim":
         return {
           ok: true,
-          data: { action: "submit_claim", message: "Dispatched claim submission command." },
+          data: { action: "prepare_submit_claim", message: "Claim submit is ready — confirm in the app." },
         };
       case "register_plot":
         return {
@@ -78,8 +84,11 @@ export async function executeSaathiTool(
         return explainClaimAudit(args, context);
       case "check_evidence_quality":
         return {
-          ok: false,
-          error: "Evidence quality is measured on the live camera, not on the server.",
+          ok: true,
+          data: {
+            action: "check_evidence_quality",
+            message: "Open the camera studio — live crop quality is measured on the viewfinder.",
+          },
         };
       default:
         return { ok: false, error: `Unknown tool: ${name}` };
@@ -170,6 +179,16 @@ function guideCapture(args: Record<string, unknown>): SaathiToolResult {
 async function classifyClaim(args: Record<string, unknown>): Promise<SaathiToolResult> {
   const text = String(args.text || "").trim();
   if (!text) {
+    if (args.peril) {
+      return {
+        ok: true,
+        data: {
+          peril: normalizePeril(args.peril),
+          confidence: Number.isFinite(Number(args.confidence)) ? Number(args.confidence) : 0.8,
+          reasoning: String(args.reasoning || "Classified by Fasal Saathi."),
+        },
+      };
+    }
     return { ok: false, error: "text is required for classify_claim" };
   }
   const lang = String(args.lang || "en").trim().slice(0, 8) || "en";
@@ -389,7 +408,7 @@ async function explainClaimAudit(
   const message =
     claim.status === "needs_recapture"
       ? `Claim ${claim.id} needs recapture for missing angle(s): ${(claim.missing_angles || []).join(", ") || "unspecified"}. Reason: ${claim.recapture_reason || "Angle clarity needed"}.`
-      : `Claim ${claim.id}: Stage 1 Vision Gate ${stage1}, Stage 2 DINOv2 ${stage2}, Stage 3 satellite cross-check ${stage3}. Overall confidence ${overall == null ? "pending" : `${overall}%`}.`;
+      : `Claim ${claim.id}: Stage 1 Vision Gate ${stage1}, Stage 2 Gemini analysis ${stage2}, Stage 3 satellite cross-check ${stage3}. Overall confidence ${overall == null ? "pending" : `${overall}%`}.`;
   return {
     ok: true,
     data: {
@@ -397,7 +416,7 @@ async function explainClaimAudit(
       claim_id: claim.id,
       status: claim.status,
       stage_1_gate: stage1,
-      stage_2_dinov2_model: stage2,
+      stage_2_gemini_analysis: stage2,
       stage_3_sentinel_crosscheck: stage3,
       all_stages_complete: stages.every((s) => s !== "pending" && s !== "failed"),
       integrity_score: claim.integrity_score ?? null,

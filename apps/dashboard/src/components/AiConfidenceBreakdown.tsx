@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Submission } from "@/lib/api";
-import { REQUIRED_ANGLES } from "@/lib/evidence";
+import { normalizePeril, routeForPeril } from "@/lib/claim-routing";
 
 const ANGLE_LABELS: Record<string, string> = {
   wide_field: "Wide Field",
@@ -15,83 +15,86 @@ const ANGLE_LABELS: Record<string, string> = {
 export interface AiConfidenceBreakdownProps {
   prediction: NonNullable<Submission["latest_prediction"]>;
   images?: Submission["images"];
+  peril?: string | null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 export function AiConfidenceBreakdown({
   prediction,
   images = [],
+  peril,
 }: AiConfidenceBreakdownProps) {
-  const [showScores, setShowScores] = useState(false);
+  const explanation = asRecord(prediction.explanation);
+  const authenticity = asRecord(explanation?.authenticity);
+  const reasoning = String(explanation?.reasoning || "").trim();
+  const visualFindings = String(explanation?.visual_findings || "").trim();
+  const perImage = Array.isArray(explanation?.per_image) ? explanation.per_image : [];
 
   const confidence = prediction?.overall_confidence ?? 0;
   const isUnusable = (prediction?.predicted_grade || "U") === "U";
   const confidencePct = isUnusable ? 0 : Math.round(confidence * 100);
-  const isHighConfidence = !isUnusable && confidence >= 0.7;
-  const isModerateConfidence = !isUnusable && confidence >= 0.55 && confidence < 0.7;
-
-  // Grade badge styling & labels
   const grade = prediction?.predicted_grade || "U";
-  const gradeConfig: Record<
-    string,
-    { label: string; bg: string; text: string; border: string }
-  > = {
+
+  const gradeConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
     A: {
-      label: "A — Healthy Leaf Signal",
+      label: "A — Healthy canopy signal",
       bg: "bg-[var(--accent-soft)]",
       text: "text-[var(--ink)]",
       border: "border-[var(--line)]",
     },
     B: {
-      label: "B — Uncertain / Borderline",
+      label: "B — Uncertain / needs a closer look",
       bg: "bg-[var(--surface)]",
       text: "text-[var(--ink)]",
       border: "border-[var(--ink)]",
     },
     C: {
-      label: "C — Disease Pattern Signal",
+      label: "C — Damage / disease pattern",
       bg: "bg-[var(--ink)]",
       text: "text-[var(--surface)]",
       border: "border-[var(--ink)]",
     },
     U: {
-      label: "U — Unusable or Unsupported",
+      label: "U — Unusable or not authentic",
       bg: "bg-[var(--canvas)]",
       text: "text-[var(--ink-muted)]",
       border: "border-[var(--line)]",
     },
   };
-
   const currentGradeStyle = gradeConfig[grade] || gradeConfig.U;
 
-  // Angle coverage calculation (safe against missing or undefined images array)
+  const requiredAngles = routeForPeril(normalizePeril(peril)).requiredAngles;
+
   const safeImages = Array.isArray(images) ? images : [];
   const uploadedAngles = new Set(
     safeImages
       .filter((img) => img?.upload_status === "uploaded")
       .map((img) => img?.angle_type)
-      .filter(Boolean)
+      .filter(Boolean),
   );
-
-  const angleCount = REQUIRED_ANGLES.filter((angle) =>
-    uploadedAngles.has(angle)
-  ).length;
-  const anglePct = Math.round((angleCount / REQUIRED_ANGLES.length) * 100);
 
   const warnings = [
     ...(prediction?.quality_warnings || []),
     ...(prediction?.anomaly_flags || []),
   ].filter(Boolean);
 
+  const authentic = authenticity?.authentic !== false && !isUnusable;
+  const authReason = String(authenticity?.reason || (authentic ? "Looks like a real field photo" : "Failed authenticity checks"));
+
   return (
     <div className="space-y-4 rounded-md border border-slate-200 bg-white p-4 text-slate-800 shadow-sm">
-      {/* Header with Title & Grade */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            AI Screening Analysis & Confidence
+            Gemini field analysis (assistive)
           </h4>
           <p className="mt-0.5 text-xs text-slate-600">
-            Model: <span className="font-mono">{prediction?.adapter_type || "crop_vit"}</span> ({prediction?.model_version || "v1.0"})
+            Model: <span className="font-mono">{prediction?.model_version || "gemini-3.8-flash"}</span>
           </p>
         </div>
         <div
@@ -103,64 +106,88 @@ export function AiConfidenceBreakdown({
         </div>
       </div>
 
-      {/* Confidence Meter Bar */}
-      <div>
-        <div className="flex items-center justify-between text-xs mb-1">
-          <span className="font-medium text-slate-700">
-            {isUnusable ? "Unusable evidence — crop not determined" : "Overall Confidence"}
-          </span>
-          <span className="font-mono font-bold tabular-nums text-slate-900">
-            {confidencePct}%
-          </span>
+      <div className={`rounded border p-2.5 text-xs ${authentic ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-rose-200 bg-rose-50 text-rose-950"}`}>
+        <div className="font-semibold">{authentic ? "Authenticity: field photograph" : "Authenticity: rejected"}</div>
+        <p className="mt-1 leading-relaxed">{authReason}</p>
+        {authenticity && (
+          <ul className="mt-2 grid grid-cols-2 gap-1 text-[11px]">
+            <li>Screen / 2nd display: {authenticity.screenReplay ? "YES" : "no"}</li>
+            <li>AI-generated: {authenticity.aiGenerated ? "YES" : "no"}</li>
+            <li>Printed photo: {authenticity.printedPhoto ? "YES" : "no"}</li>
+            <li>Indoor / non-field: {authenticity.indoorScene ? "YES" : "no"}</li>
+          </ul>
+        )}
+      </div>
+
+      {visualFindings && (
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">What Gemini saw</div>
+          <p className="mt-1 text-sm leading-relaxed text-slate-800">{visualFindings}</p>
         </div>
-        <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-slate-100 border border-slate-200">
+      )}
+
+      {reasoning && (
+        <div className="rounded border border-slate-100 bg-slate-50 p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Reviewer notes</div>
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{reasoning}</p>
+        </div>
+      )}
+
+      <div>
+        <div className="mb-1 flex items-center justify-between text-xs">
+          <span className="font-medium text-slate-700">
+            {isUnusable ? "Unusable evidence" : "Analysis confidence"}
+          </span>
+          <span className="font-mono font-bold tabular-nums text-slate-900">{confidencePct}%</span>
+        </div>
+        <div className="h-2.5 w-full overflow-hidden rounded-full border border-slate-200 bg-slate-100">
           <div
-            className={`h-full transition-all duration-300 ${
-              isHighConfidence
-                ? "bg-[var(--ink)]"
-                : isModerateConfidence
-                ? "bg-[var(--ink-muted)]"
-                : "bg-[var(--line)]"
-            }`}
+            className="h-full bg-[var(--ink)]"
             style={{ width: `${Math.min(Math.max(confidencePct, 0), 100)}%` }}
           />
-          {/* Threshold indicator mark at 55% */}
-          <div
-            className="absolute top-0 bottom-0 w-0.5 bg-slate-400 opacity-60"
-            style={{ left: "55%" }}
-            title="Abstention threshold (55%)"
-          />
-        </div>
-        <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-          <span>0%</span>
-          <span className="text-slate-400 font-mono text-[10px]">
-            Threshold: 55%
-          </span>
-          <span>100%</span>
         </div>
       </div>
 
-      {/* Angle Quality & Coverage Checklist */}
+      {perImage.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Per-angle findings</div>
+          {perImage.map((item, idx) => {
+            const row = asRecord(item);
+            if (!row) return null;
+            const angle = String(row.angleType || row.angle_type || `angle-${idx}`);
+            return (
+              <div key={`${angle}-${idx}`} className="rounded border border-slate-100 bg-white p-2 text-xs">
+                <div className="font-semibold text-slate-800">
+                  {ANGLE_LABELS[angle] || angle}
+                  {row.usable === false ? " — unusable" : ""}
+                </div>
+                <p className="mt-0.5 text-slate-600">{String(row.findings || "")}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <div className="rounded border border-slate-100 bg-slate-50/70 p-3">
-        <div className="flex items-center justify-between text-xs font-medium text-slate-700 mb-2">
-          <span>Evidence Angle Coverage</span>
+        <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-700">
+          <span>Uploaded angles</span>
           <span className="font-mono text-slate-600">
-            {angleCount} / {REQUIRED_ANGLES.length} ({anglePct}%)
+            {uploadedAngles.size} / {requiredAngles.length}
           </span>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
-          {REQUIRED_ANGLES.map((angle) => {
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+          {requiredAngles.map((angle) => {
             const isUploaded = uploadedAngles.has(angle);
             return (
               <div
                 key={angle}
-                className={`flex items-center gap-1.5 rounded px-2 py-1 text-[11px] border ${
+                className={`flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] ${
                   isUploaded
                     ? "border-[var(--ink)] bg-[var(--accent-soft)] text-[var(--ink)]"
                     : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)]"
                 }`}
               >
-                <span className="text-xs">{isUploaded ? "✓" : "⚠️"}</span>
+                <span>{isUploaded ? "✓" : "—"}</span>
                 <span className="truncate">{ANGLE_LABELS[angle] ?? angle}</span>
               </div>
             );
@@ -168,72 +195,16 @@ export function AiConfidenceBreakdown({
         </div>
       </div>
 
-      {/* Warnings & Anomaly Alerts */}
       {warnings.length > 0 && (
         <div className="rounded border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900">
-          <span className="font-semibold">Quality Flags & Warnings:</span>
-          <ul className="mt-1 list-disc list-inside space-y-0.5 text-amber-800">
+          <span className="font-semibold">Flags:</span>
+          <ul className="mt-1 list-inside list-disc space-y-0.5 text-amber-800">
             {warnings.map((w, idx) => (
               <li key={idx} className="capitalize">
                 {String(w).replaceAll("_", " ")}
               </li>
             ))}
           </ul>
-        </div>
-      )}
-
-      {/* Optional Score Distributions Accordion */}
-      {(prediction?.grade_scores || prediction?.damage_scores) && (
-        <div className="pt-1">
-          <button
-            type="button"
-            className="text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900 font-medium"
-            onClick={() => setShowScores(!showScores)}
-          >
-            {showScores ? "▼ Hide score breakdown" : "► Show detailed score breakdown"}
-          </button>
-          {showScores && (
-            <div className="mt-2 space-y-2 rounded border border-slate-200 bg-slate-50 p-2.5 text-xs">
-              {prediction.grade_scores && (
-                <div>
-                  <span className="font-semibold text-slate-700">Grade Probabilities:</span>
-                  <div className="mt-1 grid grid-cols-4 gap-2">
-                    {Object.entries(prediction.grade_scores).map(([k, v]) => {
-                      const numVal = Number(v);
-                      const displayPct = isNaN(numVal) ? "0.0" : (numVal * 100).toFixed(1);
-                      return (
-                        <div key={k} className="rounded bg-white p-1 text-center border border-slate-200">
-                          <span className="font-bold text-slate-800">{k}: </span>
-                          <span className="font-mono text-slate-600">{displayPct}%</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {prediction.damage_scores && (
-                <div>
-                  <span className="font-semibold text-slate-700">Top Damage Probabilities:</span>
-                  <div className="mt-1 space-y-1">
-                    {Object.entries(prediction.damage_scores)
-                      .sort(([, a], [, b]) => (Number(b) || 0) - (Number(a) || 0))
-                      .slice(0, 4)
-                      .map(([damage, score]) => {
-                        const numScore = Number(score);
-                        const displayPct = isNaN(numScore) ? "0.0" : (numScore * 100).toFixed(1);
-                        return (
-                          <div key={damage} className="flex items-center justify-between text-slate-600">
-                            <span className="capitalize">{damage.replaceAll("_", " ")}</span>
-                            <span className="font-mono font-medium">{displayPct}%</span>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>

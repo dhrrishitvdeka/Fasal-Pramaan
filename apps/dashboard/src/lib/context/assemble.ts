@@ -111,8 +111,8 @@ async function fetchHotDays30d(lat: number, lon: number): Promise<number | null>
   const end = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
   const start = new Date(Date.now() - 36 * 86400000).toISOString().slice(0, 10);
   const urls = [
-    `https://api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&past_days=30&daily=temperature_2m_max&timezone=auto`,
     `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${start}&end_date=${end}&daily=temperature_2m_max&timezone=auto`,
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&past_days=16&daily=temperature_2m_max&timezone=auto`,
   ];
   for (const url of urls) {
     try {
@@ -240,7 +240,13 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
               data: [
                 {
                   type: "S2L2A",
-                  dataFilter: { maxCloudCoverage: 30 },
+                  dataFilter: {
+                    maxCloudCoverage: 30,
+                    timeRange: {
+                      from: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+                      to: new Date().toISOString(),
+                    },
+                  },
                 },
               ],
             },
@@ -630,9 +636,11 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
   let bhuvanThumbnailUrl: string | null = null;
   if (lat != null && lon != null) {
     const bbox = `${(lon - 0.01).toFixed(5)},${(lat - 0.01).toFixed(5)},${(lon + 0.01).toFixed(5)},${(lat + 0.01).toFixed(5)}`;
-    const bhuvanWmsUrl = `https://bhuvan-app1.nrsc.gov.in/api/bhuvan/wms?SERVICE=WMS&REQUEST=GetMap&BBOX=${bbox}&WIDTH=256&HEIGHT=256&LAYERS=landuse`;
-    const bhuvanUrl = bhuvanWmsUrl; // canonical thumbnail
-    const legacyUrl = `https://bhuvan.nrsc.gov.in/bhuvan2d/bhuvan/bhuvan2d.php?lat=${lat}&lon=${lon}`;
+    const bhuvanWmsUrl =
+      `https://bhuvan-vec1.nrsc.gov.in/bhuvan/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap` +
+      `&LAYERS=india3&SRS=EPSG:4326&BBOX=${bbox}&WIDTH=256&HEIGHT=256&FORMAT=image/png&STYLES=`;
+    const bhuvanUrl = bhuvanWmsUrl;
+    const legacyUrl = `https://bhuvan-app1.nrsc.gov.in/bhuvan2d/bhuvan/bhuvan2d.php?lat=${lat}&lon=${lon}`;
     let thumbnailFetched = false;
     if (!isTestEnv) {
       try {

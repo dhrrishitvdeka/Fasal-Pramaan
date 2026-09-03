@@ -1,5 +1,8 @@
 import { nativeLabelForLang, parseAppLang, type AppLang } from "../live-indian-languages";
 import { apiFetch } from "@/lib/auth-headers";
+import { resolveSaathiToolName } from "@/lib/saathi/tool-catalog";
+import { webCaptureBridge } from "./capture-bridge";
+import { normalizePeril } from "@/lib/claim-routing";
 
 export type VoiceOutcome = "succeeded" | "failed" | "confirmation_required" | "cancelled";
 
@@ -201,7 +204,7 @@ export class WebVoiceBroker {
     userTurn: number,
   ): Promise<VoiceToolResult> {
     try {
-      switch (name) {
+      switch (resolveSaathiToolName(name)) {
         case "navigate_to_screen":
           return this.navigate(args);
         case "change_language":
@@ -239,6 +242,14 @@ export class WebVoiceBroker {
           return this.fetchAgroWeatherAlerts(args);
         case "explain_claim_audit":
           return this.explainClaimAudit(args);
+        case "request_evidence_angles":
+          return this.fromServer("request_evidence_angles", args, "Could not load evidence angles.");
+        case "call_context_signal":
+          return this.fromServer("call_context_signal", await this.withGps(args), "Could not load field context.");
+        case "guide_capture":
+          return this.guideCapture(args);
+        case "classify_claim":
+          return this.fromServer("classify_claim", args, "Could not classify the claim.");
         case "list_my_farms":
         case "prepare_sync_offline_queue":
         case "prepare_create_farm":
@@ -297,7 +308,10 @@ export class WebVoiceBroker {
         case "cancel_pending_action":
           return this.cancel();
         default:
-          return { outcome: "failed", message: "That app action is not allowed." };
+          return {
+            outcome: "failed",
+            message: `That app action is not allowed (${resolveSaathiToolName(name)}).`,
+          };
       }
     } catch (error) {
       return {
@@ -572,12 +586,17 @@ export class WebVoiceBroker {
         method: "POST",
         body: JSON.stringify({ name, args }),
       });
-      if (!res.ok) return null;
       const body = (await res.json().catch(() => null)) as
         | { ok?: boolean; data?: Record<string, unknown>; error?: string }
         | null;
-      if (!body?.ok || typeof body.data !== "object" || body.data == null) return null;
-      const data = body.data;
+      if (!res.ok || !body?.ok) {
+        return {
+          outcome: "failed",
+          message: String(body?.error || `Could not run ${name}.`),
+          data: body?.data,
+        };
+      }
+      const data = body.data && typeof body.data === "object" ? body.data : {};
       return {
         outcome: "succeeded",
         message: typeof data.message === "string" && data.message ? data.message : "Done.",
@@ -588,8 +607,50 @@ export class WebVoiceBroker {
     }
   }
 
+  private async fromServer(
+    name: string,
+    args: Record<string, unknown>,
+    fallback: string,
+  ): Promise<VoiceToolResult> {
+    const result = await this.serverTool(name, args);
+    if (result) return result;
+    return { outcome: "failed", message: fallback };
+  }
+
+  private async withGps(args: Record<string, unknown>): Promise<Record<string, unknown>> {
+    if (args.lat != null && args.lon != null) return args;
+    if (typeof navigator === "undefined" || !navigator.geolocation) return args;
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 4000,
+          maximumAge: 60_000,
+        });
+      });
+      return {
+        ...args,
+        lat: pos.coords.latitude,
+        lon: pos.coords.longitude,
+        accuracy_m: pos.coords.accuracy,
+      };
+    } catch {
+      return args;
+    }
+  }
+
+  private async guideCapture(args: Record<string, unknown>): Promise<VoiceToolResult> {
+    const angle = String(args.angle || "").trim();
+    if (angle && this.gateway.capture.selectAngle) {
+      await this.gateway.capture.selectAngle(angle);
+    }
+    const server = await this.serverTool("guide_capture", args);
+    if (server?.outcome === "succeeded") return server;
+    return this.fromCapture(await this.gateway.capture.readGuidance());
+  }
+
   private async checkPlotGeofence(args: Record<string, unknown>): Promise<VoiceToolResult> {
-    const server = await this.serverTool("check_plot_geofence", args);
+    const server = await this.serverTool("check_plot_geofence", await this.withGps(args));
     if (server) return server;
     const plotId = String(args.plot_id || "").trim();
     const plot = plotId
@@ -618,7 +679,7 @@ export class WebVoiceBroker {
   }
 
   private async fetchAgroWeatherAlerts(args: Record<string, unknown>): Promise<VoiceToolResult> {
-    const server = await this.serverTool("fetch_agro_weather_alerts", args);
+    const server = await this.serverTool("fetch_agro_weather_alerts", await this.withGps(args));
     if (server) return server;
     const plotId = String(args.plot_id || "").trim();
     const plot = plotId ? this.gateway.plots.find((p) => p.id === plotId) : this.gateway.plots[0];
@@ -652,7 +713,7 @@ export class WebVoiceBroker {
         claim_id: found.id,
         status: found.status,
         stage_1_gate: null,
-        stage_2_dinov2_model: null,
+        stage_2_gemini_analysis: null,
         stage_3_sentinel_crosscheck: null,
         missing_angles: found.missingAngles || [],
         reviewer_notes: found.reviewerNotes || null,
@@ -683,9 +744,23 @@ export class WebVoiceBroker {
 
   private beginCapture(args: Record<string, unknown>): VoiceToolResult {
     const plotId = String(args.plot_id || "").trim();
-    const path = plotId ? `/farmer/capture?plotId=${encodeURIComponent(plotId)}` : "/farmer/capture";
+    const intent = webCaptureBridge.getIntent();
+    const perilRaw = args.peril != null ? String(args.peril) : intent?.peril;
+    const peril = perilRaw ? normalizePeril(perilRaw) : undefined;
+    const params = new URLSearchParams();
+    if (plotId) params.set("plotId", plotId);
+    if (peril) params.set("peril", peril);
+    if (intent?.id) params.set("intentId", intent.id);
+    if (intent?.crop) params.set("crop", intent.crop);
+    const query = params.toString();
+    const path = query ? `/farmer/capture?${query}` : "/farmer/capture";
     this.gateway.navigate(path);
-    return { outcome: "succeeded", message: "Guided capture is open.", entityId: plotId || undefined, data: { path } };
+    return {
+      outcome: "succeeded",
+      message: peril ? `Guided capture is open for ${peril}.` : "Guided capture is open.",
+      entityId: plotId || undefined,
+      data: { path, peril: peril || null },
+    };
   }
 
   private async setObservation(args: Record<string, unknown>): Promise<VoiceToolResult> {

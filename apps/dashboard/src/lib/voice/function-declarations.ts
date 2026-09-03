@@ -40,10 +40,11 @@ AGENTIC CAPABILITIES & TOOLS
    - When the farmer asks to register or add a plot, collect details (name, crop_type, khasra_number, area, village) and call register_plot.
 2. Camera & Shutter Control:
    - Call capture_current_angle, switch_camera, select_capture_angle, retake_capture_angle, or set_capture_observation.
+   - If the farmer names a peril, call request_evidence_angles then begin_guided_capture with that peril.
 3. Navigation:
    - Use navigate_to_screen or open_claim.
 4. Information Retrieval:
-   - Use list_plots, list_my_submissions, get_claim_detail, list_due_reminders, check_plot_geofence, fetch_agro_weather_alerts, explain_claim_audit.
+   - Use list_plots, list_my_submissions, get_claim_detail, list_due_reminders, check_plot_geofence, fetch_agro_weather_alerts, explain_claim_audit, classify_claim, call_context_signal, guide_capture.
 `.trim();
 
 function objectSchema(
@@ -153,9 +154,14 @@ export const WEB_FUNCTION_DECLARATIONS = [
   },
   {
     name: "begin_guided_capture",
-    description: "Open guided 5-angle capture for a new claim. Optional plot_id.",
+    description: "Open guided capture for a new claim. Pass peril when known (fire_burn, flood, drought, …).",
     parameters: objectSchema({
       plot_id: { type: "STRING", description: "Optional exact plot identifier." },
+      peril: {
+        type: "STRING",
+        enum: ["normal", "fire_burn", "animal_damage", "flood", "drought", "pest_disease", "hailstorm", "lodging"],
+        description: "Damage peril so the studio only asks for the required angles.",
+      },
     }),
   },
   {
@@ -273,11 +279,56 @@ export const WEB_FUNCTION_DECLARATIONS = [
   },
   {
     name: "explain_claim_audit",
-    description: "Explain the AI confidence breakdown (Gemini Vision Gate + DINOv2 Disease Analysis + Sentinel-2 Satellite cross-check) for a claim.",
+    description: "Explain the AI confidence breakdown (Gemini vision analysis + Sentinel-2 satellite cross-check) for a claim.",
     parameters: objectSchema(
       { claim_id: { type: "STRING", description: "Claim ID to explain" } },
       ["claim_id"],
     ),
+  },
+  {
+    name: "request_evidence_angles",
+    description: "Return required and optional photo angles for a peril, plus satellite/context checks.",
+    parameters: objectSchema(
+      {
+        peril: {
+          type: "STRING",
+          enum: ["normal", "fire_burn", "animal_damage", "flood", "drought", "pest_disease", "hailstorm", "lodging"],
+        },
+      },
+      ["peril"],
+    ),
+  },
+  {
+    name: "call_context_signal",
+    description: "Fetch weather / satellite / nearby-field context for a GPS point and peril.",
+    parameters: objectSchema({
+      lat: { type: "NUMBER" },
+      lon: { type: "NUMBER" },
+      peril: { type: "STRING" },
+    }),
+  },
+  {
+    name: "guide_capture",
+    description: "Spoken step-by-step guidance for one capture angle (wide_field, closeup_damage, …).",
+    parameters: objectSchema(
+      {
+        angle: {
+          type: "STRING",
+          enum: ["wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"],
+        },
+      },
+      ["angle"],
+    ),
+  },
+  {
+    name: "classify_claim",
+    description: "Classify the farmer's damage description into a peril (fire_burn, flood, drought, …).",
+    parameters: objectSchema({
+      text: { type: "STRING", description: "Farmer's words" },
+      peril: { type: "STRING" },
+      confidence: { type: "NUMBER" },
+      reasoning: { type: "STRING" },
+    }),
   },
   {
     name: "confirm_pending_action",

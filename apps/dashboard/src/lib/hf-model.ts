@@ -1,16 +1,14 @@
-import { FASAL_SPACE_ID, resolveHfModelId, resolveHfSpaceUrl } from "./hf-infer";
+/** Hugging Face Space removed — Gemini vision is the only hosted model. */
+import { resolveGeminiVisionModel } from "./gemini-models";
 
-// Lazy accessors — env may change after boot (tests, edge re-eval), so never
-// snapshot process.env at module load.
 export function getHfModelId(): string {
-  return resolveHfModelId();
+  return resolveGeminiVisionModel();
 }
 
 export function getHfSpaceId(): string {
-  return process.env.NEXT_PUBLIC_HF_SPACE_ID || FASAL_SPACE_ID;
+  return "";
 }
 
 export function getHfSpaceUrl(): string {
-  return resolveHfSpaceUrl();
+  return "";
 }
-

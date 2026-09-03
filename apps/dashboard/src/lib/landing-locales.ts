@@ -137,7 +137,7 @@ const EN_BASE: LandingTranslation = {
     {
       n: "02",
       title: "Real-time CV & Authenticity Gate",
-      desc: "On-device Web Worker CV analyzes frame blur, lighting, and crop presence at 60 FPS. Gemini vision gate blocks blurry, synthetic, or indoor photos before upload.",
+      desc: "On-device OpenCV checks blur, lighting, crop canopy, and screen replay in the viewfinder. Gemini vision gate blocks synthetic or indoor stills after capture.",
       badge: "TF.js + Gemini Gate",
     },
     {
@@ -160,9 +160,9 @@ const EN_BASE: LandingTranslation = {
     },
     {
       n: "06",
-      title: "Deep Vision Analysis & Scoring",
-      desc: "Runs DINOv2 / MobileNet neural models on uploaded evidence to verify crop genus, assess lesion severity, and compute damage percentage.",
-      badge: "DINOv2 / MobileNet",
+      title: "Gemini Field Analysis",
+      desc: "Submitted stills are analysed by Gemini: authenticity (screen / AI / indoor), crop identity, visible damage, and a written rationale for the reviewer.",
+      badge: "Gemini Vision",
     },
     {
       n: "07",
@@ -183,7 +183,7 @@ const EN_BASE: LandingTranslation = {
     "Ground truth validation combining on-device computer vision, generative AI, and satellite weather feeds.",
   onDeviceCvTitle: "On-Device CV Worker",
   onDeviceCvDesc:
-    "Client-side Web Worker running MobileNet & greenness heuristics at 60 FPS for instantaneous blur and framing guidance.",
+    "On-device OpenCV worker (canopy colour, texture, scanline/moiré screen check) locking the shutter until the frame looks like a real crop.",
   sentinelTitle: "Copernicus Sentinel-2",
   sentinelDesc:
     "Multi-spectral NDVI analysis & burn scar detection (10 m resolution) with deep-linking to Copernicus Browser.",
@@ -282,7 +282,7 @@ const HI_BASE: LandingTranslation = {
     {
       n: "02",
       title: "रीयल-टाइम विज़न व प्रामाणिकता जाँच",
-      desc: "ऑन-डिवाइस वेब वर्कर 60 FPS पर रोशनी, धुंधलापन और फसल पहचानता है। एआई गेट अयोग्य/नकली फोटो रोकता है।",
+      desc: "ऑन-डिवाइस OpenCV रोशनी, धुंधलापन, फसल और स्क्रीन रीप्ले जाँचता है। जेमिनी गेट नकली/इनडोर फोटो रोकता है।",
       badge: "TF.js + जेमिनी गेट",
     },
     {
@@ -306,8 +306,8 @@ const HI_BASE: LandingTranslation = {
     {
       n: "06",
       title: "डीप विज़न विश्लेषण व स्कोरिंग",
-      desc: "DINOv2 / MobileNet मॉडल फसल की प्रजाति व क्षति की गंभीरता माप कर नुकसान प्रतिशत निर्धारित करते हैं।",
-      badge: "DINOv2 / MobileNet",
+      desc: "जमा की गई तस्वीरों का जेमिनी विश्लेषण: प्रामाणिकता, फसल पहचान, दिख रही क्षति, और समीक्षक के लिए लिखित कारण।",
+      badge: "जेमिनी विज़न",
     },
     {
       n: "07",

@@ -11,7 +11,6 @@ type SystemStatus = {
   gemini: boolean;
   sentinel: boolean;
   imdKey: boolean;
-  hfSpaceUrl: string | null;
   version: string;
 };
 
@@ -23,7 +22,7 @@ type StatusRow = {
 
 const STATUS_ROWS: StatusRow[] = [
   { key: "supabase", label: "Supabase", description: "Claims store and auth (URL + service role key)" },
-  { key: "gemini", label: "Gemini", description: "Vision authenticity gate (GEMINI_API_KEY)" },
+  { key: "gemini", label: "Gemini", description: "Vision gate + field analysis (GEMINI_API_KEY)" },
   { key: "sentinel", label: "Sentinel", description: "Copernicus satellite cross-check (SENTINEL_TOKEN)" },
   { key: "imdKey", label: "IMD / Weather", description: "Official rainfall API upgrade path (IMD_API_KEY)" },
 ];
@@ -119,33 +118,13 @@ export default function AdminPage() {
                   <ConfigChip ok={Boolean(data[row.key])} />
                 </li>
               ))}
-              <li className="flex items-center justify-between gap-3 py-2.5">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-[var(--ink)]">HuggingFace Space</div>
-                  <div className="truncate text-xs text-[var(--ink-muted)]">
-                    {data.hfSpaceUrl || "Default space (not overridden)"}
-                  </div>
-                </div>
-                {data.hfSpaceUrl ? (
-                  <a
-                    href={data.hfSpaceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="fp-link shrink-0 text-xs underline underline-offset-2"
-                  >
-                    Open ↗
-                  </a>
-                ) : (
-                  <ConfigChip ok={false} />
-                )}
-              </li>
+
             </ul>
           </section>
 
           <p className="text-[11px] leading-snug text-slate-400">
-            Live health probes (Supabase reachability, HF Space ping) remain on{" "}
-            <span className="font-mono">/health</span>. This page reports static environment
-            configuration and refreshes every minute.
+            Liveness is on <span className="font-mono">/health</span>. This page only reports
+            whether environment keys are set.
           </p>
         </>
       )}

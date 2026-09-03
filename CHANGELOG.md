@@ -2,6 +2,27 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] — 2026-09-03
+
+### Changed — Hosted analysis is Gemini-only
+- **Vision gate + field analysis** now use Google Gemini (`GEMINI_VISION_MODEL`, default **`gemini-3.8-flash`**). Hugging Face DINOv2 / ViT is off the live Vercel path.
+- **Do not use `gemini-2.0-flash`** — that model shut down on 2026-06-01. If 3.8 404s on the key: `gemini-3.7-flash` → `gemini-3.5-flash` → `gemini-2.5-flash`.
+- Reviewer cards show Gemini’s written field analysis (`gate_result.geminiAnalysis`). Adapter type is `gemini_vision`.
+- Live voice stays **`gemini-3.1-flash-live-preview`** (Live is not on 3.8 Flash). Client is **audio-only** — no 1-FPS viewfinder streaming to Gemini.
+
+### Changed — On-device shutter
+- Live shutter lock is OpenCV-style heuristics in `cv-core` / `cv-worker` (ExG/GLI/ExR, Laplacian blur, scanline/moiré). No TF.js / MobileNet / jsDelivr on the hosted path.
+
+### Fixed — Demo routing and Saathi tools
+- Saathi Skip keeps the classified peril (`proceedToCapture`). Landing `?peril=` seeds Saathi.
+- Unified Live vs HTTP tool names (`tool-catalog.ts` aliases: `take_photo` → `capture_current_angle`, etc.).
+- `listClaims` 401/403 returns `[]`. Landing pending includes `under_review` / `submitted` / `needs_recapture`.
+- Fire coverage uses the peril route’s required angles (2), not a hard-coded 5.
+
+### Fixed — Context signals
+- Sentinel Process API sends a 14-day `timeRange`. Open-Meteo archive uses `start_date`/`end_date` (not `past_days`).
+- Quiet `GET /api/health`. Docs match the code (no pHash / PostGIS / HF on the hosted path). `IMD_API_KEY` remains unused.
+
 ## [2.6.1] — 2026-08-30
 
 ### Fixed — Production blockers

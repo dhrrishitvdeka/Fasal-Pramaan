@@ -31,8 +31,8 @@ export type CropPhenologyBreakdown = {
   syntheticRejectionPct: number;
 };
 
-const SAMPLE_W = 64;
-const SAMPLE_H = 64;
+const SAMPLE_W = 128;
+const SAMPLE_H = 128;
 
 export type CvModelLoadStatus = "loading" | "ready" | "unavailable";
 
@@ -147,7 +147,7 @@ export function terminateCvWorker(): void {
 }
 
 /**
- * Main-thread video frame analyzer (fallback). Same 64×64 + analyzeFrame path
+ * Main-thread video frame analyzer (fallback). Same 128×128 + analyzeFrame path
  * as the worker so live vs fallback cannot disagree.
  */
 export function analyzeVideoFrame(video: HTMLVideoElement, angleId?: string): CvFrameResult | null {
@@ -233,8 +233,7 @@ export async function analyzeVideoFrameAsync(
 }
 
 /**
- * Analyze a still dataUrl with the same 64×64 + analyzeFrame path as live
- * preview (includes screen detection — previously skipped on stills).
+ * Analyze a still dataUrl with the same 128×128 + analyzeFrame path as live preview.
  */
 export async function analyzeDataUrl(dataUrl: string, angleId?: string): Promise<CvFrameResult | null> {
   if (typeof document === "undefined" || !dataUrl.startsWith("data:image/")) return null;

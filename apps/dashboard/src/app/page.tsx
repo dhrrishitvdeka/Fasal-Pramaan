@@ -403,7 +403,12 @@ export default function HomePage() {
                     (claim.latest_prediction?.overall_confidence != null
                       ? Math.round(claim.latest_prediction.overall_confidence * 100)
                       : 0);
-                  const isPending = claim.status === "pending_review" || claim.status === "recaptured";
+                  const isPending =
+                    claim.status === "under_review" ||
+                    claim.status === "pending_review" ||
+                    claim.status === "submitted" ||
+                    claim.status === "needs_recapture" ||
+                    claim.status === "recaptured";
                   return (
                     <tr key={claim.id}>
                       <td className="font-mono text-xs font-semibold">{claim.id.slice(0, 12)}</td>

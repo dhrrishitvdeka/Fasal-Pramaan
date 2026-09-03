@@ -372,6 +372,7 @@ export async function listClaims(): Promise<Submission[]> {
   const route = resolveClaimClientPath(isSupabaseConfigured(), "list");
   if (route.hosted) {
     const res = await apiFetch(route.path);
+    if (res.status === 401 || res.status === 403) return [];
     if (!res.ok) throw new Error("Could not load claims");
     const body = (await res.json()) as { items?: Submission[] };
     return Array.isArray(body.items) ? body.items : [];

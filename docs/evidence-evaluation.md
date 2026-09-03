@@ -40,7 +40,7 @@ flowchart TD
     Q["1. Quality Score (40%)\nBlur, Exposure, Resolution"]
     C["2. Coverage Score (30%)\nCanonical 5-Angle Completeness"]
     X["3. Context Score (20%)\nPlot Proximity, GPS Accuracy"]
-    I["4. Integrity Score (10%)\nSHA-256, pHash, Mock GPS"]
+    I["4. Integrity Score (10%)\nSHA-256 stored + Gemini authenticity"]
     
     Formula["Final Confidence Calculation\n0.4Q + 0.3C + 0.2X + 0.1I"]
     
@@ -105,7 +105,7 @@ Context validates that the evidence was physically captured at the insured plot 
 
 Integrity enforces anti-fraud and cryptographic authenticity:
 - **Duplicate SHA-256 Checksums**: A deduction of $-65.0$ is applied if identical image byte hashes are detected across angles.
-- **Perceptual Duplicate Hashes (pHash)**: A deduction of $-65.0$ is applied if perceptual hash Hamming distance indicates recycled or re-used photos.
+- **SHA-256 on upload**: the server recomputes the digest. There is no pHash in this MVP.
 - **Mock / Spoofed GPS Detection**: A deduction of $-65.0$ is applied if mock location provider flags or simulated trajectory markers are detected.
 - **Screenshot / Screen Replay Detection**: A deduction of $-60.0$ is applied if high-frequency grid patterns or Moiré interference indicate a photo taken of a digital screen.
 - **Server Verification Mismatches**: A deduction of $-35.0$ is applied if declared client byte size/MIME type diverges from server-observed object storage properties.
@@ -221,7 +221,7 @@ A fundamental design principle of Fasal-Pramaan is the separation of **Evidence 
 
 $$\text{Evidence Confidence } (C_{\text{final}}) \neq \text{Model Prediction Confidence } (P_{\text{model}})$$
 
-- **Model Confidence ($P_{\text{model}}$)**: The softmax probability or ensemble score of the DINOv2 classifier regarding whether a specific leaf shows disease (Grade C) or healthy tissue (Grade A).
+- **Model Confidence ($P_{\text{model}}$)**: Gemini's analysis `score` / overall confidence. Assistive only — not a payout.
 - **Evidence Confidence ($C_{\text{final}}$)**: The aggregate trust score verifying whether the evidence set as a whole is complete, authentic, sharp, and physically situated within the insured plot.
 
 A claim with $99\%$ Model Prediction Confidence on a single blurry, un-geotagged photo will have an Evidence Confidence of only $45.0$, properly preventing automatic acceptance and safeguarding the integrity of the insurance pool.

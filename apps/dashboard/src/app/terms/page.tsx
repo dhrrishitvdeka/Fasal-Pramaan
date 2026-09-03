@@ -42,7 +42,7 @@ const SECTIONS = [
     enTitle: "3. Assistive AI & Human-in-the-Loop Adjudication",
     hiTitle: "3. सहायक AI एवं मानवीय निर्णय शासन",
     en: [
-      "Advisory Decision Support: Computer vision models (MobileNet, DINOv2), the Gemini vision gate, multi-signal weather indices, and composite confidence scores operate strictly as assistive decision support for insurance assessors.",
+      "Advisory Decision Support: On-device OpenCV shutter guidance, Gemini vision analysis, weather indices, and confidence scores are assistive. A human reviewer decides.",
       "No Fully Automated Claim Denial or Payout: AI algorithms do not possess independent authority to approve or deny insurance claims. Every final decision—acceptance, loss assessment adjustment, or field survey dispatch—is executed by an authorized human claim officer.",
       "Officer Override: Authorized reviewers retain full legal discretion to inspect high-resolution photographs, override automated authenticity gate flags with auditable rationale, or order physical Joint Committee field inspections.",
     ],
