@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
+import { getLocalizedAngleInfo } from "@/lib/help-i18n";
 import { getSpeechLocale } from "@/lib/live-indian-languages";
 import {
   isUnusableLighting,
@@ -540,10 +541,13 @@ function CaptureStudioContent() {
       [currentAngle.id]: newEvidence,
     }));
 
+    const angleInfo = getLocalizedAngleInfo(currentAngle.id, lang);
     showToast(
       lang === "hi"
-        ? `${currentAngle.nameHi} कैप्चर हो गया!`
-        : `${currentAngle.name} captured successfully!`
+        ? `${angleInfo.name} कैप्चर हो गया!`
+        : lang === "en"
+        ? `${angleInfo.name} captured successfully!`
+        : `${angleInfo.name} ✓`
     );
 
     // Parallel LLM gate + crop-only check with comprehensive metadata context
@@ -1045,7 +1049,7 @@ function CaptureStudioContent() {
                   )}
                 </div>
                 <span className="mt-1 w-full truncate text-[10px] font-semibold sm:text-xs">
-                  {lang === "hi" ? angle.nameHi.split(". ")[1] : angle.name.split(". ")[1]}
+                  {getLocalizedAngleInfo(angle.id, lang).shortName}
                 </span>
               </button>
             );
@@ -1217,7 +1221,7 @@ function CaptureStudioContent() {
             <div className="pointer-events-none absolute left-2 right-2 top-2 flex flex-wrap items-start justify-between gap-1 sm:left-3 sm:right-3 sm:top-3 max-[400px]:flex-col">
               <span className="flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-white/20 bg-black/75 px-2 py-1 text-[11px] font-bold text-white sm:text-xs">
                 {getAngleIcon(currentAngle.illustrationIcon)}
-                <span className="truncate">{lang === "hi" ? currentAngle.nameHi : currentAngle.name}</span>
+                <span className="truncate">{getLocalizedAngleInfo(currentAngle.id, lang).name}</span>
               </span>
 
               {/* GPS accuracy badge */}
@@ -1362,7 +1366,7 @@ function CaptureStudioContent() {
               className={clsx(!guidanceOpen && "hidden lg:block")}
             >
             <p className="mt-3 text-xs text-slate-700 leading-relaxed font-medium">
-              {lang === "hi" ? currentAngle.instructionsHi : currentAngle.instructions}
+              {getLocalizedAngleInfo(currentAngle.id, lang).instructions}
             </p>
 
             {/* Best practice bullet points */}
@@ -1371,7 +1375,7 @@ function CaptureStudioContent() {
                 <span>{lang === "hi" ? "सर्वोत्तम फोटो सुझाव" : "Framing Tips"}</span>
               </div>
               <ul className="space-y-1 text-xs text-slate-600">
-                {(lang === "hi" ? currentAngle.tipsHi : currentAngle.tips).map((tip, i) => (
+                {getLocalizedAngleInfo(currentAngle.id, lang).tips.map((tip, i) => (
                   <li key={i} className="flex items-start gap-1.5">
                     <span className="text-[var(--ink)]">•</span>
                     <span>{tip}</span>

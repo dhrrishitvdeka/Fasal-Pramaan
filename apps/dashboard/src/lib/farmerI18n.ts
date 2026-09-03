@@ -129,6 +129,9 @@ export const CANONICAL_ANGLES: AngleGuidance[] = [
   },
 ];
 
+export { getHelpI18n, getLocalizedAngleInfo } from "./help-i18n";
+
+
 export const farmerTranslations = {
   en: {
     // Nav & Shell
