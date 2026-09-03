@@ -599,7 +599,12 @@ export class WebVoiceBroker {
       const data = body.data && typeof body.data === "object" ? body.data : {};
       return {
         outcome: "succeeded",
-        message: typeof data.message === "string" && data.message ? data.message : "Done.",
+        message:
+          typeof data.message === "string" && data.message
+            ? data.message
+            : typeof data.reasoning === "string" && data.reasoning
+              ? data.reasoning
+              : `Tool ${name} succeeded.`,
         data,
       };
     } catch {

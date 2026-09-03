@@ -50,6 +50,6 @@ describe("peril routing", () => {
 
     const unknown = classifyPerilHeuristic("kuch khaas nahi hua aaj");
     expect(unknown.peril).toBe("normal");
-    expect(unknown.confidence).toBeLessThan(0.8);
+    expect(unknown.confidence).toBeLessThan(0.55);
   });
 });

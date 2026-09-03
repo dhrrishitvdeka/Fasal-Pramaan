@@ -215,7 +215,7 @@ export function classifyPerilHeuristic(text: string): { peril: Peril; confidence
   if (/(pest|keet|disease|rog|fung|spot|lesion|कीट|रोग|फफूंद|इल्ली|कीड़े)/.test(t)) return { peril: "pest_disease", confidence: 0.85 };
   if (/(hail|ola|olavrishti|ओला|ओलावृष्टि)/.test(t)) return { peril: "hailstorm", confidence: 0.9 };
   if (/(lodg|gira|gir gaya|wind|hawa|tufan|गिरा|हवा से गिर|तूफान)/.test(t)) return { peril: "lodging", confidence: 0.84 };
-  return { peril: "normal", confidence: 0.55 };
+  return { peril: "normal", confidence: 0.2 };
 }
 
 export const INTENT_STORAGE_KEY = "fp_active_claim_intent_v1";
