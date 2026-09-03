@@ -100,6 +100,8 @@ function gateway(overrides: Partial<WebVoiceGateway> = {}): WebVoiceGateway & {
     capture: {
       captureCurrentAngle: async () => ({ ok: true, message: "Captured closeup_damage", angle: "closeup_damage" }),
       readGuidance: async () => ({ ok: true, message: "Aim at the leaf", angle: "closeup_damage" }),
+      selectAngle: async (angleId: string) => ({ ok: true, message: `Switched to ${angleId}`, angleId }),
+      retakeAngle: async (angleId: string) => ({ ok: true, message: `Cleared ${angleId}`, angleId }),
       setObservation: async (observation: string) => ({ ok: true, message: observation }),
       submitDraft: async () => {
         submits += 1;
@@ -365,6 +367,31 @@ describe("web capture bridge progress fallback", () => {
   });
 });
 
+describe("web Fasal Saathi broker aliases", () => {
+  it("maps take_photo / select_angle / set_observation to live capture tools", async () => {
+    const gw = gateway();
+    const broker = new WebVoiceBroker(gw);
+    const shutter = await broker.execute("take_photo", {}, 1);
+    expect(shutter.outcome).toBe("succeeded");
+    const select = await broker.execute("select_angle", { angle: "wide_field" }, 1);
+    expect(select.outcome).toBe("succeeded");
+    expect(select.message).toMatch(/wide_field/i);
+    const note = await broker.execute("set_observation", { observation: "leaf spots" }, 1);
+    expect(note.outcome).toBe("succeeded");
+    const submit = await broker.execute("submit_claim", {}, 1);
+    expect(submit.outcome).toBe("confirmation_required");
+  });
+
+  it("opens capture with peril from begin_guided_capture", async () => {
+    const gw = gateway();
+    const broker = new WebVoiceBroker(gw);
+    const result = await broker.execute("begin_guided_capture", { peril: "fire_burn", plot_id: "plot-1" }, 1);
+    expect(result.outcome).toBe("succeeded");
+    expect(gw.paths[0]).toMatch(/peril=fire_burn/);
+    expect(gw.paths[0]).toMatch(/plotId=plot-1/);
+  });
+});
+
 describe("web voice tool declarations", () => {
   it("declares the new portal-aware tools and recapture protocol", () => {
     const names = WEB_FUNCTION_DECLARATIONS.map((item) => item.name);
@@ -379,6 +406,10 @@ describe("web voice tool declarations", () => {
         "get_current_screen",
         "read_capture_progress",
         "confirm_pending_action",
+        "request_evidence_angles",
+        "classify_claim",
+        "guide_capture",
+        "call_context_signal",
       ]),
     );
     expect(WEB_VOICE_SYSTEM_INSTRUCTION).toMatch(/needs_recapture/);

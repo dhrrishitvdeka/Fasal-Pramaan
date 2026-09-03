@@ -16,7 +16,7 @@ export type StartOptions = {
 export type LiveAudioSession = {
   context: AudioContext;
   playPcm24k: (base64: string) => void;
-  /** Send a live camera video frame (JPEG base64) over the active Gemini Live WebSocket. */
+  /** No-op kept for type compatibility. Live video frames are not streamed. */
   sendVideoFrame: (base64Jpeg: string) => void;
   /** Drop every queued buffer immediately (barge-in) and resync the playback clock. */
   interrupt: () => void;
@@ -153,19 +153,8 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
     playTime = ctx.currentTime;
   };
 
-  const sendVideoFrame = (base64Jpeg: string) => {
-    if (socket.readyState !== WebSocket.OPEN) return;
-    const cleanB64 = base64Jpeg.replace(/^data:image\/[a-z]+;base64,/, "");
-    socket.send(
-      JSON.stringify({
-        realtimeInput: {
-          video: {
-            mimeType: "image/jpeg",
-            data: cleanB64,
-          },
-        },
-      }),
-    );
+  const sendVideoFrame = (_base64Jpeg: string) => {
+    // Audio-only Live session — viewfinder frames never leave the device.
   };
 
   let workletNode: AudioWorkletNode | null = null;

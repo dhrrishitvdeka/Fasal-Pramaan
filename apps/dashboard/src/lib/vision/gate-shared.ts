@@ -4,8 +4,10 @@
  * Implements Stage 1 of the verification pipeline:
  * Evaluates Image + Comprehensive Metadata + Spatial/Environmental Context.
  * Rejects AI fakes, screen captures, wrong crops, and non-field artifacts
- * BEFORE passing verified authentic evidence to the Hugging Face DINOv2 model.
+ * BEFORE Gemini writes the reviewer-facing agronomic analysis.
  */
+
+import { resolveGeminiVisionModel } from "@/lib/gemini-models";
 
 export const ALLOWED_GATE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 
@@ -267,7 +269,7 @@ ${perilInstruction}
 ${metaContextLines}
 
 Evaluate:
-1. Visual Authenticity: Reject any photograph of computer/phone screens, AI-generated images, photographs of printed paper, indoor/domestic scenes, or non-agricultural objects (reason='ai_generated' or 'not_crop' or 'no_field').
+1. Visual Authenticity (fail closed): Reject photographs OF a phone, laptop, monitor, TV, or any second screen (bezels, status bar, moiré, pixel grid, UI chrome) with reason='screen_replay'. Reject AI-generated, stock, meme, or printed paper with reason='ai_generated'. Reject indoor rooms, selfies, and non-field objects with reason='not_crop' or 'no_field'.
 2. Exposure & Focus: Reject if completely pitch dark or washed out (reason='too_dark' or 'too_blurry').
 3. Angle Compliance: Verify canonical framing (${angleType}).
 4. Peril Consistency: Confirm if visual loss indicators match declared peril '${peril || "normal"}'.
@@ -275,7 +277,7 @@ Evaluate:
 Return ONLY valid JSON matching this schema:
 {
   "usable": true | false,
-  "reason": "ok" | "not_crop" | "wrong_crop" | "ai_generated" | "too_dark" | "too_blurry" | "no_field" | "unusable",
+  "reason": "ok" | "not_crop" | "wrong_crop" | "ai_generated" | "screen_replay" | "too_dark" | "too_blurry" | "no_field" | "unusable",
   "crop_detected": string | null,
   "peril_match": true | false,
   "metadata_verified": true | false,
@@ -288,8 +290,7 @@ Return ONLY valid JSON matching this schema:
 
 Angle: ${angleType}, Peril: ${peril || "normal"}`;
 
-  const model =
-    process.env.GEMINI_VISION_MODEL || process.env.GEMINI_MODEL || "gemini-3.7-flash";
+  const model = resolveGeminiVisionModel();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   try {

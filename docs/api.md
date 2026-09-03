@@ -1,7 +1,7 @@
 # API Reference & Data Contracts
 
 Base URL: app origin (`http://localhost:3000` for local dev via `npm run dev`, the Vercel URL in production)  
-All routes are same-origin Next.js Route Handlers under `/api/*`, backed by Supabase and the Hugging Face Space. The legacy FastAPI `/api/v1` gateway has been retired — it is replaced by these routes plus Supabase Auth. Leave `NEXT_PUBLIC_API_BASE_URL` unset. Saathi intake lives at `GET /farmer/saathi` (page, not API) and routes to peril-aware capture (`/farmer/capture?peril=&intentId=`).
+All routes are same-origin Next.js Route Handlers under `/api/*`, backed by Supabase and Google Gemini. Leave `NEXT_PUBLIC_API_BASE_URL` unset. Saathi intake lives at `GET /farmer/saathi` (page, not API) and routes to peril-aware capture (`/farmer/capture?peril=&intentId=`).
 
 ---
 
@@ -35,7 +35,7 @@ The legacy `/farms`, `/farms/{id}/plots`, `/crop-cycles`, and `/crop-types` endp
 
 ## 3. Evidence Capture & Submission Lifecycle
 
-The legacy multi-step flow (draft creation → presigned upload URLs → confirm → finalize) has been retired. Submission is now a **single in-request call** to `POST /api/claims`, which verifies bytes, stores evidence, runs inference via the Hugging Face Space, and persists the evaluation.
+Submission is a **single in-request call** to `POST /api/claims`: SHA-256 stills go to private storage, context signals assemble, then Gemini writes the reviewer analysis (`gemini-3.8-flash`).
 
 ### 3.1 Peril-Aware Claim (`POST /api/claims`)
 
@@ -189,7 +189,7 @@ Parallel LLM usability check run after each shutter (capture page `void fetch("/
 }
 ```
 
-`usable` / `reason`: `ok|not_crop|wrong_crop|ai_generated|too_dark|too_blurry|no_field|unusable|too_small_or_blank`. `fire_burn` relaxes crop check (charred field). Only verified authentic evidence passes to the Hugging Face DINOv2 model.
+`usable` / `reason`: `ok|not_crop|wrong_crop|ai_generated|screen_replay|too_dark|too_blurry|no_field|unusable|too_small_or_blank`. `fire_burn` relaxes crop check. Stills that pass go to Gemini field analysis.
 
 **Gate re-run (reviewer):** re-running the authenticity gate on already-stored claim photos is **client-orchestrated — there is no dedicated endpoint**. The review detail page downloads each stored image, converts it to a data URL, and issues sequential authed `POST /api/vision/gate` calls (same contract as above); it then records the outcome as an audited `correct` action on `POST /api/claims/{id}/action` with notes `"Gate re-run recorded: <usable>/<total> usable"`.
 
@@ -290,7 +290,7 @@ Mints an ephemeral token for direct browser-to-Gemini Live WebSocket streaming.
 - **Copernicus Sentinel-2** (ESA open data) — MSI L1C/L2A for burn scar / water extent
 - **ISRO Bhuvan** — `https://bhuvan.nrsc.gov.in/`, WMS probe `https://bhuvan-app1.nrsc.gov.in/api/bhuvan/wms` (land-use, forest edge)
 - **IMD** — `https://mausam.imd.gov.in/`, `https://dsp.imdpune.gov.in/` (Data Supply Portal), **GKMS** (Gramin Krishi Mausam Sewa), **Meghdoot** app — gridded rainfall / agromet advisories; `IMD_API_KEY` reserved for the paid upgrade, else open-meteo proxy.
-- **TensorFlow.js / MobileNet** (on-device CV worker) — TFJS bundle + `@tensorflow-models/mobilenet` v2 (alpha 0.5) loaded from jsdelivr CDN at runtime; heuristic-only fallback when unreachable.
+- **On-device OpenCV worker** — colour / texture / scanline heuristics in `cv-worker.ts`. No CDN neural net.
 
 ---
 
@@ -322,20 +322,18 @@ Honest configuration summary powering the rebuilt `/admin` page. **Auth:** Beare
 ```json
 {
   "supabase": true,
-  "gemini": false,
+  "gemini": true,
   "sentinel": true,
   "imdKey": false,
-  "hfSpaceUrl": "https://dhrrishitvdeka-fasal-pramaan-api.hf.space",
-  "version": "1.6.0"
+  "version": "2.6.1"
 }
 ```
 
-- `supabase` — both `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set.
-- `gemini` — `GEMINI_API_KEY` set (voice mode + vision gate + LLM classification live).
-- `sentinel` — `SENTINEL_TOKEN`/`COPERNICUS_TOKEN` set (Tier-1 burn-scar checks).
-- `imdKey` — `IMD_API_KEY`/`OPENWEATHER_KEY` set (paid IMD hook).
-- `hfSpaceUrl` — public Space URL from `getHfSpaceUrl()`, or `null`.
-- `version` — server-reported release version (`"1.6.0"`).
+- `supabase` — URL + service role set.
+- `gemini` — `GEMINI_API_KEY` set (gate + analysis + Live + classify).
+- `sentinel` — `SENTINEL_TOKEN`/`COPERNICUS_TOKEN` string is set (does not prove Process API works).
+- `imdKey` — reserved; weather is still Open-Meteo.
+- `version` — `2.6.1`.
 
 ### 9.2 Client Error Telemetry — `POST /api/telemetry/error` (`apps/dashboard/src/app/api/telemetry/error/route.ts`)
 

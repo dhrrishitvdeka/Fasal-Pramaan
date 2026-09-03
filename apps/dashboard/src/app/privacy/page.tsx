@@ -46,15 +46,15 @@ const SECTIONS = [
     enTitle: "3. Artificial Intelligence & Automated Processing",
     hiTitle: "3. कृत्रिम बुद्धिमत्ता (AI) एवं स्वचालित प्रसंस्करण",
     en: [
-      "On-Device Vision Analysis: Lightweight neural models (MobileNet) and image processing heuristics run locally in your browser's Web Worker to evaluate blur and lighting at capture time. Real-time preview frames are never uploaded to any server.",
+      "On-Device Vision Analysis: Colour, texture, and screen-artifact checks run locally in a Web Worker to lock the shutter. Live preview frames are not uploaded.",
       "Authenticity Vision Gate: Final submitted photographs are screened via secure API using Google Gemini to verify crop presence and reject non-agricultural, synthetic, or indoor imagery.",
-      "Neural Crop Model: Deep vision networks (DINOv2 / ViT) hosted on secure cloud infrastructure screen for crop genus classification and compute damage severity percentages.",
+      "Gemini Vision Analysis: After you submit, still photographs are sent to Google Gemini to check authenticity and write a reviewer-facing description of crop and damage. This is assistive, not a payout decision.",
       "Assistive AI Principle: AI scores and confidence metrics operate solely as assistive decision-support for human claim officers. No claim is ever automatically rejected or approved by AI without human authorization.",
     ],
     hi: [
       "ऑन-डिवाइस विज़न विश्लेषण: कैमरे के रीयल-टाइम पूर्वावलोकन की जाँच आपके फ़ोन/ब्राउज़र पर स्थानीय रूप से होती है। पूर्वावलोकन तस्वीरें सर्वर पर नहीं भेजी जातीं।",
       "प्रामाणिकता विज़न गेट: अंतिम रूप से जमा की गई फ़ोटो की जाँच गूगल जेमिनी एपीआई द्वारा की जाती है ताकि गैर-कृषि, नकली या अत्यधिक धुंधली फ़ोटो को रोका जा सके।",
-      "न्यूरल क्रॉप मॉडल: सुरक्षित सर्वर पर होस्ट किए गए मॉडल फसल की प्रजाति और क्षति के प्रतिशत का तकनीकी आकलन करते हैं।",
+      "जेमिनी विज़न विश्लेषण: जमा की गई तस्वीरों का गूगल जेमिनी से प्रामाणिकता, फसल और क्षति का लिखित आकलन — यह सहायक है, भुगतान निर्णय नहीं।",
       "सहायक एआई सिद्धांत: एआई केवल सहायक के रूप में कार्य करता है। किसी भी दावे को बिना अधिकृत मानवीय अधिकारी की अनुमति के स्वतः अस्वीकार या स्वीकृत नहीं किया जाता।",
     ],
   },

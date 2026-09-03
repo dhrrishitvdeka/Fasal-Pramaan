@@ -7,7 +7,7 @@ import {
   claimToSubmission,
   type PersistClaimInput,
 } from "@/lib/claim-pipeline";
-import { inferCropDisease } from "@/lib/hf-infer";
+import { inferCropDisease } from "@/lib/gemini-analyze";
 import { createServerSupabase } from "@/lib/supabase";
 import { createSupabaseClaimStore } from "@/lib/supabase-store";
 import { isReviewerRole, requireWebActor } from "@/lib/web-auth";
@@ -146,7 +146,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unknown plot" }, { status: 400 });
     }
   }
-  const inferOptions = { apiToken: process.env.HF_TOKEN || process.env.HUGGINGFACE_API_TOKEN };
+  const inferOptions = {};
   try {
     if (claimId) {
       const existing = await store.getClaim(claimId);

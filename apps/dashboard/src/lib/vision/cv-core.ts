@@ -82,6 +82,10 @@ export function rgbToHsv(r: number, g: number, b: number): [number, number, numb
   return [h, s, v];
 }
 
+function pixelLuma(data: Uint8ClampedArray, idx: number): number {
+  return 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+}
+
 export function detectScreenArtifacts(
   data: Uint8ClampedArray,
   w: number,
@@ -92,34 +96,74 @@ export function detectScreenArtifacts(
 
   let orthogonalGradients = 0;
   let totalEdges = 0;
+  let evenRowSum = 0;
+  let oddRowSum = 0;
+  let evenRowN = 0;
+  let oddRowN = 0;
+  let rgbFlip = 0;
+  let rgbPairs = 0;
 
   const rowGradients = new Float32Array(h);
   const colGradients = new Float32Array(w);
+  const rowMean = new Float32Array(h);
 
-  for (let y = 1; y < h - 1; y += 1) {
-    for (let x = 1; x < w - 1; x += 1) {
+  for (let y = 0; y < h; y += 1) {
+    let rowLuma = 0;
+    for (let x = 0; x < w; x += 1) {
       const idx = (y * w + x) * 4;
-      const lumCenter = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-      const lumL = 0.299 * data[idx - 4] + 0.587 * data[idx - 3] + 0.114 * data[idx - 2];
-      const lumR = 0.299 * data[idx + 4] + 0.587 * data[idx + 5] + 0.114 * data[idx + 6];
-      const lumU = 0.299 * data[idx - w * 4] + 0.587 * data[idx - w * 4 + 1] + 0.114 * data[idx - w * 4 + 2];
-      const lumD = 0.299 * data[idx + w * 4] + 0.587 * data[idx + w * 4 + 1] + 0.114 * data[idx + w * 4 + 2];
-
+      const lumCenter = pixelLuma(data, idx);
+      rowLuma += lumCenter;
+      if (y % 2 === 0) {
+        evenRowSum += lumCenter;
+        evenRowN += 1;
+      } else {
+        oddRowSum += lumCenter;
+        oddRowN += 1;
+      }
+      if (x + 1 < w) {
+        const nx = idx + 4;
+        const dR = Math.abs(data[idx] - data[nx]);
+        const dG = Math.abs(data[idx + 1] - data[nx + 1]);
+        const dB = Math.abs(data[idx + 2] - data[nx + 2]);
+        rgbPairs += 1;
+        if (dR + dG + dB > 90 && Math.max(dR, dG, dB) > 40) rgbFlip += 1;
+      }
+      if (y === 0 || x === 0 || y === h - 1 || x === w - 1) continue;
+      const lumL = pixelLuma(data, idx - 4);
+      const lumR = pixelLuma(data, idx + 4);
+      const lumU = pixelLuma(data, idx - w * 4);
+      const lumD = pixelLuma(data, idx + w * 4);
       const gx = Math.abs(lumCenter - lumL) + Math.abs(lumCenter - lumR);
       const gy = Math.abs(lumCenter - lumU) + Math.abs(lumCenter - lumD);
       const mag = gx + gy;
-
       if (mag > 14) {
         totalEdges += 1;
         rowGradients[y] += mag;
         colGradients[x] += mag;
-
-        const ratio = Math.max(gx, gy) / (mag + 0.001);
-        if (ratio > 0.82) {
-          orthogonalGradients += 1;
-        }
+        if (Math.max(gx, gy) / (mag + 0.001) > 0.82) orthogonalGradients += 1;
       }
     }
+    rowMean[y] = rowLuma / Math.max(1, w);
+  }
+
+  const evenMean = evenRowN ? evenRowSum / evenRowN : 0;
+  const oddMean = oddRowN ? oddRowSum / oddRowN : 0;
+  const scanlineDelta = Math.abs(evenMean - oddMean);
+  if (scanlineDelta > 55 && evenRowN > 20 && oddRowN > 20) {
+    return {
+      isScreen: true,
+      confidence: Math.min(99, Math.round(scanlineDelta)),
+      reason: "Horizontal scanlines (photo of a display)",
+    };
+  }
+
+  const rgbFlipRatio = rgbPairs ? rgbFlip / rgbPairs : 0;
+  if (rgbFlipRatio > 0.42 && totalEdges > 30) {
+    return {
+      isScreen: true,
+      confidence: Math.round(rgbFlipRatio * 100),
+      reason: "Subpixel / moiré grid typical of a second screen",
+    };
   }
 
   let maxRowPeak = 0;
@@ -130,13 +174,39 @@ export function detectScreenArtifacts(
   for (let x = 1; x < w - 1; x += 1) {
     if (colGradients[x] > maxColPeak) maxColPeak = colGradients[x];
   }
-
   const avgRowMag = totalEdges > 0 ? (totalEdges * 25) / h : 1;
   const hasStrongBezelLine = maxRowPeak > avgRowMag * 3.5 || maxColPeak > avgRowMag * 3.5;
 
+  const border = Math.max(1, Math.round(Math.min(w, h) * 0.08));
+  let borderDark = 0;
+  let borderN = 0;
+  let innerBright = 0;
+  let innerN = 0;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const lum = pixelLuma(data, (y * w + x) * 4);
+      const onBorder = x < border || y < border || x >= w - border || y >= h - border;
+      if (onBorder) {
+        borderN += 1;
+        if (lum < 40) borderDark += 1;
+      } else {
+        innerN += 1;
+        if (lum > 70) innerBright += 1;
+      }
+    }
+  }
+  const darkBezel = borderN > 0 && borderDark / borderN > 0.55 && innerN > 0 && innerBright / innerN > 0.35;
+  if (darkBezel && hasStrongBezelLine) {
+    return {
+      isScreen: true,
+      confidence: 86,
+      reason: "Device bezel around a bright rectangular display",
+    };
+  }
+
   if (totalEdges >= 20) {
     const orthogonalRatio = orthogonalGradients / totalEdges;
-    if (orthogonalRatio > 0.8 || (orthogonalRatio > 0.68 && hasStrongBezelLine)) {
+    if (orthogonalRatio > 0.78 || (orthogonalRatio > 0.64 && hasStrongBezelLine)) {
       return {
         isScreen: true,
         confidence: Math.round(orthogonalRatio * 100),
@@ -545,8 +615,7 @@ export function analyzeFrame(
       ? 0
       : Math.round(0.7 * canopyScore + 0.18 * textureScore + 0.12 * naturalnessScore);
   if (isFlatArtificialSurface) compositeScore = Math.round(compositeScore * 0.15);
-  if (isScreenDetected) compositeScore = Math.min(compositeScore, 18);
-  if (modelVerdict?.saysPlant) compositeScore = Math.max(compositeScore, Math.round((modelVerdict.prob ?? 0.8) * 100));
+  if (isScreenDetected) compositeScore = Math.min(compositeScore, 12);
   if (isPersonDetected) compositeScore = 0;
   const cropScore = clamp(compositeScore, 0, 100);
 

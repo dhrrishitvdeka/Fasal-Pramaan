@@ -606,7 +606,7 @@ export function submissionFromClaim(claim: FarmerClaim): Submission {
     latest_prediction: hasPrediction
       ? {
           model_version: getHfModelId(),
-          adapter_type: "hf_crop_leaf",
+          adapter_type: "gemini_vision",
           is_production_validated: false,
           predicted_crop: pred.cropIdentified || null,
           crop_confidence: pred.cropConfidence ? pred.cropConfidence / 100 : null,

@@ -12,7 +12,7 @@ pinned: false
 # Fasal-Pramaan hosted inference
 
 Private Gradio Space that loads **`dhrrishitvdeka/fasal-pramaan-model`** (`model.onnx`)
-and runs the Fasal-Pramaan DINOv2 ViT-S/14 crop-conditioned heads.
+This Space is **retired**. The hosted webapp analyses claim photos with Gemini vision and no longer calls this endpoint.
 
 This is assistive leaf-health screening only. It does **not** estimate disease
 identity, severity, affected area, yield, or payout. Human review is required.

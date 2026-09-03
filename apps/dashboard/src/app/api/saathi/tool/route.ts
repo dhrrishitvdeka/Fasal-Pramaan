@@ -3,23 +3,9 @@ import { requireWebActor } from "@/lib/web-auth";
 import { executeSaathiTool, type SaathiToolResult } from "@/lib/saathi/tools-server";
 import { CANONICAL_ANGLES } from "@/lib/farmerI18n";
 import { checkRateLimit } from "@/lib/server/rate-limit";
+import { SAATHI_SERVER_TOOLS, resolveSaathiToolName } from "@/lib/saathi/tool-catalog";
 
-const ALLOWED_TOOLS = new Set([
-  "request_evidence_angles",
-  "call_context_signal",
-  "guide_capture",
-  "classify_claim",
-  "take_photo",
-  "switch_camera",
-  "select_angle",
-  "retake_angle",
-  "set_observation",
-  "submit_claim",
-  "check_evidence_quality",
-  "check_plot_geofence",
-  "fetch_agro_weather_alerts",
-  "explain_claim_audit",
-]);
+const ALLOWED_TOOLS = new Set<string>(SAATHI_SERVER_TOOLS);
 const ANGLE_IDS = new Set(CANONICAL_ANGLES.map((a) => a.id));
 
 const RATE_LIMIT_MAX = 30;
@@ -58,34 +44,56 @@ function sanitizeArgs(name: string, raw: unknown): Record<string, unknown> | nul
       if (plotLon != null) out.plotLon = plotLon;
       return out;
     }
-    case "guide_capture": {
-      const angle = typeof args.angle === "string" ? args.angle.trim() : "";
-      if (!ANGLE_IDS.has(angle)) return null;
-      return { angle, lang: sanitizeLang(args.lang) };
-    }
     case "classify_claim": {
       const text = typeof args.text === "string" ? args.text.trim().slice(0, 1000) : "";
-      if (!text) return null;
-      const out: Record<string, unknown> = { text, lang: sanitizeLang(args.lang) };
+      const peril = typeof args.peril === "string" ? args.peril.trim().slice(0, 64) : "";
+      if (!text && !peril) return null;
+      const out: Record<string, unknown> = { lang: sanitizeLang(args.lang) };
+      if (text) out.text = text;
+      if (peril) out.peril = peril;
+      if (args.confidence != null && Number.isFinite(Number(args.confidence))) {
+        out.confidence = Number(args.confidence);
+      }
+      if (typeof args.reasoning === "string" && args.reasoning.trim()) {
+        out.reasoning = args.reasoning.trim().slice(0, 500);
+      }
       if (typeof args.contextNotes === "string" && args.contextNotes.trim()) {
         out.contextNotes = args.contextNotes.trim().slice(0, 2000);
       }
       return out;
     }
     case "take_photo":
+    case "capture_current_angle":
     case "switch_camera":
     case "submit_claim":
+    case "prepare_submit_claim":
     case "check_evidence_quality": {
       return {};
     }
     case "select_angle":
-    case "retake_angle": {
+    case "select_capture_angle":
+    case "retake_angle":
+    case "retake_capture_angle":
+    case "guide_capture": {
       const angle = typeof args.angle === "string" ? args.angle.trim() : "";
-      return { angle: ANGLE_IDS.has(angle) ? angle : "closeup_damage" };
+      if (name === "guide_capture" && !ANGLE_IDS.has(angle)) return null;
+      return {
+        angle: ANGLE_IDS.has(angle) ? angle : "closeup_damage",
+        lang: sanitizeLang(args.lang),
+      };
     }
-    case "set_observation": {
+    case "set_observation":
+    case "set_capture_observation": {
       const observation = typeof args.observation === "string" ? args.observation.trim().slice(0, 1000) : "";
       return { observation };
+    }
+    case "register_plot": {
+      const plotName = String(args.name || args.plot_name || "").trim().slice(0, 80);
+      if (!plotName) return null;
+      return {
+        name: plotName,
+        crop_type: String(args.crop_type || args.crop || "wheat").trim().slice(0, 40),
+      };
     }
     case "check_plot_geofence": {
       const out: Record<string, unknown> = {};
@@ -151,9 +159,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const name = typeof payload.name === "string" ? payload.name : "";
-  if (!ALLOWED_TOOLS.has(name)) {
-    return NextResponse.json({ ok: false, error: `Unknown tool: ${name || "(none)"}` }, { status: 400 });
+  const rawName = typeof payload.name === "string" ? payload.name : "";
+  const name = resolveSaathiToolName(rawName);
+  if (!ALLOWED_TOOLS.has(rawName) && !ALLOWED_TOOLS.has(name)) {
+    return NextResponse.json({ ok: false, error: `Unknown tool: ${rawName || "(none)"}` }, { status: 400 });
   }
 
   const args = sanitizeArgs(name, payload.args);

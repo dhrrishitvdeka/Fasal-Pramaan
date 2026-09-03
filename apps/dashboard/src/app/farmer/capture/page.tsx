@@ -149,7 +149,6 @@ function CaptureStudioContent() {
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   // Realtime CV guidance
   const [cvResult, setCvResult] = useState<import("@/lib/vision/realtime-cv").CvFrameResult | null>(null);
-  // MobileNet warmup indicator (fed by cv-worker "model_status" messages)
   const [cvModelStatus, setCvModelStatus] = useState<"unknown" | "loading" | "ready" | "unavailable">("unknown");
 
   // GPS state
@@ -300,10 +299,7 @@ function CaptureStudioContent() {
     };
   }, [cameraFacing]);
 
-  // Precache hint: spin up the CV worker on mount so TF.js + MobileNet weights
-  // start downloading (browser HTTP cache handles repeat visits) while the
-  // farmer reads guidance, before the camera even starts. Also subscribes to
-  // the worker's model warmup status for the "CV: AI ready" badge.
+  // Spin up the OpenCV worker on mount so the first live frame is off-thread.
   useEffect(() => {
     let active = true;
     let unsubscribe: (() => void) | null = null;
@@ -1192,9 +1188,9 @@ function CaptureStudioContent() {
                     </span>
                   )}
 
-                  {cvModelStatus === "unavailable" && (
-                    <span className="rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                      {lang === "hi" ? "ह्यूरिस्टिक मोड" : "Heuristic only"}
+                  {cvModelStatus === "ready" && (
+                    <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold text-white/90">
+                      {lang === "hi" ? "लाइव CV" : "Live CV"}
                     </span>
                   )}
 

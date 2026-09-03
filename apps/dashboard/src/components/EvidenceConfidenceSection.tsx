@@ -133,22 +133,15 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
   const contextDetails: EvidenceContextDetails = {
     gps_valid: gpsValid,
     gps_accuracy_m: submission.capture_accuracy_m,
-    plot_match: true,
-    capture_time_valid: true,
-    crop_context_matched: true,
-    weather_status: "normal",
-    distance_to_plot_m: 8.5,
+    plot_match: undefined,
+    capture_time_valid: undefined,
+    crop_context_matched: undefined,
+    weather_status: undefined,
   };
 
   const integrityDetails: EvidenceIntegrityDetails = {
-    metadata_valid: true,
-    sha256_verified: true,
-    duplicate_detected: false,
-    perceptual_duplicate: false,
-    authenticity_verified: true,
-    tamper_check_passed: anomalies.length === 0,
-    server_check_passed: true,
-    is_mock_location: false,
+    sha256_verified: uploaded.some((img) => Boolean(img.sha256)),
+    authenticity_verified: anomalies.length === 0,
     flags: anomalies.map(String),
   };
 
@@ -627,17 +620,17 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
               <dd className="font-mono text-slate-800 font-medium">
                 {submission.capture_accuracy_m != null ? `±${submission.capture_accuracy_m} m` : "—"}
               </dd>
-              <dt className="text-slate-500">Plot Centroid Match:</dt>
+              <dt className="text-slate-500">Plot proximity:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {ctxDetails.plot_match ? "Matched (Within Plot)" : "Unverified"}
+                {ctxDetails.plot_match === true
+                  ? "Inside registered radius"
+                  : ctxDetails.plot_match === false
+                    ? "Outside registered radius"
+                    : "Not computed"}
               </dd>
-              <dt className="text-slate-500">Capture Timestamp:</dt>
+              <dt className="text-slate-500">Crop context:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {ctxDetails.capture_time_valid ? "Valid / Verified" : "Timestamp check"}
-              </dd>
-              <dt className="text-slate-500">Crop Cycle Match:</dt>
-              <dd className="font-mono text-slate-800 font-medium">
-                {ctxDetails.crop_context_matched ? "Registered Cycle Match" : "Pending"}
+                {ctxDetails.crop_context_matched === true ? "Matches declared crop" : "See Gemini analysis"}
               </dd>
               <dt className="text-slate-500">Weather Status:</dt>
               <dd className="font-mono text-slate-800 font-medium capitalize">
@@ -663,33 +656,21 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
             </div>
 
             <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-              <dt className="text-slate-500">Metadata Verification:</dt>
+              <dt className="text-slate-500">SHA-256 digest:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {iDetails.metadata_valid !== false ? "Valid EXIF & Sensor" : "Corrupt / Incomplete"}
+                {iDetails.sha256_verified !== false ? "Stored on upload (server recomputed)" : "Missing"}
               </dd>
-              <dt className="text-slate-500">SHA-256 Checksum:</dt>
+              <dt className="text-slate-500">GPS on frames:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {iDetails.sha256_verified !== false ? "Verified on Upload" : "Hash mismatch"}
+                {ctxDetails.gps_valid !== false ? "Coordinates present" : "Missing"}
               </dd>
-              <dt className="text-slate-500">Duplicate Check:</dt>
+              <dt className="text-slate-500">Gemini authenticity:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {iDetails.duplicate_detected ? "DUPLICATE DETECTED" : "No Duplicate (Unique)"}
+                {iDetails.authenticity_verified !== false ? "Passed vision gate" : "Rejected / unverified"}
               </dd>
-              <dt className="text-slate-500">Perceptual Hash Check:</dt>
+              <dt className="text-slate-500">Integrity flags:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {iDetails.perceptual_duplicate ? "Near-Duplicate Found" : "Passed (Distinct)"}
-              </dd>
-              <dt className="text-slate-500">Authenticity / Source:</dt>
-              <dd className="font-mono text-slate-800 font-medium">
-                {iDetails.authenticity_verified !== false ? "Direct Camera Capture" : "Unverified"}
-              </dd>
-              <dt className="text-slate-500">Tamper / Server Checks:</dt>
-              <dd className="font-mono text-slate-800 font-medium">
-                {iDetails.tamper_check_passed !== false ? "Passed Server Verification" : "TAMPER FLAGGED"}
-              </dd>
-              <dt className="text-slate-500">Mock Location Check:</dt>
-              <dd className="font-mono text-slate-800 font-medium">
-                {iDetails.is_mock_location ? "MOCK GPS DETECTED" : "Hardware GPS Confirmed"}
+                {iDetails.flags && iDetails.flags.length ? iDetails.flags.join(", ") : "None recorded"}
               </dd>
             </dl>
 

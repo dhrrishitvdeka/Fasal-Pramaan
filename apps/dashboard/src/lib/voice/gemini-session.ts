@@ -4,6 +4,11 @@ import {
   WEB_FUNCTION_DECLARATIONS,
   WEB_VOICE_SYSTEM_INSTRUCTION,
 } from "./function-declarations";
+import {
+  resolveGeminiApiKey,
+  resolveGeminiLiveModel,
+  resolveGeminiLiveVoice,
+} from "@/lib/gemini-models";
 
 export type VoiceSessionOk = {
   ok: true;
@@ -23,22 +28,19 @@ export type VoiceSessionErr = {
 export type VoiceSessionResult = VoiceSessionOk | VoiceSessionErr;
 
 export function geminiApiKey(): string {
-  return (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim();
+  return resolveGeminiApiKey();
 }
 
 export function geminiLiveModel(): string {
-  return (process.env.GEMINI_LIVE_MODEL || "gemini-3.1-flash-live-preview").replace(
-    /^models\//,
-    "",
-  );
+  return resolveGeminiLiveModel();
 }
 
 export function geminiLiveVoice(): string {
-  return process.env.GEMINI_LIVE_VOICE || "Aoede";
+  return resolveGeminiLiveVoice();
 }
 
 export function geminiLiveSessionMinutes(): number {
-  const raw = Number(process.env.GEMINI_LIVE_SESSION_MINUTES || 30);
+  const raw = Number(process.env.GEMINI_LIVE_SESSION_MINUTES || 15);
   if (!Number.isFinite(raw)) return 30;
   return Math.max(5, Math.min(Math.round(raw), 60));
 }

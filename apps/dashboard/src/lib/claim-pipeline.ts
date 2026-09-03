@@ -1,4 +1,4 @@
-import { inferCropDisease, resolveHfModelId, type HfPrediction } from "./hf-infer";
+import { inferCropDisease, geminiVisionModel, type HfPrediction } from "./gemini-analyze";
 import { computeAngleCoverage, isRealSha256, isUnusableLighting } from "./evidence";
 import type { Submission } from "./api";
 import { heuristicGate, geminiGate, type GateResult } from "./vision/gate-shared";
@@ -464,7 +464,7 @@ export function imagesAreUnusable(images: PersistedImageInput[]): boolean {
 
 export function unusablePrediction(warnings: string[] = ["image_too_dark"]): HfPrediction {
   return {
-    modelId: resolveHfModelId(),
+    modelId: geminiVisionModel(),
     label: "unusable_or_out_of_domain",
     score: 0,
     predictedCrop: "unknown",
@@ -753,6 +753,26 @@ export async function attachHfPrediction(
   if (!current) throw new Error("Claim not found");
   const safe = sanitizeHfPrediction(prediction);
   const warningNote = (safe.qualityWarnings || []).join(", ");
+  const existingGate =
+    current.gate_result && typeof current.gate_result === "object" && !Array.isArray(current.gate_result)
+      ? (current.gate_result as Record<string, unknown>)
+      : {};
+  const geminiAnalysis = {
+    adapter_type: "gemini_vision",
+    model_id: safe.modelId,
+    reasoning: safe.reasoning || "",
+    visual_findings: safe.visualFindings || "",
+    authenticity: safe.authenticity || null,
+    per_image: safe.perImage || [],
+    severity: safe.severity ?? null,
+    affected_area_pct: safe.affectedAreaPct ?? null,
+    growth_stage: safe.growthStage ?? null,
+    peril_match: safe.perilMatch ?? null,
+    predicted_grade: safe.predictedGrade,
+    predicted_crop: safe.predictedCrop,
+    primary_damage: safe.primaryDamage,
+    grade_label: safe.gradeLabel,
+  };
   const modelPatch: Partial<WebClaimRow> = {
     model_id: safe.modelId,
     hf_label: safe.plantDiseaseClass || safe.label,
@@ -762,6 +782,7 @@ export async function attachHfPrediction(
       safe.cropConfidence == null ? null : Math.round(safe.cropConfidence * 1000) / 10,
     inference_status: "complete",
     inference_error: null,
+    gate_result: { ...existingGate, geminiAnalysis },
     updated_at: new Date().toISOString(),
   };
   // Late inference must never clobber a reviewer's accept/correct/reject.
@@ -776,10 +797,11 @@ export async function attachHfPrediction(
       disease_detected: safe.plantDiseaseClass || safe.primaryDamage || safe.label,
       crop_identified: safe.predictedCrop || null,
       severity_grade: safe.predictedGrade || null,
-      severity_percentage: null,
+      severity_percentage: safe.affectedAreaPct ?? null,
       affected_area_hectares: null,
       estimated_loss_inr: null,
       ...(warningNote ? { quality_notes: warningNote } : {}),
+      ...(safe.reasoning ? { context_notes: safe.reasoning.slice(0, 1500) } : {}),
     },
     { expectedStatus: current.status },
   );
@@ -875,7 +897,7 @@ export type InferRuntimeOptions = {
   apiToken?: string;
   fetchImpl?: typeof fetch;
   spaceUrl?: string;
-  /** Persist + gate + context only; caller schedules HF attach (e.g. Next.js `after()`). */
+  /** Persist + gate + context only; caller schedules Gemini attach (e.g. Next.js `after()`). */
   skipInference?: boolean;
 };
 
@@ -923,6 +945,7 @@ export async function inferAndAttachToClaim(
       }
     }
     const extras = [...uniqueAngles.values()];
+    const claimRow = await store.getClaim(claimId);
     prediction = await infer({
       imageBytes: requireImageBytes(closeup, closeup.angleType),
       expectedCrop: cropType,
@@ -931,6 +954,11 @@ export async function inferAndAttachToClaim(
       apiToken: inferOptions?.apiToken,
       fetchImpl: inferOptions?.fetchImpl,
       spaceUrl: inferOptions?.spaceUrl,
+      peril: claimRow?.peril || undefined,
+      farmerObservation:
+        claimRow?.farmer_observations ||
+        images.find((img) => img.farmerObservation)?.farmerObservation ||
+        undefined,
     });
     await attachHfPrediction(store, claimId, prediction);
     return { prediction };
@@ -1252,6 +1280,51 @@ export async function recaptureAndInfer(
   return { claimId: input.claimId, ...inferred };
 }
 
+function geminiAnalysisFromGate(gate: unknown): {
+  reasoning?: string;
+  visual_findings?: string;
+  authenticity?: HfPrediction["authenticity"] | null;
+  per_image?: HfPrediction["perImage"];
+  severity?: string | null;
+  affected_area_pct?: number | null;
+  growth_stage?: string | null;
+  peril_match?: boolean | null;
+  predicted_crop?: string | null;
+  primary_damage?: string | null;
+  grade_label?: string | null;
+  quality_warnings?: string[];
+} | null {
+  if (!gate || typeof gate !== "object") return null;
+  const blob = (gate as { geminiAnalysis?: unknown }).geminiAnalysis;
+  if (!blob || typeof blob !== "object") return null;
+  return blob as {
+    reasoning?: string;
+    visual_findings?: string;
+    authenticity?: HfPrediction["authenticity"] | null;
+    per_image?: HfPrediction["perImage"];
+    severity?: string | null;
+    affected_area_pct?: number | null;
+    growth_stage?: string | null;
+    peril_match?: boolean | null;
+    predicted_crop?: string | null;
+    primary_damage?: string | null;
+    grade_label?: string | null;
+    quality_warnings?: string[];
+  };
+}
+
+function geminiAnomalyFlags(analysis: ReturnType<typeof geminiAnalysisFromGate>): string[] {
+  const auth = analysis?.authenticity;
+  if (!auth) return [];
+  const flags: string[] = [];
+  if (auth.screenReplay) flags.push("screen_replay");
+  if (auth.aiGenerated) flags.push("ai_generated");
+  if (auth.printedPhoto) flags.push("printed_photo");
+  if (auth.indoorScene) flags.push("indoor_or_non_field");
+  if (auth.authentic === false) flags.push("not_authentic");
+  return flags;
+}
+
 export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Submission {
   return {
     id: claim.id,
@@ -1293,44 +1366,53 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
       },
     })),
     latest_prediction: claim.hf_label
-      ? {
-          model_version: claim.model_id || "",
-          adapter_type: "crop_health_v4",
-          is_production_validated: false,
-          predicted_crop:
-            workflowGrade(claim.severity_grade) === "U"
+      ? (() => {
+          const analysis = geminiAnalysisFromGate(claim.gate_result);
+          const unusable = workflowGrade(claim.severity_grade) === "U";
+          return {
+            model_version: claim.model_id || geminiVisionModel(),
+            adapter_type: "gemini_vision",
+            is_production_validated: false,
+            predicted_crop: unusable
               ? "unknown"
-              : claim.corrected_crop || claim.crop_identified,
-          crop_confidence:
-            workflowGrade(claim.severity_grade) === "U" ? 0 : (claim.crop_confidence ?? 0) / 100,
-          predicted_grade: workflowGrade(claim.severity_grade),
-          grade_label: workflowGrade(claim.severity_grade)
-            ? workflowGrade(claim.severity_grade) === "U"
-              ? "unusable_or_out_of_domain"
-              : "workflow_bucket"
-            : null,
-          primary_damage:
-            workflowGrade(claim.severity_grade) === "U"
+              : claim.corrected_crop || analysis?.predicted_crop || claim.crop_identified,
+            crop_confidence: unusable ? 0 : (claim.crop_confidence ?? 0) / 100,
+            predicted_growth_stage: analysis?.growth_stage ?? null,
+            predicted_grade: workflowGrade(claim.severity_grade),
+            grade_label:
+              analysis?.grade_label ||
+              (unusable ? "unusable_or_not_authentic" : "gemini_workflow_bucket"),
+            primary_damage: unusable
               ? "unknown"
-              : claim.disease_detected || claim.hf_label,
-          severity: claim.corrected_severity ?? null,
-          overall_confidence: workflowGrade(claim.severity_grade) === "U" ? 0 : claim.hf_score ?? 0,
-          affected_area_pct: claim.corrected_affected_area_pct ?? null,
-          quality_warnings:
-            workflowGrade(claim.severity_grade) === "U"
-              ? [claim.quality_notes || "unusable_or_out_of_domain"]
-              : [],
-          anomaly_flags: [],
-          human_review_recommendation:
-            workflowGrade(claim.severity_grade) === "U" ? "recapture" : "Review recommended",
-          explanation: {
-            hf_label: claim.hf_label,
-            hf_score: claim.hf_score,
-            model_id: claim.model_id,
-            predicted_grade: claim.severity_grade,
-            grade_is_workflow_bucket: true,
-          },
-        }
+              : claim.disease_detected || analysis?.primary_damage || claim.hf_label,
+            severity: claim.corrected_severity ?? analysis?.severity ?? null,
+            overall_confidence: unusable ? 0 : claim.hf_score ?? 0,
+            affected_area_pct:
+              claim.corrected_affected_area_pct ??
+              analysis?.affected_area_pct ??
+              claim.severity_percentage ??
+              null,
+            quality_warnings: unusable
+              ? [claim.quality_notes || "unusable_or_not_authentic"]
+              : Array.isArray(analysis?.quality_warnings)
+                ? analysis.quality_warnings
+                : [],
+            anomaly_flags: geminiAnomalyFlags(analysis),
+            human_review_recommendation: unusable
+              ? "recapture"
+              : "Assistive Gemini analysis — human review required",
+            explanation: {
+              model_id: claim.model_id,
+              predicted_grade: claim.severity_grade,
+              grade_is_workflow_bucket: true,
+              reasoning: analysis?.reasoning || claim.context_notes || "",
+              visual_findings: analysis?.visual_findings || "",
+              authenticity: analysis?.authenticity || null,
+              per_image: analysis?.per_image || [],
+              peril_match: analysis?.peril_match ?? null,
+            },
+          };
+        })()
       : null,
     latest_evaluation: {
       evaluation_version: "evidence-confidence-v1",

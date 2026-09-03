@@ -1,6 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { claimNeedsInferenceRetry, claimToSubmission, retryPendingInference } from "@/lib/claim-pipeline";
-import { inferCropDisease } from "@/lib/hf-infer";
+import { inferCropDisease } from "@/lib/gemini-analyze";
 import { createServerSupabase } from "@/lib/supabase";
 import { createSupabaseClaimStore } from "@/lib/supabase-store";
 import { isReviewerRole, requireWebActor } from "@/lib/web-auth";
@@ -22,7 +22,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   if (claimNeedsInferenceRetry(claim)) {
-    const inferOptions = { apiToken: process.env.HF_TOKEN || process.env.HUGGINGFACE_API_TOKEN };
+    const inferOptions = {};
     after(() =>
       retryPendingInference(store, id, inferCropDisease, inferOptions).then(
         () => undefined,

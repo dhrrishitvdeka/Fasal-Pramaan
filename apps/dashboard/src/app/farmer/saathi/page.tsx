@@ -18,6 +18,7 @@ import {
   PawPrint,
   RotateCcw,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
 import { saathiRouteLabel, useSaathiSession } from "@/lib/saathi/session-provider";
@@ -41,10 +42,20 @@ export default function SaathiIntakePage() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const autoStartedRef = useRef(false);
+  const perilSeededRef = useRef(false);
+  const search = useSearchParams();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (perilSeededRef.current) return;
+    const raw = search.get("peril");
+    if (!raw) return;
+    perilSeededRef.current = true;
+    void sendText(raw.replace(/_/g, " "), "text");
+  }, [search, sendText]);
 
   useEffect(() => {
     if (autoStartedRef.current) return;
@@ -344,9 +355,16 @@ export default function SaathiIntakePage() {
               <span>{lang === "hi" ? "कैमरा खोलें — फोटो लें" : "Open Camera Studio"}</span>
               <ArrowRight className="h-4 w-4" />
             </button>
-            <Link href="/farmer/capture" className="fp-btn-secondary py-2.5 text-xs rounded-xl">
+            <button
+              type="button"
+              className="fp-btn-secondary py-2.5 text-xs rounded-xl"
+              onClick={() => {
+                if (canProceed) proceedToCapture();
+                else window.location.assign("/farmer/capture");
+              }}
+            >
               {lang === "hi" ? "स्किप" : "Skip"}
-            </Link>
+            </button>
           </div>
         </div>
       )}

@@ -49,13 +49,13 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
+  "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   `img-src ${imgSrc}`,
   `media-src 'self' blob: data:`,
-  `connect-src ${connectSrc} https://cdn.jsdelivr.net`,
-  "worker-src 'self' blob: https://cdn.jsdelivr.net",
+  `connect-src ${connectSrc}`,
+  "worker-src 'self' blob:",
 ].join("; ");
 
 /** @type {import('next').NextConfig} */

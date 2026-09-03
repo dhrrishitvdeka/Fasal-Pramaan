@@ -14,7 +14,7 @@ flowchart TD
 
   subgraph Processing["Automated Trust & Screening Tier"]
     TrustEngine["Evidence Trust Engine\n(Quality, Coverage, Context, Integrity)"]
-    Model["Assistive DINOv2 AI Screening\n(A/B/C/U Screening Grade)"]
+    Model["Assistive Gemini screening\n(A/B/C/U workflow buckets)"]
   end
 
   subgraph HumanGovernance["Authoritative Human Governance Tier"]
@@ -39,7 +39,7 @@ flowchart TD
 ```
 
 ### 1.1 Assistive Triage vs. Autonomous Adjudication
-- **The AI Model is an Assistant**: The Vision Transformer provides rapid visual triage, preliminary screening grades ($A/B/C/U$), and quality anomaly detection.
+- **The AI Model is an Assistant**: Gemini writes a field analysis and a screening grade ($A/B/C/U$). It does not pay out.
 - **Human Authority is Absolute**: Every insurance claim, damage percentage, and financial payout decision requires explicit review and confirmation by an accredited human officer.
 - **Mandatory Override Logging**: Whenever a reviewer corrects an AI screening grade or modifies a damage severity estimate, the platform mandates an `override_reason` that is permanently recorded in the immutable audit log.
 
