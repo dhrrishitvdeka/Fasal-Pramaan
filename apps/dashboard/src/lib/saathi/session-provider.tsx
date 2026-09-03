@@ -141,6 +141,8 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
   const mountedRef = useRef(true);
   const connectVoiceRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const hasGreetedRef = useRef(false);
+  const openingRef = useRef(false);
+  const openingTimerRef = useRef<number | null>(null);
 
   statusRef.current = liveStatus;
   langRef.current = lang;
@@ -282,6 +284,18 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
       const last = copy[copy.length - 1];
       if (last && last.id.startsWith("live-") && last.role === role) {
         copy[copy.length - 1] = { ...last, text: buf };
+      } else if (
+        role === "saathi" &&
+        last?.role === "saathi" &&
+        !last.id.startsWith("live-") &&
+        !last.id.startsWith("sys-")
+      ) {
+        copy[copy.length - 1] = {
+          id: `live-saathi-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          role,
+          text: buf,
+          at: new Date().toISOString(),
+        };
       } else {
         copy.push({
           id: `live-${role}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -309,12 +323,17 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
       window.clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
     }
+    if (openingTimerRef.current != null) {
+      window.clearTimeout(openingTimerRef.current);
+      openingTimerRef.current = null;
+    }
   }, []);
 
   const disconnectVoice = useCallback(() => {
     intentionalCloseRef.current = true;
     connectingRef.current = false;
     setupCompleteRef.current = false;
+    openingRef.current = false;
     lastContextRef.current = "";
     retryCountRef.current = 0;
     clearTimers();
@@ -330,6 +349,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
       intentionalCloseRef.current = true;
       connectingRef.current = false;
       setupCompleteRef.current = false;
+      openingRef.current = false;
       lastContextRef.current = "";
       retryCountRef.current = 0;
       clearTimers();
@@ -346,6 +366,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
   const pushPortalContext = useCallback((reason: string) => {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN || !setupCompleteRef.current) return;
+    if (openingRef.current) return;
     const snap = snapshotRef.current;
     const recapture = snap.claims.filter((claim) => claim.status === "needs_recapture");
     const nextReminder = snap.milestones
@@ -365,7 +386,6 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     }> | null;
     const payload = {
       type: "portal_context",
-      reason,
       path: snap.pathname,
       language: snap.lang,
       plot_count: snap.plots.length,
@@ -382,6 +402,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
         ? signals.map((s) => ({ source: s.source, status: s.status, label: s.labelEn }))
         : null,
     };
+    void reason;
     const text = `PORTAL CONTEXT (internal; do not read aloud unless asked):\n${JSON.stringify(payload)}`;
     if (text === lastContextRef.current) return;
     lastContextRef.current = text;
@@ -472,8 +493,16 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
               setupCompleteRef.current = true;
               setLiveStatus("live");
               retryCountRef.current = 0;
-              pushPortalContext("session_start");
               if (!hasGreetedRef.current) {
+                openingRef.current = true;
+                liveAudioRef.current?.setHoldUplink(true);
+                if (openingTimerRef.current != null) window.clearTimeout(openingTimerRef.current);
+                openingTimerRef.current = window.setTimeout(() => {
+                  if (!openingRef.current) return;
+                  openingRef.current = false;
+                  liveAudioRef.current?.setHoldUplink(false);
+                  pushPortalContext("session_start");
+                }, 12_000);
                 hasGreetedRef.current = true;
                 try {
                   socket.send(
@@ -490,10 +519,13 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
                   // ignore
                 }
               } else {
+                openingRef.current = false;
+                liveAudioRef.current?.setHoldUplink(false);
                 pushPortalContext("resume");
               }
             }
             if (item.type === "inputTranscript") {
+              if (openingRef.current) continue;
               inputBufRef.current += item.text;
               upsertTranscript("farmer", inputBufRef.current);
             }
@@ -506,13 +538,22 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
             if (item.type === "toolCalls") void handleTools(item.calls);
             if (item.type === "turnComplete") {
               const spoken = inputBufRef.current.trim();
-              if (spoken) {
+              if (spoken && !openingRef.current) {
                 userTurnRef.current += 1;
                 const extracted = extractSlotsFromText(spoken, plots as never);
                 if (Object.keys(extracted).length) setSlots((s) => mergeSlots(s, extracted));
               }
               inputBufRef.current = "";
               outputBufRef.current = "";
+              if (openingRef.current) {
+                openingRef.current = false;
+                if (openingTimerRef.current != null) {
+                  window.clearTimeout(openingTimerRef.current);
+                  openingTimerRef.current = null;
+                }
+                liveAudioRef.current?.setHoldUplink(false);
+                pushPortalContext("session_start");
+              }
             }
             if (item.type === "error") {
               failSession(
@@ -640,6 +681,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
           return;
         }
         liveAudioRef.current = liveAudio;
+        liveAudio.setHoldUplink(openingRef.current);
       } catch (micErr) {
         pushNote(micErr instanceof Error ? micErr.message : micPermissionMessage);
       }
@@ -778,7 +820,8 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     if (liveStatus !== "live") return;
-    const timer = window.setTimeout(() => pushPortalContext("state_change"), 800);
+    if (openingRef.current) return;
+    const timer = window.setTimeout(() => pushPortalContext("state_change"), 1500);
     return () => window.clearTimeout(timer);
   }, [liveStatus, pathname, lang, plots, claims, milestones, pushPortalContext]);
 
