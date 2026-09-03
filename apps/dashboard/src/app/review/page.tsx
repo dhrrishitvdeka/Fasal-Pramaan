@@ -19,6 +19,7 @@ import {
 import { PERIL_OPTIONS } from "@/lib/claim-routing";
 import { TableSkeleton } from "@/components/LoadingAnimation";
 import ErrorMessage from "@/components/ErrorMessage";
+import { Search, Download } from "lucide-react";
 
 type QueueSort = "newest" | "evidence_asc" | "evidence_desc" | "model_desc";
 
@@ -318,47 +319,61 @@ function ReviewQueuePage() {
       </div>
 
       {/* Search & Sort Row */}
-      <div className="flex flex-col gap-2 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
-        <div className="w-full sm:w-72">
+      <div className="flex flex-col gap-3 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="relative w-full sm:w-80">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             type="search"
             placeholder="Search by ID, plot, crop, peril…"
             value={searchQuery}
             onChange={(e) => setParam("q", e.target.value)}
-            className="fp-input mt-0"
+            className="w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 shadow-2xs focus:border-slate-800 focus:outline-none"
           />
         </div>
-        <div className="flex w-full items-center gap-2 sm:w-auto">
-          <label className="shrink-0 font-medium text-slate-500">Peril:</label>
-          <select
-            value={perilFilter}
-            onChange={(e) => setParam("peril", e.target.value === "all" ? "" : e.target.value)}
-            className="fp-input mt-0 min-w-0 flex-1 py-1 text-xs sm:flex-none sm:w-40"
-          >
-            <option value="all">All perils</option>
-            {PERIL_OPTIONS.map((p) => (
-              <option key={p.value} value={p.value}>{p.en}</option>
-            ))}
-          </select>
-          <label className="shrink-0 font-medium text-slate-500">Sort by:</label>
-          <select
-            value={sortBy}
-            onChange={(e) => setParam("sort", e.target.value === "newest" ? "" : e.target.value)}
-            className="fp-input mt-0 min-w-0 flex-1 py-1 text-xs sm:flex-none"
-          >
-            <option value="newest">Newest First</option>
-            <option value="evidence_asc">Evidence Confidence (Lowest First)</option>
-            <option value="evidence_desc">Evidence Confidence (Highest First)</option>
-            <option value="model_desc">Model Confidence (Highest First)</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-2.5 sm:w-auto">
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="peril-filter" className="shrink-0 font-medium text-slate-500">
+              Peril:
+            </label>
+            <select
+              id="peril-filter"
+              value={perilFilter}
+              onChange={(e) => setParam("peril", e.target.value === "all" ? "" : e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-2xs focus:border-slate-800 focus:outline-none w-auto sm:w-36"
+            >
+              <option value="all">All perils</option>
+              {PERIL_OPTIONS.map((p) => (
+                <option key={p.value} value={p.value}>{p.en}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="sort-filter" className="shrink-0 font-medium text-slate-500">
+              Sort by:
+            </label>
+            <select
+              id="sort-filter"
+              value={sortBy}
+              onChange={(e) => setParam("sort", e.target.value === "newest" ? "" : e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-2xs focus:border-slate-800 focus:outline-none w-auto sm:w-52"
+            >
+              <option value="newest">Newest First</option>
+              <option value="evidence_asc">Evidence Confidence (Lowest First)</option>
+              <option value="evidence_desc">Evidence Confidence (Highest First)</option>
+              <option value="model_desc">Model Confidence (Highest First)</option>
+            </select>
+          </div>
+
           <button
             type="button"
             onClick={handleExportCsv}
             disabled={filteredItems.length === 0}
             title="Export filtered cases to CSV"
-            className="hidden rounded border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 md:inline-block"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-2xs"
           >
-            Export CSV
+            <Download className="h-3.5 w-3.5 text-slate-500" />
+            <span>Export CSV</span>
           </button>
         </div>
       </div>
@@ -367,7 +382,10 @@ function ReviewQueuePage() {
         <ErrorMessage
           title="Something went wrong loading the review queue"
           message={error instanceof Error ? error.message : "Unable to retrieve claims for review. Please verify reviewer credentials."}
-          onRetry={() => void refetch()}
+          onRetry={() => {
+            if (typeof window !== "undefined") window.location.reload();
+            else void refetch();
+          }}
           className="my-4"
         />
       )}
