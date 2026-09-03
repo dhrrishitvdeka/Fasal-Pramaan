@@ -25,12 +25,27 @@ export default function ErrorBoundary({
           <br />
           पृष्ठ में अप्रत्याशित त्रुटि आई। आपका डेटा सुरक्षित है।
         </p>
-        {error.digest ? (
-          <p className="mt-3 font-mono text-[11px] text-[var(--ink-muted)]">ref: {error.digest}</p>
-        ) : null}
-        <button type="button" onClick={reset} className="fp-btn-primary mt-5 w-full sm:w-auto">
-          Try again · पुनः प्रयास करें
-        </button>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.location.reload();
+              } else {
+                reset();
+              }
+            }}
+            className="fp-btn-primary w-full sm:w-auto"
+          >
+            Try again · पुनः प्रयास करें
+          </button>
+          <a
+            href="/overview"
+            className="fp-btn-secondary w-full sm:w-auto text-xs inline-flex items-center justify-center"
+          >
+            Return to overview
+          </a>
+        </div>
       </div>
     </div>
   );

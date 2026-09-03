@@ -23,7 +23,6 @@ export default function HealthPage() {
     <div className="space-y-4 p-4 sm:p-6">
       <div>
         <h1 className="text-lg font-bold text-slate-900">System health</h1>
-        <p className="text-xs text-slate-500">Liveness only — no configuration secrets.</p>
       </div>
       <div className="fp-panel p-4">
         <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500">Dependency checks</h2>
