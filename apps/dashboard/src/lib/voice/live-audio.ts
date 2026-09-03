@@ -20,6 +20,8 @@ export type LiveAudioSession = {
   sendVideoFrame: (base64Jpeg: string) => void;
   /** Drop every queued buffer immediately (barge-in) and resync the playback clock. */
   interrupt: () => void;
+  /** When true, microphone chunks are discarded and not sent to Gemini. */
+  setHoldUplink: (hold: boolean) => void;
   /** Full teardown: playback, mic graph, stream tracks, and the AudioContext. */
   stop: () => void;
 };
@@ -203,26 +205,29 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
       playPcm24k() {},
       sendVideoFrame() {},
       interrupt() {},
+      setHoldUplink() {},
     } satisfies LiveAudioSession;
   }
   stream = mediaStream;
   source = ctx.createMediaStreamSource(mediaStream);
+  let holdUplink = false;
 
   const processAudioChunk = (input: Float32Array, rms: number) => {
     if (onVolumeChange) onVolumeChange(Math.min(1, rms * 4));
+    if (holdUplink) return;
 
     // Acoustic Echo Suppression during speaker playback:
     // When the assistant is speaking through device speakers, prevent the microphone
     // from feeding the assistant's own voice back into Gemini Live.
     const isAssistantSpeaking = ctx.currentTime < playTime + 0.15;
     if (isAssistantSpeaking) {
-      // Speaker bleed on phone loudspeakers routinely exceeds 0.12 RMS and used
-      // to interrupt() the assistant's own audio. Drop residual echo; only
-      // barge-in on a clearly louder user utterance.
-      if (rms < 0.3) {
+      // Phone loudspeakers routinely exceed 0.3 RMS on the greeting; only barge-in
+      // on a clearly louder user utterance, and never upload the echo chunk.
+      if (rms < 0.55) {
         return;
       }
       interrupt();
+      return;
     }
 
     if (socket.readyState !== WebSocket.OPEN) return;
@@ -272,5 +277,9 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
     connectSilentProcessor(processor, ctx);
   }
 
-  return { context: ctx, playPcm24k, sendVideoFrame, interrupt, stop };
+  const setHoldUplink = (hold: boolean) => {
+    holdUplink = hold;
+  };
+
+  return { context: ctx, playPcm24k, sendVideoFrame, interrupt, stop, setHoldUplink };
 }
