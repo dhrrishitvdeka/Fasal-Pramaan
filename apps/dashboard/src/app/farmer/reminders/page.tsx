@@ -113,9 +113,9 @@ export default function FarmerRemindersPage() {
     ownershipType: "owner",
     areaKattha: "10",
     areaUnit: "kattha" as AreaUnit,
-    soilType: "Alluvial / Loam",
-    irrigationType: "Tube-well",
-    season: "Rabi",
+    soilType: "",
+    irrigationType: "",
+    season: "",
     cropType: "wheat",
     cropVariety: "",
     sowingDate: todayIsoDate(),
@@ -321,9 +321,9 @@ export default function FarmerRemindersPage() {
         ownershipType: "owner",
         areaKattha: "10",
         areaUnit: "kattha",
-        soilType: "Alluvial / Loam",
-        irrigationType: "Tube-well",
-        season: "Rabi",
+        soilType: "",
+        irrigationType: "",
+        season: "",
         cropType: "wheat",
         cropVariety: "",
         sowingDate: todayIsoDate(),
@@ -699,6 +699,7 @@ export default function FarmerRemindersPage() {
                     onChange={(e) => setPlotForm((prev) => ({ ...prev, soilType: e.target.value }))}
                     className="fp-input mt-1"
                   >
+                    <option value="">{lang === "hi" ? "सेट नहीं" : "Not set"}</option>
                     {SOIL_TYPES.map((st) => (
                       <option key={st.value} value={st.value}>
                         {lang === "hi" ? st.labelHi : st.labelEn}
@@ -714,6 +715,7 @@ export default function FarmerRemindersPage() {
                     onChange={(e) => setPlotForm((prev) => ({ ...prev, irrigationType: e.target.value }))}
                     className="fp-input mt-1"
                   >
+                    <option value="">{lang === "hi" ? "सेट नहीं" : "Not set"}</option>
                     {IRRIGATION_TYPES.map((it) => (
                       <option key={it.value} value={it.value}>
                         {lang === "hi" ? it.labelHi : it.labelEn}
@@ -760,6 +762,7 @@ export default function FarmerRemindersPage() {
                     onChange={(e) => setPlotForm((prev) => ({ ...prev, season: e.target.value }))}
                     className="fp-input mt-1"
                   >
+                    <option value="">{lang === "hi" ? "सेट नहीं" : "Not set"}</option>
                     <option value="Rabi">{lang === "hi" ? "रबी (Rabi - शीतकालीन)" : "Rabi (Winter Season)"}</option>
                     <option value="Kharif">{lang === "hi" ? "खरीफ (Kharif - मानसूनी)" : "Kharif (Monsoon Season)"}</option>
                     <option value="Zaid">{lang === "hi" ? "जायद (Zaid - ग्रीष्मकालीन)" : "Zaid (Summer Season)"}</option>

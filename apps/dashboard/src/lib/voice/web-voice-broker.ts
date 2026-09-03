@@ -348,7 +348,7 @@ export class WebVoiceBroker {
   private async registerPlot(args: Record<string, unknown>): Promise<VoiceToolResult> {
     const name = String(args.name || args.plot_name || "Farm Plot").trim();
     const cropType = String(args.crop_type || args.crop || "wheat").trim().toLowerCase();
-    const khasra = args.khasra_number ? String(args.khasra_number).trim() : `KH-${Math.floor(100 + Math.random() * 900)}`;
+    const khasra = args.khasra_number ? String(args.khasra_number).trim() : "";
     const area = args.area_hectares ? Number(args.area_hectares) : 1.0;
     const village = args.village ? String(args.village).trim() : undefined;
 

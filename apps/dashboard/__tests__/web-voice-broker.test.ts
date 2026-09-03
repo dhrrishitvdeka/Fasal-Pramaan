@@ -173,7 +173,7 @@ describe("web Fasal Saathi broker", () => {
       {
         name: "East bund",
         cropType: "paddy",
-        khasraNumber: expect.stringMatching(/^KH-/),
+        khasraNumber: "",
         areaHectares: 2,
         village: "Rampur",
       },
