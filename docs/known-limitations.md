@@ -12,8 +12,8 @@
 - Quality uses client-measured blur/lighting when present.
 - Coverage is “required angles present”.
 - Context is “GPS numbers present”, plus Open-Meteo / optional Sentinel / Bhuvan probe.
-- Integrity is “SHA-256 stored”. There is **no pHash**, no EXIF parser, no mock-GPS detector.
-- Duplicate SHA across a claim is not a global farm-wide search.
+- Integrity checks SHA-256 presence and detects duplicate hashes reused across distinct angles within a claim (penalizing integrity to 35). There is **no pHash**, no EXIF parser, and no mock-GPS detector.
+- Duplicate SHA detection is scoped across angles within the claim; it is not a global farm-wide search.
 
 ## External signals
 

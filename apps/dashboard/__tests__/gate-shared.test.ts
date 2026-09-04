@@ -37,10 +37,20 @@ describe("vision authenticity gate (heuristic, no network)", () => {
     expect(res.usable).toBe(true);
     expect(res.reason).toBe("ok");
     expect(res.crop_detected).toBe("unknown");
+    expect(res.warnings).toContain("fire_burn_heuristic_fallback");
 
     const withCrop = heuristicGate(bigJpegDataUrl(), "Wheat", "fire_burn");
     expect(withCrop.usable).toBe(true);
     expect(withCrop.crop_detected).toBe("Wheat");
+    expect(withCrop.confidence).toBeCloseTo(0.65, 5);
+  });
+
+  it("rejects severe blur (< 10) even for fire_burn frames", () => {
+    const blurryFire = heuristicGate(bigJpegDataUrl(), "Wheat", "fire_burn", {
+      cvAnalysis: { blurScore: 6, luma: 40 },
+    });
+    expect(blurryFire.usable).toBe(false);
+    expect(blurryFire.reason).toBe("too_blurry");
   });
 
   it("does not auto-pass expected-crop frames without CV quality signals", () => {

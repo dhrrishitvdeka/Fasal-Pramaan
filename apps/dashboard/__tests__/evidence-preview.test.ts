@@ -91,4 +91,21 @@ describe("honest evidence preview", () => {
     expect(isRealSha256("not-a-hash")).toBe(false);
     expect(isRealSha256("a".repeat(64))).toBe(true);
   });
+
+  it("penalizes integrity score when duplicate hashes are reused across distinct angles", () => {
+    const preview = computeEvidencePreview([
+      {
+        angleId: "wide_field",
+        imageUrl: "x",
+        sha256: "a".repeat(64),
+      },
+      {
+        angleId: "closeup_damage",
+        imageUrl: "y",
+        sha256: "a".repeat(64),
+      },
+    ]);
+    expect(preview.integrityScore).toBe(35);
+    expect(preview.integrityNotes).toMatch(/duplicate/i);
+  });
 });

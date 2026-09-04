@@ -4,7 +4,7 @@ import { checkRateLimit } from "@/lib/server/rate-limit";
 
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60_000;
-export const VERSION = "2.6.1";
+export const VERSION = "2.7.0";
 
 /**
  * Honest configuration summary for the admin System Status page.

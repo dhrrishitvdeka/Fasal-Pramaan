@@ -102,7 +102,7 @@ sequenceDiagram
   Reviewer->>Dashboard: Inspects Duplicate Flag -> Clicks 'Reject Claim' with reason
 ```
 
-1. **Demonstrate Protection**: Show that even if an image is visually sharp ($S_{\text{Quality}} = 95.0$), a cryptographic or perceptual hash collision immediately drops $S_{\text{Integrity}}$ to $35.0$.
+1. **Demonstrate Protection**: Show that even if an image is visually sharp ($S_{\text{Quality}} = 95.0$), an identical cryptographic SHA-256 hash collision reused across angles immediately drops $S_{\text{Integrity}}$ to $35.0$.
 2. **Strict Escalation**: Highlight that the automated recapture engine **refuses to issue an automated retake** for integrity breaches, requiring explicit human reviewer adjudication to protect the insurance pool.
 3. **Reviewer Action**: Reviewer clicks **Reject Claim** and logs the reason *"Fraudulent duplicate photo detected across angles"*.
 
