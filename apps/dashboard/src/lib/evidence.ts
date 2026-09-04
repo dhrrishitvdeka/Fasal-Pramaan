@@ -165,6 +165,10 @@ function mean(values: number[]): number | null {
  * Detect duplicate or exact-same-angle images across evidence inputs.
  * Checks for duplicate SHA-256 digests, identical data URLs, perceptual dHash similarity,
  * or identical continuous edge signals.
+ *
+ * Defensive: sensor fields may be getter-backed and throw (poisoned/malformed capture
+ * metadata). Each field is read tolerantly — a throwing signal is treated as absent
+ * for that image, never as a pipeline crash.
  */
 export function detectDuplicateImages(images: EvidenceImageInput[]): {
   hasDuplicates: boolean;
@@ -174,10 +178,32 @@ export function detectDuplicateImages(images: EvidenceImageInput[]): {
   const duplicatePairs: [number, number][] = [];
   const reasons: string[] = [];
 
-  for (let i = 0; i < images.length; i++) {
-    for (let j = i + 1; j < images.length; j++) {
-      const a = images[i];
-      const b = images[j];
+  function safeRead<T>(fn: () => T): T | null {
+    try {
+      return fn();
+    } catch {
+      return null;
+    }
+  }
+
+  const safe = images.map((img) => ({
+    sha256: safeRead(() => img.sha256),
+    imageUrl: safeRead(() => img.imageUrl),
+    bytes: safeRead(() => img.bytes),
+    pHash: safeRead(() => img.pHash),
+    blurScore: safeRead(() => img.blurScore),
+    lightingScore: safeRead(() => img.lightingScore),
+    luma: safeRead(() => img.luma),
+    greenPct: safeRead(() => img.greenPct),
+    cropScore: safeRead(() => img.cropScore),
+    angleId: safeRead(() => img.angleId),
+    angleType: safeRead(() => img.angleType),
+  }));
+
+  for (let i = 0; i < safe.length; i++) {
+    for (let j = i + 1; j < safe.length; j++) {
+      const a = safe[i];
+      const b = safe[j];
 
       // 1. Exact SHA-256 hash match
       if (
@@ -240,7 +266,13 @@ export function detectDuplicateImages(images: EvidenceImageInput[]): {
         }
       }
 
-      // 5. Multi-metric continuous CV measurement match across frames (even across different slot labels)
+      // 5. Multi-metric continuous CV measurement match across frames (even across different slot labels).
+      // Strict: ALL continuous signals must be bit-identical (same blur + lighting + luma +
+      // crop score + green %). Same-field photos shot in the same light routinely share
+      // blur/lighting plus one coincidental metric, so requiring only one match caused
+      // false-positive duplicate_angle blocks on genuinely different photos. A true
+      // re-encoded duplicate still matches on every signal. Exact byte/SHA/pHash cases
+      // are already caught by checks 1-4 above.
       const scoresMatch =
         a.blurScore != null &&
         b.blurScore != null &&
@@ -264,7 +296,7 @@ export function detectDuplicateImages(images: EvidenceImageInput[]): {
         b.greenPct != null &&
         a.greenPct === b.greenPct;
 
-      if (scoresMatch && (lumaMatch || cropMatch || greenMatch || a.angleId === b.angleId || a.angleType === b.angleType)) {
+      if (scoresMatch && lumaMatch && cropMatch && greenMatch) {
         duplicatePairs.push([i, j]);
         reasons.push(`Photos ${i + 1} and ${j + 1} share identical sensor and CV feature signatures.`);
       }

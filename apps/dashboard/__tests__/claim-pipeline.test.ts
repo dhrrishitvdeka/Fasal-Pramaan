@@ -500,7 +500,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     const store = createMemoryClaimStore();
     let inferCalls = 0;
     // Poison a gate-only metadata field: gateSingleImage reads greenPct when building the
-    // Gemini/heuristic metadata payload, but nothing after the gate touches it.
+    // Gemini/heuristic metadata payload and throws; duplicate detection reads it tolerantly.
     const poisoned: PersistedImageInput = {
       angleType: "closeup_damage",
       bytes: jpegLikeBytes(),
@@ -731,15 +731,17 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(dupPreview.integrityNotes).toMatch(/duplicate/i);
   });
 
-  it("gateImagesGate flags duplicate uploads across slots with duplicate_angle and fails gate", async () => {
+  it("gateImagesGate flags duplicate uploads across slots as coverage penalty without failing gate", async () => {
     const images: PersistedImageInput[] = [
       usableImage({ angleType: "photo_1", sha256: "e".repeat(64) }),
       usableImage({ angleType: "photo_2", sha256: "e".repeat(64) }), // duplicate sha256
     ];
     const outcome = await gateImagesGate(images, "wheat", "normal");
-    expect(outcome.gateFailed).toBe(true);
-    expect(outcome.blockingReason).toBe("duplicate_angle");
     expect(outcome.perImage[1].usable).toBe(false);
     expect(outcome.perImage[1].reason).toBe("duplicate_angle");
+    // Duplicates are a coverage problem, not an authenticity block: inference proceeds.
+    expect(outcome.gateFailed).toBe(false);
+    expect(outcome.blockingReason).toBeUndefined();
+    expect((outcome.gateResult as { duplicateAngles: string[] }).duplicateAngles).toEqual(["photo_2"]);
   });
 });

@@ -838,6 +838,15 @@ export default function ReviewDetailPage() {
                   {detected && <span>· Detected: <strong className="text-slate-800">{detected}</strong></span>}
                 </div>
 
+                {gateInfo?.gateFailed && !gateInfo?.overridden && (pred?.predicted_grade === "U" || !pred) && (
+                  <div className="flex items-center gap-2 rounded-lg border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-950 font-medium">
+                    <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
+                    <span>
+                      Vision gate blocked{gateInfo.blockingReason ? ` (${gateInfo.blockingReason.replaceAll("_", " ")})` : ""} — field analysis never ran. Grade U is a placeholder, not a model judgment. Override the gate or request a recapture to proceed.
+                    </span>
+                  </div>
+                )}
+
                 {oneLiner ? (
                   <p className="text-xs leading-relaxed text-slate-800 bg-slate-50/80 p-3 rounded-lg border border-slate-100">
                     &ldquo;{oneLiner}&rdquo;

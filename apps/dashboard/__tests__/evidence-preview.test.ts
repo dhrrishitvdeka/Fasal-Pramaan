@@ -195,11 +195,19 @@ describe("perceptual dHash and duplicate angle detection", () => {
 
   it("detects identical multi-metric continuous CV measurements across slots", () => {
     const dup = detectDuplicateImages([
-      { angleId: "photo_1", blurScore: 54, lightingScore: 68, luma: 128 },
-      { angleId: "photo_2", blurScore: 54, lightingScore: 68, luma: 128 },
+      { angleId: "photo_1", blurScore: 54, lightingScore: 68, luma: 128, cropScore: 80, greenPct: 42 },
+      { angleId: "photo_2", blurScore: 54, lightingScore: 68, luma: 128, cropScore: 80, greenPct: 42 },
     ]);
     expect(dup.hasDuplicates).toBe(true);
     expect(dup.reasons[0]).toMatch(/identical sensor and CV feature signatures/i);
+  });
+
+  it("does not flag partial sensor matches (same light, different scene) as duplicates", () => {
+    const dup = detectDuplicateImages([
+      { angleId: "photo_1", blurScore: 54, lightingScore: 68, luma: 128, cropScore: 80, greenPct: 42 },
+      { angleId: "photo_2", blurScore: 54, lightingScore: 68, luma: 140, cropScore: 61, greenPct: 55 },
+    ]);
+    expect(dup.hasDuplicates).toBe(false);
   });
 });
 
