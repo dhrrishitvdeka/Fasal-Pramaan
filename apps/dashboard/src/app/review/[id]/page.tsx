@@ -39,12 +39,13 @@ import {
   Layers,
   MapPin,
   Maximize2,
+  RefreshCw,
   RotateCcw,
   Scale,
+  ScanSearch,
   Shield,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Sprout,
   UserCheck,
   X,
@@ -700,7 +701,7 @@ export default function ReviewDetailPage() {
       {message && (
         <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-blue-600 shrink-0" />
             <span>{message}</span>
           </div>
           <button type="button" onClick={() => setMessage(null)} className="text-blue-500 hover:text-blue-700">
@@ -709,8 +710,9 @@ export default function ReviewDetailPage() {
         </div>
       )}
 
-      {/* 3. SINGLE-COLUMN REVIEW FLOW — summary → photos → AI → trust → decision → audit */}
-      <div className="mx-auto max-w-5xl space-y-3">
+      {/* 3. REVIEW WORKSPACE — main flow + sticky audit rail (right) */}
+      <div className="mx-auto grid w-full max-w-[1440px] items-start gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="mx-auto w-full max-w-3xl min-w-0 space-y-3">
           {/* EVIDENCE PHOTO GALLERY */}
           <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs space-y-2">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -832,14 +834,13 @@ export default function ReviewDetailPage() {
               !declared.toLowerCase().includes(detected.toLowerCase());
 
             return (
-              <section className="relative overflow-hidden rounded-xl border-2 border-indigo-200 bg-white shadow-md shadow-indigo-100/50">
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-400" />
-                <div className="flex flex-wrap items-center gap-2 px-3 pb-2 pt-3">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-600 text-white">
-                    <Sparkles className="h-3.5 w-3.5" />
+              <section className="rounded-xl border border-slate-200 bg-white shadow-2xs">
+                <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-900 text-white">
+                    <ScanSearch className="h-3.5 w-3.5" />
                   </span>
-                  <h3 className="text-[13px] font-extrabold tracking-tight text-slate-900">AI Assessment</h3>
-                  <span className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-blue-700 border border-blue-200">
+                  <h3 className="text-[13px] font-bold tracking-tight text-slate-900">Crop Analysis</h3>
+                  <span className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-700">
                     Grade {pred?.predicted_grade || data.inference_status || "U"}
                   </span>
                   <span className="font-mono text-[10px] text-slate-400">{pred?.model_version}</span>
@@ -847,6 +848,28 @@ export default function ReviewDetailPage() {
                     {data.peril || "normal"} · {declared || "—"} → {detected || "—"}
                   </span>
                 </div>
+
+                {/* Analyzed input — which photos the output below is based on */}
+                {inspectableImages.length > 0 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto border-b border-slate-100 px-3 py-2">
+                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">Input</span>
+                    {inspectableImages.map((img, idx) => (
+                      <button
+                        key={img.id}
+                        type="button"
+                        onClick={() => setLightboxIndex(idx)}
+                        className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-900 hover:border-slate-500"
+                        title={`${(ALL_ANGLES.find((a) => a.key === img.angle_type)?.label || img.angle_type).replaceAll("_", " ")} — click to inspect`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img.download_url as string} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      </button>
+                    ))}
+                    <span className="shrink-0 font-mono text-[10px] text-slate-400">
+                      {inspectableImages.length} frame{inspectableImages.length === 1 ? "" : "s"} · {pred?.predicted_growth_stage || "stage n/a"}
+                    </span>
+                  </div>
+                )}
 
                 {gateInfo?.gateFailed && !gateInfo?.overridden && (pred?.predicted_grade === "U" || !pred) && (
                   <p className="mx-3 flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-[11px] font-medium text-rose-900">
@@ -906,21 +929,21 @@ export default function ReviewDetailPage() {
                       type="button"
                       onClick={handleReanalyze}
                       disabled={reanalyzing || busy || isClosed}
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-black disabled:opacity-50"
                     >
                       {reanalyzing ? (
                         <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> Analyzing…</>
                       ) : (
-                        <><Sparkles className="h-3.5 w-3.5" /> Re-run AI analysis</>
+                        <><RefreshCw className="h-3.5 w-3.5" /> Re-run analysis</>
                       )}
                     </button>
                   </div>
                 )}
 
                 {pred && (
-                  <details className="px-3 py-2">
-                    <summary className="cursor-pointer list-none text-[11px] font-bold uppercase tracking-wider text-indigo-700 hover:text-indigo-900">
-                      Scoring breakdown +
+                  <details className="px-3 py-2" open>
+                    <summary className="cursor-pointer list-none text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-900">
+                      Model output +
                     </summary>
                     <div className="pt-1.5">
                       <AiConfidenceBreakdown prediction={pred} images={data.images} peril={data.peril} />
@@ -1143,7 +1166,9 @@ export default function ReviewDetailPage() {
             </details>
           </section>
 
-          {/* 4. AUDIT & REVIEW TIMELINE — beautiful timeline */}
+        </div>
+        <aside className="w-full min-w-0 xl:sticky xl:top-3">
+          {/* 4. AUDIT TRAIL — right rail */}
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
             <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-900 text-white">
@@ -1158,7 +1183,7 @@ export default function ReviewDetailPage() {
             {historyItems.length === 0 ? (
               <p className="px-3 py-4 text-xs text-slate-400">No actions yet — your decision starts the trail.</p>
             ) : (
-              <ol className="relative max-h-72 space-y-0 overflow-y-auto px-3 py-3">
+              <ol className="relative max-h-[70vh] space-y-0 overflow-y-auto px-3 py-3">
                 <span aria-hidden="true" className="absolute bottom-6 left-[23px] top-6 w-px bg-gradient-to-b from-slate-300 via-slate-200 to-transparent" />
                 {historyItems.map((item, idx) => {
                   const act = item.action.toLowerCase();
@@ -1176,7 +1201,7 @@ export default function ReviewDetailPage() {
                   return (
                     <li key={item.id} className="relative flex gap-2 pb-3 last:pb-0">
                       <span className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold text-white shadow-sm ring-4 ${dotBg} ${tone.split(" ")[1]}`}>
-                        {idx === 0 ? <Sparkles className="h-3 w-3" /> : initial}
+                        {initial}
                       </span>
                       <div className="min-w-0 flex-1 rounded-lg border border-slate-200/80 bg-white px-2.5 py-2 shadow-2xs">
                         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
@@ -1204,6 +1229,7 @@ export default function ReviewDetailPage() {
               </ol>
             )}
           </section>
+        </aside>
       </div>
 
       {/* ADAPTIVE RECAPTURE MODAL */}
