@@ -31,12 +31,36 @@ export function gateCacheKey(
   angleType?: string,
   expectedCrop?: string,
   peril?: string,
+  measurements?: {
+    cropScore?: number | null;
+    greenPct?: number | null;
+    luma?: number | null;
+    blurScore?: number | null;
+    hintCode?: string | null;
+  },
 ): string {
   const normSha = sha.toLowerCase().trim();
   const normAngle = (angleType || "closeup_damage").toLowerCase().trim();
   const normCrop = (expectedCrop || "").toLowerCase().trim();
   const normPeril = (peril || "normal").toLowerCase().trim();
-  return `${normSha}:${normAngle}:${normCrop}:${normPeril}`;
+  // Measurement-sensitive key: the same bytes re-submitted with different CV
+  // signals must not replay a stale verdict.
+  const m = measurements || {};
+  const normMeas = [
+    m.cropScore ?? "",
+    m.greenPct ?? "",
+    m.luma ?? "",
+    m.blurScore ?? "",
+    String(m.hintCode || "").toLowerCase().trim(),
+  ].join(",");
+  return `${normSha}:${normAngle}:${normCrop}:${normPeril}:${normMeas}`;
+}
+
+function cacheGateResult(cacheKey: string, result: GateResult): void {
+  // Cache passes only: failures are cheap to recompute and must never pin a
+  // stale block across retries (e.g. key configured after a heuristic fallback).
+  if (!cacheKey || !result.usable) return;
+  gateCache.set(cacheKey, { result, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
 }
 
 async function gateSingleImage(
@@ -47,7 +71,13 @@ async function gateSingleImage(
   const sha = input.sha256 ? String(input.sha256).toLowerCase() : "";
   const isRealSha = sha && /^[a-f0-9]{64}$/i.test(sha);
   const cacheKey = isRealSha
-    ? gateCacheKey(sha, input.angleType, expectedCrop, peril)
+    ? gateCacheKey(sha, input.angleType, expectedCrop, peril, {
+        cropScore: input.cropScore,
+        greenPct: input.greenPct,
+        luma: input.luma,
+        blurScore: input.blurScore,
+        hintCode: input.hintCode,
+      })
     : "";
   if (cacheKey) {
     const cached = gateCache.get(cacheKey);
@@ -70,7 +100,8 @@ async function gateSingleImage(
       confidence: 0,
       fallback: true,
     };
-    if (cacheKey) gateCache.set(cacheKey, { result: fallback, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
+    // Failures are never cached (see cacheGateResult): a retry with bytes
+    // must not replay this no-bytes verdict.
     return fallback;
   }
 
@@ -101,7 +132,7 @@ async function gateSingleImage(
   try {
     const gemini = await geminiGate(dataUrl, input.angleType || "closeup_damage", expectedCrop, peril, meta);
     if (gemini) {
-      if (cacheKey) gateCache.set(cacheKey, { result: gemini, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
+      cacheGateResult(cacheKey, gemini);
       return gemini;
     }
   } catch {
@@ -110,7 +141,7 @@ async function gateSingleImage(
 
   const heuristic = heuristicGate(dataUrl, expectedCrop, peril, meta);
   const result: GateResult = { ...heuristic, fallback: true };
-  if (cacheKey) gateCache.set(cacheKey, { result, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
+  cacheGateResult(cacheKey, result);
   return result;
 }
 
@@ -1480,17 +1511,23 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
       coverage: {
         score: claim.coverage_score ?? 0,
         available: true,
-        details: {
-          missing_views: claim.missing_angles || [],
-          // usable = required minus missing (gate-usable), while views_present
-          // stays as stored frames so reviewers can see present-vs-usable gaps.
-          usable_views: Math.max(0, 5 - (claim.missing_angles || []).length),
-          required_views: 5,
-          views_present: images.length,
-          views_required: 5,
-          wide_context: images.some((img) => img.angle_type === "wide_field"),
-          closeup_damage: images.some((img) => img.angle_type === "closeup_damage"),
-        },
+        details: (() => {
+          const missing = claim.missing_angles || [];
+          const peril = (claim as any).peril as Peril | undefined;
+          const required =
+            (peril && ROUTE_CONFIG[peril]?.requiredAngles.length) || REQUIRED_ANGLES.length;
+          return {
+            missing_views: missing,
+            // usable = required minus missing (gate-usable), while views_present
+            // stays as stored frames so reviewers can see present-vs-usable gaps.
+            usable_views: Math.max(0, required - missing.length),
+            required_views: required,
+            views_present: images.length,
+            views_required: required,
+            wide_context: images.some((img) => img.angle_type === "wide_field"),
+            closeup_damage: images.some((img) => img.angle_type === "closeup_damage"),
+          };
+        })(),
       },
       context: { score: claim.context_score ?? 0, available: true },
       integrity: { score: claim.integrity_score ?? 0, available: true },
@@ -1579,6 +1616,18 @@ export async function applyReviewerAction(
         "Cannot accept claim: integrity score is below 50. Request physical inspection or recapture.",
       );
     }
+    if (existing.severity_grade === "U") {
+      throw new Error(
+        "Cannot accept claim: model analysis is unusable (grade U). Correct the grade or request recapture first.",
+      );
+    }
+  }
+
+  if (
+    (payload.action === "reject" || payload.action === "request_recapture") &&
+    !String(payload.reason || payload.notes || "").trim()
+  ) {
+    throw new Error("A reason or note is required for this action.");
   }
 
   let status = existing.status;
@@ -1621,8 +1670,9 @@ export async function applyReviewerAction(
       patch.disease_detected = payload.corrected_damage_codes[0];
     }
     if (payload.corrected_affected_area_pct != null && Number.isFinite(payload.corrected_affected_area_pct)) {
-      patch.corrected_affected_area_pct = payload.corrected_affected_area_pct;
-      patch.severity_percentage = payload.corrected_affected_area_pct;
+      const pct = Math.max(0, Math.min(100, payload.corrected_affected_area_pct));
+      patch.corrected_affected_area_pct = pct;
+      patch.severity_percentage = pct;
     }
     if (payload.corrected_growth_stage) {
       patch.corrected_growth_stage = payload.corrected_growth_stage;
@@ -1649,10 +1699,19 @@ export async function applyReviewerAction(
       ? `${existing.quality_notes} (gate overridden)`
       : "(gate overridden)";
 
-    // Recalculate preview from stored images to restore non-zero confidence
+    // Recalculate preview from stored images to restore non-zero confidence.
+    // Scoped: only gate-failed angles are treated as overridden; genuinely
+    // missing angles stay missing instead of being restored.
     try {
       const images = await store.listImages(id);
       if (images.length > 0) {
+        const failedAngles = new Set(
+          Array.isArray((existingGate as { perImage?: unknown }).perImage)
+            ? ((existingGate as { perImage?: Array<{ angleType?: unknown; usable?: unknown }> }).perImage || [])
+                .filter((entry) => entry && entry.usable === false && typeof entry.angleType === "string")
+                .map((entry) => String((entry as { angleType: string }).angleType))
+            : [],
+        );
         const preview = computeEvidencePreview(
           images.map((img) => ({
             angleType: img.angle_type,
@@ -1661,7 +1720,9 @@ export async function applyReviewerAction(
             sha256: img.sha256 ?? undefined,
             blurScore: img.blur_score ?? undefined,
             lightingScore: img.lighting_score ?? undefined,
-            qualityPassed: true, // overridden by reviewer
+            // Only the reviewer's overridden (gate-failed) angles are forced
+            // usable; all other frames keep their measured quality flag.
+            qualityPassed: failedAngles.size === 0 || failedAngles.has(img.angle_type) ? true : (img.quality_passed ?? null),
           })),
           (existing as any).peril,
         );
