@@ -37,6 +37,7 @@ import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
 import { getLocalizedAngleInfo } from "@/lib/help-i18n";
 import { getSpeechLocale } from "@/lib/live-indian-languages";
 import {
+  detectDuplicateImages,
   isUnusableLighting,
   measureLightingScore,
   qualityPassedFromSignals,
@@ -1030,6 +1031,27 @@ function CaptureStudioContent() {
       );
       return { ok: false as const, message: "Unusable frames" };
     }
+
+    const imagesList = Object.values(capturedImages);
+    const dupCheck = detectDuplicateImages(
+      imagesList.map((img) => ({
+        angleId: img.angleType,
+        angleType: img.angleType,
+        imageUrl: img.imageUrl,
+        sha256: img.sha256,
+        blurScore: img.blurScore,
+        lightingScore: img.lightingScore,
+      })),
+    );
+    if (dupCheck.hasDuplicates) {
+      showToast(
+        lang === "hi"
+          ? "एक ही फ़ोटो या कोण बार-बार अपलोड किया गया है। कृपया अलग-अलग 3 तस्वीरें लें।"
+          : "Duplicate or exact same angle images detected. Please upload 3 distinct photos.",
+      );
+      return { ok: false as const, message: "Duplicate images detected" };
+    }
+
     if (!isTargetedRecapture && !selectedPlot) {
       showToast(
         lang === "hi"
@@ -1209,8 +1231,8 @@ function CaptureStudioContent() {
         return {
           ok: true,
           message: angle
-            ? `Captured ${captured} of ${total} angles. Current: ${angle.id}.${missingAngles.length ? ` Missing: ${missingAngles.join(", ")}` : ""}`
-            : `Captured ${captured} of ${total} angles.`,
+            ? `Captured ${captured} of ${total} evidence photos. Current: ${angle.id}.${missingAngles.length ? ` Missing: ${missingAngles.join(", ")}` : ""}`
+            : `Captured ${captured} of ${total} evidence photos.`,
           captured,
           total,
           currentAngle: angle?.id,
@@ -1330,14 +1352,14 @@ function CaptureStudioContent() {
                 {lang === "hi" ? activeRoute.labelHi : activeRoute.labelEn}
               </span>
               <span className="text-slate-600">
-                {activeRoute.requiredAngles.length} {lang === "hi" ? "कोण" : "angles"} · {lang === "hi" ? activeRoute.descriptionHi : activeRoute.descriptionEn}
+                {activeRoute.requiredAngles.length} {lang === "hi" ? "साक्ष्य तस्वीरें" : "evidence photos"} · {lang === "hi" ? activeRoute.descriptionHi : activeRoute.descriptionEn}
               </span>
               <Link href="/farmer/saathi" className="text-emerald-700 underline underline-offset-2">Change</Link>
             </div>
           )}
           {!activeIntent && !isTargetedRecapture && !milestone && (
             <div className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
-              {lang === "hi" ? "सुझाव: पहले फसल साथी से बात करें — वह आपके लिए सही कोण तय करेगा।" : "Tip: Talk to Fasal Saathi first — it will pick the right angles for your peril."}{" "}
+              {lang === "hi" ? "सुझाव: पहले फसल साथी से बात करें — वह आपके दावे के लिए मार्गदर्शन करेगा।" : "Tip: Talk to Fasal Saathi first — it will guide you through evidence capture."}{" "}
               <Link href="/farmer/saathi" className="font-bold underline">Saathi →</Link>
             </div>
           )}
@@ -1719,17 +1741,17 @@ function CaptureStudioContent() {
                 )}
               </div>
 
-              {/* Multi-angle batch upload card at bottom of workbench */}
+              {/* Multi-photo batch upload card at bottom of workbench */}
               <div className="mt-5 border-t border-[var(--line)] pt-3">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <div className="text-xs">
                     <span className="font-bold text-[var(--ink)] block">
-                      {lang === "hi" ? "त्वरित बैच अपलोड" : "Batch Multi-Angle Upload"}
+                      {lang === "hi" ? "त्वरित बैच अपलोड" : "Batch Multi-Photo Upload"}
                     </span>
                     <span className="text-[11px] text-[var(--ink-muted)]">
                       {lang === "hi"
-                        ? "गैलरी से सभी 5 कोणों की तस्वीरें एक साथ चुनें"
-                        : "Select all 5 field angle photos from your device at once"}
+                        ? "गैलरी से सभी 3 साक्ष्य तस्वीरें एक साथ चुनें"
+                        : "Select all 3 crop evidence photos from your device at once"}
                     </span>
                   </div>
                   <button
@@ -1739,7 +1761,7 @@ function CaptureStudioContent() {
                     className="fp-btn-secondary text-xs px-3 py-1.5 gap-1.5 shrink-0"
                   >
                     <Layers className="h-3.5 w-3.5" />
-                    <span>{lang === "hi" ? "सभी 5 फ़ोटो चुनें" : "Select 5 Photos"}</span>
+                    <span>{lang === "hi" ? "सभी 3 फ़ोटो चुनें" : "Select 3 Photos"}</span>
                   </button>
                 </div>
               </div>
@@ -2225,9 +2247,9 @@ function CaptureStudioContent() {
               >
                 {isAllCaptured
                   ? lang === "hi"
-                    ? "✓ सभी कोण तैयार हैं"
-                    : "✓ All angles ready"
-                  : `${capturedCount} / ${requiredCount} ${lang === "hi" ? "कोण तैयार" : "angles"}`}
+                    ? "✓ सभी 3 साक्ष्य फ़ोटो तैयार हैं"
+                    : "✓ All 3 photos ready"
+                  : `${capturedCount} / ${requiredCount} ${lang === "hi" ? "फ़ोटो तैयार" : "photos ready"}`}
               </span>
             </div>
 
@@ -2275,11 +2297,11 @@ function CaptureStudioContent() {
                 <span>
                   {requiredCount - capturedCount === 1
                     ? lang === "hi"
-                      ? "जमा करने से पहले 1 कोण और कैप्चर करें।"
-                      : "Capture 1 more angle before submitting."
+                      ? "जमा करने से पहले 1 फ़ोटो और लें।"
+                      : "Capture 1 more photo before submitting."
                     : lang === "hi"
-                      ? `जमा करने से पहले ${requiredCount - capturedCount} कोण और कैप्चर करें।`
-                      : `Capture ${requiredCount - capturedCount} more angles before submitting.`}
+                      ? `जमा करने से पहले ${requiredCount - capturedCount} फ़ोटो और लें।`
+                      : `Capture ${requiredCount - capturedCount} more photos before submitting.`}
                 </span>
               </p>
             )}

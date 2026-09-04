@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireWebActor } from "@/lib/web-auth";
 import { executeSaathiTool, type SaathiToolResult } from "@/lib/saathi/tools-server";
-import { CANONICAL_ANGLES } from "@/lib/farmerI18n";
+import { CANONICAL_ANGLES, LEGACY_CANONICAL_ANGLES } from "@/lib/farmerI18n";
 import { SAATHI_SERVER_TOOLS, resolveSaathiToolName } from "@/lib/saathi/tool-catalog";
 
 const ALLOWED_TOOLS = new Set<string>(SAATHI_SERVER_TOOLS);
-const ANGLE_IDS = new Set(CANONICAL_ANGLES.map((a) => a.id));
+const ANGLE_IDS = new Set([...CANONICAL_ANGLES.map((a) => a.id), ...LEGACY_CANONICAL_ANGLES]);
 
 const MAX_BODY_CHARS = 64 * 1024;
 
@@ -75,7 +75,7 @@ function sanitizeArgs(name: string, raw: unknown): Record<string, unknown> | nul
       const angle = typeof args.angle === "string" ? args.angle.trim() : "";
       if (name === "guide_capture" && !ANGLE_IDS.has(angle)) return null;
       return {
-        angle: ANGLE_IDS.has(angle) ? angle : "closeup_damage",
+        angle: ANGLE_IDS.has(angle) ? angle : "photo_1",
         lang: sanitizeLang(args.lang),
       };
     }

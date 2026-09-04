@@ -54,11 +54,14 @@ import {
 import clsx from "clsx";
 
 const ALL_ANGLES = [
-  { key: "wide_field", label: "Wide Field" },
-  { key: "left_context", label: "Left Context" },
-  { key: "mid_canopy", label: "Mid Canopy" },
-  { key: "right_context", label: "Right Context" },
-  { key: "closeup_damage", label: "Closeup Damage" },
+  { key: "photo_1", label: "Photo 1 (Field Overview)" },
+  { key: "photo_2", label: "Photo 2 (Crop Condition)" },
+  { key: "photo_3", label: "Photo 3 (Damage Detail)" },
+  { key: "wide_field", label: "Wide Field (Legacy)" },
+  { key: "left_context", label: "Left Context (Legacy)" },
+  { key: "mid_canopy", label: "Mid Canopy (Legacy)" },
+  { key: "right_context", label: "Right Context (Legacy)" },
+  { key: "closeup_damage", label: "Closeup Damage (Legacy)" },
 ];
 
 /** Fetch a stored photo and encode as base64 data URL (chunked btoa, ≤15MB guard). */
@@ -156,7 +159,7 @@ export default function ReviewDetailPage() {
 
   // Auto-fill suggested recapture angles from evaluation
   const suggestedAngles = useMemo(() => {
-    if (!evaluation) return ["closeup_damage"];
+    if (!evaluation) return ["photo_3"];
     if (evaluation.request?.required_angles && evaluation.request.required_angles.length > 0) {
       return evaluation.request.required_angles;
     }
@@ -164,7 +167,7 @@ export default function ReviewDetailPage() {
     if (Array.isArray(missing) && missing.length > 0) {
       return missing;
     }
-    return ["closeup_damage"];
+    return ["photo_3"];
   }, [evaluation]);
 
   const action = useMutation({
@@ -302,8 +305,13 @@ export default function ReviewDetailPage() {
     if (!data) return null;
     return (
       (data.images || []).find(
-        (img) => img.angle_type === "wide_field" && img.upload_status === "uploaded" && img.download_url,
-      ) ?? null
+        (img) =>
+          (img.angle_type === "photo_1" || img.angle_type === "wide_field") &&
+          img.upload_status === "uploaded" &&
+          img.download_url,
+      ) ??
+      (data.images || []).find((img) => img.upload_status === "uploaded" && img.download_url) ??
+      null
     );
   }, [data]);
 

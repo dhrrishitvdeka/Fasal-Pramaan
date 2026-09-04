@@ -1,6 +1,7 @@
 import { assembleContext } from "@/lib/context/assemble";
 import { normalizePeril, routeForPeril } from "@/lib/claim-routing";
-import { CANONICAL_ANGLES } from "@/lib/farmerI18n";
+import { CANONICAL_ANGLES, LEGACY_CANONICAL_ANGLES } from "@/lib/farmerI18n";
+import { getLocalizedAngleInfo } from "@/lib/help-i18n";
 import { classifyPerilWithLLM } from "@/lib/saathi/classify-server";
 import { createServerSupabase } from "@/lib/supabase";
 import { resolveSaathiToolName } from "@/lib/saathi/tool-catalog";
@@ -157,22 +158,36 @@ async function callContextSignal(args: Record<string, unknown>): Promise<SaathiT
 function guideCapture(args: Record<string, unknown>): SaathiToolResult {
   const angleId = String(args.angle || "").trim();
   const lang = String(args.lang || "en").trim().toLowerCase();
-  const angle = CANONICAL_ANGLES.find((a) => a.id === angleId);
-  if (!angle) {
-    return { ok: false, error: `Unknown angle: ${angleId}` };
-  }
   const hi = lang.startsWith("hi");
-  return {
-    ok: true,
-    data: {
-      id: angle.id,
-      name: hi ? angle.nameHi : angle.name,
-      instructions: hi ? angle.instructionsHi : angle.instructions,
-      instructionsHi: angle.instructionsHi,
-      tips: hi ? angle.tipsHi : angle.tips,
-      tipsHi: angle.tipsHi,
-    },
-  };
+  const canonical = CANONICAL_ANGLES.find((a) => a.id === angleId);
+  if (canonical) {
+    return {
+      ok: true,
+      data: {
+        id: canonical.id,
+        name: hi ? canonical.nameHi : canonical.name,
+        instructions: hi ? canonical.instructionsHi : canonical.instructions,
+        instructionsHi: canonical.instructionsHi,
+        tips: hi ? canonical.tipsHi : canonical.tips,
+        tipsHi: canonical.tipsHi,
+      },
+    };
+  }
+  if (LEGACY_CANONICAL_ANGLES.includes(angleId)) {
+    const info = getLocalizedAngleInfo(angleId, hi ? "hi" : "en");
+    return {
+      ok: true,
+      data: {
+        id: angleId,
+        name: info.name,
+        instructions: info.instructions,
+        instructionsHi: info.instructions,
+        tips: info.tips,
+        tipsHi: info.tips,
+      },
+    };
+  }
+  return { ok: false, error: `Unknown angle: ${angleId}` };
 }
 
 async function classifyClaim(args: Record<string, unknown>): Promise<SaathiToolResult> {

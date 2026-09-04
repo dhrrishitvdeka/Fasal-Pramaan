@@ -27,16 +27,13 @@ describe("peril routing", () => {
   });
 
   it("anglesForPeril keeps canonical order filtered to the peril's angle set", () => {
-    // fire_burn required [wide_field, closeup_damage] + optional [mid_canopy],
-    // returned in CANONICAL_ANGLES order.
+    // Perils route through the 3-screen evidence photo set in CANONICAL_ANGLES order
     const fireIds = anglesForPeril("fire_burn").map((a) => a.id);
-    expect(fireIds).toEqual(["wide_field", "mid_canopy", "closeup_damage"]);
+    expect(fireIds).toEqual(["photo_1", "photo_2", "photo_3"]);
     expect(anglesForPeril("normal").map((a) => a.id)).toEqual([
-      "wide_field",
-      "left_context",
-      "mid_canopy",
-      "right_context",
-      "closeup_damage",
+      "photo_1",
+      "photo_2",
+      "photo_3",
     ]);
   });
 

@@ -59,6 +59,7 @@ export function isFireRelaxAngle(angleId?: string): boolean {
   return (
     angleId === "fire_burn" ||
     angleId === "wide_field" ||
+    angleId === "photo_1" ||
     (angleId != null && angleId.includes("fire"))
   );
 }

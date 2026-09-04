@@ -86,15 +86,15 @@ function geminiFetchImpl(payload: unknown = geminiSuccess): typeof fetch {
 }
 
 describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
-  it("computes coverage from real captured angles without inventing quality", () => {
+  it("computes coverage from real captured photos without inventing quality", () => {
     const preview = computeEvidencePreview([
-      { angleType: "wide_field", bytes: jpegLikeBytes(), sha256: "a".repeat(64) },
-      { angleType: "closeup_damage", bytes: jpegLikeBytes() },
+      { angleType: "photo_1", bytes: jpegLikeBytes(), sha256: "a".repeat(64) },
+      { angleType: "photo_2", bytes: jpegLikeBytes() },
     ]);
-    expect(preview.coverageScore).toBe(40);
+    expect(preview.coverageScore).toBe(67);
     expect(preview.qualityScore).toBe(0);
     expect(preview.integrityScore).toBe(50);
-    expect(preview.missingAngles).toEqual(["left_context", "mid_canopy", "right_context"]);
+    expect(preview.missingAngles).toEqual(["photo_3"]);
   });
 
   it("parses Gemini analysis JSON and rejects empty payloads", () => {
@@ -371,7 +371,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(store.blobs.get(kept!.storage_path!)).toEqual(closeup);
     const claim = store.claims.get(claimId);
     expect(claim?.status).toBe("under_review");
-    expect(claim?.missing_angles).toEqual(["left_context", "mid_canopy", "right_context"]);
+    expect(claim?.missing_angles).toEqual(["photo_3"]);
     const detail = await getReviewerClaim(store, claimId);
     expect(detail!.id).toBe(claimId);
     expect(detail!.status).toBe("under_review");

@@ -1833,10 +1833,89 @@ export function getHelpI18n(lang: AppLang): HelpTranslations {
   return HELP_TRANSLATIONS[lang] || HELP_TRANSLATIONS.en;
 }
 
+const PHOTO_EVIDENCE_MAP: Record<
+  string,
+  {
+    nameEn: string;
+    shortNameEn: string;
+    instructionsEn: string;
+    tipsEn: string[];
+    nameHi: string;
+    shortNameHi: string;
+    instructionsHi: string;
+    tipsHi: string[];
+  }
+> = {
+  photo_1: {
+    nameEn: "1. Field & Crop Overview",
+    shortNameEn: "Field Overview",
+    instructionsEn: "Capture an overview photograph of the crop field showing the affected stand and surrounding plot context.",
+    tipsEn: [
+      "Keep the horizon line in the upper third of the viewfinder",
+      "Show plot boundary or earthen bund clearly",
+      "Avoid shooting directly into blinding sunlight",
+    ],
+    nameHi: "1. खेत व फसल का समग्र दृश्य",
+    shortNameHi: "खेत का दृश्य",
+    instructionsHi: "खेत का समग्र दृश्य दिखाएँ जिसमें फसल और प्रभावित क्षेत्र स्पष्ट दिखाई दे।",
+    tipsHi: [
+      "धूप के सामने सीधे कैमरे का रुख न रखें",
+      "कैमरा स्थिर रखें ताकि फोटो धुंधली न हो",
+      "खेत की फसल को साफ़-साफ़ फ्रेम में लें",
+    ],
+  },
+  photo_2: {
+    nameEn: "2. Crop Condition",
+    shortNameEn: "Crop Condition",
+    instructionsEn: "Capture the crop condition showing foliage, plant health, lodging tilt, or stand density.",
+    tipsEn: [
+      "Stand 1–2 meters from crops for clear view",
+      "Show contrast between affected and normal areas if applicable",
+      "Keep focus sharp and lighting clear",
+    ],
+    nameHi: "2. फसल की स्थिति",
+    shortNameHi: "फसल की स्थिति",
+    instructionsHi: "फसल के पौधों की सामान्य स्थिति और क्षति का क्षेत्र दिखाएँ।",
+    tipsHi: [
+      "पौधों से 1-2 मीटर की दूरी से फोटो लें",
+      "स्वस्थ और प्रभावित हिस्सों का अंतर दिखाएँ",
+      "कैमरे को हिलाए बिना स्पष्ट फोटो लें",
+    ],
+  },
+  photo_3: {
+    nameEn: "3. Damage Detail",
+    shortNameEn: "Damage Detail",
+    instructionsEn: "Capture clear close-up detail of damaged leaves, stems, earheads, or specific damage symptoms.",
+    tipsEn: [
+      "Tap screen to focus sharply on the damaged foliage",
+      "Maintain 30–50 cm distance to prevent close-up blur",
+      "Avoid harsh shadows on the affected plant",
+    ],
+    nameHi: "3. क्षति का विवरण",
+    shortNameHi: "क्षति का विवरण",
+    instructionsHi: "क्षतिग्रस्त पत्तियों, तनों, बालियों या लक्षणों की स्पष्ट क्लोज-अप तस्वीर लें।",
+    tipsHi: [
+      "पत्तियों या लक्षणों पर फोकस करें",
+      "कम से कम 30-50 सेमी की दूरी रखें ताकि ब्लर न हो",
+      "छाया से बचें और प्राकृतिक रोशनी में लें",
+    ],
+  },
+};
+
 export function getLocalizedAngleInfo(
   angleId: string,
   lang: AppLang
 ): { name: string; shortName: string; instructions: string; tips: string[] } {
+  const photoDef = PHOTO_EVIDENCE_MAP[angleId];
+  if (photoDef) {
+    const isHi = lang === "hi";
+    return {
+      name: isHi ? photoDef.nameHi : photoDef.nameEn,
+      shortName: isHi ? photoDef.shortNameHi : photoDef.shortNameEn,
+      instructions: isHi ? photoDef.instructionsHi : photoDef.instructionsEn,
+      tips: isHi ? photoDef.tipsHi : photoDef.tipsEn,
+    };
+  }
   const t = getHelpI18n(lang);
   const found = t.angles.find((a) => a.id === angleId);
   if (found) {

@@ -58,7 +58,7 @@ export interface FarmerPlot {
 
 export interface ClaimImageEvidence {
   id?: string;
-  angleType: "wide_field" | "left_context" | "mid_canopy" | "right_context" | "closeup_damage" | string;
+  angleType: "photo_1" | "photo_2" | "photo_3" | "wide_field" | "left_context" | "mid_canopy" | "right_context" | "closeup_damage" | string;
   imageUrl: string;
   storagePath?: string;
   timestamp: string;
