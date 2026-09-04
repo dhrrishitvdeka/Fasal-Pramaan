@@ -128,8 +128,37 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
     .filter((h) => /^[0-9a-f]{64}$/i.test(h));
   const uniqueHashes = new Set(validHashes);
   const hasDuplicateHash = validHashes.length > uniqueHashes.size;
+  // Read the persisted vision-gate verdict so this card agrees with the Quality
+  // card instead of reporting PASSED while the gate rejected the claim.
+  const gateRaw = (submission as unknown as { gate_result?: unknown }).gate_result as {
+    gateFailed?: unknown;
+    overridden?: unknown;
+    blockingReason?: unknown;
+    duplicateAngles?: unknown;
+    perImage?: unknown;
+  } | null | undefined;
+  const gateOverridden = gateRaw?.overridden === true;
+  const gateFailedHard = gateRaw?.gateFailed === true && !gateOverridden;
+  const gateBlockingReason =
+    typeof gateRaw?.blockingReason === "string" && gateRaw.blockingReason.trim()
+      ? gateRaw.blockingReason.trim()
+      : null;
+  const gatePerImage = Array.isArray(gateRaw?.perImage)
+    ? (gateRaw.perImage as Array<{ usable?: unknown; reason?: unknown; angleType?: unknown }>)
+    : [];
+  const gateDuplicateAngles = [
+    ...gatePerImage
+      .filter((p) => p.usable === false && p.reason === "duplicate_angle" && typeof p.angleType === "string")
+      .map((p) => String(p.angleType)),
+    ...(Array.isArray(gateRaw?.duplicateAngles)
+      ? (gateRaw.duplicateAngles as unknown[]).filter((v): v is string => typeof v === "string")
+      : []),
+  ].filter((v, i, arr) => v && arr.indexOf(v) === i);
   let integrityScore = anomalies.length > 0 ? 40 : 100;
   if (hasDuplicateHash || hasDuplicate) {
+    integrityScore = Math.min(integrityScore, 35);
+  }
+  if (gateFailedHard) {
     integrityScore = Math.min(integrityScore, 35);
   }
 
@@ -147,7 +176,12 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
   if (integrityScore < 70) {
     uncType = "integrity";
     uncSev = "critical";
-    if (hasDuplicateHash || hasDuplicate) {
+    if (gateFailedHard) {
+      uncReasons.push(
+        `Vision gate rejected${gateBlockingReason ? `: ${gateBlockingReason.replaceAll("_", " ")}` : ""} — overall confidence held at 0 until overridden or recaptured`,
+      );
+      recAction = "human_review";
+    } else if (hasDuplicateHash || hasDuplicate) {
       uncReasons.push("Integrity issue: duplicate image or exact same angle uploaded across photos");
       recAction = "retake_image";
     } else {
@@ -204,8 +238,15 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
 
   const integrityDetails: EvidenceIntegrityDetails = {
     sha256_verified: uploaded.some((img) => Boolean(img.sha256)),
-    authenticity_verified: Boolean(submission.latest_prediction) && anomalies.length === 0,
-    flags: anomalies.map(String),
+    authenticity_verified: Boolean(submission.latest_prediction) && anomalies.length === 0 && !gateFailedHard,
+    flags: [
+      ...anomalies.map(String),
+      ...(gateFailedHard
+        ? [`Vision gate rejected${gateBlockingReason ? `: ${gateBlockingReason.replaceAll("_", " ")}` : ""}`]
+        : gateDuplicateAngles.length > 0
+          ? [`Possible duplicate angle (${gateDuplicateAngles.join(", ")}) — counted as missing coverage`]
+          : []),
+    ],
   };
 
   const fallback: EvidenceEvaluation = {

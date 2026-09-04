@@ -195,7 +195,6 @@ export async function gateImagesGate(
       greenPct: img.greenPct,
     })),
   );
-
   const duplicateIndices = new Set<number>();
   if (dupCheck.hasDuplicates) {
     for (const [, j] of dupCheck.duplicatePairs) {
@@ -223,14 +222,22 @@ export async function gateImagesGate(
     perImage.push({ ...res, angleType: img.angleType });
   }
 
-  const blocking = perImage.find((r) => !r.usable);
-  const gateFailed = perImage.some((r) => !r.usable);
-  const blockingReason = blocking?.reason;
+  // Duplicate angles are a coverage problem, not an authenticity block: the extra
+  // slot is flagged unusable (so coverage drops and the reviewer sees it), but the
+  // claim still proceeds to inference instead of being zeroed to overall 0 with a
+  // Grade U placeholder. Genuine tamper (screen/person/AI/wrong-crop) still blocks.
+  const duplicateAngles = perImage
+    .filter((r) => !r.usable && r.reason === "duplicate_angle")
+    .map((r) => r.angleType);
+  const hardBlocking = perImage.find((r) => !r.usable && r.reason !== "duplicate_angle");
+  const gateFailed = hardBlocking != null;
+  const blockingReason = hardBlocking?.reason;
 
   const gateResult = {
     perImage,
     gateFailed,
     blockingReason: blockingReason || null,
+    duplicateAngles,
     expectedCrop: expectedCrop || null,
     peril: peril || null,
     checkedAt: new Date().toISOString(),
@@ -638,6 +645,16 @@ export function computeEvidencePreview(images: PersistedImageInput[], peril?: st
   const uniqueHashes = new Set(validHashes);
   const hasDuplicateHash = validHashes.length > uniqueHashes.size;
 
+  // Sensor getters may throw on malformed capture metadata (fail-closed tests poison
+  // them); duplicate detection already reads tolerantly, so snapshot the newly added
+  // signals defensively here rather than crashing preview construction.
+  const safeSignal = <T>(read: () => T): T | undefined => {
+    try {
+      return read();
+    } catch {
+      return undefined;
+    }
+  };
   const dupCheck = detectDuplicateImages(
     images.map((img) => ({
       angleId: img.angleType,
@@ -645,6 +662,9 @@ export function computeEvidencePreview(images: PersistedImageInput[], peril?: st
       sha256: img.sha256,
       blurScore: img.blurScore,
       lightingScore: img.lightingScore,
+      luma: safeSignal(() => img.luma),
+      cropScore: safeSignal(() => img.cropScore),
+      greenPct: safeSignal(() => img.greenPct),
     })),
   );
   const hasDuplicate = hasDuplicateHash || dupCheck.hasDuplicates;
@@ -772,6 +792,19 @@ async function buildImageRows(
   return attachPerImageGate(imageRows, perImageGate);
 }
 
+/** Duplicate angles flagged by the vision gate count as missing coverage (not as an
+ * authenticity block). Returns a copy with qualityPassed=false on duplicate slots so
+ * coverage drops honestly and the reviewer sees which angle needs a retake. */
+function applyDuplicateQualityPenalty<T extends { angleType: string; qualityPassed?: boolean | null }>(
+  images: T[],
+  gate?: PersistedGateOutcome | null,
+): T[] {
+  const raw = (gate?.gateResult as { duplicateAngles?: unknown } | null)?.duplicateAngles;
+  const dup = new Set(Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : []);
+  if (!dup.size) return images;
+  return images.map((img) => (dup.has(img.angleType) ? { ...img, qualityPassed: false } : img));
+}
+
 export async function persistFarmerSubmission(
   store: ClaimStore,
   input: PersistClaimInput,
@@ -790,7 +823,7 @@ export async function persistFarmerSubmission(
       throw new Error("Claim already exists");
     }
   }
-  const preview = computeEvidencePreview(input.images, input.peril);
+  const preview = computeEvidencePreview(applyDuplicateQualityPenalty(input.images, gate), input.peril);
   const now = new Date().toISOString();
   // Upload blobs BEFORE inserting the claim so a mid-loop failure cannot leave
   // an imageless row. Orphaned storage objects are preferable to lost evidence.
@@ -1216,8 +1249,8 @@ export async function persistAndInfer(
   } catch {
     // swallow context assembly errors
   }
-  // ----- Vision gate blocking (uses the gate computed early above; cache behavior unchanged) -----
-  // If any image Gate usable==false, set claim's gate_result JSON and return unusablePrediction terminally.
+  // ----- Vision gate blocking (hard authenticity failures only; duplicate angles
+  // are a coverage penalty handled in the preview, never a terminal block) -----
   if (gate.gateFailed) {
     return gateBlockedEarlyReturn(store, persisted.claimId, gate);
   }
@@ -1227,7 +1260,10 @@ export async function persistAndInfer(
   }
   // ----- Adaptive engine: compute level/nextStep and persist for reviewer queue -----
   try {
-    const previewForAdaptive = computeEvidencePreview(input.images, input.peril);
+    const previewForAdaptive = computeEvidencePreview(
+      applyDuplicateQualityPenalty(input.images, gate),
+      input.peril,
+    );
     const adaptive: AdaptiveResult = adaptiveConfidence({
       quality: previewForAdaptive.qualityScore,
       coverage: previewForAdaptive.coverageScore,
@@ -1326,7 +1362,10 @@ export async function recaptureAndInfer(
   const uploaded = await uploadNewImages(store, input.claimId, input.images, gate?.perImage);
   await store.replaceAngleImages(input.claimId, uploaded);
   const merged = await store.listImages(input.claimId);
-  const preview = computeEvidencePreview(merged.map(rowToPreviewInput), (existing as any).peril);
+  const preview = computeEvidencePreview(
+    applyDuplicateQualityPenalty(merged.map(rowToPreviewInput), gate),
+    (existing as any).peril,
+  );
   const now = new Date().toISOString();
   await store.updateClaim(input.claimId, {
     status: "under_review",
