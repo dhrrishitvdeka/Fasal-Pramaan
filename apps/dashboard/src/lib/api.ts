@@ -455,6 +455,9 @@ export async function submitWebClaim(input: {
     greenPct?: number | null;
     luma?: number | null;
     cropScore?: number | null;
+    hintCode?: string | null;
+    isScreenDetected?: boolean | null;
+    isPersonDetected?: boolean | null;
     facing?: string | null;
     dimensions?: { width: number; height: number } | null;
     capturedAt?: string | null;

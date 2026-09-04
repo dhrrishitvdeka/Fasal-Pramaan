@@ -72,6 +72,9 @@ export interface ClaimImageEvidence {
   luma?: number | null;
   cropScore?: number | null;
   greenPct?: number | null;
+  hintCode?: string | null;
+  isScreenDetected?: boolean | null;
+  isPersonDetected?: boolean | null;
   facing?: string | null;
   dimensions?: { width: number; height: number } | null;
   farmerObservation?: string | null;
@@ -584,6 +587,9 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         greenPct: img.greenPct,
         luma: img.luma,
         cropScore: img.cropScore,
+        hintCode: img.hintCode ?? undefined,
+        isScreenDetected: img.isScreenDetected ?? undefined,
+        isPersonDetected: img.isPersonDetected ?? undefined,
         facing: img.facing,
         dimensions: img.dimensions,
         capturedAt: img.timestamp || undefined,

@@ -190,10 +190,30 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
   return {
     ...fallback,
     ...raw,
-    quality: { ...fallback.quality, ...(raw.quality || {}), score: raw.quality?.score ?? fallback.quality.score },
-    coverage: { ...fallback.coverage, ...(raw.coverage || {}), score: raw.coverage?.score ?? fallback.coverage.score },
-    context: { ...fallback.context, ...(raw.context || {}), score: raw.context?.score ?? fallback.context.score },
-    integrity: { ...fallback.integrity, ...(raw.integrity || {}), score: raw.integrity?.score ?? fallback.integrity.score },
+    quality: {
+      ...fallback.quality,
+      ...(raw.quality || {}),
+      details: { ...fallback.quality.details, ...((raw.quality as any)?.details || {}) },
+      score: raw.quality?.score ?? fallback.quality.score,
+    },
+    coverage: {
+      ...fallback.coverage,
+      ...(raw.coverage || {}),
+      details: { ...fallback.coverage.details, ...((raw.coverage as any)?.details || {}) },
+      score: raw.coverage?.score ?? fallback.coverage.score,
+    },
+    context: {
+      ...fallback.context,
+      ...(raw.context || {}),
+      details: { ...fallback.context.details, ...((raw.context as any)?.details || {}) },
+      score: raw.context?.score ?? fallback.context.score,
+    },
+    integrity: {
+      ...fallback.integrity,
+      ...(raw.integrity || {}),
+      details: { ...fallback.integrity.details, ...((raw.integrity as any)?.details || {}) },
+      score: raw.integrity?.score ?? fallback.integrity.score,
+    },
     confidence: { ...fallback.confidence, ...(raw.confidence || {}), final: raw.confidence?.final ?? fallback.confidence.final },
     uncertainty: { ...fallback.uncertainty, ...(raw.uncertainty || {}), type: raw.uncertainty?.type ?? fallback.uncertainty.type, reasons: raw.uncertainty?.reasons || fallback.uncertainty.reasons },
   };

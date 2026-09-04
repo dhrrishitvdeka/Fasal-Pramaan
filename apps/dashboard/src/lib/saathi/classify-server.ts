@@ -92,7 +92,7 @@ export async function classifyPerilWithLLM(
         },
       ],
       toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: ["classify_claim"] } },
-      generationConfig: { temperature: 0.2, maxOutputTokens: 512 },
+      generationConfig: { maxOutputTokens: 512 },
     };
 
     const controller = typeof AbortSignal !== "undefined" && typeof (AbortSignal as unknown as { timeout?: (ms: number) => AbortSignal }).timeout === "function"

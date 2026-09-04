@@ -517,6 +517,11 @@ function CaptureStudioContent() {
         : undefined;
     const nowIso = new Date().toISOString();
 
+    const blurForQuality = cvResult?.blurScore ?? undefined;
+    // Unmeasured quality must not count as failed: coverage excludes only
+    // explicitly-failed frames, so unknown stays present (gate decides from
+    // fresh crop measurements instead).
+    const hasQualitySignal = lightingScore != null || blurForQuality != null;
     const newEvidence: ClaimImageEvidence = {
       angleType: currentAngle.id,
       imageUrl,
@@ -525,12 +530,20 @@ function CaptureStudioContent() {
       lon: useGps ? gpsCoords.lon : null,
       accuracyM: useGps ? gpsCoords.accuracyM : null,
       sha256: digest,
-      qualityPassed: qualityPassedFromSignals({ lightingScore }),
+      qualityPassed: hasQualitySignal
+        ? qualityPassedFromSignals({
+            lightingScore,
+            blurScore: blurForQuality,
+          })
+        : true,
       lightingScore,
       blurScore: cvResult?.blurScore ?? undefined,
       greenPct: cvResult?.greenPct ?? undefined,
       luma: cvResult?.luma ?? undefined,
       cropScore: cvResult?.cropScore ?? undefined,
+      hintCode: cvResult?.hintCode ?? undefined,
+      isScreenDetected: cvResult?.isScreenDetected ?? undefined,
+      isPersonDetected: cvResult?.isPersonDetected ?? undefined,
       facing: cameraFacing,
       dimensions,
       farmerObservation: observations || undefined,

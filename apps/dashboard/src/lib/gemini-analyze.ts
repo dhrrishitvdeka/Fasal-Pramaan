@@ -380,7 +380,6 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
     body: JSON.stringify({
       contents: [{ role: "user", parts }],
       generationConfig: {
-        temperature: 0.15,
         maxOutputTokens: 2048,
         responseMimeType: "application/json",
       },
