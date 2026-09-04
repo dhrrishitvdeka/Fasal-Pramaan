@@ -266,6 +266,24 @@ export default function ReviewDetailPage() {
     return typeof topLevel === "string" && topLevel ? topLevel : null;
   }, [data, contextSignals]);
 
+  const bhuvanFallbackUrl = useMemo(() => {
+    if (!data) return null;
+    const bhuvanMeta = contextSignals.find((s) => s.source === "bhuvan")?.meta as
+      | { legacyUrl?: unknown; bhuvanUrl?: unknown }
+      | undefined;
+    const fromMeta =
+      typeof bhuvanMeta?.legacyUrl === "string" && bhuvanMeta.legacyUrl
+        ? bhuvanMeta.legacyUrl
+        : typeof bhuvanMeta?.bhuvanUrl === "string" && bhuvanMeta.bhuvanUrl
+          ? bhuvanMeta.bhuvanUrl
+          : null;
+    if (fromMeta) return fromMeta;
+    if (data.capture_lat != null && data.capture_lon != null) {
+      return `https://bhuvan-app1.nrsc.gov.in/bhuvan2d/bhuvan/bhuvan2d.php?lat=${data.capture_lat}&lon=${data.capture_lon}`;
+    }
+    return null;
+  }, [data, contextSignals]);
+
   const burnMapUrl = useMemo(() => {
     if (!data) return null;
     const sentinelMeta = contextSignals.find((s) => s.source === "sentinel")?.meta;
@@ -753,6 +771,7 @@ export default function ReviewDetailPage() {
             <SatelliteCrossCheckCard
               wideFieldImageUrl={wideFieldImage?.download_url}
               bhuvanTileUrl={bhuvanThumbnailUrl}
+              bhuvanFallbackUrl={bhuvanFallbackUrl}
               burnMapUrl={burnMapUrl}
             />
           </section>
