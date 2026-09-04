@@ -30,18 +30,18 @@ export function SatelliteCrossCheckCard({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Field (wide_field)
+            Field Overview (photo_1 / wide_field)
           </p>
           {wideFieldImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={wideFieldImageUrl}
-              alt="wide_field crop capture"
+              alt="Field overview crop capture"
               className="h-[256px] w-full rounded border border-slate-200 bg-white object-cover"
             />
           ) : (
             <div className="flex h-[256px] items-center justify-center rounded border border-slate-200 bg-slate-100 text-xs text-slate-400">
-              No wide_field photo uploaded
+              No overview photo uploaded
             </div>
           )}
         </div>

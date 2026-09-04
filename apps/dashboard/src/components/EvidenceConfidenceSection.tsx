@@ -15,11 +15,9 @@ import { adaptiveConfidence } from "../lib/context/adaptive-engine";
 import type { ContextSignal } from "../lib/context/types";
 
 const ALL_ANGLES = [
-  { key: "wide_field", label: "Wide Field" },
-  { key: "left_context", label: "Left Context" },
-  { key: "mid_canopy", label: "Mid Canopy" },
-  { key: "right_context", label: "Right Context" },
-  { key: "closeup_damage", label: "Closeup Damage" },
+  { key: "photo_1", label: "Photo 1 (Field Overview)" },
+  { key: "photo_2", label: "Photo 2 (Crop Condition)" },
+  { key: "photo_3", label: "Photo 3 (Damage Detail)" },
 ];
 
 /**
@@ -32,22 +30,74 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
   // Fallback calculation for legacy or partial submissions
   const images = submission.images || [];
   const uploaded = images.filter((img) => img.upload_status === "uploaded");
-  const uploadedAngles = new Set(uploaded.map((img) => img.angle_type));
-  const missingAngles = ALL_ANGLES.filter((a) => !uploadedAngles.has(a.key)).map((a) => a.key);
 
-  const hasWide = uploadedAngles.has("wide_field");
-  const hasCloseup = uploadedAngles.has("closeup_damage");
+  // Deduplicate identical hashes or duplicate download URLs
+  const seenHashes = new Set<string>();
+  const seenUrls = new Set<string>();
+  const distinctUploaded: typeof uploaded = [];
+  let hasDuplicate = false;
 
-  // Coverage score calculation with critical angle weighting (closeup_damage & wide_field are key)
-  let coverageScore = 100;
-  if (!hasCloseup && !hasWide) {
-    coverageScore = 30;
-  } else if (!hasCloseup) {
-    coverageScore = 55;
-  } else if (!hasWide) {
-    coverageScore = 65;
-  } else if (missingAngles.length > 0) {
-    coverageScore = Math.max(40, 100 - missingAngles.length * 15);
+  for (const img of uploaded) {
+    if (img.sha256 && /^[0-9a-f]{64}$/i.test(img.sha256)) {
+      const h = img.sha256.toLowerCase().trim();
+      if (seenHashes.has(h)) {
+        hasDuplicate = true;
+        continue;
+      }
+      seenHashes.add(h);
+    }
+    if (img.download_url) {
+      if (seenUrls.has(img.download_url)) {
+        hasDuplicate = true;
+        continue;
+      }
+      seenUrls.add(img.download_url);
+    }
+    distinctUploaded.push(img);
+  }
+
+  const hasLegacyAngles = uploaded.some((img) =>
+    ["wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"].includes(img.angle_type)
+  );
+  const has3PhotoAngles = uploaded.some((img) =>
+    ["photo_1", "photo_2", "photo_3"].includes(img.angle_type)
+  );
+
+  const hasWide = uploaded.some((img) => img.angle_type === "wide_field" || img.angle_type === "photo_1");
+  const hasCloseup = uploaded.some((img) => img.angle_type === "closeup_damage" || img.angle_type === "photo_3");
+
+  const distinctCount = Math.min(3, distinctUploaded.length);
+  let coverageScore: number;
+  let missingAngles: string[];
+
+  if (hasLegacyAngles && !has3PhotoAngles) {
+    // Legacy 5-angle submission evaluation
+    const legacyAngles = ["wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"];
+    const legacyUploaded = new Set(uploaded.map((img) => img.angle_type));
+    missingAngles = legacyAngles.filter((k) => !legacyUploaded.has(k));
+
+    if (!hasCloseup && !hasWide) {
+      coverageScore = 30;
+    } else if (!hasCloseup) {
+      coverageScore = 55;
+    } else if (!hasWide) {
+      coverageScore = 65;
+    } else if (missingAngles.length > 0) {
+      coverageScore = Math.max(40, 100 - missingAngles.length * 15);
+    } else {
+      coverageScore = 100;
+    }
+  } else {
+    // Modern 3-photo evidence system: any 3 distinct clear photos give 100% coverage
+    coverageScore = Math.min(100, Math.round((distinctCount / 3) * 100));
+    missingAngles =
+      distinctCount >= 3
+        ? []
+        : distinctCount === 2
+          ? ["photo_3"]
+          : distinctCount === 1
+            ? ["photo_2", "photo_3"]
+            : ["photo_1", "photo_2", "photo_3"];
   }
 
   // Context score calculation
@@ -79,7 +129,7 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
   const uniqueHashes = new Set(validHashes);
   const hasDuplicateHash = validHashes.length > uniqueHashes.size;
   let integrityScore = anomalies.length > 0 ? 40 : 100;
-  if (hasDuplicateHash) {
+  if (hasDuplicateHash || hasDuplicate) {
     integrityScore = Math.min(integrityScore, 35);
   }
 
@@ -97,8 +147,8 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
   if (integrityScore < 70) {
     uncType = "integrity";
     uncSev = "critical";
-    if (hasDuplicateHash) {
-      uncReasons.push("Integrity issue: duplicate image hash reused across angles");
+    if (hasDuplicateHash || hasDuplicate) {
+      uncReasons.push("Integrity issue: duplicate image or exact same angle uploaded across photos");
     }
     uncReasons.push(...anomalies.map((a) => `Integrity issue: ${String(a)}`));
     recAction = "human_review";
@@ -106,7 +156,7 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
     uncType = "coverage";
     uncSev = coverageScore < 50 ? "high" : "medium";
     if (missingAngles.length > 0) {
-      uncReasons.push(`Missing required angles: ${missingAngles.join(", ")}`);
+      uncReasons.push(`Missing required photos: ${missingAngles.join(", ")}`);
     }
     recAction = "request_specific_evidence";
   } else if (qualityScore < 70 || warnings.length > 0) {
@@ -132,13 +182,13 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
   };
 
   const coverageDetails: EvidenceCoverageDetails = {
-    required_views: 5,
-    usable_views: uploadedAngles.size,
+    required_views: hasLegacyAngles && !has3PhotoAngles ? 5 : 3,
+    usable_views: hasLegacyAngles && !has3PhotoAngles ? uploaded.length : distinctCount,
     missing_views: missingAngles,
     wide_context: hasWide,
     closeup_damage: hasCloseup,
-    views_present: uploadedAngles.size,
-    views_required: 5,
+    views_present: uploaded.length,
+    views_required: hasLegacyAngles && !has3PhotoAngles ? 5 : 3,
   };
 
   const contextDetails: EvidenceContextDetails = {
@@ -597,11 +647,11 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
             <dl className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
               <dt className="text-slate-500">Required Views:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {cDetails.required_views != null ? String(cDetails.required_views) : "5 standard"}
+                {cDetails.required_views != null ? String(cDetails.required_views) : "3 standard"}
               </dd>
               <dt className="text-slate-500">Usable Views:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {cDetails.usable_views != null ? String(cDetails.usable_views) : `${submission.images?.length || 0} / 5`}
+                {cDetails.usable_views != null ? String(cDetails.usable_views) : `${submission.images?.length || 0} / 3`}
               </dd>
               <dt className="text-slate-500">Wide Context View:</dt>
               <dd className="font-mono text-slate-800 font-medium">

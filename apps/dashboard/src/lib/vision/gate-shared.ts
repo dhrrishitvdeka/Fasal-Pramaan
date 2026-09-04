@@ -293,7 +293,7 @@ ${metaContextLines}
 Evaluate:
 1. Visual Authenticity (fail closed): Reject photographs OF a phone, laptop, monitor, TV, or any second screen (bezels, status bar, moiré, pixel grid, UI chrome) with reason='screen_replay'. Reject AI-generated, stock, meme, or printed paper with reason='ai_generated'. Reject indoor rooms, selfies, and non-field objects with reason='not_crop' or 'no_field'. Ornamental hedge, garden shrub, lawn, houseplant, or decorative foliage that is not a farm crop stand → reason='not_crop' (or 'wrong_crop' if a crop was declared), usable=false.
 2. Exposure & Focus: Reject if completely pitch dark or washed out (reason='too_dark' or 'too_blurry').
-3. Angle Compliance: Verify canonical framing (${angleType}).
+3. Crop Evidence Verification: Accept any clear photograph showing the crop stand, agricultural field, or crop damage/symptoms (${angleType}). Do NOT enforce rigid camera angle constraints. Flag retake ONLY if photo quality is unusable (pitch dark, blurry, fake, screen replay, non-crop, or exact duplicate angle).
 4. Peril Consistency: Confirm if visual loss indicators match declared peril '${peril || "normal"}'.
 
 Return ONLY valid JSON matching this schema:

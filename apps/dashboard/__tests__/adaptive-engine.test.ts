@@ -36,11 +36,11 @@ describe("adaptive engine", () => {
       overall: 99,
       peril: "normal",
       gateFailed: true,
-      missingAngles: ["wide_field"],
+      missingAngles: ["photo_1"],
     });
     expect(res.level).toBe("low");
     expect(res.nextStep).toBe("retake");
-    expect(res.missingAngles).toEqual(["wide_field"]);
+    expect(res.missingAngles).toEqual(["photo_1"]);
     expect(res.reasons.join(" ")).toMatch(/gate/i);
   });
 
@@ -50,7 +50,7 @@ describe("adaptive engine", () => {
       integrity: 30,
       overall: 99,
       peril: "normal",
-      missingAngles: ["wide_field"],
+      missingAngles: ["photo_1"],
     });
     expect(res.level).toBe("low");
     expect(res.nextStep).toBe("escalate_to_human");
@@ -77,11 +77,11 @@ describe("adaptive engine", () => {
       overall: 90,
       peril: "fire_burn",
       signals: [sig("sentinel", "unavailable")],
-      missingAngles: ["wide_field"],
+      missingAngles: ["photo_1"],
     });
     expect(res.level).toBe("medium");
     expect(res.nextStep).toBe("request_missing");
-    expect(res.missingAngles).toEqual(["wide_field"]);
+    expect(res.missingAngles).toEqual(["photo_1"]);
   });
 
   it("proceeds for animal_damage when GPS is unavailable but every required angle was captured", () => {
@@ -104,21 +104,21 @@ describe("adaptive engine", () => {
       overall: 76,
       peril: "animal_damage",
       signals: [sig("imd", "available", { rainfall_7d_mm: 4 })],
-      missingAngles: ["wide_field"],
+      missingAngles: ["photo_1"],
     });
     expect(res.level).toBe("medium");
     expect(res.nextStep).toBe("request_missing");
-    expect(res.missingAngles).toEqual(["wide_field"]);
+    expect(res.missingAngles).toEqual(["photo_1"]);
   });
 
   it("never requests missing angles for animal_damage when only optional angles are absent", () => {
-    // animal_damage requires wide_field/mid_canopy/closeup_damage; left/right context are optional.
+    // animal_damage requires photo_1/photo_2/photo_3; extra unneeded angles are ignored.
     const res = adaptiveConfidence({
       ...base,
       overall: 76,
       peril: "animal_damage",
       signals: [sig("imd", "available", { rainfall_7d_mm: 4 })],
-      missingAngles: ["left_context"],
+      missingAngles: ["extra_unsupported_view"],
     });
     expect(res.level).toBe("medium");
     expect(res.nextStep).toBe("proceed");
@@ -139,7 +139,7 @@ describe("adaptive engine", () => {
   });
 
   it("filters reported missing angles down to the peril's required set only", () => {
-    // fire_burn requires wide_field + closeup_damage; left_context is not required.
+    // Perils require the 3 evidence photos; extra angles are filtered out.
     const res = adaptiveConfidence({
       quality: 60,
       coverage: 50,
@@ -148,11 +148,11 @@ describe("adaptive engine", () => {
       overall: 80,
       peril: "fire_burn",
       signals: [sig("sentinel", "available")],
-      missingAngles: ["wide_field", "left_context"],
+      missingAngles: ["photo_1", "extra_unsupported_view"],
     });
-    expect(res.missingAngles).toEqual(["wide_field"]);
+    expect(res.missingAngles).toEqual(["photo_1"]);
     expect(res.level).toBe("medium");
     expect(res.nextStep).toBe("request_missing");
-    expect(res.reasons.join(" ")).toContain("wide_field");
+    expect(res.reasons.join(" ")).toContain("photo_1");
   });
 });

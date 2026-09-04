@@ -29,11 +29,9 @@ export interface EvidencePreview {
 }
 
 export const REQUIRED_ANGLES = [
-  "wide_field",
-  "left_context",
-  "mid_canopy",
-  "right_context",
-  "closeup_damage",
+  "photo_1",
+  "photo_2",
+  "photo_3",
 ] as const;
 
 export function isRealSha256(hash: string | null | undefined): boolean {
@@ -103,31 +101,145 @@ function mean(values: number[]): number | null {
 }
 
 /**
- * Single source of truth for angle-coverage scoring: an angle counts only when a
- * usable frame exists for it (image present and not explicitly failed on quality),
- * deduplicated across frames of the same angle.
- *
- * `qualityPassed === false` marks a frame the capture pipeline measured as unusable;
- * `null/undefined` means quality was simply not measured, so presence still counts.
+ * Detect duplicate or exact-same-angle images across evidence inputs.
+ * Checks for duplicate SHA-256 digests, identical data URLs, or identical edge signals.
+ */
+export function detectDuplicateImages(images: EvidenceImageInput[]): {
+  hasDuplicates: boolean;
+  duplicatePairs: [number, number][];
+  reasons: string[];
+} {
+  const duplicatePairs: [number, number][] = [];
+  const reasons: string[] = [];
+
+  for (let i = 0; i < images.length; i++) {
+    for (let j = i + 1; j < images.length; j++) {
+      const a = images[i];
+      const b = images[j];
+
+      // 1. Exact SHA-256 hash match
+      if (
+        a.sha256 &&
+        b.sha256 &&
+        isRealSha256(a.sha256) &&
+        isRealSha256(b.sha256) &&
+        a.sha256.toLowerCase().trim() === b.sha256.toLowerCase().trim()
+      ) {
+        duplicatePairs.push([i, j]);
+        reasons.push(`Photos ${i + 1} and ${j + 1} share identical cryptographic SHA-256 hash.`);
+        continue;
+      }
+
+      // 2. Identical non-empty data URL
+      if (
+        a.imageUrl &&
+        b.imageUrl &&
+        a.imageUrl === b.imageUrl &&
+        a.imageUrl.length > 50
+      ) {
+        duplicatePairs.push([i, j]);
+        reasons.push(`Photos ${i + 1} and ${j + 1} contain identical image data.`);
+        continue;
+      }
+
+      // 3. Exact same angle slot duplicated with identical dimensions & measurements
+      const aId = a.angleId || a.angleType;
+      const bId = b.angleId || b.angleType;
+      if (
+        aId &&
+        bId &&
+        aId === bId &&
+        a.blurScore != null &&
+        b.blurScore != null &&
+        a.blurScore === b.blurScore &&
+        a.lightingScore != null &&
+        b.lightingScore != null &&
+        a.lightingScore === b.lightingScore
+      ) {
+        duplicatePairs.push([i, j]);
+        reasons.push(`Duplicate photo for angle '${aId}'.`);
+      }
+    }
+  }
+
+  return {
+    hasDuplicates: duplicatePairs.length > 0,
+    duplicatePairs,
+    reasons,
+  };
+}
+
+/**
+ * Single source of truth for photo-coverage scoring:
+ * Any 3 distinct, clear, usable crop evidence photos are accepted.
+ * A photo counts when present and not explicitly failed on quality (blur/dark).
+ * Duplicate images do not double-count.
  */
 export function computeAngleCoverage(
   images: EvidenceImageInput[],
   requiredAngles: readonly string[] = REQUIRED_ANGLES,
 ): { covered: number; total: number; missing: string[] } {
-  const reqSet = new Set(requiredAngles);
-  const coveredAngles = new Set<string>();
+  const reqList = [...requiredAngles];
+  const reqSet = new Set(reqList);
+  const coveredSlots = new Set<string>();
+
+  // Pass 1: Deduplicate identical images so duplicate frames never double-count
+  const usableImages: EvidenceImageInput[] = [];
+  const seenHashes = new Set<string>();
+  const seenUrls = new Set<string>();
+  const seenAngleKeys = new Set<string>();
+
   for (const img of images) {
-    const id = img.angleId || img.angleType;
-    if (!id || !reqSet.has(id)) continue;
     const present = img.present != null ? Boolean(img.present) : Boolean(img.imageUrl);
     if (!present) continue;
     if (img.qualityPassed === false) continue;
-    coveredAngles.add(id);
+
+    // Check duplicate hash
+    if (img.sha256 && isRealSha256(img.sha256)) {
+      const h = img.sha256.toLowerCase().trim();
+      if (seenHashes.has(h)) continue;
+      seenHashes.add(h);
+    }
+
+    // Check duplicate image url
+    if (img.imageUrl) {
+      if (seenUrls.has(img.imageUrl)) continue;
+      seenUrls.add(img.imageUrl);
+    }
+
+    // Deduplicate same declared angle if multiple frames of same angle exist
+    const id = img.angleId || img.angleType;
+    if (id) {
+      if (seenAngleKeys.has(id)) continue;
+      seenAngleKeys.add(id);
+    }
+
+    usableImages.push(img);
   }
+
+  // Pass 2: Exact matching against required slot IDs
+  const unassigned: EvidenceImageInput[] = [];
+  for (const img of usableImages) {
+    const id = img.angleId || img.angleType;
+    if (id && reqSet.has(id) && !coveredSlots.has(id)) {
+      coveredSlots.add(id);
+    } else {
+      unassigned.push(img);
+    }
+  }
+
+  // Pass 3: Any remaining distinct usable evidence photos fill remaining open slots
+  for (const slot of reqList) {
+    if (!coveredSlots.has(slot) && unassigned.length > 0) {
+      unassigned.shift();
+      coveredSlots.add(slot);
+    }
+  }
+
   return {
-    covered: coveredAngles.size,
-    total: requiredAngles.length,
-    missing: requiredAngles.filter((angle) => !coveredAngles.has(angle)),
+    covered: coveredSlots.size,
+    total: reqList.length,
+    missing: reqList.filter((slot) => !coveredSlots.has(slot)),
   };
 }
 
@@ -158,9 +270,12 @@ export function computeEvidencePreview(
   const uniqueHashes = new Set(validHashes);
   const hasDuplicateHash = validHashes.length > uniqueHashes.size;
 
+  const dupCheck = detectDuplicateImages(images);
+  const hasDuplicate = hasDuplicateHash || dupCheck.hasDuplicates;
+
   const realHashes = validHashes.length;
   let integrityScore = images.length === 0 ? 0 : Math.round((realHashes / images.length) * 100);
-  if (hasDuplicateHash) {
+  if (hasDuplicate) {
     integrityScore = Math.min(integrityScore, 35);
   }
 
@@ -186,15 +301,15 @@ export function computeEvidencePreview(
     qualityNotes: qualityAvailable
       ? `Quality from measured blur/lighting on ${qualityParts.length} image(s).`
       : "Quality not measured — left at 0 rather than estimated.",
-    coverageNotes: `${distinctUsableRequired}/${total} required captured angle(s).`,
+    coverageNotes: `${distinctUsableRequired}/${total} required crop evidence photo(s).`,
     contextNotes:
       gpsOk.length === images.length && images.length > 0
         ? "All frames include authentic GPS coordinates."
         : gpsOk.length === 0
           ? "No authentic GPS fix on captured frames."
           : `${gpsOk.length} of ${images.length} frames have authentic GPS coordinates.`,
-    integrityNotes: hasDuplicateHash
-      ? "Duplicate image hash reused across distinct angles (anti-tamper flag)."
+    integrityNotes: hasDuplicate
+      ? "Duplicate image or exact same angle uploaded across photos (anti-tamper / retake flag)."
       : realHashes === images.length && images.length > 0
         ? "Verified unique SHA-256 digest stored for every frame."
         : realHashes === 0

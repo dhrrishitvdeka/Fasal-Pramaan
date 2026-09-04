@@ -8,7 +8,18 @@ import { REQUIRED_ANGLES } from "@/lib/evidence";
 const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const MAX_IMAGE_CHARS = 18 * 1024 * 1024;
-const ANGLE_TYPES = new Set<string>([...REQUIRED_ANGLES, "angle"]);
+const ANGLE_TYPES = new Set<string>([
+  ...REQUIRED_ANGLES,
+  "photo_1",
+  "photo_2",
+  "photo_3",
+  "wide_field",
+  "left_context",
+  "mid_canopy",
+  "right_context",
+  "closeup_damage",
+  "angle",
+]);
 
 export async function POST(request: Request) {
   const auth = await requireWebActor(request);
@@ -29,7 +40,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
   const imageDataUrl = String(body.imageDataUrl || body.dataUrl || "").trim();
-  const angleType = String(body.angleType || "closeup_damage").trim();
+  const angleType = String(body.angleType || "photo_1").trim();
   if (!ANGLE_TYPES.has(angleType)) {
     return NextResponse.json({ error: "Unsupported angleType" }, { status: 400 });
   }

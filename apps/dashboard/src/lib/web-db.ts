@@ -513,10 +513,13 @@ export function evaluationFromClaim(claim: FarmerClaim): EvidenceEvaluation {
       available: true,
       details: {
         views_present: claim.images.length,
-        views_required: 5,
+        views_required: 3,
         missing_views: missing,
-        wide_context: claim.images.some((img) => img.angleType === "wide_field"),
-        closeup_damage: claim.images.some((img) => img.angleType === "closeup_damage"),
+        wide_context: claim.images.some((img) => img.angleType === "wide_field" || img.angleType === "photo_1"),
+        closeup_damage: claim.images.some((img) => img.angleType === "closeup_damage" || img.angleType === "photo_3"),
+        photo_1: claim.images.some((img) => img.angleType === "photo_1" || img.angleType === "wide_field"),
+        photo_2: claim.images.some((img) => img.angleType === "photo_2" || img.angleType === "mid_canopy"),
+        photo_3: claim.images.some((img) => img.angleType === "photo_3" || img.angleType === "closeup_damage"),
       },
     },
     context: {

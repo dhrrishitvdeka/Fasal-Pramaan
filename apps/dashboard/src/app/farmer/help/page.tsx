@@ -45,7 +45,7 @@ function AngleIcon({ name, className }: { name: string; className?: string }) {
 export default function FarmerHelpPage() {
   const { lang } = useFarmerData();
   const t = getHelpI18n(lang);
-  const [selectedAngleId, setSelectedAngleId] = useState<string>("wide_field");
+  const [selectedAngleId, setSelectedAngleId] = useState<string>(t.angles[0]?.id || "photo_1");
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
   const activeAngle: AngleHelpData =

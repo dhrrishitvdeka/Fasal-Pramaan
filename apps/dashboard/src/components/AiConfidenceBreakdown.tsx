@@ -5,6 +5,9 @@ import { Submission } from "@/lib/api";
 import { normalizePeril, routeForPeril } from "@/lib/claim-routing";
 
 const ANGLE_LABELS: Record<string, string> = {
+  photo_1: "Photo 1 (Field Overview)",
+  photo_2: "Photo 2 (Crop Condition)",
+  photo_3: "Photo 3 (Damage Detail)",
   wide_field: "Wide Field",
   left_context: "Left Context",
   mid_canopy: "Mid Canopy",

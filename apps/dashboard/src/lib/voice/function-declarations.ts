@@ -56,15 +56,15 @@ CONVERSATION STYLE & PRECISION (CRITICAL):
 
 PORTAL MAP & SCREEN CONTEXT
 - /farmer — home: greeting, stats (plots, claims, verified, pending recapture), registered plots, active claims, upcoming reminders.
-- /farmer/capture — guided 5-angle claim capture (wide_field, left_context, mid_canopy, right_context, closeup_damage).
+- /farmer/capture — 3-photo crop evidence capture (photo_1, photo_2, photo_3).
 - /farmer/claims — claims list
 - /farmer/claims/{id} — claim detail
 - Recapture deep link is /farmer/capture?recapture={id}&angles={comma-separated}
 - /farmer/reminders — growth-timeline milestones; snooze or mark complete
 
 CAPTURE PROTOCOL
-- Angles in order: wide_field, left_context, mid_canopy, right_context, closeup_damage.
-- When capture is open, guide ONE angle at a time. Call capture_current_angle when the farmer asks.
+- Photos in order: photo_1 (Field Overview / wide_field), photo_2 (Crop Condition), photo_3 (Damage Detail). Any 3 clear distinct crop photos are accepted.
+- When capture is open, guide ONE photo at a time. Call capture_current_angle when the farmer asks.
 - If capture is not open, verify plot first, then call begin_guided_capture (or begin_recapture).
 
 CLAIM STATUSES & AUDIT
@@ -269,13 +269,13 @@ export const WEB_FUNCTION_DECLARATIONS = [
   },
   {
     name: "select_capture_angle",
-    description: "Switch the active camera viewfinder to a specific angle (wide_field, left_context, mid_canopy, right_context, closeup_damage).",
+    description: "Switch the active camera viewfinder to a specific photo/angle (photo_1, photo_2, photo_3, wide_field, closeup_damage, etc.).",
     parameters: objectSchema(
       {
         angle: {
           type: "STRING",
-          enum: ["wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"],
-          description: "Target canonical angle",
+          enum: ["photo_1", "photo_2", "photo_3", "wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"],
+          description: "Target evidence photo slot or canonical angle",
         },
       },
       ["angle"],
@@ -283,13 +283,13 @@ export const WEB_FUNCTION_DECLARATIONS = [
   },
   {
     name: "retake_capture_angle",
-    description: "Clear and retake a specific capture angle.",
+    description: "Clear and retake a specific capture photo or angle.",
     parameters: objectSchema(
       {
         angle: {
           type: "STRING",
-          enum: ["wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"],
-          description: "Angle to clear and retake",
+          enum: ["photo_1", "photo_2", "photo_3", "wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"],
+          description: "Photo slot or angle to clear and retake",
         },
       },
       ["angle"],
@@ -346,12 +346,12 @@ export const WEB_FUNCTION_DECLARATIONS = [
   },
   {
     name: "guide_capture",
-    description: "Spoken step-by-step guidance for one capture angle (wide_field, closeup_damage, …).",
+    description: "Spoken step-by-step guidance for one capture photo or angle (photo_1, photo_2, photo_3, wide_field, etc.).",
     parameters: objectSchema(
       {
         angle: {
           type: "STRING",
-          enum: ["wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"],
+          enum: ["photo_1", "photo_2", "photo_3", "wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"],
         },
       },
       ["angle"],

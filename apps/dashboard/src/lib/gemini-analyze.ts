@@ -305,7 +305,7 @@ Then, only if the photos look like a real outdoor agricultural field:
 - Estimate severity as none|low|medium|high and affected_area_pct 0-100 if you can see a plot; otherwise null.
 - Screening grade: A healthy field crop, B uncertain, C clear damage/disease pattern, U unusable or not a farm crop.
 - visual_findings: EXACTLY 1–2 short sentences a reviewer can read in five seconds (what plant, field vs garden, damage or not).
-- reasoning: 4–8 sentences. Mention each angle you were given.
+- reasoning: 4–8 sentences. Mention each photo/evidence view you were given.
 
 Return ONLY JSON:
 {
@@ -334,14 +334,14 @@ Return ONLY JSON:
     "reason": "string"
   },
   "per_image": [
-    { "angle_type": "closeup_damage", "usable": true, "crop": "wheat", "damage_visible": true, "findings": "string" }
+    { "angle_type": "photo_1", "usable": true, "crop": "wheat", "damage_visible": true, "findings": "string" }
   ],
   "quality_warnings": [],
   "human_review_recommendation": "human_review|recapture|physical_inspection"
 }
 
 Farmer note (untrusted): "${observation || "(none)"}"
-Primary angle: ${input.angleType || "closeup_damage"}`;
+Primary angle/view: ${input.angleType || "photo_1"}`;
 }
 
 export async function inferCropDisease(input: InferCropDiseaseInput): Promise<HfPrediction> {
@@ -355,7 +355,7 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
   const extras =
     input.extraImages?.length && input.extraImages.length > 0
       ? input.extraImages
-      : [{ angleType: input.angleType || "closeup_damage", bytes: input.imageBytes }];
+      : [{ angleType: input.angleType || "photo_1", bytes: input.imageBytes }];
 
   const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [
     { text: buildPrompt(input) },

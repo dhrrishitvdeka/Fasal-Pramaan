@@ -1,5 +1,10 @@
 import { inferCropDisease, geminiVisionModel, type HfPrediction } from "./gemini-analyze";
-import { computeAngleCoverage, isRealSha256, isUnusableLighting } from "./evidence";
+import {
+  computeAngleCoverage,
+  detectDuplicateImages,
+  isRealSha256,
+  isUnusableLighting,
+} from "./evidence";
 import type { Submission } from "./api";
 import { heuristicGate, geminiGate, type GateResult } from "./vision/gate-shared";
 import type { ContextSignal } from "./context/types";
@@ -248,11 +253,9 @@ async function runVisionGate(
 }
 
 export const REQUIRED_ANGLES = [
-  "wide_field",
-  "left_context",
-  "mid_canopy",
-  "right_context",
-  "closeup_damage",
+  "photo_1",
+  "photo_2",
+  "photo_3",
 ] as const;
 
 export type PersistedImageInput = {
@@ -599,10 +602,21 @@ export function computeEvidencePreview(images: PersistedImageInput[], peril?: st
   const uniqueHashes = new Set(validHashes);
   const hasDuplicateHash = validHashes.length > uniqueHashes.size;
 
+  const dupCheck = detectDuplicateImages(
+    images.map((img) => ({
+      angleId: img.angleType,
+      angleType: img.angleType,
+      sha256: img.sha256,
+      blurScore: img.blurScore,
+      lightingScore: img.lightingScore,
+    })),
+  );
+  const hasDuplicate = hasDuplicateHash || dupCheck.hasDuplicates;
+
   const realHashes = validHashes.length;
   let integrity = images.length === 0 ? 0 : Math.round((realHashes / images.length) * 100);
-  if (hasDuplicateHash) {
-    // Inter-angle duplicate hash collision: identical image frame reused across distinct angles
+  if (hasDuplicate) {
+    // Duplicate image or exact same angle uploaded across photos: anti-tamper / retake flag
     integrity = Math.min(integrity, 35);
   }
 
@@ -622,15 +636,15 @@ export function computeEvidencePreview(images: PersistedImageInput[], peril?: st
     overallConfidence: overall,
     missingAngles: missing,
     qualityNotes: qualityParts.length ? `Measured blur/lighting on ${qualityParts.length} image(s)` : "Quality not measured",
-    coverageNotes: `${angleCoverage.covered}/${angleCoverage.total} required angles present`,
+    coverageNotes: `${angleCoverage.covered}/${angleCoverage.total} required crop evidence photo(s) present`,
     contextNotes:
       gpsOk.length === images.length && images.length > 0
         ? "GPS coordinates present on all images"
         : gpsOk.length > 0
           ? `GPS coordinates present on ${gpsOk.length}/${images.length} images`
           : "GPS unavailable",
-    integrityNotes: hasDuplicateHash
-      ? "Duplicate image hash reused across distinct angles (anti-tamper flag)"
+    integrityNotes: hasDuplicate
+      ? "Duplicate image or exact same angle uploaded across photos (anti-tamper / retake flag)"
       : realHashes === images.length && images.length > 0
         ? `${realHashes} verified unique SHA-256 digest(s) stored`
         : realHashes > 0
@@ -1524,8 +1538,11 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
             required_views: required,
             views_present: images.length,
             views_required: required,
-            wide_context: images.some((img) => img.angle_type === "wide_field"),
-            closeup_damage: images.some((img) => img.angle_type === "closeup_damage"),
+            wide_context: images.some((img) => img.angle_type === "wide_field" || img.angle_type === "photo_1"),
+            closeup_damage: images.some((img) => img.angle_type === "closeup_damage" || img.angle_type === "photo_3"),
+            photo_1: images.some((img) => img.angle_type === "photo_1" || img.angle_type === "wide_field"),
+            photo_2: images.some((img) => img.angle_type === "photo_2" || img.angle_type === "mid_canopy"),
+            photo_3: images.some((img) => img.angle_type === "photo_3" || img.angle_type === "closeup_damage"),
           };
         })(),
       },
