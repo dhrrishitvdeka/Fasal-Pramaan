@@ -232,7 +232,7 @@ const HI_BASE: LandingTranslation = {
   perilLabels: {
     normal: {
       title: "सामान्य क्षति",
-      desc: "सामान्य क्षति — 5-कोण साक्ष्य और गुणवत्ता जाँच।",
+      desc: "सामान्य क्षति — 3-फ़ोटो साक्ष्य और गुणवत्ता जाँच।",
     },
     fire_burn: {
       title: "आग / जलना",

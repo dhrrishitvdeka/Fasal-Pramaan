@@ -170,8 +170,8 @@ function FarmerClaimDetailContent() {
             </div>
             <div className="text-xs text-emerald-800">
               {lang === "hi"
-                ? "आपके 5-कोण साक्ष्य को क्रिप्टोग्राफिक हैश के साथ सुरक्षित कर लिया गया है। AI विश्लेषण जारी है।"
-                : "Your 5-angle photographic evidence has been securely hashed and queued for verification."}
+                ? "आपके 3-फ़ोटो साक्ष्य को क्रिप्टोग्राफिक हैश के साथ सुरक्षित कर लिया गया है। AI विश्लेषण जारी है।"
+                : "Your 3-photo photographic evidence has been securely hashed and queued for verification."}
             </div>
           </div>
         </div>
@@ -228,8 +228,8 @@ function FarmerClaimDetailContent() {
             <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
               {isVerified
                 ? lang === "hi"
-                  ? "बीमा अधिकारी द्वारा आपके 5-कोण साक्ष्य को पूर्ण रूप से सत्यापित कर दिया गया है। दावा राशि सीधे डीबीटी खाते में भेजी जा रही है।"
-                  : "Reviewing officer has officially verified your 5-angle photographic evidence. The sanctioned payout is being dispatched via Direct Benefit Transfer (DBT)."
+                  ? "बीमा अधिकारी द्वारा आपके 3-फ़ोटो साक्ष्य को पूर्ण रूप से सत्यापित कर दिया गया है। दावा राशि सीधे डीबीटी खाते में भेजी जा रही है।"
+                  : "Reviewing officer has officially verified your 3-photo photographic evidence. The sanctioned payout is being dispatched via Direct Benefit Transfer (DBT)."
                 : isRecapture
                 ? lang === "hi"
                   ? "समीक्षा अधिकारी को अंतिम स्वीकृति हेतु विशिष्ट कोणों की पुनः फोटो चाहिए।"
@@ -543,12 +543,12 @@ function FarmerClaimDetailContent() {
             </h2>
           </div>
           <span className="text-xs text-slate-500 font-mono">
-            {claim.images.length} / 5 {lang === "hi" ? "कोण संग्रहीत" : "canonical angles"}
+            {claim.images.length} / 3 {lang === "hi" ? "फ़ोटो संग्रहीत" : "photos stored"}
           </span>
         </div>
 
-        {/* 5-Angle Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        {/* 3-Photo Evidence Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3.5">
           {claim.images.map((img, idx) => {
             const isAngleMissing =
               claim.missingAngles && claim.missingAngles.includes(img.angleType);

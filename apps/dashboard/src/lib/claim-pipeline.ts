@@ -135,7 +135,7 @@ async function gateSingleImage(
 
   // Try Gemini first with full image + metadata context; reuse same prompt via shared geminiGate.
   try {
-    const gemini = await geminiGate(dataUrl, input.angleType || "closeup_damage", expectedCrop, peril, meta);
+    const gemini = await geminiGate(dataUrl, input.angleType || "photo_1", expectedCrop, peril, meta);
     if (gemini) {
       cacheGateResult(cacheKey, gemini);
       return gemini;
@@ -181,8 +181,44 @@ export async function gateImagesGate(
     return { perImage: [], gateFailed: false, gateResult: { perImage: [], gateFailed: false } };
   }
 
+  // Cross-image duplicate or exact same angle detection across the upload batch
+  const dupCheck = detectDuplicateImages(
+    inputImages.map((img) => ({
+      angleId: img.angleType,
+      angleType: img.angleType,
+      sha256: img.sha256,
+      bytes: img.bytes,
+      blurScore: img.blurScore,
+      lightingScore: img.lightingScore,
+      luma: img.luma,
+      cropScore: img.cropScore,
+      greenPct: img.greenPct,
+    })),
+  );
+
+  const duplicateIndices = new Set<number>();
+  if (dupCheck.hasDuplicates) {
+    for (const [, j] of dupCheck.duplicatePairs) {
+      duplicateIndices.add(j);
+    }
+  }
+
   const perImage: Array<GateResult & { angleType: string }> = [];
-  for (const img of inputImages) {
+  for (let i = 0; i < inputImages.length; i++) {
+    const img = inputImages[i];
+    if (duplicateIndices.has(i)) {
+      perImage.push({
+        usable: false,
+        reason: "duplicate_angle",
+        crop_detected: expectedCrop || null,
+        confidence: 0.95,
+        visual_reason: "Exact duplicate photo or angle already uploaded in another slot.",
+        warnings: ["duplicate_angle"],
+        fallback: true,
+        angleType: img.angleType,
+      });
+      continue;
+    }
     const res = await gateSingleImage(img, expectedCrop, peril);
     perImage.push({ ...res, angleType: img.angleType });
   }
@@ -1030,7 +1066,10 @@ export async function inferAndAttachToClaim(
     }
     return { prediction };
   }
-  const closeup = images.find((img) => img.angleType === "closeup_damage") || images[0];
+  const closeup =
+    images.find((img) => img.angleType === "photo_3") ||
+    images.find((img) => img.angleType === "closeup_damage") ||
+    images[0];
   let prediction: HfPrediction | null = null;
   try {
     const uniqueAngles = new Map<string, { angleType: string; bytes: Uint8Array }>();

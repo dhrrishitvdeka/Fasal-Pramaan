@@ -37,7 +37,9 @@ import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
 import { getLocalizedAngleInfo } from "@/lib/help-i18n";
 import { getSpeechLocale } from "@/lib/live-indian-languages";
 import {
+  computeDHashFromImageData,
   detectDuplicateImages,
+  hammingDistance,
   isUnusableLighting,
   measureLightingScore,
   qualityPassedFromSignals,
@@ -542,6 +544,40 @@ function CaptureStudioContent() {
     const nowIso = new Date().toISOString();
 
     const blurForQuality = cvResult?.blurScore ?? undefined;
+
+    let pHash: string | undefined;
+    try {
+      if (typeof document !== "undefined") {
+        const canvas = document.createElement("canvas");
+        canvas.width = 9;
+        canvas.height = 8;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (ctx && video && video.videoWidth > 0) {
+          ctx.drawImage(video, 0, 0, 9, 8);
+          const imgData = ctx.getImageData(0, 0, 9, 8);
+          pHash = computeDHashFromImageData(imgData.data, 9, 8);
+        }
+      }
+    } catch {
+      // non-fatal
+    }
+
+    const existingList = Object.entries(capturedImages).filter(([slot]) => slot !== currentAngle.id);
+    const isExactDup = existingList.some(([, prevImg]) => {
+      if (digest && prevImg.sha256 && digest === prevImg.sha256) return true;
+      if (prevImg.imageUrl && prevImg.imageUrl === imageUrl) return true;
+      if (pHash && prevImg.pHash && hammingDistance(pHash, prevImg.pHash) <= 6) return true;
+      return false;
+    });
+
+    if (isExactDup) {
+      showToast(
+        lang === "hi"
+          ? "यह फ़ोटो पहले से कैप्चर की गई फ़ोटो जैसी ही है — कृपया अलग स्थान या कोण से फ़ोटो लें।"
+          : "Exact duplicate photo or angle already captured — please retake from a different viewpoint."
+      );
+    }
+
     // Unmeasured quality must not count as failed: coverage excludes only
     // explicitly-failed frames, so unknown stays present (gate decides from
     // fresh crop measurements instead).
@@ -554,12 +590,15 @@ function CaptureStudioContent() {
       lon: useGps ? gpsCoords.lon : null,
       accuracyM: useGps ? gpsCoords.accuracyM : null,
       sha256: digest,
-      qualityPassed: hasQualitySignal
-        ? qualityPassedFromSignals({
-            lightingScore,
-            blurScore: blurForQuality,
-          })
-        : true,
+      pHash,
+      qualityPassed: isExactDup
+        ? false
+        : hasQualitySignal
+          ? qualityPassedFromSignals({
+              lightingScore,
+              blurScore: blurForQuality,
+            })
+          : true,
       lightingScore,
       blurScore: cvResult?.blurScore ?? undefined,
       greenPct: cvResult?.greenPct ?? undefined,
@@ -597,6 +636,8 @@ function CaptureStudioContent() {
           capturedAt: nowIso,
           facing: cameraFacing,
           dimensions,
+          pHash,
+          isDuplicate: isExactDup,
           cvAnalysis: cvResult
             ? {
                 cropScore: cvResult.cropScore,
@@ -614,6 +655,9 @@ function CaptureStudioContent() {
           farmerObservation: observations || undefined,
         };
 
+        const existingHashes = existingList.map(([, img]) => img.sha256).filter(Boolean);
+        const existingPHashes = existingList.map(([, img]) => img.pHash).filter(Boolean);
+
         const res = await apiFetch("/api/vision/gate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -622,6 +666,10 @@ function CaptureStudioContent() {
             angleType: currentAngle.id,
             expectedCrop: selectedPlot?.cropType || activeIntent?.crop || undefined,
             peril: requestedPeril,
+            sha256: digest,
+            pHash,
+            existingHashes,
+            existingPHashes,
             metadata,
           }),
         });
@@ -629,17 +677,21 @@ function CaptureStudioContent() {
         if (gate && gate.usable === false) {
           const reason = String(gate.reason || "unusable");
           const warn =
-            reason === "wrong_crop"
+            reason === "duplicate_angle"
               ? lang === "hi"
-                ? `फसल मेल नहीं खाती (${gate.crop_detected || "अज्ञात"}) — सही फसल की फोटो लें।`
-                : `Crop mismatch (${gate.crop_detected || "unknown"}) — retake with correct crop in frame.`
-              : reason === "ai_generated"
+                ? "एक ही कोण या डुप्लिकेट फोटो पहचानी गई — कृपया अलग दृश्य से पुनः फोटो लें।"
+                : "Duplicate photo or exact same angle detected — please retake from a different viewpoint."
+              : reason === "wrong_crop"
                 ? lang === "hi"
-                  ? "AI-निर्मित/नकली लग रही है — मूल फोटो लें।"
-                  : "Looks AI-generated — please capture original photo."
-                : lang === "hi"
-                  ? `फोटो उपयोगी नहीं (${reason}) — दोबारा लें।`
-                  : `Photo not usable (${reason}) — please retake.`;
+                  ? `फसल मेल नहीं खाती (${gate.crop_detected || "अज्ञात"}) — सही फसल की फोटो लें।`
+                  : `Crop mismatch (${gate.crop_detected || "unknown"}) — retake with correct crop in frame.`
+                : reason === "ai_generated"
+                  ? lang === "hi"
+                    ? "AI-निर्मित/नकली लग रही है — मूल फोटो लें।"
+                    : "Looks AI-generated — please capture original photo."
+                  : lang === "hi"
+                    ? `फोटो उपयोगी नहीं (${reason}) — दोबारा लें।`
+                    : `Photo not usable (${reason}) — please retake.`;
           showToast(warn);
           // mark qualityPassed false so coverage logic reflects gate failure
           setCapturedImages((prev) => {
@@ -1172,19 +1224,36 @@ function CaptureStudioContent() {
       },
       selectAngle: async (angleId: string) => {
         const defs = activeAngleDefsRef.current;
-        const idx = defs.findIndex((a) => a.id === angleId);
+        const normalized =
+          angleId === "wide_field"
+            ? "photo_1"
+            : angleId === "closeup_damage"
+              ? "photo_3"
+              : angleId === "mid_canopy" || angleId === "left_context" || angleId === "right_context"
+                ? "photo_2"
+                : angleId;
+        const idx = defs.findIndex((a) => a.id === angleId || a.id === normalized);
         if (idx !== -1) {
           setCurrentAngleIndex(idx);
-          return { ok: true, message: `Switched to angle: ${defs[idx].name}`, angleId };
+          return { ok: true, message: `Switched to photo: ${defs[idx].name}`, angleId: defs[idx].id };
         }
-        return { ok: false, message: `Angle ${angleId} not found in current capture route.` };
+        return { ok: false, message: `Photo slot ${angleId} not found in current capture route.` };
       },
       retakeAngle: async (angleId: string) => {
-        deleteCapturedAngle(angleId);
         const defs = activeAngleDefsRef.current;
-        const idx = defs.findIndex((a) => a.id === angleId);
+        const normalized =
+          angleId === "wide_field"
+            ? "photo_1"
+            : angleId === "closeup_damage"
+              ? "photo_3"
+              : angleId === "mid_canopy" || angleId === "left_context" || angleId === "right_context"
+                ? "photo_2"
+                : angleId;
+        const targetId = defs.some((a) => a.id === angleId) ? angleId : normalized;
+        deleteCapturedAngle(targetId);
+        const idx = defs.findIndex((a) => a.id === targetId);
         if (idx !== -1) setCurrentAngleIndex(idx);
-        return { ok: true, message: `Cleared angle ${angleId} for recapture.`, angleId };
+        return { ok: true, message: `Cleared ${targetId} for recapture.`, angleId: targetId };
       },
       checkEvidenceQuality: async () => {
         const cv = cvResultRef.current;
@@ -1394,11 +1463,11 @@ function CaptureStudioContent() {
         )}
       </div>
 
-      {/* 5-Angle Stepper / Progress Bar */}
+      {/* 3-Photo Stepper / Progress Bar */}
       <div className="fp-panel p-2.5 sm:p-4">
         <div className="flex items-center justify-between mb-3 text-xs font-semibold text-slate-600">
           <span>
-            {lang === "hi" ? "कोण प्रगति" : "Angle Progress"}: {capturedCount} / {requiredCount}{" "}
+            {lang === "hi" ? "फ़ोटो प्रगति" : "Photo Progress"}: {capturedCount} / {requiredCount}{" "}
             {lang === "hi" ? "पूर्ण" : "Captured"}
           </span>
           <span className="text-emerald-800 font-bold font-mono">
@@ -2318,7 +2387,7 @@ export default function FarmerCapturePage() {
     <Suspense
       fallback={
         <div className="flex min-h-[60vh] items-center justify-center text-sm text-slate-600">
-          Loading Guided 5-Angle Studio…
+          Loading 3-Photo Evidence Studio…
         </div>
       }
     >

@@ -31,6 +31,8 @@ export type ImageEvidenceMetadata = {
     modelProb?: number | null;
   } | null;
   sha256?: string | null;
+  pHash?: string | null;
+  isDuplicate?: boolean | null;
   plotName?: string | null;
   plotLat?: number | null;
   plotLon?: number | null;
@@ -77,6 +79,18 @@ export function heuristicGate(
       reason: "too_small_or_blank",
       crop_detected: null,
       warnings: ["too_small"],
+      confidence: 0.1,
+      fallback: true,
+    };
+  }
+
+  if (metadata?.isDuplicate === true) {
+    return {
+      usable: false,
+      reason: "duplicate_angle",
+      crop_detected: expectedCrop || null,
+      visual_reason: "Exact duplicate photo or angle already uploaded across evidence slots",
+      warnings: ["duplicate_angle"],
       confidence: 0.1,
       fallback: true,
     };
@@ -299,7 +313,7 @@ Evaluate:
 Return ONLY valid JSON matching this schema:
 {
   "usable": true | false,
-  "reason": "ok" | "not_crop" | "wrong_crop" | "ai_generated" | "screen_replay" | "too_dark" | "too_blurry" | "no_field" | "unusable",
+  "reason": "ok" | "not_crop" | "wrong_crop" | "ai_generated" | "screen_replay" | "too_dark" | "too_blurry" | "no_field" | "duplicate_angle" | "unusable",
   "crop_detected": string | null,
   "peril_match": true | false,
   "metadata_verified": true | false,

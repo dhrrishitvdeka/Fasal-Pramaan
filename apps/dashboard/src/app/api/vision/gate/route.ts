@@ -3,7 +3,7 @@ import { heuristicGate, geminiGate } from "@/lib/vision/gate-shared";
 import { requireWebActor } from "@/lib/web-auth";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { normalizePeril } from "@/lib/claim-routing";
-import { REQUIRED_ANGLES } from "@/lib/evidence";
+import { REQUIRED_ANGLES, hammingDistance } from "@/lib/evidence";
 
 const RATE_LIMIT_MAX = 20;
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -55,6 +55,38 @@ export async function POST(request: Request) {
   }
 
   const metadata = body.metadata && typeof body.metadata === "object" ? body.metadata : undefined;
+
+  // Duplicate check across already captured slots (SHA-256 byte digest or perceptual hash)
+  const incomingHash = String(body.sha256 || metadata?.sha256 || "").trim();
+  const existingHashes: string[] = Array.isArray(body.existingHashes) ? body.existingHashes : [];
+  if (incomingHash && existingHashes.some((h) => h && String(h).trim().toLowerCase() === incomingHash.toLowerCase())) {
+    return NextResponse.json({
+      usable: false,
+      reason: "duplicate_angle",
+      crop_detected: expectedCrop || null,
+      visual_reason: "Exact duplicate photo or angle already uploaded in another slot.",
+      warnings: ["duplicate_angle"],
+      confidence: 0.1,
+      fallback: true,
+    });
+  }
+
+  const incomingPHash = String(metadata?.pHash || body.pHash || "").trim();
+  const existingPHashes: string[] = Array.isArray(body.existingPHashes) ? body.existingPHashes : [];
+  if (
+    incomingPHash.length === 16 &&
+    existingPHashes.some((ph) => ph && String(ph).trim().length === 16 && hammingDistance(incomingPHash, String(ph).trim()) <= 6)
+  ) {
+    return NextResponse.json({
+      usable: false,
+      reason: "duplicate_angle",
+      crop_detected: expectedCrop || null,
+      visual_reason: "Near-identical perceptual hash indicates duplicate photo or exact same angle view.",
+      warnings: ["duplicate_angle"],
+      confidence: 0.1,
+      fallback: true,
+    });
+  }
 
   try {
     const gemini = await geminiGate(imageDataUrl, angleType, expectedCrop, peril, metadata);

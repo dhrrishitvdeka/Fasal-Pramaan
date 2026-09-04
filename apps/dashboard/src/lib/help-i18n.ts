@@ -39,15 +39,15 @@ export interface HelpTranslations {
 
 export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
   en: {
-    title: "Farmer Help & 5-Angle Capture Guide",
+    title: "Farmer Help & 3-Photo Evidence Guide",
     subtitle: "Everything you need to capture acceptable crop loss evidence and navigate the dynamic claim pipeline.",
     pipelineTitle: "How the Dynamic Claim Pipeline Works",
     pipelineSub: "From field camera capture to direct bank payout via PMFBY verification.",
     pipelineSteps: [
       {
         number: "01",
-        title: "5-Angle Guided Capture",
-        desc: "Camera assists with real-time checks for blur, lighting, GPS lock, and required angles.",
+        title: "3-Photo Guided Capture",
+        desc: "Camera assists with real-time checks for blur, lighting, GPS lock, and required evidence photos.",
         badge: "Field Camera",
       },
       {
@@ -65,12 +65,12 @@ export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
       {
         number: "04",
         title: "Reviewer Decision or Targeted Recapture",
-        desc: "Official approves DBT payout. If evidence is unclear, you only recapture the specific missing angle.",
+        desc: "Official approves DBT payout. If evidence is unclear, you only recapture the specific missing photo.",
         badge: "Fast Settlement",
       },
     ],
-    angleGuideTitle: "The 5 Canonical Camera Angles",
-    angleGuideSub: "Capturing all 5 angles maximizes your evidence trust score and prevents recapture delays.",
+    angleGuideTitle: "The 3 Crop Evidence Photos",
+    angleGuideSub: "Capturing all 3 photos maximizes your evidence trust score and prevents recapture delays.",
     angles: [
       {
         id: "wide_field",
@@ -156,7 +156,7 @@ export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
     faqs: [
       {
         q: "What if an insurance reviewer requests a recapture?",
-        a: "You do not have to retake all 5 photos! The dynamic pipeline will notify you and guide you to capture ONLY the specific angle requested (e.g. just the close-up macro).",
+        a: "You do not have to retake all 3 photos! The dynamic pipeline will notify you and guide you to capture ONLY the specific photo requested.",
       },
       {
         q: "Can I file a claim using voice in my native language?",
@@ -167,21 +167,21 @@ export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
         a: "PMFBY regulations require geospatial proof that the photos were captured inside your registered land plot. The system matches your coordinates with government land records.",
       },
     ],
-    startClaimBtn: "Start Guided 5-Angle Capture",
+    startClaimBtn: "Start Guided 3-Photo Capture",
     talkToSaathiBtn: "Talk to Fasal Saathi (Voice AI)",
     viewClaimsBtn: "Track My Claims",
   },
 
   hi: {
-    title: "किसान सहायता और 5-कोण गाइड",
+    title: "किसान सहायता और 3-फ़ोटो गाइड",
     subtitle: "फसल क्षति का सटीक साक्ष्य दर्ज करने और दावा प्रक्रिया को समझने के लिए पूरी मार्गदर्शिका।",
     pipelineTitle: "डिजिटल दावा प्रणाली कैसे काम करती है",
     pipelineSub: "खेत से फोटो खींचने से लेकर बैंक खाते में सीधा भुगतान मिलने तक का पूरा सफर।",
     pipelineSteps: [
       {
         number: "01",
-        title: "5-कोण निर्देशित फोटो",
-        desc: "कैमरा रोशनी, धुंधलेपन, जीपीएस और सही कोण की तुरंत जांच करता है।",
+        title: "3-फ़ोटो निर्देशित कैप्चर",
+        desc: "कैमरा रोशनी, धुंधलेपन, जीपीएस और सही फ़ोटो की तुरंत जांच करता है।",
         badge: "खेत का कैमरा",
       },
       {
@@ -199,12 +199,12 @@ export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
       {
         number: "04",
         title: "समीक्षा और त्वरित भुगतान",
-        desc: "अधिकारी दावा स्वीकृत करते हैं। अस्पष्ट होने पर केवल वही एक कोण दोबारा मांगा जाता है।",
+        desc: "अधिकारी दावा स्वीकृत करते हैं। अस्पष्ट होने पर केवल वही एक फ़ोटो दोबारा मांगी जाती है।",
         badge: "त्वरित निपटान",
       },
     ],
-    angleGuideTitle: "5 अनिवार्य कैमरा कोण",
-    angleGuideSub: "सभी 5 कोणों की फोटो लेने से आपका दावा बिना किसी देरी के तुरंत पास होता है।",
+    angleGuideTitle: "3 अनिवार्य फसल साक्ष्य फ़ोटो",
+    angleGuideSub: "सभी 3 फ़ोटो लेने से आपका दावा बिना किसी देरी के तुरंत पास होता है।",
     angles: [
       {
         id: "wide_field",
@@ -290,7 +290,7 @@ export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
     faqs: [
       {
         q: "यदि बीमा समीक्षक दोबारा फोटो का अनुरोध करें तो क्या करें?",
-        a: "आपको सभी 5 फोटो दोबारा लेने की आवश्यकता नहीं है! सिस्टम आपको केवल उसी एक कोण की फोटो लेने का निर्देश देगा जो अस्पष्ट थी।",
+        a: "आपको सभी 3 फोटो दोबारा लेने की आवश्यकता नहीं है! सिस्टम आपको केवल उसी एक फ़ोटो को दोबारा लेने का निर्देश देगा जो अस्पष्ट या अस्वीकृत हुई थी।",
       },
       {
         q: "क्या मैं बोलकर अपनी भाषा में दावा दर्ज कर सकता हूँ?",
@@ -301,7 +301,7 @@ export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
         a: "प्रधानमंत्री फसल बीमा योजना के नियमों के अनुसार फोटो आपके पंजीकृत खसरे के अंदर ली गई होनी चाहिए।",
       },
     ],
-    startClaimBtn: "5-कोण कैमरा से फोटो लें",
+    startClaimBtn: "3-फ़ोटो कैमरा से फोटो लें",
     talkToSaathiBtn: "फसल साथी से बात करें (आवाज़)",
     viewClaimsBtn: "मेरे दावे देखें",
   },
@@ -1829,10 +1829,6 @@ export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
   },
 };
 
-export function getHelpI18n(lang: AppLang): HelpTranslations {
-  return HELP_TRANSLATIONS[lang] || HELP_TRANSLATIONS.en;
-}
-
 const PHOTO_EVIDENCE_MAP: Record<
   string,
   {
@@ -1901,6 +1897,45 @@ const PHOTO_EVIDENCE_MAP: Record<
     ],
   },
 };
+
+export function getHelpI18n(lang: AppLang): HelpTranslations {
+  const base = HELP_TRANSLATIONS[lang] || HELP_TRANSLATIONS.en;
+  const isHi = lang === "hi";
+  const threePhotoAngles: AngleHelpData[] = [
+    {
+      id: "photo_1",
+      name: isHi ? PHOTO_EVIDENCE_MAP.photo_1.nameHi : PHOTO_EVIDENCE_MAP.photo_1.nameEn,
+      distance: isHi ? "10–15 मी दूर" : "10–15m away",
+      shortDesc: isHi ? "खेत का समग्र दृश्य" : "Overview landscape of crop stand and plot boundary.",
+      instructions: isHi ? PHOTO_EVIDENCE_MAP.photo_1.instructionsHi : PHOTO_EVIDENCE_MAP.photo_1.instructionsEn,
+      tips: isHi ? PHOTO_EVIDENCE_MAP.photo_1.tipsHi : PHOTO_EVIDENCE_MAP.photo_1.tipsEn,
+      icon: "Maximize2",
+    },
+    {
+      id: "photo_2",
+      name: isHi ? PHOTO_EVIDENCE_MAP.photo_2.nameHi : PHOTO_EVIDENCE_MAP.photo_2.nameEn,
+      distance: isHi ? "1–2 मी दूर" : "1–2m away",
+      shortDesc: isHi ? "फसल की स्थिति" : "Crop foliage, stand health, and damage transition.",
+      instructions: isHi ? PHOTO_EVIDENCE_MAP.photo_2.instructionsHi : PHOTO_EVIDENCE_MAP.photo_2.instructionsEn,
+      tips: isHi ? PHOTO_EVIDENCE_MAP.photo_2.tipsHi : PHOTO_EVIDENCE_MAP.photo_2.tipsEn,
+      icon: "Layers",
+    },
+    {
+      id: "photo_3",
+      name: isHi ? PHOTO_EVIDENCE_MAP.photo_3.nameHi : PHOTO_EVIDENCE_MAP.photo_3.nameEn,
+      distance: isHi ? "30–50 सेमी" : "30–50cm close",
+      shortDesc: isHi ? "क्षति का विवरण" : "Close-up detail of leaf, stem, or earhead damage.",
+      instructions: isHi ? PHOTO_EVIDENCE_MAP.photo_3.instructionsHi : PHOTO_EVIDENCE_MAP.photo_3.instructionsEn,
+      tips: isHi ? PHOTO_EVIDENCE_MAP.photo_3.tipsHi : PHOTO_EVIDENCE_MAP.photo_3.tipsEn,
+      icon: "ZoomIn",
+    },
+  ];
+
+  return {
+    ...base,
+    angles: threePhotoAngles,
+  };
+}
 
 export function getLocalizedAngleInfo(
   angleId: string,

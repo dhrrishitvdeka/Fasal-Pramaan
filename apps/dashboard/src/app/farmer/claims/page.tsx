@@ -338,11 +338,11 @@ function FarmerClaimsContent() {
                   </div>
                   </div>
 
-                  {/* Right side: 5-Angle Photo Thumbnails & Action Buttons */}
+                  {/* Right side: 3-Photo Evidence Thumbnails & Action Buttons */}
                   <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end justify-between gap-3 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                    {/* 5 Thumbnails */}
+                    {/* 3 Thumbnails */}
                     <div className="flex items-center gap-1.5">
-                      {claim.images.slice(0, 5).map((img, idx) => (
+                      {claim.images.slice(0, 3).map((img, idx) => (
                         <div
                           key={idx}
                           className="relative h-12 w-12 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 group shrink-0"
