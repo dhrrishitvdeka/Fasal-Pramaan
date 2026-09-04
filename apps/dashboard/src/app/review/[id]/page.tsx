@@ -180,9 +180,37 @@ export default function ReviewDetailPage() {
     return ALL_ANGLES.filter((a) => a.key.startsWith("photo_"));
   }, [data?.images]);
 
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
+
   const action = useMutation({
-    mutationFn: async (payload: ReviewActionPayload) => applyWebReviewAction(id, payload),
-    onSuccess: () => {
+    mutationFn: async (payload: ReviewActionPayload) => {
+      setPendingAction(payload.action);
+      // Optimistic status so badge + buttons react instantly.
+      const next =
+        payload.action === "accept" || payload.action === "correct"
+          ? "verified"
+          : payload.action === "reject"
+            ? "rejected"
+            : payload.action === "request_recapture"
+              ? "needs_recapture"
+              : payload.action === "physical_inspection"
+                ? "physical_inspection"
+                : null;
+      if (next) {
+        setOptimisticStatus(next);
+        qc.setQueryData(["submission", id], (old: Submission | undefined) =>
+          old ? { ...old, status: next } : old,
+        );
+      }
+      try {
+        return await applyWebReviewAction(id, payload);
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    onSuccess: (_res, variables) => {
+      setOptimisticStatus(null);
       qc.invalidateQueries({ queryKey: ["submission", id] });
       qc.invalidateQueries({ queryKey: ["review-queue"] });
       qc.invalidateQueries({ queryKey: ["review-history", id] });
@@ -192,10 +220,29 @@ export default function ReviewDetailPage() {
       qc.invalidateQueries({ queryKey: ["damage-cat"] });
       qc.invalidateQueries({ queryKey: ["severity"] });
       qc.invalidateQueries({ queryKey: ["by-crop"] });
-      setMessage("Decision recorded. Audit trail and metrics updated.");
+      // Immediate refetch so the detail view reflects the new status without waiting.
+      void refetch();
+      const label =
+        variables.action === "accept"
+          ? "Claim accepted — status updated to verified."
+          : variables.action === "correct"
+            ? "Corrections saved — claim verified with overrides."
+            : variables.action === "reject"
+              ? "Claim rejected — status updated."
+              : variables.action === "request_recapture"
+                ? "Recapture requested — farmer notified instantly."
+                : variables.action === "physical_inspection"
+                  ? "Physical inspection dispatched."
+                  : variables.action === "override_gate"
+                    ? "Authenticity gate overridden — you can now accept."
+                    : "Decision recorded. Audit trail and metrics updated.";
+      setMessage(label);
       setRecaptureModalOpen(false);
     },
     onError: (err: unknown) => {
+      // Roll back optimistic status so UI never sticks on a failed decision.
+      setOptimisticStatus(null);
+      void refetch();
       const axiosDetail =
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { detail?: string; error?: string } } }).response?.data
@@ -379,8 +426,17 @@ export default function ReviewDetailPage() {
   }
 
   const pred = data.latest_prediction;
-  const isClosed = data.status === "verified" || data.status === "rejected";
+  const liveStatus = optimisticStatus ?? data.status;
+  const isClosed = liveStatus === "verified" || liveStatus === "rejected";
   const canAccept = !isClosed && predictionIsAcceptable(pred, hasIntegrityFailure);
+  const busy = action.isPending;
+  const busyLabel = (key: string) =>
+    pendingAction === key ? (
+      <span className="flex items-center gap-1.5">
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        Working…
+      </span>
+    ) : null;
 
   const handleAccept = () => {
     if (canAccept) {
@@ -545,16 +601,18 @@ export default function ReviewDetailPage() {
           <span
             className={clsx(
               "rounded-full px-2.5 py-0.5 text-xs font-bold capitalize border",
-              data.status === "verified"
+              liveStatus === "verified"
                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                : data.status === "rejected"
+                : liveStatus === "rejected"
                 ? "bg-rose-50 text-rose-700 border-rose-200"
-                : data.status === "needs_recapture"
+                : liveStatus === "needs_recapture"
                 ? "bg-amber-50 text-amber-800 border-amber-200"
                 : "bg-blue-50 text-blue-700 border-blue-200",
+              busy && "animate-pulse",
             )}
           >
-            {data.status.replaceAll("_", " ")}
+            {liveStatus.replaceAll("_", " ")}
+            {busy && pendingAction ? ` · ${pendingAction.replaceAll("_", " ")}…` : ""}
           </span>
 
           <span className="rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-700 capitalize">
@@ -946,16 +1004,75 @@ export default function ReviewDetailPage() {
             </div>
           </section>
 
-          {/* AI MODEL PREDICTION METRICS */}
+          {/* AI MODEL PREDICTION METRICS — highlighted primary */}
+          {pred && (
+            <section className="relative overflow-hidden rounded-2xl border-2 border-indigo-300 bg-white p-4 shadow-lg shadow-indigo-100/60 ring-2 ring-indigo-100 space-y-3">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-400" />
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-2.5 pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-xs">
+                    <Sparkles className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-extrabold tracking-tight text-slate-900">
+                      AI Model Scoring Breakdown
+                    </h3>
+                    <p className="text-[11px] text-indigo-700/80 font-medium">Primary machine signal — verify against evidence below</p>
+                  </div>
+                </div>
+                <span className="font-mono text-[11px] text-slate-500 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">{pred.model_version}</span>
+              </div>
+              <AiConfidenceBreakdown prediction={pred} images={data.images} peril={data.peril} />
+            </section>
+          )}
+
+          {/* DAMAGE ASSESSMENT — reviewer-readable loss summary */}
           {pred && (
             <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  AI Model Scoring Breakdown
-                </h3>
-                <span className="font-mono text-[11px] text-slate-500">{pred.model_version}</span>
+                <div className="flex items-center gap-2">
+                  <ClipboardCheck className="h-4 w-4 text-emerald-700" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Damage Assessment
+                  </h3>
+                </div>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] text-slate-600">
+                  {pred.predicted_crop || "—"} · {pred.predicted_growth_stage || "stage n/a"}
+                </span>
               </div>
-              <AiConfidenceBreakdown prediction={pred} images={data.images} peril={data.peril} />
+              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Damage</span>
+                  <span className="mt-0.5 block text-sm font-bold capitalize text-slate-900">{String(pred.primary_damage || "—").replaceAll("_", " ")}</span>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Severity</span>
+                  <span className="mt-0.5 block text-sm font-bold capitalize text-slate-900">{pred.severity || "—"}</span>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Affected area</span>
+                  <span className="mt-0.5 block font-mono text-sm font-extrabold text-slate-900">{pred.affected_area_pct != null ? `${pred.affected_area_pct}%` : "—"}</span>
+                  {typeof pred.affected_area_pct === "number" && (
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                      <div className="h-full rounded-full bg-emerald-600" style={{ width: `${Math.min(Math.max(pred.affected_area_pct, 0), 100)}%` }} />
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Model confidence</span>
+                  <span className="mt-0.5 block font-mono text-sm font-extrabold text-slate-900">{pred.overall_confidence != null ? `${Math.round(pred.overall_confidence * 100)}%` : "—"}</span>
+                  <span className="text-[10px] text-slate-500">Grade {pred.predicted_grade || "U"}</span>
+                </div>
+              </div>
+              <p className="rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-[11px] leading-relaxed text-slate-600">
+                {pred.predicted_grade === "U"
+                  ? "Grade U — frames were unusable, so damage % is not a payout basis. Recapture or reject."
+                  : pred.severity === "high" || (pred.affected_area_pct ?? 0) >= 60
+                    ? `High loss signal (${pred.severity || "severe"} · ${pred.affected_area_pct ?? "?"}% area). Cross-check satellite + plot boundary before payout.`
+                    : pred.severity === "low" || (pred.affected_area_pct ?? 100) <= 30
+                      ? `Low loss signal — likely partial damage. A reduced payout or field check may fit better than full acceptance.`
+                      : "Moderate loss signal — review severity % and affected visuals before deciding."}
+              </p>
             </section>
           )}
 
@@ -973,34 +1090,43 @@ export default function ReviewDetailPage() {
               <Scale className="h-5 w-5 text-slate-700" />
             </div>
 
+            {/* Live decision status */}
+            <div aria-live="polite" className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-semibold uppercase tracking-wider text-slate-500 text-[11px]">Live status</span>
+              <span className={clsx("rounded-full border px-2 py-0.5 font-bold capitalize", isClosed ? "border-slate-300 bg-slate-100 text-slate-700" : "border-blue-200 bg-blue-50 text-blue-700", busy && "animate-pulse")}>
+                {busy && pendingAction ? `${pendingAction.replaceAll("_", " ")}…` : liveStatus.replaceAll("_", " ")}
+              </span>
+              {!canAccept && !isClosed && (
+                <span className="text-[11px] text-amber-700">Accept locked — integrity / grade-U gate. Override gate or recapture first.</span>
+              )}
+            </div>
+
             {/* Quick Action Button Strip */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               <button
                 type="button"
-                className="flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-xs"
-                disabled={action.isPending || isClosed || !canAccept}
+                className="flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-xs disabled:cursor-not-allowed"
+                disabled={busy || isClosed || !canAccept}
                 onClick={handleAccept}
-                title="Accept claim assessment based on evidence and model"
+                title={canAccept ? "Accept claim assessment based on evidence and model" : "Blocked: integrity failure or unusable grade"}
               >
-                <CheckCircle2 className="h-4 w-4" />
-                <span>{pred ? "Accept AI result" : "Accept claim"} (A)</span>
+                {pendingAction === "accept" ? busyLabel("accept") : (<><CheckCircle2 className="h-4 w-4" /><span>{pred ? "Accept AI result" : "Accept claim"} (A)</span></>)}
               </button>
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-black disabled:opacity-50 transition-colors shadow-xs"
-                disabled={action.isPending || isClosed}
+                className="flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-black disabled:opacity-50 transition-colors shadow-xs disabled:cursor-not-allowed"
+                disabled={busy || isClosed}
                 onClick={handleCorrect}
                 title="Apply reviewer corrections and verify"
               >
-                <FileCheck className="h-4 w-4" />
-                <span>Correct &amp; Verify (C)</span>
+                {pendingAction === "correct" ? busyLabel("correct") : (<><FileCheck className="h-4 w-4" /><span>Correct &amp; Verify (C)</span></>)}
               </button>
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-amber-400 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50 transition-colors"
-                disabled={action.isPending}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-amber-400 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
+                disabled={busy}
                 onClick={handleOpenRecapture}
                 title="Request farmer to recapture specific angles"
               >
@@ -1010,24 +1136,22 @@ export default function ReviewDetailPage() {
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors"
-                disabled={action.isPending || isClosed}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
+                disabled={busy || isClosed}
                 onClick={handleInspection}
                 title="Dispatch physical field inspector"
               >
-                <UserCheck className="h-4 w-4 text-slate-600" />
-                <span>Physical Inspection (P)</span>
+                {pendingAction === "physical_inspection" ? busyLabel("physical_inspection") : (<><UserCheck className="h-4 w-4 text-slate-600" /><span>Physical Inspection (P)</span></>)}
               </button>
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50 transition-colors sm:col-span-2 lg:col-span-1"
-                disabled={action.isPending || isClosed}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50 transition-colors sm:col-span-2 lg:col-span-1 disabled:cursor-not-allowed"
+                disabled={busy || isClosed}
                 onClick={handleReject}
                 title="Reject claim with reason"
               >
-                <XCircle className="h-4 w-4 text-rose-600" />
-                <span>Reject Claim (X)</span>
+                {pendingAction === "reject" ? busyLabel("reject") : (<><XCircle className="h-4 w-4 text-rose-600" /><span>Reject Claim (X)</span></>)}
               </button>
             </div>
 
@@ -1144,46 +1268,78 @@ export default function ReviewDetailPage() {
             </div>
           </section>
 
-          {/* 4. AUDIT & REVIEW TIMELINE */}
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <div className="flex items-center gap-2">
-                <History className="h-4 w-4 text-slate-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Case Audit &amp; Decision History
-                </h3>
+          {/* 4. AUDIT & REVIEW TIMELINE — beautiful timeline */}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/80 to-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white shadow-xs">
+                  <History className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-extrabold tracking-tight text-slate-900">
+                    Case Audit &amp; Decision History
+                  </h3>
+                  <p className="text-[11px] text-slate-500">Immutable PMFBY trail — every decision with actor &amp; time</p>
+                </div>
               </div>
-              <span className="font-mono text-[11px] text-slate-500">
-                {historyItems.length} records
+              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 font-mono text-[11px] font-bold text-slate-600 shadow-2xs">
+                {historyItems.length} {historyItems.length === 1 ? "record" : "records"}
               </span>
             </div>
 
             {historyItems.length === 0 ? (
-              <p className="text-xs text-slate-400 py-3">No previous actions recorded for this claim.</p>
+              <div className="flex items-center gap-3 px-4 py-6 text-xs text-slate-500">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                  <Clock className="h-4 w-4" />
+                </span>
+                <p>No previous actions recorded for this claim yet — your decision will start the trail.</p>
+              </div>
             ) : (
-              <ol className="space-y-3 border-l-2 border-slate-200 pl-4 pt-1 text-xs">
-                {historyItems.map((item) => (
-                  <li key={item.id} className="relative">
-                    <span
-                      aria-hidden="true"
-                      className="absolute -left-[1.35rem] top-1 h-2.5 w-2.5 rounded-full border-2 border-slate-900 bg-white"
-                    />
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <span className="font-bold text-slate-800 capitalize">
-                        {item.action.replaceAll("_", " ")}
+              <ol className="relative space-y-0 px-4 py-4">
+                <span aria-hidden="true" className="absolute bottom-6 left-[27px] top-6 w-px bg-gradient-to-b from-slate-300 via-slate-200 to-transparent" />
+                {historyItems.map((item, idx) => {
+                  const act = item.action.toLowerCase();
+                  const tone = act.includes("accept") || act.includes("verif") || act.includes("correct")
+                    ? "bg-emerald-500 ring-emerald-200 text-emerald-700 border-emerald-200"
+                    : act.includes("reject")
+                      ? "bg-rose-500 ring-rose-200 text-rose-700 border-rose-200"
+                      : act.includes("recapture") || act.includes("inspect")
+                        ? "bg-amber-500 ring-amber-200 text-amber-800 border-amber-200"
+                        : act.includes("override") || act.includes("annotat")
+                          ? "bg-violet-500 ring-violet-200 text-violet-700 border-violet-200"
+                          : "bg-slate-500 ring-slate-200 text-slate-700 border-slate-200";
+                  const [dotBg] = tone.split(" ");
+                  const initial = (item.actor || "S").trim().charAt(0).toUpperCase() || "S";
+                  return (
+                    <li key={item.id} className="relative flex gap-3 pb-4 last:pb-0">
+                      <span className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold text-white shadow-sm ring-4 ${dotBg} ${tone.split(" ")[1]}`}>
+                        {idx === 0 ? <Sparkles className="h-3.5 w-3.5" /> : initial}
                       </span>
-                      {item.actor && (
-                        <span className="font-mono text-[10px] text-slate-500">by {item.actor.slice(0, 8)}</span>
-                      )}
-                      {item.createdAt && (
-                        <time dateTime={item.createdAt} className="text-[10px] text-slate-400">
-                          {new Date(item.createdAt).toLocaleString()}
-                        </time>
-                      )}
-                    </div>
-                    {item.notes && <p className="mt-1 text-slate-600 leading-relaxed">{item.notes}</p>}
-                  </li>
-                ))}
+                      <div className="min-w-0 flex-1 rounded-xl border border-slate-200/80 bg-white p-3 shadow-2xs transition-shadow hover:shadow-sm">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${tone.split(" ").slice(2).join(" ")} bg-opacity-10`}>
+                            {item.action.replaceAll("_", " ")}
+                          </span>
+                          {item.actor && (
+                            <span className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-500">
+                              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-900 text-[9px] font-bold text-white">{initial}</span>
+                              {item.actor.length > 24 ? `${item.actor.slice(0, 24)}…` : item.actor}
+                            </span>
+                          )}
+                          {item.createdAt && (
+                            <time dateTime={item.createdAt} className="ml-auto flex items-center gap-1 text-[10px] text-slate-400">
+                              <Clock className="h-3 w-3" />
+                              {new Date(item.createdAt).toLocaleString()}
+                            </time>
+                          )}
+                        </div>
+                        {item.notes
+                          ? <p className="mt-1.5 border-l-2 border-slate-200 pl-2 text-xs leading-relaxed text-slate-600">{item.notes}</p>
+                          : <p className="mt-1 text-[11px] italic text-slate-400">No notes attached.</p>}
+                      </div>
+                    </li>
+                  );
+                })}
               </ol>
             )}
           </section>
