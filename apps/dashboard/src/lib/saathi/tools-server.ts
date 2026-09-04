@@ -72,10 +72,8 @@ export async function executeSaathiTool(
           data: { action: "prepare_submit_claim", message: "Claim submit is ready — confirm in the app." },
         };
       case "register_plot":
-        return {
-          ok: false,
-          error: "Plot registration must run in the farmer app so the plot is actually saved.",
-        };
+      case "create_plot":
+        return registerPlotServer(args, context);
       case "check_plot_geofence":
         return checkPlotGeofence(args, context);
       case "fetch_agro_weather_alerts":
@@ -426,6 +424,49 @@ async function explainClaimAudit(
       recapture_reason: claim.recapture_reason ?? null,
       missing_angles: claim.missing_angles || [],
       message,
+    },
+  };
+}
+
+async function registerPlotServer(
+  args: Record<string, unknown>,
+  context: SaathiToolContext,
+): Promise<SaathiToolResult> {
+  const client = createServerSupabase();
+  if (!client) return { ok: false, error: "Supabase is not configured" };
+  const name = String(args.name || args.plot_name || "Farm Plot").trim();
+  const cropType = String(args.crop_type || args.crop || "wheat").trim().toLowerCase();
+  const khasra = args.khasra_number ? String(args.khasra_number).trim() : "";
+  const area = args.area_hectares ? Number(args.area_hectares) : 1.0;
+  const village = args.village ? String(args.village).trim() : "";
+  const plotId = `plot_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const row = {
+    id: plotId,
+    name,
+    name_hi: name,
+    khasra_number: khasra,
+    area_hectares: Number.isFinite(area) && area > 0 ? Number(area.toFixed(4)) : 1.0,
+    crop_type: cropType,
+    crop_type_hi: cropType,
+    current_stage: "Sowing",
+    current_stage_hi: "बुवाई",
+    sowing_date: new Date().toISOString().split("T")[0],
+    village,
+    created_by: context.userId,
+  };
+  const { error } = await client.from("web_plots").insert(row);
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  return {
+    ok: true,
+    data: {
+      action: "register_plot",
+      plot_id: plotId,
+      name,
+      crop_type: cropType,
+      khasra_number: khasra,
+      message: `Plot '${name}' with ${cropType} successfully registered in database.`,
     },
   };
 }
