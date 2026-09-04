@@ -14,12 +14,29 @@ import { sanitizeMojibake } from "./name-sanitizer";
 import type { ClaimIntent, Peril } from "./claim-routing";
 import { INTENT_STORAGE_KEY } from "./claim-routing";
 import { webCaptureBridge } from "./voice/capture-bridge";
+import { katthaToHectares, toKattha, type AreaUnit } from "./land-units";
 
 export type PlotRegistrationInput = {
   name: string;
+  nameHi?: string;
   cropType: string;
+  cropTypeHi?: string;
+  cropVariety?: string;
   khasraNumber?: string;
+  khataNumber?: string;
+  hissaNumber?: string;
+  tehsil?: string;
+  ownershipType?: "owner" | "tenant" | "sharecropper" | string;
+  season?: "Kharif" | "Rabi" | "Zaid" | string;
+  areaKattha?: number;
   areaHectares?: number;
+  areaValue?: number;
+  areaUnit?: AreaUnit;
+  soilType?: string;
+  soilTypeHi?: string;
+  irrigationType?: string;
+  irrigationTypeHi?: string;
+  sowingDate?: string;
   village?: string;
   district?: string;
   state?: string;
@@ -467,26 +484,64 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
 
   const registerPlot = async (input: PlotRegistrationInput): Promise<{ plotId: string }> => {
     const name = String(input.name || "").trim() || "Farm Plot";
+    const nameHi = String(input.nameHi || name).trim();
     const cropType = String(input.cropType || "wheat").trim() || "wheat";
+    const cropTypeHi = String(input.cropTypeHi || cropType).trim();
+    const cropVariety = String(input.cropVariety || "").trim();
+    const khasraNumber = String(input.khasraNumber || "").trim();
+    const khataNumber = String(input.khataNumber || "").trim();
+    const hissaNumber = String(input.hissaNumber || "").trim();
+    const tehsil = String(input.tehsil || "").trim();
+    const ownershipType = String(input.ownershipType || "owner").trim();
+    const season = String(input.season || "").trim();
+    const soilType = String(input.soilType || "").trim();
+    const soilTypeHi = String(input.soilTypeHi || soilType).trim();
+    const irrigationType = String(input.irrigationType || "").trim();
+    const irrigationTypeHi = String(input.irrigationTypeHi || irrigationType).trim();
     const village = input.village?.trim() || farmerProfile.village || "";
     const district = input.district?.trim() || farmerProfile.district || "";
     const state = input.state?.trim() || farmerProfile.state || "";
-    const khasraNumber = input.khasraNumber?.trim() || "";
-    const areaHectares = Number.isFinite(Number(input.areaHectares)) ? Number(input.areaHectares) : 1;
+
+    let areaHectares = 1;
+    let areaKattha = input.areaKattha;
+    if (input.areaKattha !== undefined && Number.isFinite(Number(input.areaKattha))) {
+      areaHectares = katthaToHectares(Number(input.areaKattha));
+      areaKattha = Number(input.areaKattha);
+    } else if (input.areaHectares !== undefined && Number.isFinite(Number(input.areaHectares))) {
+      areaHectares = Number(input.areaHectares);
+    } else if (input.areaValue !== undefined && input.areaUnit) {
+      const k = toKattha(Number(input.areaValue), input.areaUnit);
+      areaHectares = katthaToHectares(k);
+      areaKattha = k;
+    }
+
     const lat = typeof input.lat === "number" && Number.isFinite(input.lat) ? input.lat : undefined;
     const lon = typeof input.lon === "number" && Number.isFinite(input.lon) ? input.lon : undefined;
     const now = new Date();
-    const sowingDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const sowingDate = input.sowingDate?.trim() || today;
 
     if (isSupabaseConfigured()) {
       const res = await apiFetch("/api/farmer/plots", {
         method: "POST",
         body: JSON.stringify({
           name,
-          nameHi: name,
+          nameHi,
           cropType,
+          cropTypeHi,
+          cropVariety,
           khasraNumber,
+          khataNumber,
+          hissaNumber,
+          tehsil,
+          ownershipType,
+          season,
+          areaKattha,
           areaHectares,
+          areaValue: input.areaValue,
+          areaUnit: input.areaUnit,
+          soilType,
+          irrigationType,
           village,
           district,
           state,
@@ -507,19 +562,25 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     addPlot({
       id: plotId,
       name,
-      nameHi: name,
+      nameHi,
       khasraNumber,
+      khataNumber,
+      hissaNumber,
+      tehsil,
+      ownershipType,
+      season,
       areaHectares,
+      areaKattha,
       cropType,
-      cropTypeHi: cropType,
-      cropVariety: "",
+      cropTypeHi,
+      cropVariety,
       currentStage: "Sowing",
       currentStageHi: "बुवाई",
       sowingDate,
-      soilType: "",
-      soilTypeHi: "",
-      irrigationType: "",
-      irrigationTypeHi: "",
+      soilType,
+      soilTypeHi,
+      irrigationType,
+      irrigationTypeHi,
       lat: lat ?? 0,
       lon: lon ?? 0,
       village,
