@@ -133,19 +133,12 @@ export function AiConfidenceBreakdown({
     verdict.tone === "accept" ? "bg-emerald-500" : verdict.tone === "reject" ? "bg-rose-500" : "bg-amber-500";
 
   return (
-    <div className="space-y-2.5 rounded-lg border border-indigo-200 bg-white p-3 text-slate-800">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-3">
+    <div className="space-y-2.5 text-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
         <div>
-          <div className="flex items-center gap-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
-              Gemini field analysis (assistive)
-            </h4>
-            <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-2xs">
-              Primary AI signal
-            </span>
-          </div>
-          <p className="mt-0.5 text-xs text-slate-600">
-            Model: <span className="font-mono">{prediction?.model_version || "gemini-3.8-flash"}</span>
+          <p className="text-[11px] text-slate-500">
+            Vision model: <span className="font-mono text-slate-700">{prediction?.model_version || "gemini-3.8-flash"}</span>
+            <span className="text-slate-400"> · assistive only, reviewer decides</span>
           </p>
         </div>
         <div
@@ -157,10 +150,10 @@ export function AiConfidenceBreakdown({
         </div>
       </div>
 
-      <div className={`flex items-start gap-2.5 rounded-lg border p-3 text-xs leading-relaxed shadow-2xs ${verdictStyle}`}>
-        <span aria-hidden="true" className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${verdictDot}`} />
+      <div className={`flex items-start gap-2 rounded-md border px-2.5 py-2 text-xs leading-relaxed ${verdictStyle}`}>
+        <span aria-hidden="true" className={`mt-1 h-2 w-2 shrink-0 rounded-full ${verdictDot}`} />
         <div>
-          <div className="text-[13px] font-bold">{verdict.title}</div>
+          <div className="text-xs font-bold">{verdict.title}</div>
           <p className="mt-0.5">{verdict.body}</p>
         </div>
       </div>
