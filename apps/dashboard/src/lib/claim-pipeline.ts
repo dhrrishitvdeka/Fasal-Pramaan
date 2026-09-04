@@ -570,7 +570,11 @@ export function imagesAreUnusable(images: PersistedImageInput[]): boolean {
   return measured.length > 0 && measured.every((image) => isUnusableLighting(image.lightingScore));
 }
 
-export function unusablePrediction(warnings: string[] = ["image_too_dark"]): HfPrediction {
+export function unusablePrediction(
+  warnings: string[] = ["image_too_dark"],
+  detail?: string,
+): HfPrediction {
+  const why = (detail || warnings.join(", ").replaceAll("_", " ") || "unusable frames").trim();
   return {
     modelId: geminiVisionModel(),
     label: "unusable_or_out_of_domain",
@@ -583,6 +587,8 @@ export function unusablePrediction(warnings: string[] = ["image_too_dark"]): HfP
     plantDiseaseClass: null,
     qualityWarnings: warnings,
     humanReviewRecommendation: "recapture",
+    reasoning: `No field analysis was produced because the evidence was judged unusable (${why}). A reviewer should request a daylight recapture of the flagged angle or reject with reason — grade U is a placeholder, not a crop diagnosis.`,
+    visualFindings: `Frames unusable for crop analysis (${why}).`,
     raw: { skipped: true, quality_warnings: warnings },
   };
 }
@@ -1163,10 +1169,17 @@ export async function retryPendingInference(
   store: ClaimStore,
   claimId: string,
   infer: typeof inferCropDisease = inferCropDisease,
-  inferOptions?: InferRuntimeOptions,
+  inferOptions?: InferRuntimeOptions & { force?: boolean },
 ): Promise<{ prediction: HfPrediction | null; inferError?: string } | null> {
   const claim = await store.getClaim(claimId);
-  if (!claim || !claimNeedsInferenceRetry(claim)) return null;
+  if (!claim) return null;
+  // Forced re-analysis (reviewer "Re-run AI analysis") bypasses the staleness
+  // check so claims stuck at complete-with-grade-U can be re-diagnosed, but
+  // never touches reviewer-locked (verified/rejected) claims.
+  if (!inferOptions?.force && !claimNeedsInferenceRetry(claim)) return null;
+  if (inferOptions?.force && REVIEWER_LOCKED_STATUSES.has(claim.status)) {
+    return { prediction: null, inferError: "Claim is finalized; recapture to reopen it" };
+  }
   try {
     await store.updateClaim(claimId, {
       inference_status: "pending",
