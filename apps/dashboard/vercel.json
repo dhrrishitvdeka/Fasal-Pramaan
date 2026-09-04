@@ -5,6 +5,7 @@
   "regions": ["bom1"],
   "functions": {
     "app/api/claims/route.ts": { "maxDuration": 60 },
-    "app/api/claims/[id]/route.ts": { "maxDuration": 60 }
+    "app/api/claims/[id]/route.ts": { "maxDuration": 60 },
+    "app/api/claims/[id]/reanalyze/route.ts": { "maxDuration": 60 }
   }
 }

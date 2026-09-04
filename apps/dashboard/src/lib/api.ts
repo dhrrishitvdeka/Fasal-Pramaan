@@ -478,6 +478,26 @@ export async function submitWebClaim(input: {
   return body as { claimId: string };
 }
 
+export async function reanalyzeClaim(id: string): Promise<{
+  ok: boolean;
+  grade?: string | null;
+  crop?: string | null;
+  inferError?: string | null;
+}> {
+  const res = await apiFetch(`/api/claims/${id}/reanalyze`, { method: "POST" });
+  const body = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    grade?: string | null;
+    crop?: string | null;
+    inferError?: string | null;
+  };
+  if (!res.ok) {
+    throw new Error(body.error || "Re-analysis failed");
+  }
+  return { ok: true, grade: body.grade ?? null, crop: body.crop ?? null, inferError: body.inferError ?? null };
+}
+
 export async function listReviewHistory(id: string) {
   if (isSupabaseConfigured()) {
     const res = await apiFetch(`/api/claims/${id}/actions`);
