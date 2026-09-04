@@ -134,7 +134,9 @@ export function heuristicGate(
   }
 
   const blur = cv?.blurScore;
-  if (blur != null && blur > 0 && blur < 18 && peril !== "fire_burn") {
+  // Standard blur threshold is 18; fire_burn can have smoke/ash haze, but blur < 10 is severely unusable
+  const blurFloor = peril === "fire_burn" ? 10 : 18;
+  if (blur != null && blur > 0 && blur < blurFloor) {
     return {
       usable: false,
       reason: "too_blurry",
@@ -170,7 +172,7 @@ export function heuristicGate(
     };
   }
 
-  // fire_burn can have low green — don't require strict crop check
+  // fire_burn can have low green — don't require strict crop check, but mark heuristic fallback
   if (peril === "fire_burn") {
     return {
       usable: true,
@@ -178,8 +180,8 @@ export function heuristicGate(
       crop_detected: expectedCrop || "unknown",
       peril_match: true,
       metadata_verified: Boolean(metadata?.lat != null && metadata?.lon != null),
-      warnings: [],
-      confidence: 0.75,
+      warnings: ["fire_burn_heuristic_fallback"],
+      confidence: expectedCrop ? 0.65 : 0.6,
       fallback: true,
     };
   }

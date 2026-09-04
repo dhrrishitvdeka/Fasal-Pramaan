@@ -63,10 +63,10 @@ sequenceDiagram
   API->>API: 2. Validates payload limits and recomputes SHA-256 server-side
   API->>Store: 3. Writes raw image bytes to the private bucket (server-generated keys)
   API->>Store: 4. Persists metadata with integrity flags in web_claim_images
-  alt Hash or Byte Size Mismatch / Duplicate Across Angles
-    API->>API: Mark Image as "failed" & Deduct Integrity Score (-65.0)
+  alt Duplicate Across Angles / Missing Hashes
+    API->>API: Deduct Integrity Score (down to 35.0) & Stamp Tamper Advisory Note
   else Verification Passes
-    API->>API: Mark Image as "uploaded" & Set is_original_immutable=True
+    API->>API: Preserve Verified Integrity Score (up to 100.0)
   end
 ```
 
@@ -77,4 +77,4 @@ sequenceDiagram
 1. **Zero Hardcoded Secrets**: All cryptographic keys, database passwords, and API tokens are injected strictly via environment variables. Never commit `SUPABASE_DB_PASSWORD`, `HF_TOKEN`, or publishable/service keys. `scripts/test_supabase_conn.py` reads env only.
 2. **Vercel server-only keys**: `SUPABASE_SERVICE_ROLE_KEY` and `HF_TOKEN` must never be named `NEXT_PUBLIC_*`. The evidence bucket `fasal-web-evidence` is private.
 3. **Local vs. Production Isolation**: Never enable demo credentials or mock inference fallbacks on a hosted deployment; keep demo data out of the production Supabase project.
-4. **Audit Trails**: All reviewer overrides, claim status mutations, and voice assistant operations write immutable records to the `audit_logs` table with actor UUID and timestamp. Hosted web actions also go to `web_review_actions`.
+4. **Audit Trails**: All reviewer overrides, claim status mutations, gate adjudications, and recapture requests write immutable records to the `web_review_actions` table with actor UUID, action type, notes, and timestamp.

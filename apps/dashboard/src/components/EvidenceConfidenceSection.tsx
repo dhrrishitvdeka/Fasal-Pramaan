@@ -73,7 +73,15 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
 
   // Integrity score calculation
   const anomalies = submission.latest_prediction?.anomaly_flags || [];
-  const integrityScore = anomalies.length > 0 ? 40 : 100;
+  const validHashes = images
+    .map((img) => (img.sha256 ? String(img.sha256).toLowerCase().trim() : ""))
+    .filter((h) => /^[0-9a-f]{64}$/i.test(h));
+  const uniqueHashes = new Set(validHashes);
+  const hasDuplicateHash = validHashes.length > uniqueHashes.size;
+  let integrityScore = anomalies.length > 0 ? 40 : 100;
+  if (hasDuplicateHash) {
+    integrityScore = Math.min(integrityScore, 35);
+  }
 
   // Final confidence: 0.4*quality + 0.3*coverage + 0.2*context + 0.1*integrity
   const finalConf = Math.round(
@@ -89,6 +97,9 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
   if (integrityScore < 70) {
     uncType = "integrity";
     uncSev = "critical";
+    if (hasDuplicateHash) {
+      uncReasons.push("Integrity issue: duplicate image hash reused across angles");
+    }
     uncReasons.push(...anomalies.map((a) => `Integrity issue: ${String(a)}`));
     recAction = "human_review";
   } else if (coverageScore < 80 || missingAngles.length > 0) {

@@ -152,10 +152,24 @@ export function computeEvidencePreview(
   const qualityScore = qualityMean == null ? 0 : Math.round(qualityMean);
   const qualityAvailable = qualityMean != null;
 
-  const realHashes = images.filter((img) => isRealSha256(img.sha256)).length;
-  const integrityScore = images.length === 0 ? 0 : Math.round((realHashes / images.length) * 100);
+  const validHashes = images
+    .map((img) => (img.sha256 ? String(img.sha256).toLowerCase().trim() : ""))
+    .filter(isRealSha256);
+  const uniqueHashes = new Set(validHashes);
+  const hasDuplicateHash = validHashes.length > uniqueHashes.size;
 
-  const gpsOk = images.filter((img) => img.lat != null && img.lon != null);
+  const realHashes = validHashes.length;
+  let integrityScore = images.length === 0 ? 0 : Math.round((realHashes / images.length) * 100);
+  if (hasDuplicateHash) {
+    integrityScore = Math.min(integrityScore, 35);
+  }
+
+  const gpsOk = images.filter((img) => {
+    if (img.lat == null || img.lon == null) return false;
+    if (img.lat < -90 || img.lat > 90 || img.lon < -180 || img.lon > 180) return false;
+    if (img.accuracyM != null && (img.accuracyM < 0 || img.accuracyM > 500)) return false;
+    return true;
+  });
   const contextScore = images.length === 0 ? 0 : Math.round((gpsOk.length / images.length) * 100);
 
   const overallConfidence = Math.round(
@@ -179,10 +193,12 @@ export function computeEvidencePreview(
         : gpsOk.length === 0
           ? "No authentic GPS fix on captured frames."
           : `${gpsOk.length} of ${images.length} frames have authentic GPS coordinates.`,
-    integrityNotes: realHashes === images.length && images.length > 0
-      ? "SHA-256 digest verified for every frame."
-      : realHashes === 0
-        ? "No real SHA-256 digest stored."
-        : `${realHashes} of ${images.length} frames have a verified SHA-256 digest.`,
+    integrityNotes: hasDuplicateHash
+      ? "Duplicate image hash reused across distinct angles (anti-tamper flag)."
+      : realHashes === images.length && images.length > 0
+        ? "Verified unique SHA-256 digest stored for every frame."
+        : realHashes === 0
+          ? "No real SHA-256 digest stored."
+          : `${realHashes} of ${images.length} frames have a verified SHA-256 digest.`,
   };
 }

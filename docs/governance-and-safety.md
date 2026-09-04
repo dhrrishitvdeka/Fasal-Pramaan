@@ -60,4 +60,4 @@ flowchart TD
 
 1. **Explicit Abstention over Hallucination**: When presented with an image that is out-of-domain, excessively blurred, or representing an unsupported crop species, the AI service is calibrated to output Grade `U` (Unusable) or `B` (Uncertain) rather than hallucinating high-confidence predictions.
 2. **Conservative Confidence Ceilings**: If critical contextual signals (such as GPS coordinates or server checksum verification) are absent, the Evidence Trust Engine imposes a strict ceiling on the final confidence score, preventing incomplete claims from bypassing reviewer triage.
-3. **Integrity Hard Gates**: Evidence that exhibits duplicate hashes, perceptual hash collisions, or mock GPS flags is permanently barred from automatic acceptance and escalated to anti-fraud human queues.
+3. **Integrity Hard Gates**: Evidence that exhibits duplicate cryptographic hashes reused across angles or screen-replay flags is permanently barred from automatic acceptance and escalated to anti-fraud human queues.

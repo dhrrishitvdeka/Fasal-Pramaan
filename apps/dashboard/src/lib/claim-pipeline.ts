@@ -26,6 +26,19 @@ function bytesToDataUrl(bytes: Uint8Array, contentType?: string): string {
   return `data:${mime};base64,${base64}`;
 }
 
+export function gateCacheKey(
+  sha: string,
+  angleType?: string,
+  expectedCrop?: string,
+  peril?: string,
+): string {
+  const normSha = sha.toLowerCase().trim();
+  const normAngle = (angleType || "closeup_damage").toLowerCase().trim();
+  const normCrop = (expectedCrop || "").toLowerCase().trim();
+  const normPeril = (peril || "normal").toLowerCase().trim();
+  return `${normSha}:${normAngle}:${normCrop}:${normPeril}`;
+}
+
 async function gateSingleImage(
   input: PersistedImageInput,
   expectedCrop?: string,
@@ -33,12 +46,15 @@ async function gateSingleImage(
 ): Promise<GateResult> {
   const sha = input.sha256 ? String(input.sha256).toLowerCase() : "";
   const isRealSha = sha && /^[a-f0-9]{64}$/i.test(sha);
-  if (isRealSha) {
-    const cached = gateCache.get(sha);
+  const cacheKey = isRealSha
+    ? gateCacheKey(sha, input.angleType, expectedCrop, peril)
+    : "";
+  if (cacheKey) {
+    const cached = gateCache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt) {
       return cached.result;
     }
-    if (cached) gateCache.delete(sha);
+    if (cached) gateCache.delete(cacheKey);
   }
 
   let dataUrl: string | null = null;
@@ -54,7 +70,7 @@ async function gateSingleImage(
       confidence: 0,
       fallback: true,
     };
-    if (isRealSha) gateCache.set(sha, { result: fallback, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
+    if (cacheKey) gateCache.set(cacheKey, { result: fallback, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
     return fallback;
   }
 
@@ -80,7 +96,7 @@ async function gateSingleImage(
   try {
     const gemini = await geminiGate(dataUrl, input.angleType || "closeup_damage", expectedCrop, peril, meta);
     if (gemini) {
-      if (isRealSha) gateCache.set(sha, { result: gemini, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
+      if (cacheKey) gateCache.set(cacheKey, { result: gemini, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
       return gemini;
     }
   } catch {
@@ -89,7 +105,7 @@ async function gateSingleImage(
 
   const heuristic = heuristicGate(dataUrl, expectedCrop, peril, meta);
   const result: GateResult = { ...heuristic, fallback: true };
-  if (isRealSha) gateCache.set(sha, { result, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
+  if (cacheKey) gateCache.set(cacheKey, { result, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
   return result;
 }
 
@@ -531,9 +547,25 @@ export function computeEvidencePreview(images: PersistedImageInput[], peril?: st
   const quality = qualityParts.length
     ? Math.round(qualityParts.reduce((a, b) => a + b, 0) / qualityParts.length)
     : 0;
-  const realHashes = images.filter((img) => img.sha256 && isRealSha256(img.sha256)).length;
-  const integrity = images.length === 0 ? 0 : Math.round((realHashes / images.length) * 100);
-  const gpsOk = images.filter((img) => img.lat != null && img.lon != null);
+  const validHashes = images
+    .map((img) => (img.sha256 ? String(img.sha256).toLowerCase().trim() : ""))
+    .filter(isRealSha256);
+  const uniqueHashes = new Set(validHashes);
+  const hasDuplicateHash = validHashes.length > uniqueHashes.size;
+
+  const realHashes = validHashes.length;
+  let integrity = images.length === 0 ? 0 : Math.round((realHashes / images.length) * 100);
+  if (hasDuplicateHash) {
+    // Inter-angle duplicate hash collision: identical image frame reused across distinct angles
+    integrity = Math.min(integrity, 35);
+  }
+
+  const gpsOk = images.filter((img) => {
+    if (img.lat == null || img.lon == null) return false;
+    if (img.lat < -90 || img.lat > 90 || img.lon < -180 || img.lon > 180) return false;
+    if (img.accuracyM != null && (img.accuracyM < 0 || img.accuracyM > 500)) return false;
+    return true;
+  });
   const context = images.length === 0 ? 0 : Math.round((gpsOk.length / images.length) * 100);
   const overall = Math.round(0.4 * quality + 0.3 * coverage + 0.2 * context + 0.1 * integrity);
   return {
@@ -551,7 +583,13 @@ export function computeEvidencePreview(images: PersistedImageInput[], peril?: st
         : gpsOk.length > 0
           ? `GPS coordinates present on ${gpsOk.length}/${images.length} images`
           : "GPS unavailable",
-    integrityNotes: realHashes ? `${realHashes} SHA-256 digest(s) stored` : "No SHA-256 digest stored",
+    integrityNotes: hasDuplicateHash
+      ? "Duplicate image hash reused across distinct angles (anti-tamper flag)"
+      : realHashes === images.length && images.length > 0
+        ? `${realHashes} verified unique SHA-256 digest(s) stored`
+        : realHashes > 0
+          ? `${realHashes} of ${images.length} frames have a verified SHA-256 digest`
+          : "No SHA-256 digest stored",
   };
 }
 
@@ -613,7 +651,7 @@ async function buildImageRows(
   for (const image of images) {
     const imageId = safeStorageSegment(image.id || newId("img"), "img");
     const ext = (image.contentType || "image/jpeg").includes("png") ? "png" : "jpg";
-    const path = `${safeStorageSegment(claimId, "claim")}/${safeStorageSegment(image.angleType, "angle")}-${imageId}.${ext}`;
+    const path = `${safeStorageSegment(claimId, "claim")}/${safeStorageSegment(image.angleType, "angle")}-${Date.now()}-${imageId}.${ext}`;
     const uploaded = await store.uploadImage(
       path,
       requireImageBytes(image, image.angleType),

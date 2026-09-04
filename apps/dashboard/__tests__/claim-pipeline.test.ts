@@ -5,6 +5,7 @@ import {
   buildRecaptureSubmitInput,
   computeEvidencePreview,
   createMemoryClaimStore,
+  gateCacheKey,
   getReviewerClaim,
   listReviewerQueue,
   persistAndInfer,
@@ -702,5 +703,28 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     });
     expect(retried?.prediction?.predictedGrade).toBe("C");
     expect(store.claims.get(persisted.claimId)?.inference_status).toBe("complete");
+  });
+
+  it("gateCacheKey isolates cache across sha, angle, expectedCrop, and peril", () => {
+    const sha = "a".repeat(64);
+    const key1 = gateCacheKey(sha, "closeup_damage", "wheat", "fire_burn");
+    const key2 = gateCacheKey(sha, "closeup_damage", "wheat", "drought");
+    const key3 = gateCacheKey(sha, "closeup_damage", "paddy", "fire_burn");
+    const key4 = gateCacheKey(sha, "wide_field", "wheat", "fire_burn");
+    const keySame = gateCacheKey(sha.toUpperCase(), "closeup_damage", "Wheat ", " fire_burn ");
+
+    expect(key1).not.toBe(key2);
+    expect(key1).not.toBe(key3);
+    expect(key1).not.toBe(key4);
+    expect(key1).toBe(keySame);
+  });
+
+  it("penalizes integrity score when duplicate image hashes are uploaded across angles", () => {
+    const dupPreview = computeEvidencePreview([
+      { angleType: "wide_field", bytes: jpegLikeBytes(), sha256: "d".repeat(64) },
+      { angleType: "closeup_damage", bytes: jpegLikeBytes(), sha256: "d".repeat(64) },
+    ]);
+    expect(dupPreview.integrityScore).toBe(35);
+    expect(dupPreview.integrityNotes).toMatch(/duplicate/i);
   });
 });
