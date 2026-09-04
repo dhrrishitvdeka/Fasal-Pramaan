@@ -632,26 +632,51 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
     });
   }
 
-  // 3. Bhuvan — WMS thumbnail URL in bhuvan-app1 style, with live reachability probe
+  // 3. Bhuvan — WMS thumbnail URL with live reachability probe.
+  // Bhuvan's public WMS is flaky from serverless (slow, XML exceptions on bad
+  // layer, non-image responses). Probe validates status AND content-type, with
+  // one retry; the browser <img> still loads the URL directly, and reviewers
+  // always get the Bhuvan 2D deep-link as manual fallback.
   let bhuvanThumbnailUrl: string | null = null;
   if (lat != null && lon != null) {
     const bbox = `${(lon - 0.01).toFixed(5)},${(lat - 0.01).toFixed(5)},${(lon + 0.01).toFixed(5)},${(lat + 0.01).toFixed(5)}`;
+    const wmsBase =
+      (process.env.BHUVAN_WMS_URL || "").trim() ||
+      "https://bhuvan-vec2.nrsc.gov.in/bhuvan/wms";
+    const bhuvanKey = (process.env.BHUVAN_API_KEY || "").trim();
+    // NRSC publishes state-specific LULC layer names (e.g. lulc:BR_LULC50K_1112 —
+    // see Bhuvan thematic portal). No single all-India layer is documented, so
+    // the layer is env-configurable; the default is a best-effort placeholder.
+    const bhuvanLayers = (process.env.BHUVAN_WMS_LAYERS || "").trim() || "india3";
     const bhuvanWmsUrl =
-      `https://bhuvan-vec1.nrsc.gov.in/bhuvan/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap` +
-      `&LAYERS=india3&SRS=EPSG:4326&BBOX=${bbox}&WIDTH=256&HEIGHT=256&FORMAT=image/png&STYLES=`;
+      `${wmsBase}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap` +
+      `&LAYERS=${encodeURIComponent(bhuvanLayers)}&SRS=EPSG:4326&BBOX=${bbox}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=TRUE&STYLES=` +
+      (bhuvanKey ? `&APIKEY=${encodeURIComponent(bhuvanKey)}` : "");
     const bhuvanUrl = bhuvanWmsUrl;
     const legacyUrl = `https://bhuvan-app1.nrsc.gov.in/bhuvan2d/bhuvan/bhuvan2d.php?lat=${lat}&lon=${lon}`;
-    let thumbnailFetched = false;
-    if (!isTestEnv) {
+    const probeWms = async (timeoutMs: number): Promise<boolean> => {
       try {
         const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 3000);
-        const res = await fetch(bhuvanWmsUrl, { signal: ctrl.signal });
-        clearTimeout(t);
-        thumbnailFetched = res.ok;
+        const t = setTimeout(() => ctrl.abort(), timeoutMs);
+        let res: Response | null = null;
+        try {
+          res = await fetch(bhuvanWmsUrl, { signal: ctrl.signal });
+        } finally {
+          clearTimeout(t);
+        }
+        if (!res || !res.ok) return false;
+        const ct = (res.headers.get("content-type") || "").toLowerCase();
+        // Bhuvan returns XML ServiceException on bad layer/auth — not a tile.
+        if (ct.includes("xml") || ct.includes("text")) return false;
+        return ct.includes("image") || ct.includes("octet-stream");
       } catch {
-        thumbnailFetched = false;
+        return false;
       }
+    };
+    let thumbnailFetched = false;
+    if (!isTestEnv) {
+      thumbnailFetched = await probeWms(8000);
+      if (!thumbnailFetched) thumbnailFetched = await probeWms(8000);
     }
     signals.push({
       source: "bhuvan",
@@ -662,7 +687,7 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
         ? "Bhuvan WMS tile fetched successfully — land-use cross-check available."
         : isTestEnv
           ? "Bhuvan WMS link generated (tile verification skipped in test mode); link provided for manual check."
-          : "Bhuvan tile service unreachable from server; link provided for manual check.",
+          : "Bhuvan tile service unreachable from server (check host/layer config); link provided for manual check.",
       summaryHi: thumbnailFetched
         ? "भुवन डब्ल्यूएमएस टाइल प्राप्त — भूमि उपयोग क्रॉस-चेक उपलब्ध।"
         : "भुवन टाइल सेवा सर्वर से नहीं पहुँची; मैनुअल जाँच हेतु लिंक दिया गया है।",

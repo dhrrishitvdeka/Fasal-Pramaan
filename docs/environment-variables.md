@@ -36,6 +36,9 @@ If you already set `GEMINI_VISION_MODEL=gemini-2.0-flash` on Vercel, **change it
 | `IMD_API_KEY` / `OPENWEATHER_KEY` | Reserved. Weather still comes from **free Open-Meteo**. Setting the key only flips an admin “configured” boolean |
 | `GITHUB_TOKEN` | Optional, raises GitHub stars badge quota |
 | `NEXT_PUBLIC_GITHUB_REPO` | Badge repo (`owner/name`) |
+| `BHUVAN_WMS_URL` | Optional override for the Bhuvan WMS endpoint (default `https://bhuvan-vec2.nrsc.gov.in/bhuvan/wms`, the documented LULC host). Use if NRSC publishes a new host path |
+| `BHUVAN_API_KEY` | Optional, appended as `APIKEY=` to the Bhuvan WMS GetMap request when Bhuvan requires a key |
+| `BHUVAN_WMS_LAYERS` | Optional LULC layer name (default `india3` best-effort). NRSC documents state-specific names (e.g. `lulc:BR_LULC50K_1112`, see Bhuvan thematic portal) — set this to your state's layer if tiles return exceptions |
 
 ## Do not set (retired)
 

@@ -5,12 +5,14 @@ import { useEffect, useState } from "react";
 interface SatelliteCrossCheckCardProps {
   wideFieldImageUrl?: string | null;
   bhuvanTileUrl?: string | null;
+  bhuvanFallbackUrl?: string | null;
   burnMapUrl?: string | null;
 }
 
 export function SatelliteCrossCheckCard({
   wideFieldImageUrl,
   bhuvanTileUrl,
+  bhuvanFallbackUrl,
   burnMapUrl,
 }: SatelliteCrossCheckCardProps) {
   const [bhuvanFailed, setBhuvanFailed] = useState(false);
@@ -59,8 +61,18 @@ export function SatelliteCrossCheckCard({
               className="h-[256px] w-full rounded border border-slate-200 bg-white object-cover"
             />
           ) : (
-            <div className="flex h-[256px] items-center justify-center rounded border border-slate-200 bg-slate-100 text-xs text-slate-400">
-              Bhuvan land-use tile unavailable
+            <div className="flex h-[256px] flex-col items-center justify-center gap-2 rounded border border-slate-200 bg-slate-100 px-4 text-center text-xs text-slate-400">
+              <span>Bhuvan land-use tile unavailable</span>
+              {bhuvanFallbackUrl && (
+                <a
+                  href={bhuvanFallbackUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900"
+                >
+                  Open plot in Bhuvan 2D ↗
+                </a>
+              )}
             </div>
           )}
         </div>
