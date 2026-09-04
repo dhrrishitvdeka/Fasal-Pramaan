@@ -126,8 +126,6 @@ Comprehensive architectural, mathematical, API, and deployment documentation is 
 <p align="center">
   <a href="https://github.com/dhrrishitvdeka"><img src="https://github.com/dhrrishitvdeka.png?size=160" width="88" height="88" alt="" style="border-radius:50%; object-fit:cover;" /></a>&nbsp;&nbsp;&nbsp;
   <a href="https://github.com/parasdwivedi26"><img src="https://github.com/parasdwivedi26.png?size=160" width="88" height="88" alt="" style="border-radius:50%; object-fit:cover;" /></a>&nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/vedantparashar25"><img src="https://github.com/vedantparashar25.png?size=160" width="88" height="88" alt="" style="border-radius:50%; object-fit:cover;" /></a>&nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/sandeepkumargupta1"><img src="https://github.com/sandeepkumargupta1.png?size=160" width="88" height="88" alt="" style="border-radius:50%; object-fit:cover;" /></a>
 </p>
 
 ---

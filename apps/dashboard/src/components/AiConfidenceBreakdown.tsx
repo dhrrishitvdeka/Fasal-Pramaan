@@ -89,13 +89,61 @@ export function AiConfidenceBreakdown({
   const authentic = authenticity?.authentic !== false && !isUnusable;
   const authReason = String(authenticity?.reason || (authentic ? "Looks like a real field photo" : "Failed authenticity checks"));
 
+  // 2–3 line reviewer-facing verdict: accept / reject / unsure + why.
+  const verdict = (() => {
+    const damage = String(prediction?.primary_damage || "unknown").toLowerCase();
+    const sev = String(prediction?.severity || "").toLowerCase();
+    const area = typeof prediction?.affected_area_pct === "number" ? prediction.affected_area_pct : null;
+    const hasDamageSignal = damage !== "unknown" && damage !== "healthy" && damage !== "none" && damage !== "";
+    if (isUnusable || !authentic) {
+      return {
+        tone: "reject" as const,
+        title: "AI recommends: Reject / recapture",
+        body: `Evidence is ${!authentic ? "not authentic" : "unusable for grading"} (${authReason.slice(0, 110)}). No reliable damage signal can be scored from these frames — request a daylight recapture or reject with reason.`,
+      };
+    }
+    if (grade === "A" && confidencePct >= 70) {
+      return {
+        tone: "accept" as const,
+        title: "AI recommends: Accept as healthy",
+        body: `Grade A at ${confidencePct}% confidence with no significant damage pattern${visualFindings ? " — canopy looks uniform across angles" : ""}. Safe to accept unless satellite or plot-mismatch flags say otherwise.`,
+      };
+    }
+    if ((grade === "C" || hasDamageSignal) && confidencePct >= 60) {
+      return {
+        tone: "accept" as const,
+        title: "AI recommends: Accept damage claim",
+        body: `${damage.replaceAll("_", " ")}${sev ? ` · ${sev} severity` : ""}${area != null ? ` · ~${area}% area` : ""} at ${confidencePct}% confidence. Visible damage is consistent across submitted angles — verify severity % before payout.`,
+      };
+    }
+    return {
+      tone: "unsure" as const,
+      title: "AI is unsure — needs human call",
+      body: `Grade ${grade} at ${confidencePct}%${hasDamageSignal ? ` with a weak ${damage.replaceAll("_", " ")} signal` : ""}${warnings.length ? ` · flags: ${warnings.slice(0, 2).join(", ").replaceAll("_", " ")}` : ""}. Evidence is borderline — check coverage/GPS below, or request one targeted recapture.`,
+    };
+  })();
+
+  const verdictStyle =
+    verdict.tone === "accept"
+      ? "border-emerald-300 bg-emerald-50 text-emerald-950"
+      : verdict.tone === "reject"
+        ? "border-rose-300 bg-rose-50 text-rose-950"
+        : "border-amber-300 bg-amber-50 text-amber-950";
+  const verdictDot =
+    verdict.tone === "accept" ? "bg-emerald-500" : verdict.tone === "reject" ? "bg-rose-500" : "bg-amber-500";
+
   return (
-    <div className="space-y-4 rounded-md border border-slate-200 bg-white p-4 text-slate-800 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+    <div className="space-y-4 rounded-xl border-2 border-indigo-200 bg-gradient-to-b from-indigo-50/70 via-white to-white p-4 text-slate-800 shadow-md ring-1 ring-indigo-100">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-3">
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Gemini field analysis (assistive)
-          </h4>
+          <div className="flex items-center gap-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900">
+              Gemini field analysis (assistive)
+            </h4>
+            <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-2xs">
+              Primary AI signal
+            </span>
+          </div>
           <p className="mt-0.5 text-xs text-slate-600">
             Model: <span className="font-mono">{prediction?.model_version || "gemini-3.8-flash"}</span>
           </p>
@@ -106,6 +154,14 @@ export function AiConfidenceBreakdown({
           <span className="font-bold">{grade}</span>
           <span>·</span>
           <span>{currentGradeStyle.label}</span>
+        </div>
+      </div>
+
+      <div className={`flex items-start gap-2.5 rounded-lg border p-3 text-xs leading-relaxed shadow-2xs ${verdictStyle}`}>
+        <span aria-hidden="true" className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${verdictDot}`} />
+        <div>
+          <div className="text-[13px] font-bold">{verdict.title}</div>
+          <p className="mt-0.5">{verdict.body}</p>
         </div>
       </div>
 
