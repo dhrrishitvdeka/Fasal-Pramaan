@@ -33,7 +33,6 @@ import {
 } from "recharts";
 import {
   BarChart3,
-  ShieldCheck,
   Download,
   Activity,
   Layers,
@@ -43,7 +42,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-const OVERVIEW_SECTION_IDS = ["all", "kpis", "analytics", "evidence", "peril"] as const;
+const OVERVIEW_SECTION_IDS = ["all", "kpis", "analytics", "peril"] as const;
 type OverviewSectionId = (typeof OVERVIEW_SECTION_IDS)[number];
 
 function parseOverviewSection(raw: string): OverviewSectionId {
@@ -185,36 +184,6 @@ export default function OverviewPage() {
     return list;
   }, [claims]);
 
-  // Evidence confidence tier distribution (3-tier health)
-  const confidenceTiers = useMemo(() => {
-    let high = 0; // >= 80%
-    let medium = 0; // 65 - 79%
-    let low = 0; // < 65%
-    for (const c of claims || []) {
-      const conf = resolveEvidenceEvaluation(c)?.confidence?.final ?? 0;
-      if (conf >= 80) high += 1;
-      else if (conf >= 65) medium += 1;
-      else low += 1;
-    }
-    const total = (claims || []).length || 1;
-    return {
-      high: { count: high, pct: (claims || []).length ? Math.round((high / total) * 100) : 0 },
-      medium: { count: medium, pct: (claims || []).length ? Math.round((medium / total) * 100) : 0 },
-      low: { count: low, pct: (claims || []).length ? Math.round((low / total) * 100) : 0 },
-      total: (claims || []).length,
-    };
-  }, [claims]);
-
-  const authenticityRejects = useMemo(() => {
-    return (claims || []).filter((s) => {
-      const g = s.gate_result as { gateFailed?: boolean; perImage?: Array<{ usable?: boolean }> } | null | undefined;
-      if (!g) return false;
-      if (g.gateFailed) return true;
-      if (Array.isArray(g.perImage)) return g.perImage.some((p) => p.usable === false);
-      return false;
-    }).length;
-  }, [claims]);
-
   const csvTimestamp = () => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
@@ -260,7 +229,6 @@ export default function OverviewPage() {
 
   const showKpis = section === "all" || section === "kpis";
   const showAnalytics = section === "all" || section === "analytics";
-  const showEvidence = section === "all" || section === "evidence";
   const showPeril = section === "all" || section === "peril";
 
   return (
@@ -307,7 +275,6 @@ export default function OverviewPage() {
           { id: "all" as const, label: "All Telemetry & Charts", icon: Layers },
           { id: "kpis" as const, label: "Core KPIs", icon: Activity },
           { id: "analytics" as const, label: "Visual Analytics", icon: BarChart3 },
-          { id: "evidence" as const, label: "Evidence Health", icon: ShieldCheck },
           { id: "peril" as const, label: "Peril & Authenticity", icon: Sparkles },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -607,116 +574,7 @@ export default function OverviewPage() {
         </section>
       )}
 
-      {/* SECTION 3: Evidence Trust & AI Authenticity Health */}
-      {showEvidence && (
-        <section aria-label="Evidence Quality & Authenticity" className="space-y-3 pt-2">
-          <div className="flex items-center justify-between">
-            <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
-              <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              Evidence Confidence &amp; Vision Gate Telemetry
-            </h3>
-            <span className="text-[11px] text-slate-500 font-mono">
-              Independent ground-truth signals
-            </span>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            {/* Confidence Spectrum Tier Bar */}
-            <div className="fp-panel p-4 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Confidence Tier Spectrum
-                </span>
-                <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  Avg {data.average_evidence_confidence != null ? `${data.average_evidence_confidence.toFixed(1)}%` : "—"}
-                </span>
-              </div>
-
-              {/* Multi-tier progress bar */}
-              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100 flex">
-                <div
-                  className="h-full bg-emerald-600 transition-all duration-300"
-                  style={{ width: `${confidenceTiers.high.pct}%` }}
-                  title={`High (≥80%): ${confidenceTiers.high.count} (${confidenceTiers.high.pct}%)`}
-                />
-                <div
-                  className="h-full bg-amber-500 transition-all duration-300"
-                  style={{ width: `${confidenceTiers.medium.pct}%` }}
-                  title={`Moderate (65-79%): ${confidenceTiers.medium.count} (${confidenceTiers.medium.pct}%)`}
-                />
-                <div
-                  className="h-full bg-rose-500 transition-all duration-300"
-                  style={{ width: `${confidenceTiers.low.pct}%` }}
-                  title={`Low (<65%): ${confidenceTiers.low.count} (${confidenceTiers.low.pct}%)`}
-                />
-              </div>
-
-              {/* 3 Tier breakdown cards */}
-              <div className="grid grid-cols-3 gap-2 pt-1 font-mono text-center">
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-2">
-                  <div className="text-[10px] uppercase font-semibold text-emerald-800">High (≥80%)</div>
-                  <div className="text-base font-bold text-emerald-900 mt-0.5">{confidenceTiers.high.count}</div>
-                  <div className="text-[10px] text-emerald-700">{confidenceTiers.high.pct}% of total</div>
-                </div>
-                <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-2">
-                  <div className="text-[10px] uppercase font-semibold text-amber-800">Review (65-79%)</div>
-                  <div className="text-base font-bold text-amber-900 mt-0.5">{confidenceTiers.medium.count}</div>
-                  <div className="text-[10px] text-amber-700">{confidenceTiers.medium.pct}% of total</div>
-                </div>
-                <div className="rounded-lg border border-rose-200 bg-rose-50/50 p-2">
-                  <div className="text-[10px] uppercase font-semibold text-rose-800">Alert (&lt;65%)</div>
-                  <div className="text-base font-bold text-rose-900 mt-0.5">{confidenceTiers.low.count}</div>
-                  <div className="text-[10px] text-rose-700">{confidenceTiers.low.pct}% of total</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Authenticity Vision Gate & Quality Audit */}
-            <div className="fp-panel p-4 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  AI Authenticity Gate
-                </span>
-                <span
-                  className={clsx(
-                    "rounded px-2 py-0.5 text-[10px] font-bold uppercase font-mono",
-                    authenticityRejects > 0
-                      ? "bg-rose-50 text-rose-700 border border-rose-200"
-                      : "bg-emerald-50 text-emerald-700 border border-emerald-200",
-                  )}
-                >
-                  {authenticityRejects > 0 ? `${authenticityRejects} Rejections` : "100% Passed"}
-                </span>
-              </div>
-
-              <p className="text-xs leading-relaxed text-slate-600">
-                Incoming images undergo zero-trust validation: AI synthetic artifacts, non-field anomalies,
-                lighting compliance, and SHA-256 integrity tamper checks.
-              </p>
-
-              <div className="grid grid-cols-2 gap-2 pt-1 font-mono">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                  <div className="text-[10px] uppercase font-semibold text-slate-500">Claims Scanned</div>
-                  <div className="text-lg font-bold text-slate-900 mt-0.5">{(claims || []).length}</div>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                  <div className="text-[10px] uppercase font-semibold text-slate-500">Gate Rejects</div>
-                  <div
-                    className={clsx(
-                      "text-lg font-bold mt-0.5",
-                      authenticityRejects > 0 ? "text-rose-700" : "text-emerald-700",
-                    )}
-                  >
-                    {authenticityRejects}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* SECTION 4: Peril Mix Intelligence & Export */}
+      {/* SECTION 3: Peril Mix Intelligence & Export */}
       {showPeril && (
         <section aria-label="Peril Mix & Intelligence" className="space-y-3 pt-2">
           <div className="flex items-center justify-between">

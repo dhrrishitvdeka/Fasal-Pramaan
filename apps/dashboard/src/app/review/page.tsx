@@ -277,19 +277,13 @@ function ReviewQueuePage() {
       )}
 
       {/* Filter Tabs */}
-      <div className="fp-chip-row border-b border-slate-200 pb-2 text-xs">
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2 text-xs">
         {[
           { id: "all" as const, label: "All Cases", count: tabCounts.all },
-          { id: "low_confidence" as const, label: t("lowConfidenceCases"), count: tabCounts.low_confidence, tone: "amber" },
           { id: "pending_review" as const, label: t("pendingReview"), count: tabCounts.pending_review, tone: "amber" },
+          { id: "low_confidence" as const, label: t("lowConfidenceCases"), count: tabCounts.low_confidence, tone: "amber" },
           { id: "needs_recapture" as const, label: t("recapture"), count: tabCounts.needs_recapture, tone: "blue" },
           { id: "integrity" as const, label: t("integrityFlags"), count: tabCounts.integrity, tone: "rose" },
-          { id: "coverage" as const, label: "Coverage Uncertainty", count: tabCounts.coverage },
-          { id: "visual" as const, label: "Visual Uncertainty", count: tabCounts.visual },
-          { id: "context" as const, label: "Context Uncertainty", count: tabCounts.context },
-          { id: "physical_inspection" as const, label: "Field inspection", count: tabCounts.physical_inspection },
-          { id: "verified" as const, label: "Verified", count: tabCounts.verified },
-          { id: "rejected" as const, label: "Rejected", count: tabCounts.rejected },
         ].map((tab) => (
           <Link
             key={tab.id}
