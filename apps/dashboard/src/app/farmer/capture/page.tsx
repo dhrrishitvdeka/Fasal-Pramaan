@@ -33,6 +33,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
+import PlotRegistrationForm from "@/components/PlotRegistrationForm";
 import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
 import { getLocalizedAngleInfo } from "@/lib/help-i18n";
 import { getSpeechLocale } from "@/lib/live-indian-languages";
@@ -190,15 +191,6 @@ function CaptureStudioContent() {
   const [captureMode, setCaptureMode] = useState<"camera" | "upload">("camera");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
-
-  // Inline Plot Registration State (when farmer has no registered plots)
-  const [inlinePlotName, setInlinePlotName] = useState<string>("");
-  const [inlineCropType, setInlineCropType] = useState<string>("wheat");
-  const [inlineKhasra, setInlineKhasra] = useState<string>("");
-  const [inlineArea, setInlineArea] = useState<string>("1.0");
-  const [inlineVillage, setInlineVillage] = useState<string>("");
-  const [isRegisteringInlinePlot, setIsRegisteringInlinePlot] = useState<boolean>(false);
-  const [inlinePlotError, setInlinePlotError] = useState<string | null>(null);
 
   // Load existing draft if not in recapture or milestone mode
   useEffect(() => {
@@ -1003,43 +995,6 @@ function CaptureStudioContent() {
     await handleFileUpload(fakeEvent);
   };
 
-  const handleInlinePlotSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inlinePlotName.trim() || !inlineKhasra.trim()) {
-      setInlinePlotError(
-        lang === "hi"
-          ? "खेत का नाम और खसरा संख्या दोनों अनिवार्य हैं।"
-          : "Both Plot name and Khasra number are required.",
-      );
-      return;
-    }
-    setIsRegisteringInlinePlot(true);
-    setInlinePlotError(null);
-    try {
-      const res = await registerPlot({
-        name: inlinePlotName.trim(),
-        cropType: inlineCropType,
-        khasraNumber: inlineKhasra.trim(),
-        areaHectares: parseFloat(inlineArea) || 1.0,
-        village: inlineVillage.trim() || farmerProfile?.village || undefined,
-        district: farmerProfile?.district,
-        state: farmerProfile?.state,
-      });
-      if (res?.plotId) {
-        setSelectedPlotId(res.plotId);
-        showToast(
-          lang === "hi"
-            ? "भूखंड सफलतापूर्वक पंजीकृत हुआ! अब आप तस्वीरें ले सकते हैं।"
-            : "Plot registered successfully! You can now proceed to capture photos.",
-        );
-      }
-    } catch (err) {
-      setInlinePlotError(err instanceof Error ? err.message : "Failed to register plot");
-    } finally {
-      setIsRegisteringInlinePlot(false);
-    }
-  };
-
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -1524,128 +1479,18 @@ function CaptureStudioContent() {
 
       {/* Mandatory Plot Registration Guard when farmer has 0 registered plots */}
       {!isTargetedRecapture && plots.length === 0 ? (
-        <div className="fp-panel p-5 sm:p-7 border-l-4 border-l-[var(--ink)] shadow-xs">
-          <div className="flex items-start gap-3.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[var(--line)] bg-[var(--accent-soft)] text-[var(--ink)]">
-              <Layers className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-base sm:text-lg font-bold text-[var(--ink)]">
-                {lang === "hi" ? "भूखंड पंजीकरण अनिवार्य है" : "Plot Registration Required"}
-              </h2>
-              <p className="mt-1 text-xs sm:text-sm text-[var(--ink-muted)] leading-relaxed">
-                {lang === "hi"
-                  ? "प्रधानमंत्री फसल बीमा योजना (PMFBY) के तहत फसल नुकसान का दावा केवल पंजीकृत भूखंड (खसरा संख्या) पर ही दर्ज हो सकता है। कृपया पहले अपना प्रभावित भूखंड पंजीकृत करें। पंजीकरण के बाद कैमरा व फ़ोटो स्टूडियो स्वतः खुल जाएगा।"
-                  : "Under PMFBY insurance standards, every crop damage claim must be anchored to a registered land parcel (Khasra). Please register your affected plot below. Once registered, photo capture will immediately unlock."}
-              </p>
-            </div>
-          </div>
-
-          <form onSubmit={handleInlinePlotSubmit} className="mt-5 border-t border-[var(--line)] pt-5 space-y-4">
-            {inlinePlotError && (
-              <div className="text-xs text-red-700 bg-red-50 border border-red-200 p-2.5 font-semibold">
-                {inlinePlotError}
-              </div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="font-bold text-[var(--ink)] block mb-1">
-                  {lang === "hi" ? "खेत का नाम / पहचान *" : "Plot Name / Identifier *"}
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={inlinePlotName}
-                  onChange={(e) => setInlinePlotName(e.target.value)}
-                  placeholder={lang === "hi" ? "जैसे: उत्तर का खेत / Plot 1" : "e.g. North Field / Plot 1"}
-                  className="fp-input"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-[var(--ink)] block mb-1">
-                  {lang === "hi" ? "फसल का प्रकार *" : "Crop Type *"}
-                </label>
-                <select
-                  value={inlineCropType}
-                  onChange={(e) => setInlineCropType(e.target.value)}
-                  className="fp-input"
-                >
-                  <option value="wheat">{lang === "hi" ? "गेहूँ (Wheat)" : "Wheat"}</option>
-                  <option value="paddy">{lang === "hi" ? "धान / चावल (Paddy)" : "Paddy"}</option>
-                  <option value="maize">{lang === "hi" ? "मक्का (Maize)" : "Maize"}</option>
-                  <option value="potato">{lang === "hi" ? "आलू (Potato)" : "Potato"}</option>
-                  <option value="mustard">{lang === "hi" ? "सरसों (Mustard)" : "Mustard"}</option>
-                  <option value="cotton">{lang === "hi" ? "कपास (Cotton)" : "Cotton"}</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="font-bold text-[var(--ink)] block mb-1">
-                  {lang === "hi" ? "खसरा संख्या *" : "Khasra / Survey Number *"}
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={inlineKhasra}
-                  onChange={(e) => setInlineKhasra(e.target.value)}
-                  placeholder={lang === "hi" ? "जैसे: 402/1" : "e.g. 402/1"}
-                  className="fp-input"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold text-[var(--ink)] block mb-1">
-                  {lang === "hi" ? "क्षेत्रफल (हेक्टेयर)" : "Area (Hectares)"}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={inlineArea}
-                  onChange={(e) => setInlineArea(e.target.value)}
-                  className="fp-input"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="font-bold text-[var(--ink)] block mb-1">
-                  {lang === "hi" ? "गाँव / स्थान" : "Village / Location"}
-                </label>
-                <input
-                  type="text"
-                  value={inlineVillage}
-                  onChange={(e) => setInlineVillage(e.target.value)}
-                  placeholder={farmerProfile?.village || (lang === "hi" ? "गाँव का नाम" : "Village name")}
-                  className="fp-input"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
-              <Link
-                href="/farmer/plots"
-                className="fp-btn-secondary text-xs px-4 py-2"
-              >
-                {lang === "hi" ? "भूखंड सूची देखें" : "View All Plots"}
-              </Link>
-              <button
-                type="submit"
-                disabled={isRegisteringInlinePlot}
-                className="fp-btn-primary text-xs px-5 py-2.5 gap-2"
-              >
-                {isRegisteringInlinePlot ? (
-                  <span>{lang === "hi" ? "पंजीकृत हो रहा है..." : "Registering..."}</span>
-                ) : (
-                  <>
-                    <Check className="h-4 w-4" />
-                    <span>{lang === "hi" ? "भूखंड पंजीकृत करें और दावा शुरू करें" : "Register Plot & Unlock Studio"}</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
+        <PlotRegistrationForm
+          mode="inline_capture"
+          onSuccess={(plotId) => {
+            setSelectedPlotId(plotId);
+            showToast(
+              lang === "hi"
+                ? "भूखंड सफलतापूर्वक पंजीकृत हुआ! अब आप तस्वीरें ले सकते हैं।"
+                : "Plot registered successfully! You can now proceed to capture photos.",
+            );
+          }}
+          cancelHref="/farmer/reminders"
+        />
       ) : (
       /* Main Studio Viewport: Left Live Camera Viewfinder or Upload Workbench / Right Step Guidance */
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
