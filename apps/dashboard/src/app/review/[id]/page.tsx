@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { applyWebReviewAction, getWebClaim, listReviewHistory, type Submission } from "@/lib/api";
+import { applyWebReviewAction, getWebClaim, listReviewHistory, reanalyzeClaim, type Submission } from "@/lib/api";
 import type { ReviewActionPayload } from "@/lib/web-db";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useMemo, useEffect } from "react";
@@ -109,11 +109,39 @@ export default function ReviewDetailPage() {
     setMounted(true);
   }, []);
 
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const handleReanalyze = async () => {
+    if (reanalyzing || action.isPending) return;
+    setReanalyzing(true);
+    setMessage(null);
+    try {
+      const result = await reanalyzeClaim(id);
+      await qc.invalidateQueries({ queryKey: ["submission", id] });
+      await refetch();
+      setMessage(
+        result.grade && result.grade !== "U"
+          ? `AI analysis complete — Grade ${result.grade}${result.crop && result.crop !== "unknown" ? ` · ${result.crop}` : ""}.`
+          : result.inferError
+            ? `Re-analysis finished with a warning: ${result.inferError}`
+            : "Re-analysis finished — frames still unusable. Request a recapture.",
+      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Re-analysis failed");
+    } finally {
+      setReanalyzing(false);
+    }
+  };
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["submission", id],
     queryFn: async () => getWebClaim(id),
     enabled: gate.status === "ok",
-    refetchInterval: (query) => (query.state.data && !query.state.data.latest_prediction ? 5_000 : false),
+    refetchInterval: (query) => {
+      const current = query.state.data as Submission | undefined;
+      if (!current) return false;
+      // Keep polling while analysis is missing OR still running server-side.
+      return !current.latest_prediction || current.inference_status === "pending" ? 5_000 : false;
+    },
   });
 
   const { data: history } = useQuery({
@@ -681,10 +709,8 @@ export default function ReviewDetailPage() {
         </div>
       )}
 
-      {/* 3. TWO-COLUMN REVIEW WORKSPACE */}
-      <div className="grid items-start gap-3 lg:grid-cols-12">
-        {/* LEFT COLUMN: Physical Evidence, High-Res Gallery & Satellite Cross-Check (5 cols) */}
-        <div className="space-y-3 lg:col-span-5">
+      {/* 3. SINGLE-COLUMN REVIEW FLOW — summary → photos → AI → trust → decision → audit */}
+      <div className="mx-auto max-w-5xl space-y-3">
           {/* EVIDENCE PHOTO GALLERY */}
           <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs space-y-2">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -705,7 +731,7 @@ export default function ReviewDetailPage() {
                 <span>No photographic evidence attached</span>
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                 {inspectableImages.map((img, idx) => {
                   const angleObj = ALL_ANGLES.find((a) => a.key === img.angle_type);
                   const angleLabel = angleObj?.label || img.angle_type.replaceAll("_", " ");
@@ -784,10 +810,6 @@ export default function ReviewDetailPage() {
               />
             </div>
           </details>
-        </div>
-
-        {/* RIGHT COLUMN: AI Diagnostics, Authenticity Gate & Decision Workbench (7 cols) */}
-        <div className="space-y-3 lg:col-span-7">
           {/* AI ASSESSMENT — synthesis + scoring + damage in ONE compact card */}
           {(() => {
             const explanation = (pred?.explanation || {}) as Record<string, unknown>;
@@ -862,6 +884,36 @@ export default function ReviewDetailPage() {
                       <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Conf</div>
                       <div className="font-mono text-xs font-extrabold text-slate-900">{pred.overall_confidence != null ? `${Math.round(pred.overall_confidence * 100)}%` : "—"}</div>
                     </div>
+                  </div>
+                )}
+
+                {!pred && data.inference_status === "pending" && (
+                  <p className="mx-3 mb-3 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-2 py-2 text-xs font-medium text-blue-900">
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                    AI is analyzing the crop photos right now — this refreshes automatically.
+                  </p>
+                )}
+
+                {!pred && data.inference_status !== "pending" && (
+                  <div className="mx-3 mb-3 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-950">
+                    <p className="font-bold">No crop-disease analysis yet{data.inference_status === "failed" ? " — the last run failed" : ""}.</p>
+                    {data.inference_error ? (
+                      <p className="mt-1 font-mono text-[11px] leading-snug text-amber-900/90">Error: {data.inference_error}</p>
+                    ) : (
+                      <p className="mt-1 leading-snug">The vision model hasn&apos;t returned a crop, damage, or severity verdict for these photos.</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleReanalyze}
+                      disabled={reanalyzing || busy || isClosed}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {reanalyzing ? (
+                        <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" /> Analyzing…</>
+                      ) : (
+                        <><Sparkles className="h-3.5 w-3.5" /> Re-run AI analysis</>
+                      )}
+                    </button>
                   </div>
                 )}
 
@@ -1152,7 +1204,6 @@ export default function ReviewDetailPage() {
               </ol>
             )}
           </section>
-        </div>
       </div>
 
       {/* ADAPTIVE RECAPTURE MODAL */}
