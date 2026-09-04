@@ -330,6 +330,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     const { store, claimId, closeup } = await persistSeed();
     await applyReviewerAction(store, claimId, {
       action: "request_recapture",
+      reason: "Need wide_field",
       required_angles: ["wide_field"],
     });
     const before = await store.listImages(claimId);
@@ -546,6 +547,7 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     const seeded = await persistSeed();
     await applyReviewerAction(seeded.store, seeded.claimId, {
       action: "request_recapture",
+      reason: "Need wide_field",
       required_angles: ["wide_field"],
     });
     let inferCalls = 0;
