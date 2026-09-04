@@ -84,7 +84,9 @@ export function heuristicGate(
 
   const cv = metadata?.cvAnalysis;
 
-  if (cv?.hintCode === "crop_not_detected" || cv?.hintCode === "screen_detected" || cv?.hintCode === "person_detected") {
+  // Security-critical hints always win: screen / person must fail closed
+  // even when crop measurements look good.
+  if (cv?.hintCode === "screen_detected" || cv?.hintCode === "person_detected") {
     return {
       usable: false,
       reason: cv.hintCode === "screen_detected" ? "screen_replay_detected" : cv.hintCode,
@@ -148,6 +150,24 @@ export function heuristicGate(
   }
 
   const cropScore = cv?.cropScore;
+  const greenPctEarly = cv?.greenPct;
+  // Fresh on-device measurements override a stale `crop_not_detected` hint:
+  // only honor the hint when there is no fresh cropScore/greenPct to contradict it.
+  const hasFreshCropSignal = cropScore != null || greenPctEarly != null;
+  if (
+    cv?.hintCode === "crop_not_detected" &&
+    !hasFreshCropSignal &&
+    peril !== "fire_burn"
+  ) {
+    return {
+      usable: false,
+      reason: "crop_not_detected",
+      crop_detected: expectedCrop || null,
+      warnings: ["crop_not_detected"],
+      confidence: 0.2,
+      fallback: true,
+    };
+  }
   if (cropScore != null && cropScore < 75 && peril !== "fire_burn") {
     return {
       usable: false,
@@ -310,7 +330,6 @@ Angle: ${angleType}, Peril: ${peril || "normal"}`;
           },
         ],
         generationConfig: {
-          temperature: 0.1,
           maxOutputTokens: 768,
           responseMimeType: "application/json",
         },

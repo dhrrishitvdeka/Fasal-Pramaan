@@ -86,7 +86,12 @@ async function gateSingleImage(
       greenPct: input.greenPct,
       luma: input.luma ?? null,
       blurScore: input.blurScore,
-      hintCode: input.qualityPassed === false ? "crop_not_detected" : input.qualityPassed ? "ok" : undefined,
+      // Never synthesize "crop_not_detected" from a generic qualityPassed=false
+      // (lighting failure is not crop absence). Only forward the real on-device
+      // hint; the heuristic decides from fresh measurements.
+      hintCode: input.hintCode ?? undefined,
+      isScreenDetected: input.isScreenDetected ?? null,
+      isPersonDetected: input.isPersonDetected ?? null,
     },
     sha256: input.sha256,
     farmerObservation: input.farmerObservation,
@@ -236,6 +241,10 @@ export type PersistedImageInput = {
   luma?: number | null;
   greenPct?: number | null;
   cropScore?: number | null;
+  /** Raw on-device CV hint (e.g. "ok", "too_dark"). Passed through, never synthesized. */
+  hintCode?: string | null;
+  isScreenDetected?: boolean | null;
+  isPersonDetected?: boolean | null;
   facing?: string | null;
   dimensions?: { width: number; height: number } | null;
   farmerObservation?: string | null;
@@ -364,6 +373,9 @@ export type RecaptureClientImage = {
   greenPct?: number | null;
   luma?: number | null;
   cropScore?: number | null;
+  hintCode?: string | null;
+  isScreenDetected?: boolean | null;
+  isPersonDetected?: boolean | null;
   facing?: string | null;
   dimensions?: { width: number; height: number } | null;
   timestamp?: string | null;
@@ -413,6 +425,9 @@ export function buildRecaptureSubmitInput(
       greenPct: img.greenPct,
       luma: img.luma,
       cropScore: img.cropScore,
+      hintCode: (img as RecaptureClientImage).hintCode ?? undefined,
+      isScreenDetected: (img as RecaptureClientImage).isScreenDetected ?? undefined,
+      isPersonDetected: (img as RecaptureClientImage).isPersonDetected ?? undefined,
       facing: img.facing,
       dimensions: img.dimensions,
       capturedAt: img.timestamp || undefined,
@@ -1457,11 +1472,25 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
       : null,
     latest_evaluation: {
       evaluation_version: "evidence-confidence-v1",
-      quality: { score: claim.quality_score ?? 0, available: claim.quality_score != null },
+      quality: {
+        score: claim.quality_score ?? 0,
+        available: claim.quality_score != null,
+        details: { issues: claim.quality_notes ? [claim.quality_notes] : [] },
+      },
       coverage: {
         score: claim.coverage_score ?? 0,
         available: true,
-        details: { missing_views: claim.missing_angles || [] },
+        details: {
+          missing_views: claim.missing_angles || [],
+          // usable = required minus missing (gate-usable), while views_present
+          // stays as stored frames so reviewers can see present-vs-usable gaps.
+          usable_views: Math.max(0, 5 - (claim.missing_angles || []).length),
+          required_views: 5,
+          views_present: images.length,
+          views_required: 5,
+          wide_context: images.some((img) => img.angle_type === "wide_field"),
+          closeup_damage: images.some((img) => img.angle_type === "closeup_damage"),
+        },
       },
       context: { score: claim.context_score ?? 0, available: true },
       integrity: { score: claim.integrity_score ?? 0, available: true },
