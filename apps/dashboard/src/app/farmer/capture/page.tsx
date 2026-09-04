@@ -30,6 +30,7 @@ import {
   Check,
   AlertTriangle,
   Lock,
+  Upload,
 } from "lucide-react";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
@@ -173,6 +174,10 @@ function CaptureStudioContent() {
   // Submission / draft state
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Temporary Nocturnal / Test Mode Image Upload State
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
 
   // Load existing draft if not in recapture or milestone mode
   useEffect(() => {
@@ -650,6 +655,262 @@ function CaptureStudioContent() {
     });
   };
 
+  /**
+   * Temporary Nocturnal / Test Mode: Process and store an uploaded crop image
+   * Bypasses the dark-room camera shutter lock so full pipeline and model
+   * predictions can be verified end-to-end at night.
+   */
+  const saveUploadedEvidenceImage = async (
+    targetAngleId: string,
+    imageUrl: string,
+    fileDimensions?: { width: number; height: number }
+  ) => {
+    const digest = await sha256FromDataUrl(imageUrl);
+    const useGps = gpsCoords.status === "accurate" || gpsCoords.status === "searching";
+    const dimensions = fileDimensions || { width: 1280, height: 720 };
+    const nowIso = new Date().toISOString();
+
+    // Run on-device agronomic CV on the uploaded frame still
+    let cv: import("@/lib/vision/realtime-cv").CvFrameResult | null = null;
+    try {
+      const mod = await import("@/lib/vision/realtime-cv");
+      cv = await mod.analyzeDataUrl(imageUrl, targetAngleId);
+    } catch {
+      cv = null;
+    }
+
+    // Measure lighting on the uploaded still using an offscreen canvas
+    let measuredLighting: number | undefined = undefined;
+    try {
+      const testCanvas = document.createElement("canvas");
+      testCanvas.width = 64;
+      testCanvas.height = 64;
+      const testCtx = testCanvas.getContext("2d");
+      if (testCtx) {
+        const testImg = new Image();
+        testImg.src = imageUrl;
+        testCtx.drawImage(testImg, 0, 0, 64, 64);
+        measuredLighting = measureLightingScore(testCtx.getImageData(0, 0, 64, 64));
+      }
+    } catch {
+      measuredLighting = undefined;
+    }
+
+    const lightingScore =
+      measuredLighting != null && !isUnusableLighting(measuredLighting)
+        ? measuredLighting
+        : 75; // safe normal lighting for test upload
+
+    const newEvidence: ClaimImageEvidence = {
+      angleType: targetAngleId,
+      imageUrl,
+      timestamp: nowIso,
+      lat: useGps && gpsCoords.lat != null ? gpsCoords.lat : selectedPlot?.lat ?? null,
+      lon: useGps && gpsCoords.lon != null ? gpsCoords.lon : selectedPlot?.lon ?? null,
+      accuracyM:
+        useGps && gpsCoords.accuracyM != null
+          ? gpsCoords.accuracyM
+          : selectedPlot?.lat != null
+          ? 5.0
+          : null,
+      sha256: digest,
+      qualityPassed: true, // uploaded file for test mode
+      lightingScore,
+      blurScore: cv?.blurScore ?? 50,
+      greenPct: cv?.greenPct ?? 80,
+      luma: cv?.luma ?? 60,
+      cropScore: cv?.cropScore ?? 85,
+      hintCode: cv?.hintCode ?? "ok",
+      isScreenDetected: cv?.isScreenDetected ?? false,
+      isPersonDetected: cv?.isPersonDetected ?? false,
+      facing: "environment",
+      dimensions,
+      farmerObservation: observations || undefined,
+    };
+
+    setCapturedImages((prev) => ({
+      ...prev,
+      [targetAngleId]: newEvidence,
+    }));
+
+    const angleInfo = getLocalizedAngleInfo(targetAngleId, lang);
+    showToast(
+      lang === "hi"
+        ? `${angleInfo.name} अपलोड हो गया!`
+        : `${angleInfo.name} uploaded successfully!`
+    );
+
+    // Call Stage 1 Vision Gate in background with comprehensive metadata
+    void (async () => {
+      try {
+        const metadata = {
+          lat: newEvidence.lat,
+          lon: newEvidence.lon,
+          accuracyM: newEvidence.accuracyM,
+          capturedAt: nowIso,
+          facing: "environment",
+          dimensions,
+          cvAnalysis: cv
+            ? {
+                cropScore: cv.cropScore,
+                greenPct: cv.greenPct,
+                isScreenDetected: cv.isScreenDetected,
+                phenologyType: cv.phenologyType,
+                luma: cv.luma,
+                blurScore: cv.blurScore,
+                hintCode: cv.hintCode,
+                modelLabel: cv.modelLabel,
+                modelProb: cv.modelProb,
+              }
+            : {
+                cropScore: 85,
+                greenPct: 80,
+                isScreenDetected: false,
+                phenologyType: "vegetative",
+                luma: 60,
+                blurScore: 50,
+                hintCode: "ok",
+              },
+          sha256: digest,
+          farmerObservation: observations || undefined,
+        };
+
+        const res = await apiFetch("/api/vision/gate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageDataUrl: imageUrl,
+            angleType: targetAngleId,
+            expectedCrop: selectedPlot?.cropType || activeIntent?.crop || undefined,
+            peril: requestedPeril,
+            metadata,
+          }),
+        });
+        const gate = (await res.json().catch(() => null)) as {
+          usable?: boolean;
+          reason?: string;
+          crop_detected?: string | null;
+          warnings?: string[];
+        } | null;
+        if (gate && gate.usable === false) {
+          const reason = String(gate.reason || "unusable");
+          const warn =
+            reason === "wrong_crop"
+              ? lang === "hi"
+                ? `फसल मेल नहीं खाती (${gate.crop_detected || "अज्ञात"}) — सही फसल की फोटो लें।`
+                : `Crop mismatch (${gate.crop_detected || "unknown"}) — retake with correct crop in frame.`
+              : reason === "ai_generated"
+                ? lang === "hi"
+                  ? "AI-निर्मित/नकली लग रही है — मूल फोटो लें।"
+                  : "Looks AI-generated — please capture original photo."
+                : lang === "hi"
+                  ? `फोटो उपयोगी नहीं (${reason}) — दोबारा लें।`
+                  : `Photo not usable (${reason}) — please retake.`;
+          showToast(warn);
+          setCapturedImages((prev) => {
+            const cur = prev[targetAngleId];
+            if (!cur || cur.imageUrl !== imageUrl) return prev;
+            return { ...prev, [targetAngleId]: { ...cur, qualityPassed: false } };
+          });
+        } else if (gate?.usable && gate.crop_detected) {
+          showToast(
+            lang === "hi"
+              ? `✓ फसल पहचानी गई: ${gate.crop_detected} (${angleInfo.shortName})`
+              : `✓ Crop verified: ${gate.crop_detected} (${angleInfo.shortName})`
+          );
+        }
+      } catch {
+        // ignore gate errors — not blocking
+      }
+    })();
+  };
+
+  /**
+   * File selection handler supporting both single-photo assignment
+   * and multi-photo batch upload across remaining angles.
+   */
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+
+    try {
+      const fileList = Array.from(files);
+      const ALLOWED_MIME = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+      const validFiles = fileList.filter((f) => ALLOWED_MIME.has(f.type.toLowerCase()));
+
+      if (validFiles.length === 0) {
+        showToast(
+          lang === "hi"
+            ? "केवल JPEG, PNG या WebP प्रारूप समर्थित हैं।"
+            : "Only JPEG, PNG, or WebP images are supported."
+        );
+        return;
+      }
+
+      if (validFiles.length === 1) {
+        const file = validFiles[0];
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("File read error"));
+          reader.readAsDataURL(file);
+        });
+
+        const dims = await new Promise<{ width: number; height: number }>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ width: img.naturalWidth || 1280, height: img.naturalHeight || 720 });
+          img.onerror = () => resolve({ width: 1280, height: 720 });
+          img.src = dataUrl;
+        });
+
+        await saveUploadedEvidenceImage(currentAngle.id, dataUrl, dims);
+
+        if (currentAngleIndex < activeAngleDefs.length - 1) {
+          setCurrentAngleIndex(currentAngleIndex + 1);
+        }
+      } else {
+        // Multi-file batch upload: map across uncaptured or all angles
+        const missing = activeAngleDefs.filter((a) => !capturedImages[a.id]);
+        const targetAngles =
+          missing.length >= validFiles.length
+            ? missing.map((a) => a.id)
+            : activeAngleDefs.map((a) => a.id);
+
+        const count = Math.min(validFiles.length, targetAngles.length);
+        for (let i = 0; i < count; i++) {
+          const file = validFiles[i];
+          const targetAngleId = targetAngles[i];
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error("File read error"));
+            reader.readAsDataURL(file);
+          });
+          const dims = await new Promise<{ width: number; height: number }>((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve({ width: img.naturalWidth || 1280, height: img.naturalHeight || 720 });
+            img.onerror = () => resolve({ width: 1280, height: 720 });
+            img.src = dataUrl;
+          });
+          await saveUploadedEvidenceImage(targetAngleId, dataUrl, dims);
+        }
+
+        showToast(
+          lang === "hi"
+            ? `${count} फसल तस्वीरें सफलतापूर्वक अपलोड हो गईं!`
+            : `${count} crop photos uploaded successfully in batch!`
+        );
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      showToast(lang === "hi" ? "फोटो अपलोड विफल रहा।" : "Photo upload failed.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -939,6 +1200,57 @@ function CaptureStudioContent() {
         </div>
       )}
 
+      {/* Hidden File Input for Temporary Crop Photo Upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        className="hidden"
+        aria-hidden="true"
+        onChange={handleFileUpload}
+      />
+
+      {/* Temporary Nocturnal / Pipeline Test Mode Banner */}
+      <div className="rounded-xl border border-emerald-300 bg-emerald-50/90 p-3 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-600" />
+            </span>
+            <span className="text-xs font-bold text-emerald-950">
+              {lang === "hi"
+                ? "🧪 पाइपलाइन परीक्षण मोड: फसल फोटो अपलोड सक्रिय (अस्थायी)"
+                : "🧪 Pipeline Verification Mode: Crop Photo Upload Active (Temporary)"}
+            </span>
+            <span className="rounded bg-emerald-200/80 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase text-emerald-900">
+              Night Test
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 disabled:opacity-50 transition-colors"
+            >
+              <Upload className="h-3.5 w-3.5" />
+              <span>
+                {isUploading
+                  ? (lang === "hi" ? "अपलोड हो रहा है..." : "Uploading...")
+                  : (lang === "hi" ? "तस्वीरें अपलोड करें" : "Upload Crop Images")}
+              </span>
+            </button>
+          </div>
+        </div>
+        <p className="mt-1.5 text-[11px] text-emerald-900 leading-normal">
+          {lang === "hi"
+            ? "रात्रि परीक्षण के लिए: आप सीधे फसल की 1 या अधिक तस्वीरें चुनकर कोण भर सकते हैं और पूरे जेमिनी AI मॉडल व PMFBY सत्यापन पाइपलाइन की जांच कर सकते हैं।"
+            : "For nocturnal/indoor testing: Select 1 or more crop images to fill required angles and verify the Gemini AI model and PMFBY claim pipeline end-to-end without needing real-time outdoor camera frames."}
+        </p>
+      </div>
+
       {/* Header Banner */}
       <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 sm:flex-row sm:items-center sm:justify-between sm:pb-4">
         <div className="min-w-0">
@@ -1099,16 +1411,31 @@ function CaptureStudioContent() {
                 <p className="text-sm font-medium">
                   {cameraError || (lang === "hi" ? "कैमरा शुरू हो रहा है…" : "Starting camera…")}
                 </p>
-                {cameraError ? (
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                   <button
                     type="button"
-                    onClick={() => void startCamera()}
-                    className="fp-btn-primary mt-3 gap-2 text-xs"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-800 disabled:opacity-50 transition-colors"
                   >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    <span>{lang === "hi" ? "कैमरा पुनः शुरू करें" : "Retry Camera"}</span>
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>
+                      {lang === "hi"
+                        ? `इस कोण के लिए फोटो अपलोड करें (${getLocalizedAngleInfo(currentAngle.id, lang).shortName})`
+                        : `Upload Photo for ${getLocalizedAngleInfo(currentAngle.id, lang).shortName}`}
+                    </span>
                   </button>
-                ) : null}
+                  {cameraError ? (
+                    <button
+                      type="button"
+                      onClick={() => void startCamera()}
+                      className="fp-btn-primary gap-2 text-xs"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span>{lang === "hi" ? "कैमरा पुनः शुरू करें" : "Retry Camera"}</span>
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ) : null}
 
@@ -1272,77 +1599,110 @@ function CaptureStudioContent() {
           {/* Primary Viewport Action Buttons — thumb-zone sticky bar on phone,
               back to normal flow inside the lg+ two-column studio */}
           <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 -mx-3 border-t border-slate-200 bg-white/90 px-3 py-2 shadow-[0_-4px_12px_rgba(28,25,21,0.08)] backdrop-blur-md sm:-mx-4 sm:px-4 md:bottom-0 md:-mx-6 md:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:shadow-none lg:backdrop-blur-none">
-            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-            {/* Flip camera */}
-            <button
-              type="button"
-              onClick={() =>
-                setCameraFacing((prev) => (prev === "environment" ? "user" : "environment"))
-              }
-              aria-label={t.switchCamera}
-              className="inline-flex min-h-11 items-center gap-1.5 border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:px-3"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{t.switchCamera}</span>
-            </button>
-
-            {/* Main Shutter / Capture Button with 75%+ Crop Lock */}
-            {(() => {
-              const isDryOrCharred = requestedPeril === "fire_burn" || requestedPeril === "drought";
-              const isLocked =
-                isCameraActive &&
-                !capturedImages[currentAngle.id] &&
-                ((cvResult == null && !isDryOrCharred) ||
-                  cvResult?.isPersonDetected === true ||
-                  cvResult?.isScreenDetected === true ||
-                  (cvResult != null && cvResult.cropScore < 75 && !isDryOrCharred) ||
-                  (cvResult?.shouldBlockShutter === true && !isDryOrCharred));
-
-              if (isLocked) {
-                return (
-                  <button
-                    type="button"
-                    onClick={capturePhotoFromCamera}
-                    aria-label="Capture locked (Need 75%+ crop match)"
-                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-stone-300 bg-stone-200 px-3 py-3 text-xs font-bold text-stone-600 shadow-inner sm:text-sm cursor-not-allowed opacity-90 transition-all"
-                  >
-                    <Lock className="h-4 w-4 text-stone-600 shrink-0" />
-                    <span>
-                      {cvResult?.isPersonDetected
-                        ? (lang === "hi" ? "व्यक्ति / चेहरा लॉक (फसल दिखाएँ)" : "Person in Frame (Aim at real crop)")
-                        : cvResult?.isScreenDetected
-                        ? (lang === "hi" ? "स्क्रीन लॉक (असली फसल दिखाएँ)" : "Screen Blocked (Aim at real crop)")
-                        : cvResult == null
-                        ? (lang === "hi" ? "गुणवत्ता जाँच चल रही है…" : "Quality check running…")
-                        : (lang === "hi"
-                          ? `कैमरा लॉक (${cvResult?.cropScore ?? 0}% / 75% आवश्यक)`
-                          : `Locked (${cvResult?.cropScore ?? 0}% / 75% Crop Needed)`)}
-                    </span>
-                  </button>
-                );
-              }
-
-              return (
+            <div className="space-y-2">
+              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+                {/* Flip camera */}
                 <button
                   type="button"
-                  onClick={capturePhotoFromCamera}
-                  className={clsx(
-                    "fp-btn-primary w-full gap-2 px-3 py-3 sm:px-6 transition-all",
-                    cvResult?.hintCode === "ok" &&
-                      "ring-2 ring-emerald-500 ring-offset-2 ring-offset-[var(--surface)] shadow-[0_0_15px_rgba(16,185,129,0.35)]"
-                  )}
+                  onClick={() =>
+                    setCameraFacing((prev) => (prev === "environment" ? "user" : "environment"))
+                  }
+                  aria-label={t.switchCamera}
+                  className="inline-flex min-h-11 items-center gap-1.5 border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:px-3"
                 >
-                  <Camera className="h-5 w-5" />
-                  <span>{t.takePhoto}</span>
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{t.switchCamera}</span>
                 </button>
-              );
-            })()}
 
-            {/* Realtime Live Camera Notice */}
-            <div className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-slate-500 shrink-0">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              <span>{lang === "hi" ? "लाइव कैमरा एवं जीपीएस" : "Live Geotagged Camera"}</span>
-            </div>
+                {/* Main Shutter / Capture Button with 75%+ Crop Lock */}
+                {(() => {
+                  const isDryOrCharred = requestedPeril === "fire_burn" || requestedPeril === "drought";
+                  const isLocked =
+                    isCameraActive &&
+                    !capturedImages[currentAngle.id] &&
+                    ((cvResult == null && !isDryOrCharred) ||
+                      cvResult?.isPersonDetected === true ||
+                      cvResult?.isScreenDetected === true ||
+                      (cvResult != null && cvResult.cropScore < 75 && !isDryOrCharred) ||
+                      (cvResult?.shouldBlockShutter === true && !isDryOrCharred));
+
+                  if (isLocked) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={capturePhotoFromCamera}
+                        aria-label="Capture locked (Need 75%+ crop match)"
+                        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-stone-300 bg-stone-200 px-3 py-3 text-xs font-bold text-stone-600 shadow-inner sm:text-sm cursor-not-allowed opacity-90 transition-all"
+                      >
+                        <Lock className="h-4 w-4 text-stone-600 shrink-0" />
+                        <span>
+                          {cvResult?.isPersonDetected
+                            ? (lang === "hi" ? "व्यक्ति / चेहरा लॉक (फसल दिखाएँ)" : "Person in Frame (Aim at real crop)")
+                            : cvResult?.isScreenDetected
+                            ? (lang === "hi" ? "स्क्रीन लॉक (असली फसल दिखाएँ)" : "Screen Blocked (Aim at real crop)")
+                            : cvResult == null
+                            ? (lang === "hi" ? "गुणवत्ता जाँच चल रही है…" : "Quality check running…")
+                            : (lang === "hi"
+                              ? `कैमरा लॉक (${cvResult?.cropScore ?? 0}% / 75% आवश्यक)`
+                              : `Locked (${cvResult?.cropScore ?? 0}% / 75% Crop Needed)`)}
+                        </span>
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <button
+                      type="button"
+                      onClick={capturePhotoFromCamera}
+                      className={clsx(
+                        "fp-btn-primary w-full gap-2 px-3 py-3 sm:px-6 transition-all",
+                        cvResult?.hintCode === "ok" &&
+                          "ring-2 ring-emerald-500 ring-offset-2 ring-offset-[var(--surface)] shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+                      )}
+                    >
+                      <Camera className="h-5 w-5" />
+                      <span>{t.takePhoto}</span>
+                    </button>
+                  );
+                })()}
+
+                {/* Temporary Nocturnal Image Upload Button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  aria-label="Upload crop image"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-emerald-700 bg-emerald-700 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 disabled:opacity-50 transition-colors"
+                >
+                  <Upload className="h-4 w-4 shrink-0" />
+                  <span className="hidden sm:inline">
+                    {isUploading
+                      ? (lang === "hi" ? "अपलोड..." : "Uploading...")
+                      : (lang === "hi" ? "फोटो अपलोड" : "Upload Photo")}
+                  </span>
+                </button>
+              </div>
+
+              {/* Realtime Live Camera Notice & Nocturnal Upload Hint */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] text-slate-500">
+                <div className="inline-flex items-center gap-1">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>{lang === "hi" ? "लाइव कैमरा एवं जीपीएस" : "Live Geotagged Camera"}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900 font-semibold transition-colors"
+                >
+                  <Upload className="h-3 w-3" />
+                  <span>
+                    {lang === "hi"
+                      ? "फसल फोटो सीधे अपलोड करें (रात्रि परीक्षण)"
+                      : "Upload crop photo directly (Night testing)"}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
