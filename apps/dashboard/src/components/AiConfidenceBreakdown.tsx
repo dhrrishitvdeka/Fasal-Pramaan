@@ -133,7 +133,7 @@ export function AiConfidenceBreakdown({
     verdict.tone === "accept" ? "bg-emerald-500" : verdict.tone === "reject" ? "bg-rose-500" : "bg-amber-500";
 
   return (
-    <div className="space-y-4 rounded-xl border-2 border-indigo-200 bg-gradient-to-b from-indigo-50/70 via-white to-white p-4 text-slate-800 shadow-md ring-1 ring-indigo-100">
+    <div className="space-y-2.5 rounded-lg border border-indigo-200 bg-white p-3 text-slate-800">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-3">
         <div>
           <div className="flex items-center gap-2">

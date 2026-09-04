@@ -571,9 +571,9 @@ export default function ReviewDetailPage() {
   const perilOption = PERIL_OPTIONS.find((p) => p.value === data.peril);
 
   return (
-    <div className="space-y-5 pb-12">
+    <div className="mx-auto max-w-[1440px] space-y-3 pb-8">
       {/* 1. TOP HEADER & BREADCRUMB NAVIGATION */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
@@ -631,90 +631,48 @@ export default function ReviewDetailPage() {
         />
       </div>
 
-      {/* 2. CASE SUMMARY & FARMER CONTEXT CARD */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-          <div className="flex items-center gap-2">
-            <Sprout className="h-4 w-4 text-emerald-600" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              Plot &amp; Agricultural Telemetry
-            </h3>
-          </div>
-          {data.createdAt && (
-            <span className="flex items-center gap-1 text-[11px] text-slate-400 font-mono">
-              <Clock className="h-3 w-3" />
-              Submitted {new Date(data.createdAt).toLocaleDateString()}
-            </span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          {/* Plot & Khasra */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-2.5">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">Plot &amp; Land</span>
-            <div className="font-semibold text-slate-800 text-sm">{data.plot_name || data.crop_cycle_id || "Plot 1"}</div>
-            <div className="font-mono text-slate-500 mt-1 flex items-center gap-1">
-              <span>Khasra:</span>
-              <span className="font-bold text-slate-700">{data.khasra_number || "—"}</span>
-            </div>
-          </div>
-
-          {/* Declared Crop */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-2.5">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">Declared Crop</span>
-            <div className="font-semibold text-slate-800 text-sm capitalize">
-              {data.crop_type || data.latest_prediction?.predicted_crop || "Wheat"}
-            </div>
-            <div className="text-slate-500 mt-1">
-              Variety: <span className="font-medium text-slate-700">{data.crop_variety || "Standard"}</span>
-            </div>
-          </div>
-
-          {/* GPS Coordinates */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-2.5">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">GPS Verification</span>
-            {data.capture_lat != null && data.capture_lon != null ? (
-              <div className="font-mono text-slate-700 text-xs">
-                <div className="flex items-center gap-1 font-semibold text-emerald-700">
-                  <MapPin className="h-3 w-3 shrink-0" />
-                  <span>{data.capture_lat.toFixed(5)}, {data.capture_lon.toFixed(5)}</span>
-                </div>
-                <div className="text-[10px] text-slate-400 mt-1">
-                  Accuracy: ±{data.capture_accuracy_m ?? 5}m
-                </div>
-              </div>
-            ) : (
-              <span className="text-amber-700 font-medium">No GPS recorded</span>
-            )}
-          </div>
-
-          {/* Peril & Stated Loss */}
-          <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-2.5">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">Reported Peril</span>
-            <div className="font-semibold text-slate-800 text-sm capitalize">
-              {(data.peril || "Normal").replaceAll("_", " ")}
-            </div>
-            <div className="text-[11px] text-slate-600 mt-1 truncate" title={data.farmer_observations || undefined}>
-              Notes: {data.farmer_observations?.trim() || "No farmer remarks"}
-            </div>
-          </div>
-        </div>
+      {/* 2. CASE SUMMARY — single compact strip */}
+      <section className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs shadow-2xs">
+        <span className="flex items-center gap-1.5">
+          <Sprout className="h-3.5 w-3.5 text-emerald-600" />
+          <strong className="text-slate-900">{data.plot_name || data.crop_cycle_id || "Plot 1"}</strong>
+          <span className="font-mono text-slate-500">· Khasra {data.khasra_number || "—"}</span>
+        </span>
+        <span className="text-slate-600">Crop <strong className="capitalize text-slate-900">{data.crop_type || data.latest_prediction?.predicted_crop || "Wheat"}</strong>
+          <span className="text-slate-400"> ({data.crop_variety || "Standard"})</span>
+        </span>
+        <span className="flex items-center gap-1 font-mono text-slate-600">
+          <MapPin className="h-3 w-3 text-emerald-600" />
+          {data.capture_lat != null && data.capture_lon != null
+            ? <span className="font-semibold text-emerald-700">{data.capture_lat.toFixed(5)}, {data.capture_lon.toFixed(5)}</span>
+            : <span className="font-sans font-medium text-amber-700">No GPS</span>}
+          {data.capture_lat != null && <span className="text-slate-400">±{data.capture_accuracy_m ?? 5}m</span>}
+        </span>
+        <span className="text-slate-600">Peril <strong className="capitalize text-slate-900">{(data.peril || "Normal").replaceAll("_", " ")}</strong></span>
+        {data.farmer_observations?.trim() && (
+          <span className="max-w-full truncate text-slate-500 italic" title={data.farmer_observations}>“{data.farmer_observations.trim().slice(0, 90)}{data.farmer_observations.trim().length > 90 ? "…" : ""}”</span>
+        )}
+        {data.createdAt && (
+          <span className="ml-auto flex items-center gap-1 font-mono text-[11px] text-slate-400">
+            <Clock className="h-3 w-3" />{new Date(data.createdAt).toLocaleDateString()}
+          </span>
+        )}
       </section>
 
       {/* Case Status Alerts */}
       {isClosed && (
-        <div className="rounded-xl border border-slate-300 bg-slate-100/80 px-4 py-3 text-xs text-slate-800 flex items-center gap-2">
-          <ShieldAlert className="h-4 w-4 text-slate-600 shrink-0" />
+        <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-100/80 px-3 py-2 text-xs text-slate-700">
+          <ShieldAlert className="h-3.5 w-3.5 text-slate-500 shrink-0" />
           <span>
-            This claim has been finalized as <strong>{data.status}</strong>. Decisions are logged and immutable. Issue a recapture if fresh physical evidence is required.
+            Finalized as <strong>{liveStatus}</strong> — immutable. Issue a recapture if fresh evidence is needed.
           </span>
         </div>
       )}
 
       {message && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900 flex items-center justify-between">
+        <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-blue-600 shrink-0" />
+            <Sparkles className="h-3.5 w-3.5 text-blue-600 shrink-0" />
             <span>{message}</span>
           </div>
           <button type="button" onClick={() => setMessage(null)} className="text-blue-500 hover:text-blue-700">
@@ -724,77 +682,58 @@ export default function ReviewDetailPage() {
       )}
 
       {/* 3. TWO-COLUMN REVIEW WORKSPACE */}
-      <div className="grid items-start gap-5 lg:grid-cols-12">
+      <div className="grid items-start gap-3 lg:grid-cols-12">
         {/* LEFT COLUMN: Physical Evidence, High-Res Gallery & Satellite Cross-Check (5 cols) */}
-        <div className="space-y-5 lg:col-span-5">
+        <div className="space-y-3 lg:col-span-5">
           {/* EVIDENCE PHOTO GALLERY */}
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div className="flex items-center gap-2">
-                <Camera className="h-4 w-4 text-slate-600" />
+                <Camera className="h-3.5 w-3.5 text-slate-600" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Physical Evidence Photos
+                  Evidence Photos
                 </h3>
               </div>
               <span className="text-[11px] font-mono text-slate-500">
-                {inspectableImages.length} uploaded
+                {inspectableImages.length} · click to inspect
               </span>
             </div>
 
             {inspectableImages.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400">
-                <Camera className="h-8 w-8 mx-auto mb-2 opacity-30 text-slate-400" />
-                <span>No photographic evidence attached to this claim</span>
+              <div className="py-6 text-center text-xs text-slate-400">
+                <Camera className="h-7 w-7 mx-auto mb-1.5 opacity-30 text-slate-400" />
+                <span>No photographic evidence attached</span>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 {inspectableImages.map((img, idx) => {
                   const angleObj = ALL_ANGLES.find((a) => a.key === img.angle_type);
                   const angleLabel = angleObj?.label || img.angle_type.replaceAll("_", " ");
                   return (
                     <div
                       key={img.id}
-                      className="group relative flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-all hover:border-slate-400 hover:shadow-md"
+                      className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-900 transition-all hover:border-slate-500 hover:shadow-md"
                     >
-                      {/* Image Thumbnail Stage */}
                       <div
                         onClick={() => setLightboxIndex(idx)}
-                        className="relative aspect-[4/3] w-full bg-slate-900 cursor-pointer overflow-hidden flex items-center justify-center"
+                        className="relative aspect-square w-full cursor-pointer overflow-hidden"
+                        title={`${angleLabel} — click to inspect`}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={img.download_url as string}
                           alt={angleLabel}
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          loading="lazy"
                         />
-                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                          <div className="flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold backdrop-blur-md">
-                            <Maximize2 className="h-3.5 w-3.5" />
-                            <span>Inspect</span>
-                          </div>
-                        </div>
-
-                        {/* Angle Pill Badge */}
-                        <div className="absolute top-2 left-2">
-                          <span className="rounded-md bg-black/70 px-2 py-0.5 font-mono text-[10px] font-bold text-white backdrop-blur-md border border-white/15">
-                            {angleLabel}
+                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1 pt-4">
+                          <span className="truncate font-mono text-[9px] font-bold text-white">
+                            {angleLabel.replace(" (Field Overview)", "").replace(" (Crop Condition)", "").replace(" (Damage Detail)", "").replaceAll("_", " ")}
                           </span>
+                          {img.sha256
+                            ? <ShieldCheck className="h-3 w-3 shrink-0 text-emerald-400" />
+                            : null}
                         </div>
-                      </div>
-
-                      {/* Card Footer Metadata */}
-                      <div className="flex items-center justify-between p-2.5 text-xs bg-slate-50/80 border-t border-slate-100 font-mono">
-                        <span className="text-[11px] text-slate-600 truncate capitalize">
-                          {img.upload_status}
-                        </span>
-                        {img.sha256 ? (
-                          <span className="flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                            <ShieldCheck className="h-3 w-3" />
-                            SHA verified
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-400">Standard</span>
-                        )}
                       </div>
                     </div>
                   );
@@ -804,58 +743,52 @@ export default function ReviewDetailPage() {
           </section>
 
           {/* SATELLITE CROSS-CHECK & BHUVAN LAND-USE */}
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-blue-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Satellite &amp; Land-Use Verification
-                </h3>
-              </div>
+          <details className="rounded-xl border border-slate-200 bg-white shadow-2xs">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5">
+              <span className="flex items-center gap-2">
+                <Layers className="h-3.5 w-3.5 text-blue-600" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Satellite &amp; Land-Use</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                {contextSignals.length > 0 && (
+                  <span className="flex gap-1">
+                    {contextSignals.map((s) => (
+                      <span key={s.source} title={`${s.labelEn}: ${s.status}`} className={clsx("h-2 w-2 rounded-full", s.status === "available" ? "bg-emerald-500" : s.status === "pending" ? "bg-amber-400" : "bg-slate-300")} />
+                    ))}
+                  </span>
+                )}
+                <span className="font-mono text-[11px] text-slate-400">{contextSignals.length} signals</span>
+              </span>
+            </summary>
+            <div className="space-y-2 border-t border-slate-100 p-3">
               {contextSignals.length > 0 && (
-                <span className="font-mono text-[11px] text-slate-500">
-                  {contextSignals.length} signals
-                </span>
-              )}
-            </div>
-
-            {contextSignals.length > 0 && (
-              <div className="space-y-1.5">
-                {contextSignals.map((s) => (
-                  <div key={s.source} className="rounded-lg border border-slate-100 p-2 bg-slate-50/60 text-xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-slate-800 capitalize">{s.labelEn}</span>
-                      <span
-                        className={clsx(
-                          "rounded px-1.5 py-0.5 text-[10px] font-bold uppercase font-mono",
-                          s.status === "available"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : s.status === "pending"
-                            ? "bg-amber-50 text-amber-800 border border-amber-200"
-                            : "bg-slate-100 text-slate-600",
-                        )}
-                      >
+                <div className="space-y-1">
+                  {contextSignals.map((s) => (
+                    <div key={s.source} className="flex items-start justify-between gap-2 rounded-md bg-slate-50/70 px-2 py-1.5 text-xs">
+                      <div className="min-w-0">
+                        <span className="font-semibold text-slate-700 capitalize">{s.labelEn}</span>
+                        <p className="truncate text-[11px] text-slate-500" title={s.summaryEn}>{s.summaryEn}</p>
+                      </div>
+                      <span className={clsx("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase font-mono", s.status === "available" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : s.status === "pending" ? "bg-amber-50 text-amber-800 border border-amber-200" : "bg-slate-100 text-slate-600")}>
                         {s.status}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">{s.summaryEn}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <SatelliteCrossCheckCard
-              wideFieldImageUrl={wideFieldImage?.download_url}
-              bhuvanTileUrl={bhuvanThumbnailUrl}
-              bhuvanFallbackUrl={bhuvanFallbackUrl}
-              burnMapUrl={burnMapUrl}
-            />
-          </section>
+                  ))}
+                </div>
+              )}
+              <SatelliteCrossCheckCard
+                wideFieldImageUrl={wideFieldImage?.download_url}
+                bhuvanTileUrl={bhuvanThumbnailUrl}
+                bhuvanFallbackUrl={bhuvanFallbackUrl}
+                burnMapUrl={burnMapUrl}
+              />
+            </div>
+          </details>
         </div>
 
         {/* RIGHT COLUMN: AI Diagnostics, Authenticity Gate & Decision Workbench (7 cols) */}
-        <div className="space-y-5 lg:col-span-7">
-          {/* GEMINI FIELD ASSESSMENT */}
+        <div className="space-y-3 lg:col-span-7">
+          {/* AI ASSESSMENT — synthesis + scoring + damage in ONE compact card */}
           {(() => {
             const explanation = (pred?.explanation || {}) as Record<string, unknown>;
             const visual = String(explanation.visual_findings || "").trim();
@@ -877,291 +810,182 @@ export default function ReviewDetailPage() {
               !declared.toLowerCase().includes(detected.toLowerCase());
 
             return (
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-blue-600" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                      Gemini Multimodal Field Synthesis
-                    </h3>
-                  </div>
-                  <span className="rounded bg-blue-50 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-700 border border-blue-200">
-                    {pred?.predicted_grade ? `Grade ${pred.predicted_grade}` : data.inference_status || "Completed"}
+              <section className="relative overflow-hidden rounded-xl border-2 border-indigo-200 bg-white shadow-md shadow-indigo-100/50">
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-400" />
+                <div className="flex flex-wrap items-center gap-2 px-3 pb-2 pt-3">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-600 text-white">
+                    <Sparkles className="h-3.5 w-3.5" />
+                  </span>
+                  <h3 className="text-[13px] font-extrabold tracking-tight text-slate-900">AI Assessment</h3>
+                  <span className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-blue-700 border border-blue-200">
+                    Grade {pred?.predicted_grade || data.inference_status || "U"}
+                  </span>
+                  <span className="font-mono text-[10px] text-slate-400">{pred?.model_version}</span>
+                  <span className="ml-auto font-mono text-[11px] text-slate-500">
+                    {data.peril || "normal"} · {declared || "—"} → {detected || "—"}
                   </span>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600 font-mono">
-                  <span>Peril: <strong className="capitalize text-slate-800">{data.peril || "normal"}</strong></span>
-                  <span>· Declared: <strong className="text-slate-800">{declared || "—"}</strong></span>
-                  {detected && <span>· Detected: <strong className="text-slate-800">{detected}</strong></span>}
-                </div>
-
                 {gateInfo?.gateFailed && !gateInfo?.overridden && (pred?.predicted_grade === "U" || !pred) && (
-                  <div className="flex items-center gap-2 rounded-lg border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-950 font-medium">
-                    <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
-                    <span>
-                      Vision gate blocked{gateInfo.blockingReason ? ` (${gateInfo.blockingReason.replaceAll("_", " ")})` : ""} — field analysis never ran. Grade U is a placeholder, not a model judgment. Override the gate or request a recapture to proceed.
-                    </span>
-                  </div>
+                  <p className="mx-3 flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-[11px] font-medium text-rose-900">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-600" />
+                    Gate blocked{gateInfo.blockingReason ? ` (${gateInfo.blockingReason.replaceAll("_", " ")})` : ""} — Grade U is a placeholder. Override or recapture.
+                  </p>
                 )}
-
-                {oneLiner ? (
-                  <p className="text-xs leading-relaxed text-slate-800 bg-slate-50/80 p-3 rounded-lg border border-slate-100">
+                {mismatch && (
+                  <p className="mx-3 mt-1.5 flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-900">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                    Crop mismatch: declared {declared}, detected {detected} — confirm plot boundary.
+                  </p>
+                )}
+                {oneLiner && (
+                  <p className="mx-3 mt-1.5 rounded-md border border-slate-100 bg-slate-50/80 px-2 py-1.5 text-xs leading-snug text-slate-700">
                     &ldquo;{oneLiner}&rdquo;
                   </p>
-                ) : (
-                  <p className="text-xs text-slate-500 italic">
-                    AI synthesis is complete. Visual features calibrated across uploaded angles.
-                  </p>
                 )}
 
-                {mismatch && (
-                  <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-950 font-medium">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                    <span>
-                      Crop mismatch: Farmer declared {declared}, but Gemini detects {detected}. Confirm plot boundary before approving payout.
-                    </span>
+                {pred && (
+                  <div className="grid grid-cols-4 gap-1.5 px-3 pt-2 text-center">
+                    <div className="rounded-md bg-slate-50 border border-slate-100 px-1 py-1.5">
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Damage</div>
+                      <div className="truncate text-xs font-bold capitalize text-slate-900" title={String(pred.primary_damage || "—")}>{String(pred.primary_damage || "—").replaceAll("_", " ")}</div>
+                    </div>
+                    <div className="rounded-md bg-slate-50 border border-slate-100 px-1 py-1.5">
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Severity</div>
+                      <div className="text-xs font-bold capitalize text-slate-900">{pred.severity || "—"}</div>
+                    </div>
+                    <div className="rounded-md bg-slate-50 border border-slate-100 px-1 py-1.5">
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Area</div>
+                      <div className="font-mono text-xs font-extrabold text-slate-900">{pred.affected_area_pct != null ? `${pred.affected_area_pct}%` : "—"}</div>
+                    </div>
+                    <div className="rounded-md bg-slate-50 border border-slate-100 px-1 py-1.5">
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Conf</div>
+                      <div className="font-mono text-xs font-extrabold text-slate-900">{pred.overall_confidence != null ? `${Math.round(pred.overall_confidence * 100)}%` : "—"}</div>
+                    </div>
                   </div>
+                )}
+
+                {pred && (
+                  <details className="px-3 py-2">
+                    <summary className="cursor-pointer list-none text-[11px] font-bold uppercase tracking-wider text-indigo-700 hover:text-indigo-900">
+                      Scoring breakdown +
+                    </summary>
+                    <div className="pt-1.5">
+                      <AiConfidenceBreakdown prediction={pred} images={data.images} peril={data.peril} />
+                    </div>
+                  </details>
                 )}
               </section>
             );
           })()}
 
+          {/* Gate status — single inline row */}
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-2xs">
+            <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[11px] text-slate-500">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Gate
+            </span>
+            {gateInfo?.overridden ? (
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Overridden</span>
+            ) : gateInfo?.gateFailed ? (
+              <span className="rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">Rejected{gateInfo.blockingReason ? `: ${gateInfo.blockingReason.replaceAll("_", " ")}` : ""}</span>
+            ) : (
+              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Passed</span>
+            )}
+            {gateInfo && gateInfo.perImage.length > 0 && (
+              <span className="font-mono text-[10px] text-slate-400">
+                {gateInfo.perImage.map((i) => `${(i.angleType || "?").replaceAll("_", " ")}:${i.usable ? "ok" : i.reason}`).join(" · ")}
+              </span>
+            )}
+            <span className="ml-auto flex gap-1.5">
+              {gateInfo?.gateFailed && !gateInfo.overridden && (
+                <button type="button" className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-900 hover:bg-amber-100" disabled={busy || isClosed} onClick={handleOverrideGate}>
+                  {pendingAction === "override_gate" ? "Overriding…" : "Override"}
+                </button>
+              )}
+              <button type="button" className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled={gateRerunning || busy} onClick={handleGateRerun}>
+                {gateRerunning ? "Checking…" : "Re-verify"}
+              </button>
+            </span>
+          </div>
+
           {/* EVIDENCE CONFIDENCE & TRUST EVALUATION */}
           <EvidenceConfidenceSection submission={data} />
 
-          {/* AUTHENTICITY VISION GATE */}
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  AI Authenticity Gate
-                </h3>
-              </div>
-
-              {gateInfo?.overridden ? (
-                <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
-                  Overridden by Reviewer
-                </span>
-              ) : gateInfo?.gateFailed ? (
-                <span className="rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700">
-                  Gate Rejected{gateInfo.blockingReason ? `: ${gateInfo.blockingReason.replaceAll("_", " ")}` : ""}
-                </span>
-              ) : (
-                <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
-                  Passed Authenticity Gate
-                </span>
-              )}
-            </div>
-
-            {gateInfo && gateInfo.perImage.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {gateInfo.perImage.map((item, idx) => (
-                  <span
-                    key={`${item.angleType}-${idx}`}
-                    className={clsx(
-                      "rounded-md border px-2 py-0.5 font-mono text-[10px] font-medium",
-                      item.usable
-                        ? "border-emerald-200 bg-emerald-50/80 text-emerald-700"
-                        : "border-amber-300 bg-amber-50 text-amber-800",
-                    )}
-                  >
-                    {(item.angleType || "image").replaceAll("_", " ")}: {item.usable ? "ok" : item.reason}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Action Buttons for Authenticity Gate */}
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-              {gateInfo?.gateFailed && !gateInfo.overridden && (
-                <button
-                  type="button"
-                  className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 transition-colors"
-                  disabled={action.isPending || isClosed}
-                  onClick={handleOverrideGate}
-                >
-                  Override Gate — Mark Usable
-                </button>
-              )}
-
-              <button
-                type="button"
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-2xs"
-                disabled={gateRerunning || action.isPending}
-                onClick={handleGateRerun}
-              >
-                {gateRerunning ? (
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-500 border-t-transparent" />
-                    Checking authenticity…
-                  </span>
-                ) : (
-                  "Re-verify Stored Photos"
-                )}
-              </button>
-            </div>
-          </section>
-
-          {/* AI MODEL PREDICTION METRICS — highlighted primary */}
-          {pred && (
-            <section className="relative overflow-hidden rounded-2xl border-2 border-indigo-300 bg-white p-4 shadow-lg shadow-indigo-100/60 ring-2 ring-indigo-100 space-y-3">
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-400" />
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-100 pb-2.5 pt-1">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-xs">
-                    <Sparkles className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-extrabold tracking-tight text-slate-900">
-                      AI Model Scoring Breakdown
-                    </h3>
-                    <p className="text-[11px] text-indigo-700/80 font-medium">Primary machine signal — verify against evidence below</p>
-                  </div>
-                </div>
-                <span className="font-mono text-[11px] text-slate-500 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">{pred.model_version}</span>
-              </div>
-              <AiConfidenceBreakdown prediction={pred} images={data.images} peril={data.peril} />
-            </section>
-          )}
-
-          {/* DAMAGE ASSESSMENT — reviewer-readable loss summary */}
-          {pred && (
-            <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <ClipboardCheck className="h-4 w-4 text-emerald-700" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Damage Assessment
-                  </h3>
-                </div>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] text-slate-600">
-                  {pred.predicted_crop || "—"} · {pred.predicted_growth_stage || "stage n/a"}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Damage</span>
-                  <span className="mt-0.5 block text-sm font-bold capitalize text-slate-900">{String(pred.primary_damage || "—").replaceAll("_", " ")}</span>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Severity</span>
-                  <span className="mt-0.5 block text-sm font-bold capitalize text-slate-900">{pred.severity || "—"}</span>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Affected area</span>
-                  <span className="mt-0.5 block font-mono text-sm font-extrabold text-slate-900">{pred.affected_area_pct != null ? `${pred.affected_area_pct}%` : "—"}</span>
-                  {typeof pred.affected_area_pct === "number" && (
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200">
-                      <div className="h-full rounded-full bg-emerald-600" style={{ width: `${Math.min(Math.max(pred.affected_area_pct, 0), 100)}%` }} />
-                    </div>
-                  )}
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5">
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Model confidence</span>
-                  <span className="mt-0.5 block font-mono text-sm font-extrabold text-slate-900">{pred.overall_confidence != null ? `${Math.round(pred.overall_confidence * 100)}%` : "—"}</span>
-                  <span className="text-[10px] text-slate-500">Grade {pred.predicted_grade || "U"}</span>
-                </div>
-              </div>
-              <p className="rounded-lg border border-slate-100 bg-slate-50/60 p-2.5 text-[11px] leading-relaxed text-slate-600">
-                {pred.predicted_grade === "U"
-                  ? "Grade U — frames were unusable, so damage % is not a payout basis. Recapture or reject."
-                  : pred.severity === "high" || (pred.affected_area_pct ?? 0) >= 60
-                    ? `High loss signal (${pred.severity || "severe"} · ${pred.affected_area_pct ?? "?"}% area). Cross-check satellite + plot boundary before payout.`
-                    : pred.severity === "low" || (pred.affected_area_pct ?? 100) <= 30
-                      ? `Low loss signal — likely partial damage. A reduced payout or field check may fit better than full acceptance.`
-                      : "Moderate loss signal — review severity % and affected visuals before deciding."}
-              </p>
-            </section>
-          )}
-
           {/* REVIEWER DECISION & ACTION WORKBENCH */}
-          <section className="rounded-xl border-2 border-slate-900 bg-white p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <div>
-                <h3 className="text-sm font-bold tracking-tight text-slate-900">
-                  Reviewer Decision Workbench
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Record official PMFBY loss adjustment decision and trigger payout or recapture
-                </p>
-              </div>
-              <Scale className="h-5 w-5 text-slate-700" />
-            </div>
-
-            {/* Live decision status */}
-            <div aria-live="polite" className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="font-semibold uppercase tracking-wider text-slate-500 text-[11px]">Live status</span>
-              <span className={clsx("rounded-full border px-2 py-0.5 font-bold capitalize", isClosed ? "border-slate-300 bg-slate-100 text-slate-700" : "border-blue-200 bg-blue-50 text-blue-700", busy && "animate-pulse")}>
+          <section className="rounded-xl border-2 border-slate-900 bg-white p-3 shadow-sm space-y-2.5">
+            <div className="flex items-center gap-2">
+              <Scale className="h-4 w-4 text-slate-700" />
+              <h3 className="text-[13px] font-bold tracking-tight text-slate-900">Decision Workbench</h3>
+              <span aria-live="polite" className={clsx("rounded-full border px-2 py-0.5 text-[11px] font-bold capitalize", isClosed ? "border-slate-300 bg-slate-100 text-slate-700" : "border-blue-200 bg-blue-50 text-blue-700", busy && "animate-pulse")}>
                 {busy && pendingAction ? `${pendingAction.replaceAll("_", " ")}…` : liveStatus.replaceAll("_", " ")}
               </span>
               {!canAccept && !isClosed && (
-                <span className="text-[11px] text-amber-700">Accept locked — integrity / grade-U gate. Override gate or recapture first.</span>
+                <span className="text-[11px] text-amber-700">Accept locked — override gate or recapture first.</span>
               )}
             </div>
 
             {/* Quick Action Button Strip */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5">
               <button
                 type="button"
-                className="flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-xs disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1 rounded-md bg-emerald-600 px-2 py-2 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-xs disabled:cursor-not-allowed"
                 disabled={busy || isClosed || !canAccept}
                 onClick={handleAccept}
                 title={canAccept ? "Accept claim assessment based on evidence and model" : "Blocked: integrity failure or unusable grade"}
               >
-                {pendingAction === "accept" ? busyLabel("accept") : (<><CheckCircle2 className="h-4 w-4" /><span>{pred ? "Accept AI result" : "Accept claim"} (A)</span></>)}
+                {pendingAction === "accept" ? busyLabel("accept") : (<><CheckCircle2 className="h-3.5 w-3.5" /><span>Accept (A)</span></>)}
               </button>
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-black disabled:opacity-50 transition-colors shadow-xs disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1 rounded-md bg-slate-900 px-2 py-2 text-[11px] font-bold text-white hover:bg-black disabled:opacity-50 transition-colors shadow-xs disabled:cursor-not-allowed"
                 disabled={busy || isClosed}
                 onClick={handleCorrect}
                 title="Apply reviewer corrections and verify"
               >
-                {pendingAction === "correct" ? busyLabel("correct") : (<><FileCheck className="h-4 w-4" /><span>Correct &amp; Verify (C)</span></>)}
+                {pendingAction === "correct" ? busyLabel("correct") : (<><FileCheck className="h-3.5 w-3.5" /><span>Correct (C)</span></>)}
               </button>
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-amber-400 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1 rounded-md border border-amber-400 bg-amber-50 px-2 py-2 text-[11px] font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
                 disabled={busy}
                 onClick={handleOpenRecapture}
                 title="Request farmer to recapture specific angles"
               >
-                <RotateCcw className="h-4 w-4 text-amber-700" />
-                <span>Request Recapture (R)</span>
+                <RotateCcw className="h-3.5 w-3.5 text-amber-700" />
+                <span>Recapture (R)</span>
               </button>
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
                 disabled={busy || isClosed}
                 onClick={handleInspection}
                 title="Dispatch physical field inspector"
               >
-                {pendingAction === "physical_inspection" ? busyLabel("physical_inspection") : (<><UserCheck className="h-4 w-4 text-slate-600" /><span>Physical Inspection (P)</span></>)}
+                {pendingAction === "physical_inspection" ? busyLabel("physical_inspection") : (<><UserCheck className="h-3.5 w-3.5 text-slate-600" /><span>Inspect (P)</span></>)}
               </button>
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50 transition-colors sm:col-span-2 lg:col-span-1 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-2 text-[11px] font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50 transition-colors col-span-2 sm:col-span-1 disabled:cursor-not-allowed"
                 disabled={busy || isClosed}
                 onClick={handleReject}
                 title="Reject claim with reason"
               >
-                {pendingAction === "reject" ? busyLabel("reject") : (<><XCircle className="h-4 w-4 text-rose-600" /><span>Reject Claim (X)</span></>)}
+                {pendingAction === "reject" ? busyLabel("reject") : (<><XCircle className="h-3.5 w-3.5 text-rose-600" /><span>Reject (X)</span></>)}
               </button>
             </div>
 
-            {/* Calibration & Override Form Fields */}
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3 text-xs">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                Adjustment Parameters (For Correct &amp; Verify)
-              </h4>
+            {/* Calibration & Override Form Fields — collapsed by default */}
+            <details className="rounded-lg border border-slate-200 bg-slate-50/70 text-xs">
+              <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-slate-900">
+                Adjustments + notes (for Correct / Reject)
+              </summary>
+              <div className="space-y-2 border-t border-slate-200 px-3 py-2.5">
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <label className="block font-medium text-slate-700">
                   Loss Severity Override
                   <select
@@ -1222,81 +1046,68 @@ export default function ReviewDetailPage() {
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <label className="block font-medium text-slate-700">
-                  Corrected Crop (Optional)
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <label className="block font-medium text-slate-700 text-[11px]">
+                  Corrected Crop
                   <input
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-slate-800 focus:outline-none"
+                    className="mt-0.5 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 focus:border-slate-800 focus:outline-none"
                     value={crop}
                     onChange={(e) => setCrop(e.target.value)}
                     placeholder={pred?.predicted_crop || "e.g. Wheat"}
                   />
                 </label>
 
-                <label className="block font-medium text-slate-700">
-                  Corrected Growth Stage (Optional)
+                <label className="block font-medium text-slate-700 text-[11px]">
+                  Growth Stage
                   <input
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-slate-800 focus:outline-none"
+                    className="mt-0.5 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 focus:border-slate-800 focus:outline-none"
                     value={growthStage}
                     onChange={(e) => setGrowthStage(e.target.value)}
                     placeholder={pred?.predicted_growth_stage || "e.g. Flowering"}
                   />
                 </label>
+
+                <label className="block font-medium text-slate-700 text-[11px] col-span-2 sm:col-span-1">
+                  Override Reason *
+                  <input
+                    className="mt-0.5 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 focus:border-slate-800 focus:outline-none"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Why override AI…"
+                  />
+                </label>
+
+                <label className="block font-medium text-slate-700 text-[11px] col-span-2 sm:col-span-1">
+                  Reviewer Notes
+                  <input
+                    className="mt-0.5 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 focus:border-slate-800 focus:outline-none"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Audit log comments…"
+                  />
+                </label>
               </div>
-
-              <label className="block font-medium text-slate-700 pt-1">
-                Override Reason (Required when rejecting or altering AI severity)
-                <textarea
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-xs text-slate-800 shadow-2xs focus:border-slate-800 focus:outline-none"
-                  rows={2}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Explain why the AI assessment or damage classification was overridden..."
-                />
-              </label>
-
-              <label className="block font-medium text-slate-700">
-                Official Reviewer Notes (Audit Trail)
-                <textarea
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-xs text-slate-800 shadow-2xs focus:border-slate-800 focus:outline-none"
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Internal comments for PMFBY verification log..."
-                />
-              </label>
-            </div>
+              </div>
+            </details>
           </section>
 
           {/* 4. AUDIT & REVIEW TIMELINE — beautiful timeline */}
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/80 to-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-200/70 bg-white/70 px-4 py-3 backdrop-blur">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white shadow-xs">
-                  <History className="h-4 w-4" />
-                </span>
-                <div>
-                  <h3 className="text-sm font-extrabold tracking-tight text-slate-900">
-                    Case Audit &amp; Decision History
-                  </h3>
-                  <p className="text-[11px] text-slate-500">Immutable PMFBY trail — every decision with actor &amp; time</p>
-                </div>
-              </div>
-              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 font-mono text-[11px] font-bold text-slate-600 shadow-2xs">
-                {historyItems.length} {historyItems.length === 1 ? "record" : "records"}
+          <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+            <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-900 text-white">
+                <History className="h-3.5 w-3.5" />
+              </span>
+              <h3 className="text-[13px] font-extrabold tracking-tight text-slate-900">Audit Trail</h3>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-600">
+                {historyItems.length}
               </span>
             </div>
 
             {historyItems.length === 0 ? (
-              <div className="flex items-center gap-3 px-4 py-6 text-xs text-slate-500">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                  <Clock className="h-4 w-4" />
-                </span>
-                <p>No previous actions recorded for this claim yet — your decision will start the trail.</p>
-              </div>
+              <p className="px-3 py-4 text-xs text-slate-400">No actions yet — your decision starts the trail.</p>
             ) : (
-              <ol className="relative space-y-0 px-4 py-4">
-                <span aria-hidden="true" className="absolute bottom-6 left-[27px] top-6 w-px bg-gradient-to-b from-slate-300 via-slate-200 to-transparent" />
+              <ol className="relative max-h-72 space-y-0 overflow-y-auto px-3 py-3">
+                <span aria-hidden="true" className="absolute bottom-6 left-[23px] top-6 w-px bg-gradient-to-b from-slate-300 via-slate-200 to-transparent" />
                 {historyItems.map((item, idx) => {
                   const act = item.action.toLowerCase();
                   const tone = act.includes("accept") || act.includes("verif") || act.includes("correct")
@@ -1311,31 +1122,29 @@ export default function ReviewDetailPage() {
                   const [dotBg] = tone.split(" ");
                   const initial = (item.actor || "S").trim().charAt(0).toUpperCase() || "S";
                   return (
-                    <li key={item.id} className="relative flex gap-3 pb-4 last:pb-0">
-                      <span className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold text-white shadow-sm ring-4 ${dotBg} ${tone.split(" ")[1]}`}>
-                        {idx === 0 ? <Sparkles className="h-3.5 w-3.5" /> : initial}
+                    <li key={item.id} className="relative flex gap-2 pb-3 last:pb-0">
+                      <span className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold text-white shadow-sm ring-4 ${dotBg} ${tone.split(" ")[1]}`}>
+                        {idx === 0 ? <Sparkles className="h-3 w-3" /> : initial}
                       </span>
-                      <div className="min-w-0 flex-1 rounded-xl border border-slate-200/80 bg-white p-3 shadow-2xs transition-shadow hover:shadow-sm">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${tone.split(" ").slice(2).join(" ")} bg-opacity-10`}>
+                      <div className="min-w-0 flex-1 rounded-lg border border-slate-200/80 bg-white px-2.5 py-2 shadow-2xs">
+                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                          <span className={`rounded-full border px-1.5 py-px text-[9px] font-extrabold uppercase tracking-wide ${tone.split(" ").slice(2).join(" ")} bg-opacity-10`}>
                             {item.action.replaceAll("_", " ")}
                           </span>
                           {item.actor && (
-                            <span className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-500">
-                              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-900 text-[9px] font-bold text-white">{initial}</span>
-                              {item.actor.length > 24 ? `${item.actor.slice(0, 24)}…` : item.actor}
+                            <span className="font-mono text-[10px] text-slate-500" title={item.actor}>
+                              {item.actor.length > 20 ? `${item.actor.slice(0, 20)}…` : item.actor}
                             </span>
                           )}
                           {item.createdAt && (
-                            <time dateTime={item.createdAt} className="ml-auto flex items-center gap-1 text-[10px] text-slate-400">
-                              <Clock className="h-3 w-3" />
+                            <time dateTime={item.createdAt} className="ml-auto text-[10px] text-slate-400">
                               {new Date(item.createdAt).toLocaleString()}
                             </time>
                           )}
                         </div>
                         {item.notes
-                          ? <p className="mt-1.5 border-l-2 border-slate-200 pl-2 text-xs leading-relaxed text-slate-600">{item.notes}</p>
-                          : <p className="mt-1 text-[11px] italic text-slate-400">No notes attached.</p>}
+                          ? <p className="mt-1 border-l-2 border-slate-200 pl-1.5 text-[11px] leading-snug text-slate-600">{item.notes}</p>
+                          : null}
                       </div>
                     </li>
                   );

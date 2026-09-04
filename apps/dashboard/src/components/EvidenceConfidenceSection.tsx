@@ -416,7 +416,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
   const iStatus = getStatusBadge(integrity.score, iDetails.tamper_check_passed === false || iDetails.duplicate_detected === true);
 
   return (
-    <section className="fp-panel space-y-4 p-5 border-l-4 border-l-emerald-600 shadow-sm" aria-labelledby="evidence-confidence-heading">
+    <section className="fp-panel space-y-2.5 p-3 border-l-4 border-l-emerald-600 shadow-sm" aria-labelledby="evidence-confidence-heading">
       {/* Explicit Section Header with Clear Distinction */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
         <div>
@@ -438,7 +438,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
       </div>
 
       {/* Compact Evidence Confidence strip — subpart, not hero */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs">
         <div className="flex items-center gap-2">
           <span className="font-semibold uppercase tracking-wider text-slate-500 text-[11px]">Final evidence confidence</span>
           <span className="font-mono text-lg font-extrabold tabular-nums text-slate-900">{finalScore}<span className="text-xs font-semibold text-slate-400">/100</span></span>
@@ -467,10 +467,10 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
         </span>
       </div>
 
-      <div className="fp-panel p-4">
-        <div className="grid gap-4 sm:grid-cols-12 items-start">
+      <div className="fp-panel p-3">
+        <div className="grid gap-3 sm:grid-cols-12 items-start">
           {/* Uncertainty & Action Summary */}
-          <div className="sm:col-span-12 space-y-3">
+          <div className="sm:col-span-12 space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded border border-slate-200 bg-white p-2.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
