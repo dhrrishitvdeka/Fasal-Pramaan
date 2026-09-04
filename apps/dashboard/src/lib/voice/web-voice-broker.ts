@@ -339,7 +339,7 @@ export class WebVoiceBroker {
       outcome: "succeeded",
       message:
         plots.length === 0
-          ? "No registered plots. The farmer can still file a claim without a stored plot."
+          ? "No registered plots. An agricultural plot must be registered before a claim can be filed."
           : `Found ${this.gateway.plots.length} plots.`,
       data: { count: this.gateway.plots.length, plots },
     };
@@ -665,7 +665,7 @@ export class WebVoiceBroker {
     if (!plot) {
       return {
         outcome: "succeeded",
-        message: "No registered plot found to verify against. You can register a plot or file without one.",
+        message: "No registered plot found to verify against. A plot must be registered first.",
         data: { geofence_status: "no_plot" },
       };
     }
@@ -748,7 +748,47 @@ export class WebVoiceBroker {
   }
 
   private beginCapture(args: Record<string, unknown>): VoiceToolResult {
-    const plotId = String(args.plot_id || "").trim();
+    const plots = this.gateway.plots || [];
+    const isHi = this.gateway.language === "hi";
+
+    // 1. Mandatory plot check: if 0 plots exist, capture cannot begin
+    if (plots.length === 0) {
+      return {
+        outcome: "failed",
+        message: isHi
+          ? "बीमा दावा शुरू करने से पहले आपका भूखंड (खेत) पंजीकृत होना अनिवार्य है। कृपया मुझे अपने खेत का नाम, फसल और खसरा नंबर बताएं ताकि मैं उसे अभी जोड़ सकूँ।"
+          : "Every claim requires a registered plot. You do not have any registered plots yet. Please provide your plot name, crop type, and khasra number so I can register it for you first.",
+      };
+    }
+
+    let plotId = String(args.plot_id || "").trim();
+
+    // 2. Plot selection resolution
+    if (!plotId) {
+      if (plots.length === 1) {
+        plotId = plots[0].id;
+      } else {
+        const plotNames = plots.map((p) => p.nameHi || p.name).join(", ");
+        return {
+          outcome: "failed",
+          message: isHi
+            ? `आपके पास कई पंजीकृत भूखंड हैं (${plotNames})। कृपया बताएं कि किस भूखंड की फसल में नुकसान हुआ है?`
+            : `You have multiple registered plots (${plots.map((p) => p.name).join(", ")}). Which plot suffered the crop damage?`,
+        };
+      }
+    } else {
+      const matched = plots.find(
+        (p) =>
+          p.id.toLowerCase() === plotId.toLowerCase() ||
+          p.id.toLowerCase().startsWith(plotId.toLowerCase()) ||
+          p.name.toLowerCase() === plotId.toLowerCase() ||
+          (p.nameHi && p.nameHi.toLowerCase() === plotId.toLowerCase()),
+      );
+      if (matched) {
+        plotId = matched.id;
+      }
+    }
+
     const intent = webCaptureBridge.getIntent();
     const perilRaw = args.peril != null ? String(args.peril) : intent?.peril;
     const peril = perilRaw ? normalizePeril(perilRaw) : undefined;
@@ -764,7 +804,7 @@ export class WebVoiceBroker {
       outcome: "succeeded",
       message: peril ? `Guided capture is open for ${peril}.` : "Guided capture is open.",
       entityId: plotId || undefined,
-      data: { path, peril: peril || null },
+      data: { path, peril: peril || null, plot_id: plotId },
     };
   }
 

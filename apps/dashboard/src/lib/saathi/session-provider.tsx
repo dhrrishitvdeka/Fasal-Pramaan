@@ -389,6 +389,12 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
       path: snap.pathname,
       language: snap.lang,
       plot_count: snap.plots.length,
+      plots_summary: snap.plots.map((p) => ({
+        id: p.id,
+        name: p.name,
+        crop: p.cropType,
+        khasra: p.khasraNumber,
+      })),
       claim_count: snap.claims.length,
       recapture_count: recapture.length,
       next_reminder: nextReminder
@@ -496,22 +502,23 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
               if (!hasGreetedRef.current) {
                 openingRef.current = true;
                 liveAudioRef.current?.setHoldUplink(true);
+                pushPortalContext("session_start");
                 if (openingTimerRef.current != null) window.clearTimeout(openingTimerRef.current);
                 openingTimerRef.current = window.setTimeout(() => {
                   if (!openingRef.current) return;
                   openingRef.current = false;
                   liveAudioRef.current?.setHoldUplink(false);
-                  pushPortalContext("session_start");
                 }, 12_000);
                 hasGreetedRef.current = true;
+                const isHi = langRef.current === "hi";
                 try {
                   socket.send(
                     JSON.stringify({
                       realtimeInput: {
                         text:
-                          langRef.current === "hi"
-                            ? "किसान अभी जुड़े हैं। संक्षेप में नमस्ते कहें और पूछें कि फसल का क्या नुकसान हुआ।"
-                            : "The farmer just joined. Greet them briefly and ask what happened to their crop.",
+                          isHi
+                            ? "किसान अभी जुड़े हैं। सत्र की सक्रिय भाषा केवल 'हिन्दी' (Hindi) है। किसान को संक्षेप में (1-2 वाक्यों में) नमस्ते कहें और पूछें कि उनकी फसल में क्या नुकसान हुआ है। पूरी बातचीत हिन्दी में ही करें, अंग्रेजी शब्दों (जैसे crop, photo, claim, damage) के कारण कभी अंग्रेजी में न बदलें।"
+                            : "The farmer just joined. Greet them warmly and briefly (1-2 sentences) and ask what happened to their crop. Keep the conversation strictly in this language.",
                       },
                     }),
                   );

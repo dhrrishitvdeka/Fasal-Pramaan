@@ -390,6 +390,49 @@ describe("web Fasal Saathi broker aliases", () => {
     expect(gw.paths[0]).toMatch(/peril=fire_burn/);
     expect(gw.paths[0]).toMatch(/plotId=plot-1/);
   });
+
+  it("blocks begin_guided_capture and requires registering a plot when 0 plots exist", async () => {
+    const gw = gateway({ plots: [], language: "en" });
+    const broker = new WebVoiceBroker(gw);
+    const result = await broker.execute("begin_guided_capture", { peril: "flood" }, 1);
+    expect(result.outcome).toBe("failed");
+    expect(result.message).toMatch(/Every claim requires a registered plot/i);
+    expect(gw.paths.length).toBe(0);
+  });
+
+  it("blocks begin_guided_capture in Hindi when 0 plots exist", async () => {
+    const gw = gateway({ plots: [], language: "hi" });
+    const broker = new WebVoiceBroker(gw);
+    const result = await broker.execute("begin_guided_capture", { peril: "flood" }, 1);
+    expect(result.outcome).toBe("failed");
+    expect(result.message).toMatch(/भूखंड \(खेत\) पंजीकृत होना अनिवार्य है/);
+  });
+
+  it("prompts for plot selection when multiple plots exist and none is specified", async () => {
+    const gw = gateway({
+      language: "en",
+      plots: [
+        { id: "plot-1", name: "North Basin", cropType: "Wheat" },
+        { id: "plot-2", name: "South Field", cropType: "Rice" },
+      ],
+    });
+    const broker = new WebVoiceBroker(gw);
+    const result = await broker.execute("begin_guided_capture", { peril: "flood" }, 1);
+    expect(result.outcome).toBe("failed");
+    expect(result.message).toMatch(/multiple registered plots/i);
+    expect(gw.paths.length).toBe(0);
+  });
+
+  it("auto-selects the single registered plot when only 1 plot exists and none is specified", async () => {
+    const gw = gateway({
+      language: "en",
+      plots: [{ id: "plot-sole", name: "Sole Plot", cropType: "Mustard" }],
+    });
+    const broker = new WebVoiceBroker(gw);
+    const result = await broker.execute("begin_guided_capture", { peril: "hailstorm" }, 1);
+    expect(result.outcome).toBe("succeeded");
+    expect(gw.paths[0]).toMatch(/plotId=plot-sole/);
+  });
 });
 
 describe("web voice tool declarations", () => {

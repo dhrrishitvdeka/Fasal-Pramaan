@@ -68,6 +68,8 @@ function CaptureStudioContent() {
     lang,
     plots,
     claims,
+    farmerProfile,
+    registerPlot,
     createClaim,
     updateClaimRecapture,
     saveClaimDraft,
@@ -117,6 +119,12 @@ function CaptureStudioContent() {
   useEffect(() => {
     if (milestone?.plotId) setSelectedPlotId(milestone.plotId);
   }, [milestone?.plotId]);
+
+  useEffect(() => {
+    if (!selectedPlotId && plots.length > 0) {
+      setSelectedPlotId(plots[0].id);
+    }
+  }, [plots, selectedPlotId]);
 
   // A leftover Saathi intent must not silently hijack a fresh capture (e.g. drought
   // 3-angle route on a later general claim). Only honor it when the URL carries it.
@@ -175,9 +183,19 @@ function CaptureStudioContent() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Temporary Nocturnal / Test Mode Image Upload State
+  // Capture mode: Live Camera vs Field Photo Upload
+  const [captureMode, setCaptureMode] = useState<"camera" | "upload">("camera");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
+
+  // Inline Plot Registration State (when farmer has no registered plots)
+  const [inlinePlotName, setInlinePlotName] = useState<string>("");
+  const [inlineCropType, setInlineCropType] = useState<string>("wheat");
+  const [inlineKhasra, setInlineKhasra] = useState<string>("");
+  const [inlineArea, setInlineArea] = useState<string>("1.0");
+  const [inlineVillage, setInlineVillage] = useState<string>("");
+  const [isRegisteringInlinePlot, setIsRegisteringInlinePlot] = useState<boolean>(false);
+  const [inlinePlotError, setInlinePlotError] = useState<string | null>(null);
 
   // Load existing draft if not in recapture or milestone mode
   useEffect(() => {
@@ -911,6 +929,64 @@ function CaptureStudioContent() {
     }
   };
 
+  const triggerSingleUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.multiple = false;
+      fileInputRef.current.click();
+    }
+  };
+
+  const triggerBatchUpload = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.multiple = true;
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleDroppedFiles = async (fileList: FileList) => {
+    const fakeEvent = {
+      target: { files: fileList },
+    } as unknown as React.ChangeEvent<HTMLInputElement>;
+    await handleFileUpload(fakeEvent);
+  };
+
+  const handleInlinePlotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inlinePlotName.trim() || !inlineKhasra.trim()) {
+      setInlinePlotError(
+        lang === "hi"
+          ? "खेत का नाम और खसरा संख्या दोनों अनिवार्य हैं।"
+          : "Both Plot name and Khasra number are required.",
+      );
+      return;
+    }
+    setIsRegisteringInlinePlot(true);
+    setInlinePlotError(null);
+    try {
+      const res = await registerPlot({
+        name: inlinePlotName.trim(),
+        cropType: inlineCropType,
+        khasraNumber: inlineKhasra.trim(),
+        areaHectares: parseFloat(inlineArea) || 1.0,
+        village: inlineVillage.trim() || farmerProfile?.village || undefined,
+        district: farmerProfile?.district,
+        state: farmerProfile?.state,
+      });
+      if (res?.plotId) {
+        setSelectedPlotId(res.plotId);
+        showToast(
+          lang === "hi"
+            ? "भूखंड सफलतापूर्वक पंजीकृत हुआ! अब आप तस्वीरें ले सकते हैं।"
+            : "Plot registered successfully! You can now proceed to capture photos.",
+        );
+      }
+    } catch (err) {
+      setInlinePlotError(err instanceof Error ? err.message : "Failed to register plot");
+    } finally {
+      setIsRegisteringInlinePlot(false);
+    }
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -953,6 +1029,14 @@ function CaptureStudioContent() {
           : "Some frames are too dark or unusable. Recapture them before submitting.",
       );
       return { ok: false as const, message: "Unusable frames" };
+    }
+    if (!isTargetedRecapture && !selectedPlot) {
+      showToast(
+        lang === "hi"
+          ? "दावा जमा करने से पहले कृपया एक भूखंड पंजीकृत या चयनित करें।"
+          : "Please register or select a plot before submitting a claim.",
+      );
+      return { ok: false as const, message: "No registered plot selected" };
     }
     const result = await runVoiceSubmitDraft({
       allCaptured: isAllCaptured,
@@ -1200,7 +1284,7 @@ function CaptureStudioContent() {
         </div>
       )}
 
-      {/* Hidden File Input for Temporary Crop Photo Upload */}
+      {/* Hidden File Input for Evidence Image Upload */}
       <input
         ref={fileInputRef}
         type="file"
@@ -1210,46 +1294,6 @@ function CaptureStudioContent() {
         aria-hidden="true"
         onChange={handleFileUpload}
       />
-
-      {/* Temporary Nocturnal / Pipeline Test Mode Banner */}
-      <div className="rounded-xl border border-emerald-300 bg-emerald-50/90 p-3 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-600" />
-            </span>
-            <span className="text-xs font-bold text-emerald-950">
-              {lang === "hi"
-                ? "🧪 पाइपलाइन परीक्षण मोड: फसल फोटो अपलोड सक्रिय (अस्थायी)"
-                : "🧪 Pipeline Verification Mode: Crop Photo Upload Active (Temporary)"}
-            </span>
-            <span className="rounded bg-emerald-200/80 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase text-emerald-900">
-              Night Test
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 disabled:opacity-50 transition-colors"
-            >
-              <Upload className="h-3.5 w-3.5" />
-              <span>
-                {isUploading
-                  ? (lang === "hi" ? "अपलोड हो रहा है..." : "Uploading...")
-                  : (lang === "hi" ? "तस्वीरें अपलोड करें" : "Upload Crop Images")}
-              </span>
-            </button>
-          </div>
-        </div>
-        <p className="mt-1.5 text-[11px] text-emerald-900 leading-normal">
-          {lang === "hi"
-            ? "रात्रि परीक्षण के लिए: आप सीधे फसल की 1 या अधिक तस्वीरें चुनकर कोण भर सकते हैं और पूरे जेमिनी AI मॉडल व PMFBY सत्यापन पाइपलाइन की जांच कर सकते हैं।"
-            : "For nocturnal/indoor testing: Select 1 or more crop images to fill required angles and verify the Gemini AI model and PMFBY claim pipeline end-to-end without needing real-time outdoor camera frames."}
-        </p>
-      </div>
 
       {/* Header Banner */}
       <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 sm:flex-row sm:items-center sm:justify-between sm:pb-4">
@@ -1300,24 +1344,29 @@ function CaptureStudioContent() {
         </div>
 
         {!isTargetedRecapture && (
-          <div className="flex w-full min-w-0 items-center gap-2 border border-slate-300 bg-white px-3 py-1.5 sm:w-auto">
-            <Layers className="h-4 w-4 text-emerald-800 shrink-0" />
+          <div className="flex w-full min-w-0 items-center gap-2 border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 sm:w-auto">
+            <Layers className="h-4 w-4 text-[var(--accent)] shrink-0" />
             {plots.length === 0 ? (
-              <span className="text-xs text-slate-600">
-                {lang === "hi" ? "कोई पंजीकृत भूखंड नहीं — बिना भूखंड जमा होगा" : "No registered plots — claim will be unregistered"}
+              <span className="text-xs font-bold text-red-700">
+                {lang === "hi" ? "भूखंड आवश्यक (पंजीकरण आवश्यक)" : "Plot required (Registration required)"}
               </span>
             ) : (
-              <select
-                value={selectedPlotId}
-                onChange={(e) => setSelectedPlotId(e.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-800 focus:outline-none"
-              >
-                {plots.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {lang === "hi" ? p.nameHi || p.name : p.name} ({p.khasraNumber})
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <span className="text-[11px] text-[var(--ink-muted)] font-medium shrink-0">
+                  {lang === "hi" ? "खेत:" : "Plot:"}
+                </span>
+                <select
+                  value={selectedPlotId}
+                  onChange={(e) => setSelectedPlotId(e.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-xs font-bold text-[var(--ink)] focus:outline-none cursor-pointer"
+                >
+                  {plots.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {lang === "hi" ? p.nameHi || p.name : p.name} ({p.khasraNumber} · {p.cropTypeHi || p.cropType})
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
         )}
@@ -1382,207 +1431,457 @@ function CaptureStudioContent() {
         </div>
       </div>
 
-      {/* Main Studio Viewport: Left Live Camera Viewfinder / Right Step Guidance */}
+      {/* Mandatory Plot Registration Guard when farmer has 0 registered plots */}
+      {!isTargetedRecapture && plots.length === 0 ? (
+        <div className="fp-panel p-5 sm:p-7 border-l-4 border-l-[var(--ink)] shadow-xs">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-[var(--line)] bg-[var(--accent-soft)] text-[var(--ink)]">
+              <Layers className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base sm:text-lg font-bold text-[var(--ink)]">
+                {lang === "hi" ? "भूखंड पंजीकरण अनिवार्य है" : "Plot Registration Required"}
+              </h2>
+              <p className="mt-1 text-xs sm:text-sm text-[var(--ink-muted)] leading-relaxed">
+                {lang === "hi"
+                  ? "प्रधानमंत्री फसल बीमा योजना (PMFBY) के तहत फसल नुकसान का दावा केवल पंजीकृत भूखंड (खसरा संख्या) पर ही दर्ज हो सकता है। कृपया पहले अपना प्रभावित भूखंड पंजीकृत करें। पंजीकरण के बाद कैमरा व फ़ोटो स्टूडियो स्वतः खुल जाएगा।"
+                  : "Under PMFBY insurance standards, every crop damage claim must be anchored to a registered land parcel (Khasra). Please register your affected plot below. Once registered, photo capture will immediately unlock."}
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleInlinePlotSubmit} className="mt-5 border-t border-[var(--line)] pt-5 space-y-4">
+            {inlinePlotError && (
+              <div className="text-xs text-red-700 bg-red-50 border border-red-200 p-2.5 font-semibold">
+                {inlinePlotError}
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label className="font-bold text-[var(--ink)] block mb-1">
+                  {lang === "hi" ? "खेत का नाम / पहचान *" : "Plot Name / Identifier *"}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={inlinePlotName}
+                  onChange={(e) => setInlinePlotName(e.target.value)}
+                  placeholder={lang === "hi" ? "जैसे: उत्तर का खेत / Plot 1" : "e.g. North Field / Plot 1"}
+                  className="fp-input"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-[var(--ink)] block mb-1">
+                  {lang === "hi" ? "फसल का प्रकार *" : "Crop Type *"}
+                </label>
+                <select
+                  value={inlineCropType}
+                  onChange={(e) => setInlineCropType(e.target.value)}
+                  className="fp-input"
+                >
+                  <option value="wheat">{lang === "hi" ? "गेहूँ (Wheat)" : "Wheat"}</option>
+                  <option value="paddy">{lang === "hi" ? "धान / चावल (Paddy)" : "Paddy"}</option>
+                  <option value="maize">{lang === "hi" ? "मक्का (Maize)" : "Maize"}</option>
+                  <option value="potato">{lang === "hi" ? "आलू (Potato)" : "Potato"}</option>
+                  <option value="mustard">{lang === "hi" ? "सरसों (Mustard)" : "Mustard"}</option>
+                  <option value="cotton">{lang === "hi" ? "कपास (Cotton)" : "Cotton"}</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-[var(--ink)] block mb-1">
+                  {lang === "hi" ? "खसरा संख्या *" : "Khasra / Survey Number *"}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={inlineKhasra}
+                  onChange={(e) => setInlineKhasra(e.target.value)}
+                  placeholder={lang === "hi" ? "जैसे: 402/1" : "e.g. 402/1"}
+                  className="fp-input"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-[var(--ink)] block mb-1">
+                  {lang === "hi" ? "क्षेत्रफल (हेक्टेयर)" : "Area (Hectares)"}
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={inlineArea}
+                  onChange={(e) => setInlineArea(e.target.value)}
+                  className="fp-input"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="font-bold text-[var(--ink)] block mb-1">
+                  {lang === "hi" ? "गाँव / स्थान" : "Village / Location"}
+                </label>
+                <input
+                  type="text"
+                  value={inlineVillage}
+                  onChange={(e) => setInlineVillage(e.target.value)}
+                  placeholder={farmerProfile?.village || (lang === "hi" ? "गाँव का नाम" : "Village name")}
+                  className="fp-input"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
+              <Link
+                href="/farmer/plots"
+                className="fp-btn-secondary text-xs px-4 py-2"
+              >
+                {lang === "hi" ? "भूखंड सूची देखें" : "View All Plots"}
+              </Link>
+              <button
+                type="submit"
+                disabled={isRegisteringInlinePlot}
+                className="fp-btn-primary text-xs px-5 py-2.5 gap-2"
+              >
+                {isRegisteringInlinePlot ? (
+                  <span>{lang === "hi" ? "पंजीकृत हो रहा है..." : "Registering..."}</span>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4" />
+                    <span>{lang === "hi" ? "भूखंड पंजीकृत करें और दावा शुरू करें" : "Register Plot & Unlock Studio"}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : (
+      /* Main Studio Viewport: Left Live Camera Viewfinder or Upload Workbench / Right Step Guidance */
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left Column (7 cols): Camera Viewfinder & Controls */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="fp-viewfinder relative flex aspect-[4/3] h-[min(52vh,420px)] min-h-[240px] w-full items-center justify-center overflow-hidden border border-[var(--ink)] bg-black sm:aspect-[16/10] sm:h-auto">
-            <video
-              ref={(el) => {
-                videoRef.current = el;
-                if (el) applyVideoPlaybackFlags(el);
+        {/* Left Column (7 cols): Camera Viewfinder / Evidence Upload Workbench & Controls */}
+        <div className="lg:col-span-7 space-y-3">
+          {/* Dual-Mode Selector: Live Camera vs Field Photo Upload */}
+          <div className="flex border border-[var(--line)] bg-[var(--surface)] p-1 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => {
+                setCaptureMode("camera");
+                if (!isCameraActive) void startCamera();
               }}
-              autoPlay
-              playsInline
-              muted
-              className="absolute inset-0 z-0 h-full w-full bg-black object-cover"
-            />
-            {capturedImages[currentAngle.id] &&
-            safeDisplayUrl(capturedImages[currentAngle.id].imageUrl) ? (
-              <img
-                src={safeDisplayUrl(capturedImages[currentAngle.id].imageUrl)}
-                alt={currentAngle.name}
-                className="absolute inset-0 z-[2] h-full w-full object-cover"
-              />
-            ) : null}
-            {!isCameraActive && !capturedImages[currentAngle.id] ? (
-              <div className="absolute inset-0 z-[3] flex flex-col items-center justify-center p-6 text-center text-slate-400">
-                <Camera className="mx-auto mb-2 h-12 w-12 opacity-40" />
-                <p className="text-sm font-medium">
-                  {cameraError || (lang === "hi" ? "कैमरा शुरू हो रहा है…" : "Starting camera…")}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-emerald-700 px-3.5 py-2 text-xs font-bold text-white shadow-md hover:bg-emerald-800 disabled:opacity-50 transition-colors"
-                  >
-                    <Upload className="h-3.5 w-3.5" />
-                    <span>
-                      {lang === "hi"
-                        ? `इस कोण के लिए फोटो अपलोड करें (${getLocalizedAngleInfo(currentAngle.id, lang).shortName})`
-                        : `Upload Photo for ${getLocalizedAngleInfo(currentAngle.id, lang).shortName}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 transition-all ${
+                captureMode === "camera"
+                  ? "bg-[var(--ink)] text-[var(--surface)] font-bold shadow-xs"
+                  : "text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-[var(--accent-soft)]"
+              }`}
+            >
+              <Camera className="h-3.5 w-3.5 shrink-0" />
+              <span>{lang === "hi" ? "सीधा कैमरा (Live Camera)" : "Live Camera"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCaptureMode("upload");
+                stopCamera();
+              }}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 transition-all ${
+                captureMode === "upload"
+                  ? "bg-[var(--ink)] text-[var(--surface)] font-bold shadow-xs"
+                  : "text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-[var(--accent-soft)]"
+              }`}
+            >
+              <Upload className="h-3.5 w-3.5 shrink-0" />
+              <span>{lang === "hi" ? "खेत फ़ोटो अपलोड (Upload Photos)" : "Upload Field Photos"}</span>
+            </button>
+          </div>
+
+          {captureMode === "upload" ? (
+            /* Upload Mode Workbench */
+            <div className="fp-panel p-4 sm:p-5 flex flex-col justify-between min-h-[380px]">
+              <div>
+                {/* Angle Header in Workbench */}
+                <div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
+                  <div>
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--ink-muted)]">
+                      {lang === "hi" ? "सक्रिय कोण" : "Active Angle"} · {currentAngleIndex + 1}/{activeAngleDefs.length}
                     </span>
-                  </button>
-                  {cameraError ? (
+                    <h3 className="text-sm sm:text-base font-bold text-[var(--ink)]">
+                      {getLocalizedAngleInfo(currentAngle.id, lang).name}
+                    </h3>
+                  </div>
+                  {capturedImages[currentAngle.id] ? (
+                    <span className="inline-flex items-center gap-1 border border-[var(--ink)] bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--ink)]">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-800" />
+                      {lang === "hi" ? "अपलोड सत्यापित" : "Uploaded"}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 border border-[var(--line)] bg-[var(--surface)] px-2 py-0.5 text-[11px] font-medium text-[var(--ink-muted)]">
+                      {lang === "hi" ? "प्रतीक्षारत" : "Pending"}
+                    </span>
+                  )}
+                </div>
+
+                {/* Upload or Preview Box */}
+                {capturedImages[currentAngle.id] ? (
+                  <div className="mt-4 space-y-3">
+                    <div className="relative aspect-[16/10] w-full overflow-hidden border border-[var(--line)] bg-slate-900">
+                      <img
+                        src={safeDisplayUrl(capturedImages[currentAngle.id].imageUrl)}
+                        alt={currentAngle.name}
+                        className="h-full w-full object-cover"
+                      />
+                      <div className="absolute bottom-0 inset-x-0 bg-black/80 p-2 text-white text-[11px] font-mono flex items-center justify-between">
+                        <span className="truncate max-w-[200px] sm:max-w-[300px]">
+                          SHA-256: {capturedImages[currentAngle.id].sha256?.slice(0, 16)}...
+                        </span>
+                        <span>
+                          {capturedImages[currentAngle.id].dimensions?.width} × {capturedImages[currentAngle.id].dimensions?.height}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Metadata & Quality Chips */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                      <div className="border border-[var(--line)] bg-[var(--surface)] p-2">
+                        <span className="text-[10px] text-[var(--ink-muted)] block">{lang === "hi" ? "प्रकाश स्तर" : "Lighting"}</span>
+                        <span className="font-bold text-[var(--ink)] font-mono">
+                          {capturedImages[currentAngle.id].lightingScore != null ? `${capturedImages[currentAngle.id].lightingScore}%` : "Good"}
+                        </span>
+                      </div>
+                      <div className="border border-[var(--line)] bg-[var(--surface)] p-2">
+                        <span className="text-[10px] text-[var(--ink-muted)] block">{lang === "hi" ? "फसल गुणवत्ता" : "Foliage Quality"}</span>
+                        <span className="font-bold text-[var(--ink)] font-mono">
+                          {capturedImages[currentAngle.id].cropScore != null ? `${capturedImages[currentAngle.id].cropScore}%` : "Verified"}
+                        </span>
+                      </div>
+                      <div className="col-span-2 sm:col-span-1 border border-[var(--line)] bg-[var(--surface)] p-2">
+                        <span className="text-[10px] text-[var(--ink-muted)] block">{lang === "hi" ? "स्थान स्थिति" : "Geolocation"}</span>
+                        <span className="font-bold text-[var(--ink)] truncate block">
+                          {capturedImages[currentAngle.id].lat != null ? `${capturedImages[currentAngle.id].lat?.toFixed(4)}, ${capturedImages[currentAngle.id].lon?.toFixed(4)}` : "Plot Linked"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => triggerSingleUpload()}
+                        disabled={isUploading}
+                        className="fp-btn-secondary text-xs py-1.5 flex-1 gap-1.5"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        <span>{lang === "hi" ? "फोटो बदलें" : "Replace Photo"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteCapturedAngle(currentAngle.id)}
+                        className="fp-btn-danger text-xs py-1.5 px-3"
+                      >
+                        {lang === "hi" ? "हटाएँ" : "Clear"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => triggerSingleUpload()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (e.dataTransfer.files?.length) {
+                        void handleDroppedFiles(e.dataTransfer.files);
+                      }
+                    }}
+                    className="mt-4 flex flex-col items-center justify-center border-2 border-dashed border-[var(--line)] bg-[var(--canvas)]/40 p-8 text-center cursor-pointer hover:border-[var(--ink)] transition-colors"
+                  >
+                    <div className="flex h-12 w-12 items-center justify-center border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] mb-3">
+                      <Upload className="h-6 w-6" />
+                    </div>
+                    <p className="text-sm font-bold text-[var(--ink)]">
+                      {lang === "hi" ? "इस कोण के लिए फोटो चुनें" : `Select photo for ${getLocalizedAngleInfo(currentAngle.id, lang).shortName}`}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--ink-muted)] max-w-xs">
+                      {lang === "hi"
+                        ? "डिवाइस से फोटो चुनें या यहाँ खींचकर छोड़ें (JPG, PNG, WebP)"
+                        : "Click to browse or drag and drop image file (JPG, PNG, WebP)"}
+                    </p>
                     <button
                       type="button"
-                      onClick={() => void startCamera()}
-                      className="fp-btn-primary gap-2 text-xs"
+                      disabled={isUploading}
+                      className="fp-btn-primary mt-4 text-xs px-4 py-2 gap-1.5"
                     >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      <span>{lang === "hi" ? "कैमरा पुनः शुरू करें" : "Retry Camera"}</span>
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>
+                        {isUploading
+                          ? (lang === "hi" ? "अपलोड हो रहा है..." : "Processing...")
+                          : (lang === "hi" ? "फ़ोटो फ़ाइल चुनें" : "Choose File")}
+                      </span>
                     </button>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Overlaid Canonical Framing Guidelines (3x3 grid) */}
-            <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-60">
-              <div className="border-r border-b border-white/20" />
-              <div className="border-r border-b border-white/20" />
-              <div className="border-b border-white/20" />
-              <div className="border-r border-b border-white/20" />
-              <div className="border-r border-b border-white/20 flex items-center justify-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/40">
-                  <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
-                </div>
-              </div>
-              <div className="border-b border-white/20" />
-              <div className="border-r border-b border-white/20" />
-              <div className="border-r border-b border-white/20" />
-              <div />
-            </div>
-
-            {/* Seamless Realtime CV Reticle & Bounding Box */}
-            {cvResult?.bbox && isCameraActive && !capturedImages[currentAngle.id] && (
-              <div
-                className={clsx(
-                  "pointer-events-none absolute transition-all duration-200 ease-out",
-                  cvResult.hintCode === "ok"
-                    ? "border-emerald-400/90 bg-emerald-500/10 shadow-[0_0_20px_rgba(52,211,153,0.25)]"
-                    : cvResult.hintCode === "hold_steady" || cvResult.hintCode === "too_close" || cvResult.hintCode === "too_far"
-                    ? "border-amber-400/90 bg-amber-500/10 shadow-[0_0_15px_rgba(251,191,36,0.2)]"
-                    : "border-white/30 bg-black/10"
+                  </div>
                 )}
-                style={{
-                  left: `${cvResult.bbox.x * 100}%`,
-                  top: `${cvResult.bbox.y * 100}%`,
-                  width: `${cvResult.bbox.w * 100}%`,
-                  height: `${cvResult.bbox.h * 100}%`,
-                  borderWidth: "1.5px",
-                  borderRadius: "8px",
-                }}
-              >
-                {/* Corner bracket accents */}
-                <div className="absolute -top-1 -left-1 h-3 w-3 border-t-2 border-l-2 border-inherit rounded-tl-sm" />
-                <div className="absolute -top-1 -right-1 h-3 w-3 border-t-2 border-r-2 border-inherit rounded-tr-sm" />
-                <div className="absolute -bottom-1 -left-1 h-3 w-3 border-b-2 border-l-2 border-inherit rounded-bl-sm" />
-                <div className="absolute -bottom-1 -right-1 h-3 w-3 border-b-2 border-r-2 border-inherit rounded-br-sm" />
               </div>
-            )}
 
-            {/* Seamless Viewfinder Floating Glass HUD */}
-            {isCameraActive && !capturedImages[currentAngle.id] && (
-              <div className="pointer-events-none absolute bottom-3 left-2 right-2 flex flex-col items-center gap-1.5 sm:bottom-4 sm:left-4 sm:right-4">
-                <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-white/20 bg-black/75 px-3.5 py-1.5 text-xs text-white shadow-lg backdrop-blur-md">
-                  {/* Status Indicator Dot */}
-                  <span
-                    className={clsx(
-                      "h-2 w-2 rounded-full shrink-0",
-                      cvResult?.isPersonDetected || cvResult?.isScreenDetected
-                        ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,1)] animate-ping"
-                        : (cvResult?.cropScore ?? 0) >= 75
-                        ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"
-                        : cvResult?.hintCode === "too_dark"
-                        ? "bg-rose-500"
-                        : "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
-                    )}
-                  />
-
-                  {/* Anti-Screen / Person Alert or Localized Guidance Text */}
-                  <span className="font-semibold tracking-wide truncate">
-                    {cvResult?.isPersonDetected
-                      ? (lang === "hi" ? "व्यक्ति या चेहरा पहचाना गया — खेत की फसल दिखाएँ" : "Person in Frame — aim camera at field crops")
-                      : cvResult?.isScreenDetected
-                      ? (lang === "hi" ? "स्क्रीन / डिस्प्ले पहचानी गई — असली फसल दिखाएँ" : "Screen Detected — aim at real outdoor crop")
-                      : cvResult
-                      ? lang === "hi"
-                        ? cvResult.hintHi
-                        : cvResult.hintEn
-                      : lang === "hi"
-                      ? "कैमरा सक्रिय — फसल पर केंद्रित करें"
-                      : "Camera active — focus on crop"}
-                  </span>
-
-                  {/* Multi-spectral phenology tag */}
-                  {cvResult?.phenologyType && cvResult.phenologyType !== "none" && !cvResult.isPersonDetected && (
-                    <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold text-white/90">
-                      {cvResult.phenologyType === "mature_golden"
-                        ? "🌾 Ripe Golden"
-                        : cvResult.phenologyType === "bloom_yellow"
-                        ? "🌼 Yellow Bloom"
-                        : cvResult.phenologyType === "scorch"
-                        ? "🍂 Scorch"
-                        : cvResult.phenologyType === "charred"
-                        ? "🔥 Charred"
-                        : "🌿 Vegetative"}
+              {/* Multi-angle batch upload card at bottom of workbench */}
+              <div className="mt-5 border-t border-[var(--line)] pt-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div className="text-xs">
+                    <span className="font-bold text-[var(--ink)] block">
+                      {lang === "hi" ? "त्वरित बैच अपलोड" : "Batch Multi-Angle Upload"}
                     </span>
-                  )}
-
-                  {cvModelStatus === "ready" && (
-                    <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold text-white/90">
-                      {lang === "hi" ? "लाइव CV" : "Live CV"}
+                    <span className="text-[11px] text-[var(--ink-muted)]">
+                      {lang === "hi"
+                        ? "गैलरी से सभी 5 कोणों की तस्वीरें एक साथ चुनें"
+                        : "Select all 5 field angle photos from your device at once"}
                     </span>
-                  )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => triggerBatchUpload()}
+                    disabled={isUploading}
+                    className="fp-btn-secondary text-xs px-3 py-1.5 gap-1.5 shrink-0"
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>{lang === "hi" ? "सभी 5 फ़ोटो चुनें" : "Select 5 Photos"}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Live Camera Viewfinder */
+            <div className="fp-viewfinder relative flex aspect-[4/3] h-[min(52vh,420px)] min-h-[240px] w-full items-center justify-center overflow-hidden border border-[var(--ink)] bg-black sm:aspect-[16/10] sm:h-auto">
+              <video
+                ref={(el) => {
+                  videoRef.current = el;
+                  if (el) applyVideoPlaybackFlags(el);
+                }}
+                autoPlay
+                playsInline
+                muted
+                className="absolute inset-0 z-0 h-full w-full bg-black object-cover"
+              />
+              {capturedImages[currentAngle.id] &&
+              safeDisplayUrl(capturedImages[currentAngle.id].imageUrl) ? (
+                <img
+                  src={safeDisplayUrl(capturedImages[currentAngle.id].imageUrl)}
+                  alt={currentAngle.name}
+                  className="absolute inset-0 z-[2] h-full w-full object-cover"
+                />
+              ) : null}
+              {!isCameraActive && !capturedImages[currentAngle.id] ? (
+                <div className="absolute inset-0 z-[3] flex flex-col items-center justify-center p-6 text-center text-slate-400">
+                  <Camera className="mx-auto mb-2 h-12 w-12 opacity-40" />
+                  <p className="text-sm font-medium">
+                    {cameraError || (lang === "hi" ? "कैमरा शुरू हो रहा है…" : "Starting camera…")}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCaptureMode("upload");
+                        stopCamera();
+                      }}
+                      className="fp-btn-primary gap-1.5 text-xs"
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>
+                        {lang === "hi"
+                          ? "फ़ोटो अपलोड मोड पर जाएँ"
+                          : "Switch to Upload Mode"}
+                      </span>
+                    </button>
+                    {cameraError ? (
+                      <button
+                        type="button"
+                        onClick={() => void startCamera()}
+                        className="fp-btn-secondary gap-1.5 text-xs"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        <span>{lang === "hi" ? "कैमरा पुनः शुरू करें" : "Retry Camera"}</span>
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
-                  {/* Crop Score & 75%+ Requirement Badge */}
-                  {cvResult && cvResult.cropScore > 0 && !cvResult.isPersonDetected && (
+              {/* Overlaid Canonical Framing Guidelines (3x3 grid) */}
+              <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-60">
+                <div className="border-r border-b border-white/20" />
+                <div className="border-r border-b border-white/20" />
+                <div className="border-b border-white/20" />
+                <div className="border-r border-b border-white/20" />
+                <div className="border-r border-b border-white/20 flex items-center justify-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/40">
+                    <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+                  </div>
+                </div>
+                <div className="border-b border-white/20" />
+                <div className="border-r border-b border-white/20" />
+                <div className="border-r border-b border-white/20" />
+                <div />
+              </div>
+
+              {/* Seamless Realtime CV Reticle & Bounding Box */}
+              {cvResult?.bbox && isCameraActive && !capturedImages[currentAngle.id] && (
+                <div
+                  className={clsx(
+                    "pointer-events-none absolute transition-all duration-200 ease-out",
+                    cvResult.hintCode === "ok"
+                      ? "border-emerald-400/90 bg-emerald-500/10 shadow-[0_0_20px_rgba(52,211,153,0.25)]"
+                      : cvResult.hintCode === "hold_steady" || cvResult.hintCode === "too_close" || cvResult.hintCode === "too_far"
+                      ? "border-amber-400/90 bg-amber-500/10 shadow-[0_0_15px_rgba(251,191,36,0.2)]"
+                      : "border-white/30 bg-black/10"
+                  )}
+                  style={{
+                    left: `${cvResult.bbox.x * 100}%`,
+                    top: `${cvResult.bbox.y * 100}%`,
+                    width: `${cvResult.bbox.w * 100}%`,
+                    height: `${cvResult.bbox.h * 100}%`,
+                    borderWidth: "1.5px",
+                    borderRadius: "8px",
+                  }}
+                >
+                  {/* Corner bracket accents */}
+                  <div className="absolute -top-1 -left-1 h-3 w-3 border-t-2 border-l-2 border-inherit rounded-tl-sm" />
+                  <div className="absolute -top-1 -right-1 h-3 w-3 border-t-2 border-r-2 border-inherit rounded-tr-sm" />
+                  <div className="absolute -bottom-1 -left-1 h-3 w-3 border-b-2 border-l-2 border-inherit rounded-bl-sm" />
+                  <div className="absolute -bottom-1 -right-1 h-3 w-3 border-b-2 border-r-2 border-inherit rounded-br-sm" />
+                </div>
+              )}
+
+              {/* Seamless Viewfinder Floating Glass HUD */}
+              {isCameraActive && !capturedImages[currentAngle.id] && (
+                <div className="pointer-events-none absolute bottom-3 left-2 right-2 flex flex-col items-center gap-1.5 sm:bottom-4 sm:left-4 sm:right-4">
+                  <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-white/20 bg-black/75 px-3.5 py-1.5 text-xs text-white shadow-lg backdrop-blur-md">
+                    {/* Status Indicator Dot */}
                     <span
                       className={clsx(
-                        "rounded px-1.5 py-0.5 font-mono text-[10px] font-bold",
-                        cvResult.isScreenDetected
-                          ? "bg-rose-600 text-white"
-                          : cvResult.cropScore >= 75
-                          ? "bg-emerald-500/80 text-white shadow-xs"
-                          : "bg-amber-500/80 text-white"
+                        "h-2 w-2 rounded-full shrink-0",
+                        cvResult?.isPersonDetected || cvResult?.isScreenDetected
+                          ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,1)] animate-ping"
+                          : (cvResult?.cropScore ?? 0) >= 75
+                          ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"
+                          : cvResult?.hintCode === "too_dark"
+                          ? "bg-rose-500"
+                          : "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
                       )}
-                    >
-                      {cvResult.cropScore}% {cvResult.cropScore >= 75 ? "✓" : "/ 75%"}
+                    />
+
+                    {/* Anti-Screen / Person Alert or Localized Guidance Text */}
+                    <span className="font-semibold tracking-wide truncate">
+                      {cvResult?.isPersonDetected
+                        ? (lang === "hi" ? "व्यक्ति का चेहरा / शरीर दिखा — केवल असली फसल दिखाएँ" : "Person detected — Aim camera at field crop")
+                        : cvResult?.isScreenDetected
+                        ? (lang === "hi" ? "स्क्रीन / फोटो का फोटो अमान्य — खेत में असली फसल दिखाएँ" : "Screen replay detected — Point at real field")
+                        : (lang === "hi" ? cvResult?.hintHi : cvResult?.hintEn) ||
+                          (cvModelStatus === "ready"
+                            ? (lang === "hi" ? "फसल पर स्थिर रखें" : "Align camera with crop")
+                            : (lang === "hi" ? "कैमरा स्थिर रखें" : "Hold steady"))}
                     </span>
-                  )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Top Overlay: Active Angle Badge & GPS Meter — stack on narrow phones */}
-            <div className="pointer-events-none absolute left-2 right-2 top-2 flex flex-wrap items-start justify-between gap-1 sm:left-3 sm:right-3 sm:top-3 max-[400px]:flex-col">
-              <span className="flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-white/20 bg-black/75 px-2 py-1 text-[11px] font-bold text-white sm:text-xs">
-                {getAngleIcon(currentAngle.illustrationIcon)}
-                <span className="truncate">{getLocalizedAngleInfo(currentAngle.id, lang).name}</span>
-              </span>
-
-              {/* GPS accuracy badge */}
-              <span className="flex max-w-full shrink-0 items-center gap-1.5 self-end rounded-md border border-white/20 bg-black/75 px-2 py-1 font-mono text-[10px] text-white sm:self-auto sm:text-[11px]">
-                <Compass className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">
-                  {gpsCoords.status === "unavailable" || gpsCoords.lat == null
-                    ? "GPS unavailable"
-                    : `±${gpsCoords.accuracyM}m`}
-                </span>
-              </span>
-            </div>
-
-            {/* If current angle is already captured, show overlay banner */}
-            {capturedImages[currentAngle.id] && (
-              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between border border-white/20 bg-black/80 p-2.5 text-xs text-white">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span className="font-semibold">{t.angleCaptured}</span>
-                </div>
-                <div className="flex items-center gap-2 pointer-events-auto">
+              {/* Retake preview overlay */}
+              {capturedImages[currentAngle.id] && (
+                <div className="absolute top-3 right-3 z-[4] flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => deleteCapturedAngle(currentAngle.id)}
@@ -1592,117 +1891,196 @@ function CaptureStudioContent() {
                     <span>{t.retakePhoto}</span>
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Primary Viewport Action Buttons — thumb-zone sticky bar on phone,
               back to normal flow inside the lg+ two-column studio */}
-          <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 -mx-3 border-t border-slate-200 bg-white/90 px-3 py-2 shadow-[0_-4px_12px_rgba(28,25,21,0.08)] backdrop-blur-md sm:-mx-4 sm:px-4 md:bottom-0 md:-mx-6 md:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:shadow-none lg:backdrop-blur-none">
+          <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 -mx-3 border-t border-[var(--line)] bg-[var(--surface)] px-3 py-2 shadow-[0_-4px_12px_rgba(28,25,21,0.08)] sm:-mx-4 sm:px-4 md:bottom-0 md:-mx-6 md:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:shadow-none">
             <div className="space-y-2">
-              <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-                {/* Flip camera */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCameraFacing((prev) => (prev === "environment" ? "user" : "environment"))
-                  }
-                  aria-label={t.switchCamera}
-                  className="inline-flex min-h-11 items-center gap-1.5 border border-slate-300 bg-white px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:px-3"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{t.switchCamera}</span>
-                </button>
-
-                {/* Main Shutter / Capture Button with 75%+ Crop Lock */}
-                {(() => {
-                  const isDryOrCharred = requestedPeril === "fire_burn" || requestedPeril === "drought";
-                  const isLocked =
-                    isCameraActive &&
-                    !capturedImages[currentAngle.id] &&
-                    ((cvResult == null && !isDryOrCharred) ||
-                      cvResult?.isPersonDetected === true ||
-                      cvResult?.isScreenDetected === true ||
-                      (cvResult != null && cvResult.cropScore < 75 && !isDryOrCharred) ||
-                      (cvResult?.shouldBlockShutter === true && !isDryOrCharred));
-
-                  if (isLocked) {
-                    return (
-                      <button
-                        type="button"
-                        onClick={capturePhotoFromCamera}
-                        aria-label="Capture locked (Need 75%+ crop match)"
-                        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-stone-300 bg-stone-200 px-3 py-3 text-xs font-bold text-stone-600 shadow-inner sm:text-sm cursor-not-allowed opacity-90 transition-all"
-                      >
-                        <Lock className="h-4 w-4 text-stone-600 shrink-0" />
-                        <span>
-                          {cvResult?.isPersonDetected
-                            ? (lang === "hi" ? "व्यक्ति / चेहरा लॉक (फसल दिखाएँ)" : "Person in Frame (Aim at real crop)")
-                            : cvResult?.isScreenDetected
-                            ? (lang === "hi" ? "स्क्रीन लॉक (असली फसल दिखाएँ)" : "Screen Blocked (Aim at real crop)")
-                            : cvResult == null
-                            ? (lang === "hi" ? "गुणवत्ता जाँच चल रही है…" : "Quality check running…")
-                            : (lang === "hi"
-                              ? `कैमरा लॉक (${cvResult?.cropScore ?? 0}% / 75% आवश्यक)`
-                              : `Locked (${cvResult?.cropScore ?? 0}% / 75% Crop Needed)`)}
-                        </span>
-                      </button>
-                    );
-                  }
-
-                  return (
+              {captureMode === "camera" ? (
+                <>
+                  <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+                    {/* Flip camera */}
                     <button
                       type="button"
-                      onClick={capturePhotoFromCamera}
-                      className={clsx(
-                        "fp-btn-primary w-full gap-2 px-3 py-3 sm:px-6 transition-all",
-                        cvResult?.hintCode === "ok" &&
-                          "ring-2 ring-emerald-500 ring-offset-2 ring-offset-[var(--surface)] shadow-[0_0_15px_rgba(16,185,129,0.35)]"
-                      )}
+                      onClick={() =>
+                        setCameraFacing((prev) => (prev === "environment" ? "user" : "environment"))
+                      }
+                      aria-label={t.switchCamera}
+                      className="inline-flex min-h-11 items-center gap-1.5 border border-[var(--line)] bg-[var(--surface)] px-2.5 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--accent-soft)] sm:px-3"
                     >
-                      <Camera className="h-5 w-5" />
-                      <span>{t.takePhoto}</span>
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">{t.switchCamera}</span>
                     </button>
-                  );
-                })()}
 
-                {/* Temporary Nocturnal Image Upload Button */}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  aria-label="Upload crop image"
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-emerald-700 bg-emerald-700 px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 disabled:opacity-50 transition-colors"
-                >
-                  <Upload className="h-4 w-4 shrink-0" />
-                  <span className="hidden sm:inline">
-                    {isUploading
-                      ? (lang === "hi" ? "अपलोड..." : "Uploading...")
-                      : (lang === "hi" ? "फोटो अपलोड" : "Upload Photo")}
-                  </span>
-                </button>
-              </div>
+                    {/* Main Shutter / Capture Button with 75%+ Crop Lock */}
+                    {(() => {
+                      const isDryOrCharred = requestedPeril === "fire_burn" || requestedPeril === "drought";
+                      const isLocked =
+                        isCameraActive &&
+                        !capturedImages[currentAngle.id] &&
+                        ((cvResult == null && !isDryOrCharred) ||
+                          cvResult?.isPersonDetected === true ||
+                          cvResult?.isScreenDetected === true ||
+                          (cvResult != null && cvResult.cropScore < 75 && !isDryOrCharred) ||
+                          (cvResult?.shouldBlockShutter === true && !isDryOrCharred));
 
-              {/* Realtime Live Camera Notice & Nocturnal Upload Hint */}
-              <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] text-slate-500">
-                <div className="inline-flex items-center gap-1">
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                  <span>{lang === "hi" ? "लाइव कैमरा एवं जीपीएस" : "Live Geotagged Camera"}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900 font-semibold transition-colors"
-                >
-                  <Upload className="h-3 w-3" />
-                  <span>
-                    {lang === "hi"
-                      ? "फसल फोटो सीधे अपलोड करें (रात्रि परीक्षण)"
-                      : "Upload crop photo directly (Night testing)"}
-                  </span>
-                </button>
-              </div>
+                      if (isLocked) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={capturePhotoFromCamera}
+                            aria-label="Capture locked (Need 75%+ crop match)"
+                            className="flex min-h-11 w-full items-center justify-center gap-2 border border-stone-300 bg-stone-200 px-3 py-3 text-xs font-bold text-stone-600 shadow-inner sm:text-sm cursor-not-allowed opacity-90 transition-all"
+                          >
+                            <Lock className="h-4 w-4 text-stone-600 shrink-0" />
+                            <span>
+                              {cvResult?.isPersonDetected
+                                ? (lang === "hi" ? "व्यक्ति / चेहरा लॉक (फसल दिखाएँ)" : "Person in Frame (Aim at real crop)")
+                                : cvResult?.isScreenDetected
+                                ? (lang === "hi" ? "स्क्रीन लॉक (असली फसल दिखाएँ)" : "Screen Blocked (Aim at real crop)")
+                                : cvResult == null
+                                ? (lang === "hi" ? "गुणवत्ता जाँच चल रही है…" : "Quality check running…")
+                                : (lang === "hi"
+                                  ? `कैमरा लॉक (${cvResult?.cropScore ?? 0}% / 75% आवश्यक)`
+                                  : `Locked (${cvResult?.cropScore ?? 0}% / 75% Crop Needed)`)}
+                            </span>
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <button
+                          type="button"
+                          onClick={capturePhotoFromCamera}
+                          className={clsx(
+                            "fp-btn-primary w-full gap-2 px-3 py-3 sm:px-6 transition-all",
+                            cvResult?.hintCode === "ok" &&
+                              "ring-2 ring-emerald-500 ring-offset-2 ring-offset-[var(--surface)] shadow-[0_0_15px_rgba(16,185,129,0.35)]"
+                          )}
+                        >
+                          <Camera className="h-5 w-5" />
+                          <span>{t.takePhoto}</span>
+                        </button>
+                      );
+                    })()}
+
+                    {/* Switch to Upload Mode Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCaptureMode("upload");
+                        stopCamera();
+                      }}
+                      aria-label="Switch to upload mode"
+                      className="inline-flex min-h-11 items-center gap-1.5 border border-[var(--line)] bg-[var(--surface)] px-2.5 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--accent-soft)] sm:px-3"
+                      title={lang === "hi" ? "फ़ोटो अपलोड मोड" : "Upload Mode"}
+                    >
+                      <Upload className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">{lang === "hi" ? "अपलोड" : "Upload"}</span>
+                    </button>
+                  </div>
+
+                  {/* Realtime Live Camera Notice & Switcher Link */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] text-[var(--ink-muted)]">
+                    <div className="inline-flex items-center gap-1">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-800" />
+                      <span>{lang === "hi" ? "सीधा कैमरा एवं जीपीएस" : "Live Geotagged Camera"}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCaptureMode("upload");
+                        stopCamera();
+                      }}
+                      className="underline hover:text-[var(--ink)] font-medium"
+                    >
+                      {lang === "hi"
+                        ? "या गैलरी से फ़ोटो अपलोड करें →"
+                        : "Or upload photos from device →"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (currentAngleIndex > 0) setCurrentAngleIndex(currentAngleIndex - 1);
+                      }}
+                      disabled={currentAngleIndex === 0}
+                      className="fp-btn-secondary min-h-11 px-3 text-xs gap-1 disabled:opacity-30"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      <span className="hidden sm:inline">{lang === "hi" ? "पिछला कोण" : "Previous Angle"}</span>
+                    </button>
+
+                    {capturedImages[currentAngle.id] ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (currentAngleIndex < activeAngleDefs.length - 1) {
+                            setCurrentAngleIndex(currentAngleIndex + 1);
+                          }
+                        }}
+                        disabled={currentAngleIndex === activeAngleDefs.length - 1}
+                        className="fp-btn-primary min-h-11 flex-1 px-4 text-xs gap-1.5 disabled:opacity-40"
+                      >
+                        <span>{lang === "hi" ? "अगला कोण ➔" : "Next Angle ➔"}</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => triggerSingleUpload()}
+                        disabled={isUploading}
+                        className="fp-btn-primary min-h-11 flex-1 px-4 text-xs gap-2"
+                      >
+                        <Upload className="h-4 w-4" />
+                        <span>
+                          {isUploading
+                            ? (lang === "hi" ? "अपलोड हो रहा है..." : "Processing...")
+                            : (lang === "hi" ? `इस कोण (${getLocalizedAngleInfo(currentAngle.id, lang).shortName}) के लिए फ़ोटो चुनें` : `Choose Photo for ${getLocalizedAngleInfo(currentAngle.id, lang).shortName}`)}
+                        </span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (currentAngleIndex < activeAngleDefs.length - 1) {
+                          setCurrentAngleIndex(currentAngleIndex + 1);
+                        }
+                      }}
+                      disabled={currentAngleIndex === activeAngleDefs.length - 1}
+                      className="fp-btn-secondary min-h-11 px-3 text-xs gap-1 disabled:opacity-30"
+                    >
+                      <span className="hidden sm:inline">{lang === "hi" ? "अगला कोण" : "Next Angle"}</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* Upload mode hint link */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] text-[var(--ink-muted)]">
+                    <div className="inline-flex items-center gap-1">
+                      <Upload className="h-3.5 w-3.5 text-[var(--ink)]" />
+                      <span>{lang === "hi" ? "खेत फ़ोटो अपलोड मोड" : "Field Photo Upload Mode"}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCaptureMode("camera");
+                        if (!isCameraActive) void startCamera();
+                      }}
+                      className="underline hover:text-[var(--ink)] font-medium"
+                    >
+                      {lang === "hi" ? "सीधे कैमरे पर वापस जाएँ →" : "Switch back to live camera →"}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1908,6 +2286,7 @@ function CaptureStudioContent() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
