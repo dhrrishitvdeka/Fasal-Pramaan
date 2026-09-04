@@ -206,3 +206,33 @@ DROP POLICY IF EXISTS web_evidence_insert ON storage.objects;
 DROP POLICY IF EXISTS web_evidence_select ON storage.objects;
 DROP POLICY IF EXISTS web_evidence_update ON storage.objects;
 DROP POLICY IF EXISTS web_evidence_delete ON storage.objects;
+
+-- Service-role grants: hosted Next.js routes bypass RLS as service_role, but
+-- restricted Supabase projects still require explicit table grants.
+GRANT USAGE ON SCHEMA public TO service_role, authenticated, anon;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
+
+-- Hot-path indexes: list/queue queries filter and join on these columns.
+-- Postgres does not auto-index FK targets, so create them explicitly.
+CREATE INDEX IF NOT EXISTS web_claims_created_by_idx ON public.web_claims (created_by);
+CREATE INDEX IF NOT EXISTS web_claims_plot_id_idx ON public.web_claims (plot_id);
+CREATE INDEX IF NOT EXISTS web_plots_created_by_idx ON public.web_plots (created_by);
+CREATE INDEX IF NOT EXISTS web_claim_images_claim_id_idx ON public.web_claim_images (claim_id);
+CREATE INDEX IF NOT EXISTS web_milestones_plot_id_idx ON public.web_milestones (plot_id);
+CREATE INDEX IF NOT EXISTS web_milestones_created_by_idx ON public.web_milestones (created_by);
+CREATE INDEX IF NOT EXISTS web_review_actions_claim_id_idx ON public.web_review_actions (claim_id);
+CREATE INDEX IF NOT EXISTS web_profiles_email_idx ON public.web_profiles (email);
+
+-- Keep updated_at honest: bump on every UPDATE since app code rarely sets it.
+CREATE OR REPLACE FUNCTION public.web_bump_updated_at()
+RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS web_claims_bump_updated_at ON public.web_claims;
+CREATE TRIGGER web_claims_bump_updated_at
+  BEFORE UPDATE ON public.web_claims
+  FOR EACH ROW EXECUTE FUNCTION public.web_bump_updated_at();

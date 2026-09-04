@@ -10,12 +10,20 @@ export async function middleware(request: NextRequest) {
   if (pathname === "/unlock" || pathname === "/api/unlock") {
     return NextResponse.next();
   }
+  // Liveness probes and API clients must never get an HTML redirect:
+  // Docker HEALTHCHECK hits /api/health and would restart-loop under lock.
+  if (pathname === "/api/health") {
+    return NextResponse.next();
+  }
   if (!isSiteLockActive()) {
     return NextResponse.next();
   }
   const token = request.cookies.get(SITE_LOCK_COOKIE)?.value;
   if (await isValidSiteLockToken(token)) {
     return NextResponse.next();
+  }
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "Site locked" }, { status: 401 });
   }
   const unlock = request.nextUrl.clone();
   unlock.pathname = "/unlock";

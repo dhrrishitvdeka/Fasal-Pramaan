@@ -69,11 +69,14 @@ export async function requireWebActor(
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !anon) {
+    // Demo backdoor is local-dev only: a misconfigured production (missing
+    // Supabase env) must 503, never mint open farmer access.
     if (
-      process.env.NEXT_PUBLIC_DEMO_MODE === "true" ||
-      token.startsWith("demo-") ||
-      token === "demo" ||
-      token === "test-token"
+      process.env.NODE_ENV !== "production" &&
+      (process.env.NEXT_PUBLIC_DEMO_MODE === "true" ||
+        token.startsWith("demo-") ||
+        token === "demo" ||
+        token === "test-token")
     ) {
       return {
         ok: true,
