@@ -58,6 +58,20 @@ describe("adaptive engine", () => {
     expect(res.reasons.join(" ")).toMatch(/integrity/i);
   });
 
+  it("forces retake when duplicateDetected is true", () => {
+    const res = adaptiveConfidence({
+      ...base,
+      integrity: 35,
+      overall: 70,
+      peril: "normal",
+      duplicateDetected: true,
+      missingAngles: ["photo_2"],
+    });
+    expect(res.level).toBe("low");
+    expect(res.nextStep).toBe("retake");
+    expect(res.reasons.join(" ")).toMatch(/duplicate/i);
+  });
+
   it("holds fire_burn at medium/proceed when photos are complete but Sentinel burn-scar is unavailable", () => {
     const res = adaptiveConfidence({
       ...base,

@@ -6,6 +6,7 @@ import {
   computeEvidencePreview,
   createMemoryClaimStore,
   gateCacheKey,
+  gateImagesGate,
   getReviewerClaim,
   listReviewerQueue,
   persistAndInfer,
@@ -728,5 +729,17 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     ]);
     expect(dupPreview.integrityScore).toBe(35);
     expect(dupPreview.integrityNotes).toMatch(/duplicate/i);
+  });
+
+  it("gateImagesGate flags duplicate uploads across slots with duplicate_angle and fails gate", async () => {
+    const images: PersistedImageInput[] = [
+      usableImage({ angleType: "photo_1", sha256: "e".repeat(64) }),
+      usableImage({ angleType: "photo_2", sha256: "e".repeat(64) }), // duplicate sha256
+    ];
+    const outcome = await gateImagesGate(images, "wheat", "normal");
+    expect(outcome.gateFailed).toBe(true);
+    expect(outcome.blockingReason).toBe("duplicate_angle");
+    expect(outcome.perImage[1].usable).toBe(false);
+    expect(outcome.perImage[1].reason).toBe("duplicate_angle");
   });
 });

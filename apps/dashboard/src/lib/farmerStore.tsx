@@ -66,6 +66,7 @@ export interface ClaimImageEvidence {
   lon: number | null;
   accuracyM: number | null;
   sha256: string;
+  pHash?: string;
   qualityPassed: boolean;
   blurScore?: number;
   lightingScore?: number;

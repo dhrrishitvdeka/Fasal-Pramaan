@@ -117,7 +117,7 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
   let qualityScore = Math.max(20, 100 - warnings.length * 20);
   if (lightingScores.length) {
     qualityScore = Math.round(lightingScores.reduce((a, b) => a + b, 0) / lightingScores.length);
-  } else if (!hasCloseup) {
+  } else if (hasLegacyAngles && !has3PhotoAngles && !hasCloseup) {
     qualityScore = Math.min(qualityScore, 75);
   }
 
@@ -149,9 +149,11 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
     uncSev = "critical";
     if (hasDuplicateHash || hasDuplicate) {
       uncReasons.push("Integrity issue: duplicate image or exact same angle uploaded across photos");
+      recAction = "retake_image";
+    } else {
+      recAction = "human_review";
     }
     uncReasons.push(...anomalies.map((a) => `Integrity issue: ${String(a)}`));
-    recAction = "human_review";
   } else if (coverageScore < 80 || missingAngles.length > 0) {
     uncType = "coverage";
     uncSev = coverageScore < 50 ? "high" : "medium";

@@ -22,6 +22,7 @@ export function adaptiveConfidence(opts: {
   peril: Peril;
   signals?: ContextSignal[];
   gateFailed?: boolean;
+  duplicateDetected?: boolean;
   missingAngles?: string[];
 }): AdaptiveResult {
   const peril = opts.peril || "normal";
@@ -39,6 +40,12 @@ export function adaptiveConfidence(opts: {
   const sentinelOk = hasSentinel?.status === "available";
   const gps = signals.find((s) => s.source === "gps");
   const gateBlock = opts.gateFailed;
+
+  if (opts.duplicateDetected) {
+    reasons.push("Exact same angle or duplicate image uploaded — retake required");
+    reasonsHi.push("एक ही कोण या डुप्लिकेट फोटो अपलोड की गई — पुनः फोटो आवश्यक");
+    return { level: "low", nextStep: "retake", threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: capturedMissing };
+  }
 
   if (gateBlock) {
     reasons.push("Authenticity gate flagged image as unusable");

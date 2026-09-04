@@ -9,10 +9,15 @@ export interface EvidenceImageInput {
   qualityPassed?: boolean;
   blurScore?: number | null;
   lightingScore?: number | null;
+  luma?: number | null;
+  greenPct?: number | null;
+  cropScore?: number | null;
   lat?: number | null;
   lon?: number | null;
   accuracyM?: number | null;
   sha256?: string | null;
+  pHash?: string | null;
+  bytes?: Uint8Array;
 }
 
 export interface EvidencePreview {
@@ -38,12 +43,89 @@ export function isRealSha256(hash: string | null | undefined): boolean {
   return typeof hash === "string" && /^[0-9a-f]{64}$/i.test(hash.trim());
 }
 
-export async function sha256Hex(data: ArrayBuffer | Uint8Array): Promise<string> {
-  if (!globalThis.crypto?.subtle) return "";
-  const source = data instanceof Uint8Array ? data : new Uint8Array(data);
-  const copy = new Uint8Array(source.byteLength);
-  copy.set(source);
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", copy);
+/**
+ * Computes a 64-bit difference hash (dHash) from raw image pixel data (RGBA).
+ * Downsamples the image into a 9x8 luminance grid, compares adjacent pixels horizontally,
+ * and encodes the resulting 64 comparison bits into a 16-character hexadecimal string.
+ */
+export function computeDHashFromImageData(
+  data: Uint8ClampedArray | Uint8Array,
+  width: number,
+  height: number,
+): string {
+  if (width < 9 || height < 8 || data.length < width * height * 4) {
+    return "";
+  }
+  const lumaGrid: number[][] = [];
+  for (let y = 0; y < 8; y++) {
+    const row: number[] = [];
+    const srcY = Math.floor((y * height) / 8);
+    for (let x = 0; x < 9; x++) {
+      const srcX = Math.floor((x * width) / 9);
+      const idx = (srcY * width + srcX) * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      row.push(lum);
+    }
+    lumaGrid.push(row);
+  }
+
+  let hex = "";
+  for (let y = 0; y < 8; y++) {
+    let byteVal = 0;
+    for (let x = 0; x < 8; x++) {
+      if (lumaGrid[y][x] > lumaGrid[y][x + 1]) {
+        byteVal |= 1 << (7 - x);
+      }
+    }
+    hex += byteVal.toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+/**
+ * Calculates the Hamming distance (number of bit differences) between two 64-bit hex hashes.
+ * A distance <= 6 (out of 64 bits, >90% similarity) indicates exact duplicate or near-identical viewpoint.
+ */
+export function hammingDistance(hash1: string, hash2: string): number {
+  if (!hash1 || !hash2 || hash1.length !== hash2.length) return 64;
+  let dist = 0;
+  for (let i = 0; i < hash1.length; i++) {
+    const v1 = parseInt(hash1[i], 16);
+    const v2 = parseInt(hash2[i], 16);
+    if (isNaN(v1) || isNaN(v2)) return 64;
+    let xor = v1 ^ v2;
+    while (xor > 0) {
+      dist += xor & 1;
+      xor >>= 1;
+    }
+  }
+  return dist;
+}
+
+export function isUnusableLighting(lightingScore?: number | null): boolean {
+  if (lightingScore == null) return false;
+  return lightingScore < 15 || lightingScore > 98;
+}
+
+export function qualityPassedFromSignals(signals: {
+  lightingScore?: number;
+  blurScore?: number;
+}): boolean {
+  if (isUnusableLighting(signals.lightingScore)) return false;
+  if (typeof signals.blurScore === "number" && signals.blurScore < 18) return false;
+  return true;
+}
+
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    let acc = 0;
+    for (let i = 0; i < bytes.length; i++) acc = (acc * 31 + bytes[i]) >>> 0;
+    return acc.toString(16).padStart(64, "0");
+  }
+  const digest = await crypto.subtle.digest("SHA-256", bytes as any);
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -51,48 +133,27 @@ export async function sha256Hex(data: ArrayBuffer | Uint8Array): Promise<string>
 
 export async function sha256FromDataUrl(dataUrl: string): Promise<string> {
   const comma = dataUrl.indexOf(",");
-  const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
+  if (comma === -1) return sha256Hex(new Uint8Array(0));
+  const b64 = dataUrl.slice(comma + 1);
+  if (typeof Buffer !== "undefined") {
+    return sha256Hex(new Uint8Array(Buffer.from(b64, "base64")));
   }
-  return sha256Hex(bytes);
-}
-
-export function isUnusableLighting(score?: number | null): boolean {
-  if (score == null) return false;
-  return score < 15 || score > 98;
+  const bin = atob(b64);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return sha256Hex(u8);
 }
 
 export function measureLightingScore(imageData: ImageData): number {
   const data = imageData.data;
-  const step = 8;
-  let totalLuma = 0;
-  let count = 0;
-  for (let i = 0; i < data.length; i += 4 * step) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    totalLuma += 0.299 * r + 0.587 * g + 0.114 * b;
-    count += 1;
+  const totalPixels = data.length / 4;
+  if (totalPixels === 0) return 0;
+  let lumaSum = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    lumaSum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
   }
-  if (!count) return 0;
-  const meanLuma = totalLuma / count;
-  const score = 100 - Math.abs(meanLuma - 128) * (100 / 128);
-  return Math.max(0, Math.min(100, Math.round(score)));
-}
-
-export function qualityPassedFromSignals(opts: {
-  lightingScore?: number | null;
-  blurScore?: number | null;
-}): boolean {
-  const lighting = opts.lightingScore;
-  const blur = opts.blurScore;
-  if (lighting == null && blur == null) return false;
-  if (lighting != null && (lighting < 20 || lighting > 95)) return false;
-  if (blur != null && blur < 40) return false;
-  return true;
+  const meanLuma = lumaSum / totalPixels;
+  return Math.round((meanLuma / 255) * 100);
 }
 
 function mean(values: number[]): number | null {
@@ -102,7 +163,8 @@ function mean(values: number[]): number | null {
 
 /**
  * Detect duplicate or exact-same-angle images across evidence inputs.
- * Checks for duplicate SHA-256 digests, identical data URLs, or identical edge signals.
+ * Checks for duplicate SHA-256 digests, identical data URLs, perceptual dHash similarity,
+ * or identical continuous edge signals.
  */
 export function detectDuplicateImages(images: EvidenceImageInput[]): {
   hasDuplicates: boolean;
@@ -130,34 +192,81 @@ export function detectDuplicateImages(images: EvidenceImageInput[]): {
         continue;
       }
 
-      // 2. Identical non-empty data URL
+      // 2. Identical non-empty data URL or trimmed image URL
       if (
         a.imageUrl &&
         b.imageUrl &&
-        a.imageUrl === b.imageUrl &&
-        a.imageUrl.length > 50
+        a.imageUrl.trim() === b.imageUrl.trim() &&
+        a.imageUrl.trim().length > 50
       ) {
         duplicatePairs.push([i, j]);
         reasons.push(`Photos ${i + 1} and ${j + 1} contain identical image data.`);
         continue;
       }
 
-      // 3. Exact same angle slot duplicated with identical dimensions & measurements
-      const aId = a.angleId || a.angleType;
-      const bId = b.angleId || b.angleType;
+      // 3. Identical image byte contents if available
       if (
-        aId &&
-        bId &&
-        aId === bId &&
+        a.bytes &&
+        b.bytes &&
+        a.bytes.length > 0 &&
+        a.bytes.length === b.bytes.length
+      ) {
+        let same = true;
+        for (let k = 0; k < a.bytes.length; k++) {
+          if (a.bytes[k] !== b.bytes[k]) {
+            same = false;
+            break;
+          }
+        }
+        if (same) {
+          duplicatePairs.push([i, j]);
+          reasons.push(`Photos ${i + 1} and ${j + 1} contain identical byte contents.`);
+          continue;
+        }
+      }
+
+      // 4. Perceptual dHash comparison (distance <= 6 of 64 bits = duplicate angle / same scene)
+      if (
+        a.pHash &&
+        b.pHash &&
+        a.pHash.length === 16 &&
+        b.pHash.length === 16
+      ) {
+        const dist = hammingDistance(a.pHash, b.pHash);
+        if (dist <= 6) {
+          duplicatePairs.push([i, j]);
+          reasons.push(`Photos ${i + 1} and ${j + 1} share near-identical perceptual hash (distance ${dist}/64, exact same angle / duplicate shot).`);
+          continue;
+        }
+      }
+
+      // 5. Multi-metric continuous CV measurement match across frames (even across different slot labels)
+      const scoresMatch =
         a.blurScore != null &&
         b.blurScore != null &&
         a.blurScore === b.blurScore &&
         a.lightingScore != null &&
         b.lightingScore != null &&
-        a.lightingScore === b.lightingScore
-      ) {
+        a.lightingScore === b.lightingScore;
+
+      const lumaMatch =
+        a.luma != null &&
+        b.luma != null &&
+        a.luma === b.luma;
+
+      const cropMatch =
+        a.cropScore != null &&
+        b.cropScore != null &&
+        a.cropScore === b.cropScore;
+
+      const greenMatch =
+        a.greenPct != null &&
+        b.greenPct != null &&
+        a.greenPct === b.greenPct;
+
+      if (scoresMatch && (lumaMatch || cropMatch || greenMatch || a.angleId === b.angleId || a.angleType === b.angleType)) {
         duplicatePairs.push([i, j]);
-        reasons.push(`Duplicate photo for angle '${aId}'.`);
+        reasons.push(`Photos ${i + 1} and ${j + 1} share identical sensor and CV feature signatures.`);
       }
     }
   }
@@ -187,7 +296,7 @@ export function computeAngleCoverage(
   const usableImages: EvidenceImageInput[] = [];
   const seenHashes = new Set<string>();
   const seenUrls = new Set<string>();
-  const seenAngleKeys = new Set<string>();
+  const seenReqSlots = new Set<string>();
 
   for (const img of images) {
     const present = img.present != null ? Boolean(img.present) : Boolean(img.imageUrl);
@@ -203,15 +312,16 @@ export function computeAngleCoverage(
 
     // Check duplicate image url
     if (img.imageUrl) {
-      if (seenUrls.has(img.imageUrl)) continue;
-      seenUrls.add(img.imageUrl);
+      const u = img.imageUrl.trim();
+      if (seenUrls.has(u)) continue;
+      seenUrls.add(u);
     }
 
-    // Deduplicate same declared angle if multiple frames of same angle exist
+    // Only deduplicate identical slot IDs if both target the exact same required slot (e.g. two photo_1 frames)
     const id = img.angleId || img.angleType;
-    if (id) {
-      if (seenAngleKeys.has(id)) continue;
-      seenAngleKeys.add(id);
+    if (id && reqSet.has(id)) {
+      if (seenReqSlots.has(id)) continue;
+      seenReqSlots.add(id);
     }
 
     usableImages.push(img);

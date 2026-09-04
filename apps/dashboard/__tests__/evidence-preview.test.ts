@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { computeAngleCoverage, computeEvidencePreview, isRealSha256 } from "../src/lib/evidence";
+import {
+  computeAngleCoverage,
+  computeDHashFromImageData,
+  computeEvidencePreview,
+  detectDuplicateImages,
+  hammingDistance,
+  isRealSha256,
+} from "../src/lib/evidence";
 
 describe("computeAngleCoverage (B10 unified scoring)", () => {
   it("counts distinct usable required photos and reports missing", () => {
@@ -139,3 +146,60 @@ describe("honest evidence preview", () => {
     expect(preview.missingAngles).toEqual(["photo_2"]);
   });
 });
+
+describe("perceptual dHash and duplicate angle detection", () => {
+  it("computes 16-hex perceptual difference hash from pixel data", () => {
+    const width = 18;
+    const height = 16;
+    const pixels = new Uint8Array(width * height * 4);
+    // Create horizontal luminance gradient
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const val = Math.floor((x / width) * 255);
+        pixels[idx] = val;
+        pixels[idx + 1] = val;
+        pixels[idx + 2] = val;
+        pixels[idx + 3] = 255;
+      }
+    }
+    const hash = computeDHashFromImageData(pixels, width, height);
+    expect(hash.length).toBe(16);
+    expect(/^[0-9a-f]{16}$/i.test(hash)).toBe(true);
+  });
+
+  it("calculates correct hamming distance between perceptual hashes", () => {
+    expect(hammingDistance("0000000000000000", "0000000000000000")).toBe(0);
+    expect(hammingDistance("0000000000000001", "0000000000000003")).toBe(1);
+    expect(hammingDistance("0000000000000000", "000000000000000f")).toBe(4);
+    expect(hammingDistance("0000000000000000", "ffffffffffffffff")).toBe(64);
+  });
+
+  it("detects duplicates when perceptual hashes are within threshold <= 6", () => {
+    const dup = detectDuplicateImages([
+      { angleId: "photo_1", pHash: "0000000000000000" },
+      { angleId: "photo_2", pHash: "0000000000000003" }, // dist = 2 <= 6
+    ]);
+    expect(dup.hasDuplicates).toBe(true);
+    expect(dup.duplicatePairs).toEqual([[0, 1]]);
+    expect(dup.reasons[0]).toMatch(/perceptual hash/i);
+  });
+
+  it("does not flag duplicates when perceptual hashes are sufficiently different (> 6)", () => {
+    const dup = detectDuplicateImages([
+      { angleId: "photo_1", pHash: "0000000000000000" },
+      { angleId: "photo_2", pHash: "00000000000000ff" }, // dist = 8 > 6
+    ]);
+    expect(dup.hasDuplicates).toBe(false);
+  });
+
+  it("detects identical multi-metric continuous CV measurements across slots", () => {
+    const dup = detectDuplicateImages([
+      { angleId: "photo_1", blurScore: 54, lightingScore: 68, luma: 128 },
+      { angleId: "photo_2", blurScore: 54, lightingScore: 68, luma: 128 },
+    ]);
+    expect(dup.hasDuplicates).toBe(true);
+    expect(dup.reasons[0]).toMatch(/identical sensor and CV feature signatures/i);
+  });
+});
+

@@ -170,6 +170,16 @@ export default function ReviewDetailPage() {
     return ["photo_3"];
   }, [evaluation]);
 
+  const modalAngles = useMemo(() => {
+    const hasLegacy = data?.images?.some((img) =>
+      ["wide_field", "left_context", "mid_canopy", "right_context", "closeup_damage"].includes(img.angle_type),
+    );
+    if (hasLegacy) {
+      return ALL_ANGLES;
+    }
+    return ALL_ANGLES.filter((a) => a.key.startsWith("photo_"));
+  }, [data?.images]);
+
   const action = useMutation({
     mutationFn: async (payload: ReviewActionPayload) => applyWebReviewAction(id, payload),
     onSuccess: () => {
@@ -1199,7 +1209,7 @@ export default function ReviewDetailPage() {
                 Select Required Angles:
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {ALL_ANGLES.map((angle) => {
+                {modalAngles.map((angle) => {
                   const isChecked = selectedAngles.includes(angle.key);
                   const isSuggested = suggestedAngles.includes(angle.key);
                   return (
