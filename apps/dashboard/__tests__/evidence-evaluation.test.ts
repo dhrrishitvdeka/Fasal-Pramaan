@@ -158,4 +158,35 @@ describe("Evidence Evaluation Layer Tests", () => {
     expect(resolved.id).toBe("ev-999");
     expect(resolved.confidence.final).toBe(92);
   });
+
+  it("measures resolution, framing, crop visibility, damage visibility, and consistency", () => {
+    const ev = resolveEvidenceEvaluation(baseSubmission);
+    expect(ev.quality.details?.resolution_score).toBeGreaterThanOrEqual(0.75);
+    expect(ev.quality.details?.framing_score).toBeGreaterThanOrEqual(0.8);
+    expect(ev.quality.details?.crop_visibility).toContain("wheat");
+    expect(ev.quality.details?.damage_visibility).toContain("25% area affected");
+    expect(ev.quality.details?.consistency_score).toBeGreaterThanOrEqual(0.9);
+  });
+
+  it("computes plot proximity when capture coordinates and registered plot coordinates are given", () => {
+    // Within 200m
+    const nearSub: Submission = {
+      ...baseSubmission,
+      capture_lat: 28.6139,
+      capture_lon: 77.209,
+      ...({ plot_lat: 28.6140, plot_lon: 77.2091 } as any),
+    };
+    const nearEv = resolveEvidenceEvaluation(nearSub);
+    expect(nearEv.context.details?.plot_match).toBe(true);
+
+    // Far away (>200m)
+    const farSub: Submission = {
+      ...baseSubmission,
+      capture_lat: 28.6139,
+      capture_lon: 77.209,
+      ...({ plot_lat: 28.6250, plot_lon: 77.2200 } as any),
+    };
+    const farEv = resolveEvidenceEvaluation(farSub);
+    expect(farEv.context.details?.plot_match).toBe(false);
+  });
 });

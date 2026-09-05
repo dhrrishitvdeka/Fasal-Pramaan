@@ -812,7 +812,7 @@ export default function ReviewDetailPage() {
               />
             </div>
           </details>
-          {/* AI ASSESSMENT — synthesis + scoring + damage in ONE compact card */}
+          {/* AI ASSESSMENT — synthesis + scoring + gate in ONE structured card */}
           {(() => {
             const explanation = (pred?.explanation || {}) as Record<string, unknown>;
             const visual = String(explanation.visual_findings || "").trim();
@@ -835,7 +835,7 @@ export default function ReviewDetailPage() {
             return (
               <section className="rounded-sm border border-[var(--line)] bg-white">
                 <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] px-4 py-2">
-                  <h3 className="text-sm font-semibold text-slate-900">Crop analysis</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">AI Crop Assessment</h3>
                   <span className="rounded-sm border border-[var(--line)] bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-700">
                     Grade {pred?.predicted_grade || data.inference_status || "U"}
                   </span>
@@ -845,62 +845,40 @@ export default function ReviewDetailPage() {
                   </span>
                 </div>
 
-                {/* Analyzed input — which photos the output below is based on */}
-                {inspectableImages.length > 0 && (
-                  <div className="flex items-center gap-1.5 overflow-x-auto border-b border-[var(--line)] px-4 py-2">
-                    <span className="shrink-0 text-[11px] font-medium text-slate-500">Input</span>
-                    {inspectableImages.map((img, idx) => (
-                      <button
-                        key={img.id}
-                        type="button"
-                        onClick={() => setLightboxIndex(idx)}
-                        className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-900 hover:border-slate-500"
-                        title={`${(ALL_ANGLES.find((a) => a.key === img.angle_type)?.label || img.angle_type).replaceAll("_", " ")} — click to inspect`}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={img.download_url as string} alt="" className="h-full w-full object-cover" loading="lazy" />
-                      </button>
-                    ))}
-                    <span className="shrink-0 font-mono text-[10px] text-slate-400">
-                      {inspectableImages.length} frame{inspectableImages.length === 1 ? "" : "s"} · {pred?.predicted_growth_stage || "stage n/a"}
-                    </span>
-                  </div>
-                )}
-
                 {gateInfo?.gateFailed && !gateInfo?.overridden && (pred?.predicted_grade === "U" || !pred) && (
-                  <p className="mx-3 flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-[11px] font-medium text-rose-900">
+                  <p className="mx-3 mt-2 flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-[11px] font-medium text-rose-900">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-600" />
                     Gate blocked{gateInfo.blockingReason ? ` (${gateInfo.blockingReason.replaceAll("_", " ")})` : ""} — Grade U is a placeholder. Override or recapture.
                   </p>
                 )}
                 {mismatch && (
-                  <p className="mx-3 mt-1.5 flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-900">
+                  <p className="mx-3 mt-2 flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-medium text-amber-900">
                     <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
                     Crop mismatch: declared {declared}, detected {detected} — confirm plot boundary.
                   </p>
                 )}
                 {oneLiner && (
-                  <p className="mx-3 mt-1.5 rounded-md border border-slate-100 bg-slate-50/80 px-2 py-1.5 text-xs leading-snug text-slate-700">
+                  <p className="mx-3 mt-2 rounded-md border border-slate-100 bg-slate-50/80 px-2.5 py-1.5 text-xs leading-snug text-slate-700 italic">
                     &ldquo;{oneLiner}&rdquo;
                   </p>
                 )}
 
                 {pred && (
-                  <div className="grid grid-cols-4 gap-2 px-4 pt-2 text-center">
-                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5">
+                  <div className="grid grid-cols-4 gap-2 px-4 py-2.5 text-center">
+                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5 bg-slate-50/40">
                       <div className="text-[11px] font-medium text-slate-500">Damage</div>
                       <div className="truncate text-xs font-semibold capitalize text-slate-900" title={String(pred.primary_damage || "—")}>{String(pred.primary_damage || "—").replaceAll("_", " ")}</div>
                     </div>
-                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5">
+                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5 bg-slate-50/40">
                       <div className="text-[11px] font-medium text-slate-500">Severity</div>
                       <div className="text-xs font-semibold capitalize text-slate-900">{pred.severity || "—"}</div>
                     </div>
-                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5">
+                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5 bg-slate-50/40">
                       <div className="text-[11px] font-medium text-slate-500">Area</div>
                       <div className="font-mono text-xs font-semibold text-slate-900">{pred.affected_area_pct != null ? `${pred.affected_area_pct}%` : "—"}</div>
                     </div>
-                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5">
-                      <div className="text-[11px] font-medium text-slate-500">Conf</div>
+                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5 bg-slate-50/40">
+                      <div className="text-[11px] font-medium text-slate-500">Confidence</div>
                       <div className="font-mono text-xs font-semibold text-slate-900">{pred.overall_confidence != null ? `${Math.round(pred.overall_confidence * 100)}%` : "—"}</div>
                     </div>
                   </div>
@@ -936,12 +914,44 @@ export default function ReviewDetailPage() {
                   </div>
                 )}
 
+                {/* Gate status sub-bar */}
+                <div className="flex flex-wrap items-center gap-2 border-t border-[var(--line)] bg-slate-50/50 px-4 py-2 text-xs">
+                  <span className="text-[11px] font-semibold text-slate-600">Vision Gate:</span>
+                  {gateInfo?.overridden ? (
+                    <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Overridden</span>
+                  ) : gateInfo?.gateFailed ? (
+                    <span className="rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">Rejected{gateInfo.blockingReason ? `: ${gateInfo.blockingReason.replaceAll("_", " ")}` : ""}</span>
+                  ) : (
+                    <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Passed</span>
+                  )}
+                  {gateInfo && gateInfo.perImage.length > 0 && (
+                    <span className="font-mono text-[10px] text-slate-400">
+                      {gateInfo.perImage.map((i) => `${(i.angleType || "?").replaceAll("_", " ")}:${i.usable ? "ok" : i.reason}`).join(" · ")}
+                    </span>
+                  )}
+                  <span className="ml-auto flex gap-1.5">
+                    {gateInfo?.gateFailed && !gateInfo.overridden && (
+                      <button type="button" className="min-h-8 rounded border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-900 hover:bg-amber-100" disabled={busy || isClosed} onClick={handleOverrideGate}>
+                        {pendingAction === "override_gate" ? "Overriding…" : "Override"}
+                      </button>
+                    )}
+                    <button type="button" className="min-h-8 rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled={gateRerunning || busy} onClick={handleGateRerun}>
+                      {gateRerunning ? "Checking…" : "Re-verify"}
+                    </button>
+                  </span>
+                </div>
+
+                {/* Collapsible Deep Model Attribution */}
                 {pred && (
-                  <details className="px-3 py-2" open>
-                    <summary className="cursor-pointer list-none text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-900">
-                      Model output +
+                  <details className="group border-t border-[var(--line)]">
+                    <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors">
+                      <span className="flex items-center gap-1.5">
+                        <ChevronDown className="h-3.5 w-3.5 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
+                        Deep Model Attribution & Probabilities
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-400 font-normal">Layer breakdown & calibration</span>
                     </summary>
-                    <div className="pt-1.5">
+                    <div className="border-t border-[var(--line)] p-3">
                       <AiConfidenceBreakdown prediction={pred} images={data.images} peril={data.peril} />
                     </div>
                   </details>
@@ -949,35 +959,6 @@ export default function ReviewDetailPage() {
               </section>
             );
           })()}
-
-          {/* Gate status — single inline row */}
-          <div className="flex flex-wrap items-center gap-2 rounded-sm border border-[var(--line)] bg-white px-4 py-2 text-xs">
-            <span className="text-[11px] font-medium text-slate-500">
-              Gate
-            </span>
-            {gateInfo?.overridden ? (
-              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Overridden</span>
-            ) : gateInfo?.gateFailed ? (
-              <span className="rounded-full border border-rose-300 bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">Rejected{gateInfo.blockingReason ? `: ${gateInfo.blockingReason.replaceAll("_", " ")}` : ""}</span>
-            ) : (
-              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Passed</span>
-            )}
-            {gateInfo && gateInfo.perImage.length > 0 && (
-              <span className="font-mono text-[10px] text-slate-400">
-                {gateInfo.perImage.map((i) => `${(i.angleType || "?").replaceAll("_", " ")}:${i.usable ? "ok" : i.reason}`).join(" · ")}
-              </span>
-            )}
-            <span className="ml-auto flex gap-1.5">
-              {gateInfo?.gateFailed && !gateInfo.overridden && (
-                <button type="button" className="min-h-9 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-900 hover:bg-amber-100" disabled={busy || isClosed} onClick={handleOverrideGate}>
-                  {pendingAction === "override_gate" ? "Overriding…" : "Override"}
-                </button>
-              )}
-              <button type="button" className="min-h-9 rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50" disabled={gateRerunning || busy} onClick={handleGateRerun}>
-                {gateRerunning ? "Checking…" : "Re-verify"}
-              </button>
-            </span>
-          </div>
 
           {/* EVIDENCE CONFIDENCE & TRUST EVALUATION */}
           <EvidenceConfidenceSection submission={data} />
@@ -1049,9 +1030,13 @@ export default function ReviewDetailPage() {
             </div>
 
             {/* Calibration & Override Form Fields — collapsed by default */}
-            <details className="rounded-sm border border-[var(--line)] bg-white text-xs">
-              <summary className="cursor-pointer list-none px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900">
-                Adjustments and notes (for Correct / Reject)
+            <details className="group rounded-sm border border-[var(--line)] bg-white text-xs">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors">
+                <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                  <ChevronDown className="h-3.5 w-3.5 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
+                  Adjustments & Calibration (for Correct / Reject)
+                </span>
+                <span className="font-mono text-[10px] text-slate-400">Severity · Area · Crop · Reason</span>
               </summary>
               <div className="space-y-2 border-t border-[var(--line)] px-4 py-2">
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import {
   EvidenceEvaluation,
   Submission,
@@ -13,6 +14,7 @@ import { normalizePeril } from "../lib/claim-routing";
 import { apiFetch } from "../lib/auth-headers";
 import { adaptiveConfidence } from "../lib/context/adaptive-engine";
 import type { ContextSignal } from "../lib/context/types";
+import { isCropMatch } from "../lib/crop-synonyms";
 
 const ALL_ANGLES = [
   { key: "photo_1", label: "Photo 1 (Field Overview)" },
@@ -148,44 +150,55 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
     : [];
   const gateDuplicateAngles = [
     ...gatePerImage
-      .filter((p) => p.usable === false && p.reason === "duplicate_angle" && typeof p.angleType === "string")
-      .map((p) => String(p.angleType)),
+      .filter((p) => p.usable === false && p.reason === "duplicate_angle")
+      .map((p) => String(p.angleType || "")),
     ...(Array.isArray(gateRaw?.duplicateAngles)
-      ? (gateRaw.duplicateAngles as unknown[]).filter((v): v is string => typeof v === "string")
+      ? (gateRaw?.duplicateAngles as unknown[]).map(String)
       : []),
-  ].filter((v, i, arr) => v && arr.indexOf(v) === i);
-  let integrityScore = anomalies.length > 0 ? 40 : 100;
-  if (hasDuplicateHash || hasDuplicate) {
-    integrityScore = Math.min(integrityScore, 35);
-  }
+  ].filter(Boolean);
+
+  let integrityScore = 100;
   if (gateFailedHard) {
-    integrityScore = Math.min(integrityScore, 35);
+    integrityScore = 0;
+  } else if (anomalies.length > 0) {
+    integrityScore = 30;
+  } else if (hasDuplicateHash) {
+    integrityScore = 40;
+  } else if (gateDuplicateAngles.length > 0) {
+    integrityScore = 70;
   }
 
-  // Final confidence: 0.4*quality + 0.3*coverage + 0.2*context + 0.1*integrity
-  const finalConf = Math.round(
-    0.4 * qualityScore + 0.3 * coverageScore + 0.2 * contextScore + 0.1 * integrityScore
+  // Overall confidence calculation
+  const finalConf = Math.min(
+    100,
+    Math.max(
+      0,
+      Math.round(
+        0.4 * qualityScore +
+          0.3 * coverageScore +
+          0.2 * contextScore +
+          0.1 * integrityScore
+      )
+    )
   );
 
-  // Determine dominant uncertainty
-  let uncType: string | null = null;
-  let uncSev: string | null = null;
+  // Derive dominant uncertainty
+  let uncType: "integrity" | "coverage" | "visual" | "context" | null = null;
+  let uncSev: "low" | "medium" | "high" | "critical" | null = null;
   const uncReasons: string[] = [];
-  let recAction: string | null = "none";
+  let recAction: "human_review" | "retake_image" | "request_specific_evidence" | "request_context" | "none" = "none";
 
-  if (integrityScore < 70) {
+  if (integrityScore < 50 || gateFailedHard) {
     uncType = "integrity";
     uncSev = "critical";
+    recAction = "human_review";
     if (gateFailedHard) {
       uncReasons.push(
-        `Vision gate rejected${gateBlockingReason ? `: ${gateBlockingReason.replaceAll("_", " ")}` : ""} — overall confidence held at 0 until overridden or recaptured`,
+        `Authenticity rejected by vision gate${gateBlockingReason ? `: ${gateBlockingReason.replaceAll("_", " ")}` : ""}`
       );
-      recAction = "human_review";
-    } else if (hasDuplicateHash || hasDuplicate) {
-      uncReasons.push("Integrity issue: duplicate image or exact same angle uploaded across photos");
-      recAction = "retake_image";
-    } else {
-      recAction = "human_review";
+    }
+    if (hasDuplicateHash) {
+      uncReasons.push("Duplicate image hash detected across frames");
     }
     uncReasons.push(...anomalies.map((a) => `Integrity issue: ${String(a)}`));
   } else if (coverageScore < 80 || missingAngles.length > 0) {
@@ -207,6 +220,65 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
     recAction = "request_context";
   }
 
+  // Derive granular quality sub-metrics
+  let resolutionScore: number | undefined = undefined;
+  if (uploaded.length > 0) {
+    const hasDimensions = images.some((img: any) => img.dimensions?.width && img.dimensions?.height);
+    if (hasDimensions) {
+      const avgPixels = images
+        .map((img: any) => (img.dimensions?.width || 0) * (img.dimensions?.height || 0))
+        .filter((p) => p > 0);
+      const mean = avgPixels.reduce((a, b) => a + b, 0) / avgPixels.length;
+      resolutionScore = Math.min(1, Math.max(0.75, Math.round((mean / 921600) * 100) / 100));
+    } else {
+      const avgBlur = blurScores.length ? blurScores.reduce((a, b) => a + b, 0) / blurScores.length : 0;
+      resolutionScore = Math.max(0.75, Math.round(100 - avgBlur * 0.25) / 100);
+    }
+  }
+
+  let framingScore: number | undefined = undefined;
+  if (uploaded.length > 0) {
+    const framingWarnings = warnings.filter((w) => /fram|crop|bound|angle|focus/i.test(String(w)));
+    const baseFraming = coverageScore >= 80 ? 0.95 : coverageScore >= 50 ? 0.80 : 0.65;
+    framingScore = Math.max(0.35, Math.round((baseFraming - framingWarnings.length * 0.15) * 100) / 100);
+  }
+
+  let cropVisibility: string | undefined = undefined;
+  if (submission.latest_prediction?.predicted_crop && submission.latest_prediction.predicted_crop !== "unknown") {
+    const cropConf = submission.latest_prediction.crop_confidence != null
+      ? `${Math.round(submission.latest_prediction.crop_confidence * 100)}%`
+      : "High";
+    cropVisibility = `${cropConf} (${submission.latest_prediction.predicted_crop})`;
+  } else if (submission.crop_type) {
+    cropVisibility = `Present (${submission.crop_type})`;
+  } else if (uploaded.length > 0) {
+    cropVisibility = "Visible";
+  }
+
+  let damageVisibility: string | undefined = undefined;
+  if (submission.latest_prediction?.affected_area_pct != null && submission.latest_prediction.affected_area_pct > 0) {
+    damageVisibility = `${submission.latest_prediction.affected_area_pct}% area affected`;
+  } else if (submission.latest_prediction?.primary_damage && submission.latest_prediction.primary_damage !== "unknown") {
+    damageVisibility = `${submission.latest_prediction.primary_damage.replaceAll("_", " ")} detected`;
+  } else if (hasCloseup) {
+    damageVisibility = "Verified (Close-up)";
+  } else if (uploaded.length > 0) {
+    damageVisibility = "Field view assessed";
+  }
+
+  let consistencyScore: number | undefined = undefined;
+  if (uploaded.length > 0) {
+    let penalty = 0;
+    if (hasDuplicateHash || hasDuplicate) penalty += 0.4;
+    if (anomalies.length > 0) penalty += 0.3;
+    if (lightingScores.length > 1) {
+      const minLight = Math.min(...lightingScores);
+      const maxLight = Math.max(...lightingScores);
+      if (maxLight - minLight > 40) penalty += 0.1;
+    }
+    consistencyScore = Math.max(0.25, Math.round((0.96 - penalty) * 100) / 100);
+  }
+
   const qualityDetails: EvidenceQualityDetails = {
     blur_score: blurScores.length
       ? blurScores.reduce((a, b) => a + b, 0) / blurScores.length / 100
@@ -214,6 +286,11 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
     brightness_score: lightingScores.length
       ? lightingScores.reduce((a, b) => a + b, 0) / lightingScores.length / 100
       : undefined,
+    resolution_score: resolutionScore,
+    framing_score: framingScore,
+    crop_visibility: cropVisibility,
+    damage_visibility: damageVisibility,
+    consistency_score: consistencyScore,
     issues: warnings.map(String),
   };
 
@@ -227,13 +304,51 @@ export function resolveEvidenceEvaluation(submission: Submission): EvidenceEvalu
     views_required: hasLegacyAngles && !has3PhotoAngles ? 5 : 3,
   };
 
+  // Derive plot proximity from signals or coordinates
+  const rawContextSignals = (submission as any).context_signals ?? (submission as any).contextSignals;
+  let parsedSignals: any[] = [];
+  if (Array.isArray(rawContextSignals)) {
+    parsedSignals = rawContextSignals;
+  } else if (typeof rawContextSignals === "string") {
+    try { parsedSignals = JSON.parse(rawContextSignals); } catch { /* ignore */ }
+  }
+  const plotSignal = parsedSignals.find((s: any) => s?.source === "plot_match");
+  const imdSignal = parsedSignals.find((s: any) => s?.source === "imd");
+
+  let plotMatch: boolean | undefined = undefined;
+  if (plotSignal && typeof plotSignal.meta?.within === "boolean") {
+    plotMatch = plotSignal.meta.within;
+  } else if (hasGps) {
+    const pLat = (submission as any).plot_lat ?? (submission as any).plotLat;
+    const pLon = (submission as any).plot_lon ?? (submission as any).plotLon;
+    if (pLat != null && pLon != null) {
+      const R = 6371000;
+      const toRad = (d: number) => (d * Math.PI) / 180;
+      const dLat = toRad(pLat - (submission.capture_lat || 0));
+      const dLon = toRad(pLon - (submission.capture_lon || 0));
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(submission.capture_lat || 0)) * Math.cos(toRad(pLat)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const dist = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+      plotMatch = dist <= 200;
+    } else if (submission.plot_name || submission.crop_cycle_id) {
+      plotMatch = gpsValid;
+    }
+  }
+
   const contextDetails: EvidenceContextDetails = {
     gps_valid: gpsValid,
     gps_accuracy_m: submission.capture_accuracy_m,
-    plot_match: undefined,
-    capture_time_valid: undefined,
-    crop_context_matched: undefined,
-    weather_status: undefined,
+    plot_match: plotMatch,
+    capture_time_valid: true,
+    crop_context_matched: Boolean(
+      submission.latest_prediction?.predicted_crop && submission.crop_type
+        ? isCropMatch(submission.latest_prediction.predicted_crop, submission.crop_type)
+        : true
+    ),
+    weather_status: imdSignal?.status === "available"
+      ? (typeof imdSignal.meta?.imdCategory === "string" ? imdSignal.meta.imdCategory : "verified")
+      : undefined,
   };
 
   const integrityDetails: EvidenceIntegrityDetails = {
@@ -360,13 +475,22 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
     }
     const lat = (submission as any).capture_lat ?? (submission as any).captureLat;
     const lon = (submission as any).capture_lon ?? (submission as any).captureLon;
+    const plotLat = (submission as any).plot_lat ?? (submission as any).plotLat;
+    const plotLon = (submission as any).plot_lon ?? (submission as any).plotLon;
     if (lat == null || lon == null) return;
     let cancelled = false;
     setSignalsLoading(true);
     apiFetch("/api/context/assemble", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lat, lon, peril, sowingDate: (submission as any).sowingDate }),
+      body: JSON.stringify({
+        lat,
+        lon,
+        peril,
+        sowingDate: (submission as any).sowingDate,
+        plotLat,
+        plotLon,
+      }),
     })
       .then((r) => r.json().catch(() => null))
       .then((j: any) => {
@@ -378,7 +502,16 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
     return () => {
       cancelled = true;
     };
-  }, [submission.id, peril, (submission as any).context_signals, (submission as any).contextSignals]);
+  }, [
+    submission.id,
+    peril,
+    (submission as any).context_signals,
+    (submission as any).contextSignals,
+    (submission as any).plot_lat,
+    (submission as any).plotLat,
+    (submission as any).plot_lon,
+    (submission as any).plotLon,
+  ]);
   const adaptive = adaptiveConfidence({
     quality: quality.score,
     coverage: coverage.score,
@@ -396,7 +529,17 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
 
   const qDetails: EvidenceQualityDetails = quality?.details || {};
   const cDetails: EvidenceCoverageDetails = coverage?.details || {};
-  const ctxDetails: EvidenceContextDetails = context?.details || {};
+  const dynamicPlotSignal = signals?.find((s) => s.source === "plot_match");
+  const dynamicWeatherSignal = signals?.find((s) => s.source === "imd");
+  const ctxDetails: EvidenceContextDetails = {
+    ...context?.details,
+    ...(dynamicPlotSignal && typeof dynamicPlotSignal.meta?.within === "boolean"
+      ? { plot_match: dynamicPlotSignal.meta.within }
+      : {}),
+    ...(dynamicWeatherSignal?.status === "available" && dynamicWeatherSignal.meta?.imdCategory
+      ? { weather_status: String(dynamicWeatherSignal.meta.imdCategory) }
+      : {}),
+  };
   const iDetails: EvidenceIntegrityDetails = integrity?.details || {};
 
   // Status badges calculation for accessibility
@@ -464,147 +607,141 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
         </span>
       </div>
 
-      <div className="fp-panel p-3">
-        <div className="grid gap-3 sm:grid-cols-12 items-start">
-          {/* Uncertainty & Action Summary */}
-          <div className="sm:col-span-12 space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded border border-slate-200 bg-white p-2.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
-                  Dominant Uncertainty
-                </span>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="font-bold text-sm text-slate-900 capitalize">
-                    {uncertainty.type || "None"}
-                  </span>
-                  {uncertainty.severity && uncertainty.severity !== "low" && (
-                    <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-rose-700 border border-rose-200">
-                      {uncertainty.severity}
-                    </span>
-                  )}
-                </div>
-              </div>
+      {/* 4 Pillars Summary Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="rounded-sm border border-[var(--line)] bg-white p-2 text-center">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block">Quality</span>
+          <span className="font-mono text-sm font-bold text-slate-900">{quality.score}<span className="text-[10px] text-slate-400">/100</span></span>
+          <span className={`block mt-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold ${qStatus.bg}`}>{qStatus.text}</span>
+        </div>
+        <div className="rounded-sm border border-[var(--line)] bg-white p-2 text-center">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block">Coverage</span>
+          <span className="font-mono text-sm font-bold text-slate-900">{coverage.score}<span className="text-[10px] text-slate-400">/100</span></span>
+          <span className={`block mt-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold ${cStatus.bg}`}>{cStatus.text}</span>
+        </div>
+        <div className="rounded-sm border border-[var(--line)] bg-white p-2 text-center">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block">Context</span>
+          <span className="font-mono text-sm font-bold text-slate-900">{context.score}<span className="text-[10px] text-slate-400">/100</span></span>
+          <span className={`block mt-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold ${ctxStatus.bg}`}>{ctxStatus.text}</span>
+        </div>
+        <div className="rounded-sm border border-[var(--line)] bg-white p-2 text-center">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block">Integrity</span>
+          <span className="font-mono text-sm font-bold text-slate-900">{integrity.score}<span className="text-[10px] text-slate-400">/100</span></span>
+          <span className={`block mt-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold ${iStatus.bg}`}>{iStatus.text}</span>
+        </div>
+      </div>
 
-              <div className="rounded border border-slate-200 bg-white p-2.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
-                  Recommended Action
+      {/* Uncertainty & Action Summary */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold text-slate-500">Uncertainty:</span>
+          <span className="font-bold text-slate-800 capitalize">{uncertainty.type || "None"}</span>
+          {uncertainty.severity && uncertainty.severity !== "low" && (
+            <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-rose-700 border border-rose-200">
+              {uncertainty.severity}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] font-semibold text-slate-500">Recommended Action:</span>
+          <span className="font-bold text-slate-900 capitalize">
+            {uncertainty.recommended_action
+              ? uncertainty.recommended_action.replaceAll("_", " ")
+              : "Normal Review"}
+          </span>
+        </div>
+      </div>
+
+      {/* Uncertainty Reasons Callout */}
+      {uncertainty.reasons && uncertainty.reasons.length > 0 && (
+        <div className="rounded border border-amber-200 bg-amber-50/80 p-2 text-xs text-amber-900">
+          <span className="font-bold">Uncertainty Reason:</span>
+          <ul className="mt-0.5 list-disc list-inside space-y-0.5 text-amber-800 text-[11px]">
+            {uncertainty.reasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Generated Evidence Request Preview */}
+      {request && (
+        <div className="rounded border border-blue-200 bg-blue-50/80 p-2 text-xs text-blue-900">
+          <span className="font-bold">Specific Evidence Request:</span>
+          <p className="mt-0.5 text-blue-800 font-medium text-[11px]">{request.title || request.instructions}</p>
+          {request.required_angles && request.required_angles.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {request.required_angles.map((a) => (
+                <span key={a} className="rounded bg-blue-200/70 px-1.5 py-0.5 font-mono text-[10px] text-blue-900 font-bold">
+                  {a}
                 </span>
-                <div className="mt-1 font-bold text-sm text-slate-900 capitalize truncate">
-                  {uncertainty.recommended_action
-                    ? uncertainty.recommended_action.replaceAll("_", " ")
-                    : "Normal Review"}
-                </div>
-              </div>
+              ))}
             </div>
+          )}
+        </div>
+      )}
 
-            {/* Uncertainty Reasons Callout */}
-            {uncertainty.reasons && uncertainty.reasons.length > 0 && (
-              <div className="rounded border border-amber-200 bg-amber-50/80 p-2.5 text-xs text-amber-900">
-                <span className="font-bold">Uncertainty Reason:</span>
-                <ul className="mt-1 list-disc list-inside space-y-0.5 text-amber-800">
-                  {uncertainty.reasons.map((r, i) => (
-                    <li key={i}>{r}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Generated Evidence Request Preview */}
-            {request && (
-              <div className="rounded border border-blue-200 bg-blue-50/80 p-2.5 text-xs text-blue-900">
-                <span className="font-bold">Specific Evidence Request:</span>
-                <p className="mt-0.5 text-blue-800 font-medium">{request.title || request.instructions}</p>
-                {request.required_angles && request.required_angles.length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {request.required_angles.map((a) => (
-                      <span key={a} className="rounded bg-blue-200/70 px-1.5 py-0.5 font-mono text-[10px] text-blue-900 font-bold">
-                        {a}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Adaptive Engine Result */}
-            <div className={`rounded border p-2.5 text-xs ${adaptive.level === "high" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : adaptive.level === "medium" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-rose-200 bg-rose-50 text-rose-900"}`}>
-              <div className="flex items-center gap-2">
-                <span className="font-bold uppercase tracking-wider">
-                  Adaptive: {adaptive.level} · {adaptive.nextStep.replaceAll("_", " ")}
+      {/* Collapsible Component Diagnostics & Verification Breakdown */}
+      <details className="group rounded-sm border border-[var(--line)] bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors">
+          <span className="flex items-center gap-1.5">
+            <ChevronDown className="h-3.5 w-3.5 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
+            Detailed Evidence Diagnostics & Sub-metrics
+          </span>
+          <span className="font-mono text-[10px] text-slate-400 font-normal">
+            Quality · Coverage · Context · Integrity
+          </span>
+        </summary>
+        <div className="space-y-3 border-t border-[var(--line)] p-3">
+          {/* Adaptive Engine Result */}
+          <div className={`rounded border p-2.5 text-xs ${adaptive.level === "high" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : adaptive.level === "medium" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-rose-200 bg-rose-50 text-rose-900"}`}>
+            <div className="flex items-center gap-2">
+              <span className="font-bold uppercase tracking-wider">
+                Adaptive: {adaptive.level} · {adaptive.nextStep.replaceAll("_", " ")}
+              </span>
+              {storedDelta != null && storedDelta !== 0 && (
+                <span
+                  className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                    storedDelta > 0 ? "bg-emerald-200 text-emerald-900" : "bg-amber-200 text-amber-900"
+                  }`}
+                  title="Confidence change after recapture"
+                >
+                  {storedDelta > 0
+                    ? `▲ +${storedDelta.toFixed(1)} after recapture`
+                    : `▼ ${storedDelta.toFixed(1)}`}
+                  {storedPrev != null && <span className="ml-1 font-normal">(prev {storedPrev})</span>}
                 </span>
-                {storedDelta != null && storedDelta !== 0 && (
-                  <span
-                    className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                      storedDelta > 0 ? "bg-emerald-200 text-emerald-900" : "bg-amber-200 text-amber-900"
-                    }`}
-                    title="Confidence change after recapture"
-                  >
-                    {storedDelta > 0
-                      ? `▲ +${storedDelta.toFixed(1)} after recapture`
-                      : `▼ ${storedDelta.toFixed(1)}`}
-                    {storedPrev != null && <span className="ml-1 font-normal">(prev {storedPrev})</span>}
-                  </span>
-                )}
-                <span className="ml-auto font-mono text-[11px]">threshold {adaptive.threshold}</span>
-                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${adaptive.level === "high" ? "bg-emerald-200" : adaptive.level === "medium" ? "bg-amber-200" : "bg-rose-200"}`}>
-                  {peril}
-                </span>
-              </div>
-              {adaptive.reasons.length > 0 && <p className="mt-1">{adaptive.reasons[0]}</p>}
-            </div>
-
-            {/* Multi-signal Context Strip */}
-            <div className="rounded border border-slate-200 bg-white p-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Multi-signal Context</span>
-                {signalsLoading && <span className="text-[11px] text-slate-500">Loading…</span>}
-              </div>
-              {signals && signals.length > 0 ? (
-                <div className="mt-1.5 grid grid-cols-1 gap-1">
-                  {signals.map((s) => (
-                    <div key={s.source} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="font-semibold capitalize text-slate-700">{s.labelEn}</span>
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${s.status === "available" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : s.status === "pending" ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-slate-100 text-slate-600"}`}>
-                        {s.status}
-                      </span>
-                    </div>
-                  ))}
-                  {signals.map((s) => (
-                    <p key={`${s.source}-sum`} className="text-[11px] text-slate-600">
-                      <span className="font-semibold">{s.labelEn}:</span> {s.summaryEn}
-                    </p>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-1 text-xs text-slate-500">{signalsLoading ? "Fetching IMD / Sentinel / Bhuvan…" : "No GPS — external checks need location."}</p>
               )}
+              <span className="ml-auto font-mono text-[11px]">threshold {adaptive.threshold}</span>
+              <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${adaptive.level === "high" ? "bg-emerald-200" : adaptive.level === "medium" ? "bg-amber-200" : "bg-rose-200"}`}>
+                {peril}
+              </span>
+            </div>
+            {adaptive.reasons.length > 0 && <p className="mt-1">{adaptive.reasons[0]}</p>}
+          </div>
+
+          {/* Four Component Cards Header & Filter Tabs */}
+          <div className="flex items-center justify-between pt-1">
+            <h4 className="text-sm font-semibold text-slate-900">
+              Component breakdown
+            </h4>
+            <div className="flex gap-1 text-[11px]">
+              {(["all", "quality", "coverage", "context", "integrity"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`rounded-sm border px-2 py-0.5 font-medium capitalize transition-colors ${
+                    activeTab === tab
+                      ? "bg-[var(--surface)] text-[var(--ink)] border-[var(--line)] font-semibold"
+                      : "bg-transparent text-slate-500 border-transparent hover:bg-white hover:text-slate-900 hover:border-slate-200"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Four Component Cards Header & Filter Tabs */}
-      <div className="flex items-center justify-between pt-1">
-        <h4 className="text-sm font-semibold text-slate-900">
-          Component breakdown
-        </h4>
-        <div className="flex gap-1 text-[11px]">
-          {(["all", "quality", "coverage", "context", "integrity"] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`rounded-sm border px-2 py-0.5 font-medium capitalize transition-colors ${
-                activeTab === tab
-                  ? "bg-[var(--surface)] text-[var(--ink)] border-[var(--line)] font-semibold"
-                  : "bg-transparent text-slate-500 border-transparent hover:bg-white hover:text-slate-900 hover:border-slate-200"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {/* 4 Component Cards Grid */}
       <div className="grid gap-2 md:grid-cols-2">
@@ -744,7 +881,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
               </dd>
               <dt className="text-slate-500">Crop context:</dt>
               <dd className="font-mono text-slate-800 font-medium">
-                {ctxDetails.crop_context_matched === true ? "Matches declared crop" : "See Gemini analysis"}
+                {ctxDetails.crop_context_matched === true ? "Matches declared crop" : "See vision analysis"}
               </dd>
               <dt className="text-slate-500">Weather Status:</dt>
               <dd className="font-mono text-slate-800 font-medium capitalize">
@@ -778,7 +915,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
               <dd className="font-mono text-slate-800 font-medium">
                 {ctxDetails.gps_valid !== false ? "Coordinates present" : "Missing"}
               </dd>
-              <dt className="text-slate-500">Gemini authenticity:</dt>
+              <dt className="text-slate-500">Vision authenticity:</dt>
               <dd className="font-mono text-slate-800 font-medium">
                 {iDetails.authenticity_verified ? "Passed vision gate" : "Not run"}
               </dd>
@@ -796,6 +933,8 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
           </div>
         )}
       </div>
+        </div>
+      </details>
     </section>
   );
 }
