@@ -1593,21 +1593,22 @@ function CaptureStudioContent() {
         {/* Left Column (7 cols): Camera Viewfinder / Evidence Upload Workbench & Controls */}
         <div className="lg:col-span-7 space-y-3">
           {/* Dual-Mode Selector: Live Camera vs Field Photo Upload + Demo Toggle */}
-          <div className="flex items-center border border-[var(--line)] bg-[var(--surface)] p-1 text-xs font-semibold gap-1">
+          <div className="flex items-stretch border border-[var(--line)] bg-[var(--surface)] p-1 text-xs font-semibold gap-1 rounded-sm">
             <button
               type="button"
               onClick={() => {
                 setCaptureMode("camera");
                 if (!isCameraActive) void startCamera();
               }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 transition-all ${
+              className={`min-h-9 min-w-0 flex-1 flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[2px] px-2 py-2 text-[11px] sm:text-xs transition-all ${
                 captureMode === "camera"
                   ? "bg-[var(--ink)] text-[var(--surface)] font-bold shadow-xs"
                   : "text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-[var(--accent-soft)]"
               }`}
             >
               <Camera className="h-3.5 w-3.5 shrink-0" />
-              <span>{lang === "hi" ? "सीधा कैमरा (Live Camera)" : "Live Camera"}</span>
+              <span className="sm:hidden">{lang === "hi" ? "कैमरा" : "Camera"}</span>
+              <span className="hidden sm:inline">{lang === "hi" ? "सीधा कैमरा" : "Live Camera"}</span>
             </button>
             <button
               type="button"
@@ -1615,14 +1616,15 @@ function CaptureStudioContent() {
                 setCaptureMode("upload");
                 stopCamera();
               }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 transition-all ${
+              className={`min-h-9 min-w-0 flex-1 flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[2px] px-2 py-2 text-[11px] sm:text-xs transition-all ${
                 captureMode === "upload"
                   ? "bg-[var(--ink)] text-[var(--surface)] font-bold shadow-xs"
                   : "text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-[var(--accent-soft)]"
               }`}
             >
               <Upload className="h-3.5 w-3.5 shrink-0" />
-              <span>{lang === "hi" ? "खेत फ़ोटो अपलोड (Upload Photos)" : "Upload Field Photos"}</span>
+              <span className="sm:hidden">{lang === "hi" ? "अपलोड" : "Upload"}</span>
+              <span className="hidden sm:inline">{lang === "hi" ? "खेत फ़ोटो अपलोड" : "Upload Photos"}</span>
             </button>
             <button
               type="button"
@@ -1636,7 +1638,7 @@ function CaptureStudioContent() {
                 );
               }}
               className={clsx(
-                "px-2.5 py-2 text-xs font-bold transition-all border shrink-0",
+                "min-h-9 whitespace-nowrap rounded-[2px] px-2.5 py-2 text-[11px] sm:text-xs font-bold transition-all border shrink-0",
                 isDemoMode
                   ? "border-amber-500 bg-amber-100 text-amber-900 shadow-xs"
                   : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100"
