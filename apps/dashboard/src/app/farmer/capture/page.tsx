@@ -93,6 +93,8 @@ function CaptureStudioContent() {
   const milestoneId = searchParams.get("milestone");
   const intentIdParam = searchParams.get("intentId");
   const perilParam = searchParams.get("peril");
+  const demoParam = searchParams.get("demo") === "true" || searchParams.get("mode") === "demo";
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(demoParam);
   const milestone = milestones.find((item) => item.id === milestoneId);
 
   // Determine active angles to capture — peril-aware, recapture-aware, intent-aware
@@ -480,8 +482,9 @@ function CaptureStudioContent() {
 
   const capturePhotoFromCamera = async () => {
     const isDryOrCharredPeril = requestedPeril === "fire_burn" || requestedPeril === "drought";
+    const isRelaxed = isDryOrCharredPeril || isDemoMode;
 
-    if (!cvResult && !isDryOrCharredPeril) {
+    if (!cvResult && !isRelaxed) {
       const msg =
         lang === "hi"
           ? "गुणवत्ता जाँच अभी तैयार नहीं है — फसल फ्रेम में आने तक प्रतीक्षा करें।"
@@ -490,15 +493,15 @@ function CaptureStudioContent() {
       return { ok: false as const, message: msg };
     }
 
-    // Anti-Screen Fraud Rejection
-    if (cvResult?.isScreenDetected) {
+    // Anti-Screen Fraud Rejection (bypassed in demo mode)
+    if (cvResult?.isScreenDetected && !isDemoMode) {
       const msg = lang === "hi" ? "स्क्रीन / डिस्प्ले पहचानी गई — कृपया असली खेत व फसल की फोटो लें।" : "Screen / display detected — photograph real outdoor crop.";
       showToast(msg);
       return { ok: false as const, message: msg };
     }
 
-    // Strict 75%+ Crop Quality Lock
-    if (cvResult && cvResult.cropScore < 75 && !isDryOrCharredPeril) {
+    // Strict 75%+ Crop Quality Lock (relaxed in demo/presentation mode)
+    if (cvResult && cvResult.cropScore < 75 && !isRelaxed) {
       const msg = lang === "hi"
         ? `फसल पहचान केवल ${cvResult.cropScore}% है — फोटो लेने के लिए 75%+ होना आवश्यक है। कैमरे को फसल के पास लाएँ।`
         : `Crop match is only ${cvResult.cropScore}% — 75%+ required to unlock capture. Aim closer at crop foliage.`;
@@ -506,7 +509,7 @@ function CaptureStudioContent() {
       return { ok: false as const, message: msg };
     }
 
-    if (cvResult?.shouldBlockShutter && !isDryOrCharredPeril && cvResult.hintCode === "too_dark") {
+    if (cvResult?.shouldBlockShutter && !isRelaxed && cvResult.hintCode === "too_dark") {
       showToast(lang === "hi" ? cvResult.hintHi : cvResult.hintEn);
       return { ok: false as const, message: lang === "hi" ? cvResult.hintHi : cvResult.hintEn };
     }
@@ -630,6 +633,7 @@ function CaptureStudioContent() {
           dimensions,
           pHash,
           isDuplicate: isExactDup,
+          isDemoMode,
           cvAnalysis: cvResult
             ? {
                 cropScore: cvResult.cropScore,
@@ -696,7 +700,7 @@ function CaptureStudioContent() {
         }
         // also run local CV on still for second opinion (crop-only)
         const cv = await import("@/lib/vision/realtime-cv").then((m) => m.analyzeDataUrl(imageUrl, currentAngle.id));
-        if (cv && !cv.cropDetected && requestedPeril !== "fire_burn") {
+        if (cv && !cv.cropDetected && requestedPeril !== "fire_burn" && !isDemoMode) {
           showToast(lang === "hi" ? cv.hintHi : cv.hintEn);
         }
       } catch {
@@ -1109,6 +1113,7 @@ function CaptureStudioContent() {
             plotLat: plot?.lat ?? null,
             plotLon: plot?.lon ?? null,
             sowingDate: plot?.sowingDate || activeIntent?.sowingDate || null,
+            growthStage: plot?.currentStage || activeIntent?.growthStage || undefined,
             evidenceTrust: {
               qualityScore: 0,
               coverageScore: 0,
@@ -1496,8 +1501,8 @@ function CaptureStudioContent() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left Column (7 cols): Camera Viewfinder / Evidence Upload Workbench & Controls */}
         <div className="lg:col-span-7 space-y-3">
-          {/* Dual-Mode Selector: Live Camera vs Field Photo Upload */}
-          <div className="flex border border-[var(--line)] bg-[var(--surface)] p-1 text-xs font-semibold">
+          {/* Dual-Mode Selector: Live Camera vs Field Photo Upload + Demo Toggle */}
+          <div className="flex items-center border border-[var(--line)] bg-[var(--surface)] p-1 text-xs font-semibold gap-1">
             <button
               type="button"
               onClick={() => {
@@ -1527,6 +1532,27 @@ function CaptureStudioContent() {
             >
               <Upload className="h-3.5 w-3.5 shrink-0" />
               <span>{lang === "hi" ? "खेत फ़ोटो अपलोड (Upload Photos)" : "Upload Field Photos"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isDemoMode;
+                setIsDemoMode(next);
+                showToast(
+                  next
+                    ? (lang === "hi" ? "डेमो मोड चालू — 75% फसल लॉक शिथिल" : "Demo Mode enabled — 75% crop lock relaxed")
+                    : (lang === "hi" ? "डेमो मोड बंद — 75% फसल लॉक सक्रिय" : "Demo Mode disabled — standard 75% lock active")
+                );
+              }}
+              className={clsx(
+                "px-2.5 py-2 text-xs font-bold transition-all border shrink-0",
+                isDemoMode
+                  ? "border-amber-500 bg-amber-100 text-amber-900 shadow-xs"
+                  : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+              )}
+              title={lang === "hi" ? "इनडोर / प्रेजेंटेशन डेमो मोड (75% फसल लॉक शिथिल)" : "Indoor presentation demo mode (relaxes 75% crop lock)"}
+            >
+              {isDemoMode ? "⚡ Demo ON" : "Demo"}
             </button>
           </div>
 
@@ -1786,13 +1812,18 @@ function CaptureStudioContent() {
               {isCameraActive && !capturedImages[currentAngle.id] && (
                 <div className="pointer-events-none absolute bottom-3 left-2 right-2 flex flex-col items-center gap-1.5 sm:bottom-4 sm:left-4 sm:right-4">
                   <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-white/20 bg-black/75 px-3.5 py-1.5 text-xs text-white shadow-lg backdrop-blur-md">
+                    {isDemoMode && (
+                      <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-950 uppercase tracking-wide shrink-0">
+                        Demo Mode
+                      </span>
+                    )}
                     {/* Status Indicator Dot */}
                     <span
                       className={clsx(
                         "h-2 w-2 rounded-full shrink-0",
                         cvResult?.isPersonDetected || cvResult?.isScreenDetected
-                          ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,1)] animate-ping"
-                          : (cvResult?.cropScore ?? 0) >= 75
+                          ? (isDemoMode ? "bg-amber-400" : "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,1)] animate-ping")
+                          : ((cvResult?.cropScore ?? 0) >= 75 || isDemoMode)
                           ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"
                           : cvResult?.hintCode === "too_dark"
                           ? "bg-rose-500"
@@ -1802,10 +1833,12 @@ function CaptureStudioContent() {
 
                     {/* Anti-Screen / Person Alert or Localized Guidance Text */}
                     <span className="font-semibold tracking-wide truncate">
-                      {cvResult?.isPersonDetected
+                      {cvResult?.isPersonDetected && !isDemoMode
                         ? (lang === "hi" ? "व्यक्ति का चेहरा / शरीर दिखा — केवल असली फसल दिखाएँ" : "Person detected — Aim camera at field crop")
-                        : cvResult?.isScreenDetected
+                        : cvResult?.isScreenDetected && !isDemoMode
                         ? (lang === "hi" ? "स्क्रीन / फोटो का फोटो अमान्य — खेत में असली फसल दिखाएँ" : "Screen replay detected — Point at real field")
+                        : isDemoMode
+                        ? (lang === "hi" ? "डेमो मोड — फसल लॉक शिथिल (फोटो लें)" : "Demo Mode — Crop lock relaxed")
                         : (lang === "hi" ? cvResult?.hintHi : cvResult?.hintEn) ||
                           (cvModelStatus === "ready"
                             ? (lang === "hi" ? "फसल पर स्थिर रखें" : "Align camera with crop")
@@ -1854,14 +1887,15 @@ function CaptureStudioContent() {
                     {/* Main Shutter / Capture Button with 75%+ Crop Lock */}
                     {(() => {
                       const isDryOrCharred = requestedPeril === "fire_burn" || requestedPeril === "drought";
+                      const isRelaxed = isDryOrCharred || isDemoMode;
                       const isLocked =
                         isCameraActive &&
                         !capturedImages[currentAngle.id] &&
-                        ((cvResult == null && !isDryOrCharred) ||
-                          cvResult?.isPersonDetected === true ||
-                          cvResult?.isScreenDetected === true ||
-                          (cvResult != null && cvResult.cropScore < 75 && !isDryOrCharred) ||
-                          (cvResult?.shouldBlockShutter === true && !isDryOrCharred));
+                        ((cvResult == null && !isRelaxed) ||
+                          (!isDemoMode && cvResult?.isPersonDetected === true) ||
+                          (!isDemoMode && cvResult?.isScreenDetected === true) ||
+                          (cvResult != null && cvResult.cropScore < 75 && !isRelaxed) ||
+                          (cvResult?.shouldBlockShutter === true && !isRelaxed));
 
                       if (isLocked) {
                         return (

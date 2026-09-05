@@ -13,10 +13,11 @@ export type AcceptablePrediction = {
 export function predictionIsAcceptable(
   pred: AcceptablePrediction,
   integrityFailed = false,
+  gateOverridden = false,
 ): boolean {
   if (integrityFailed) return false;
   if (!pred) return true;
-  if (pred.predicted_grade === "U") return false;
+  if (pred.predicted_grade === "U") return Boolean(gateOverridden);
   if (
     pred.predicted_grade === "A" ||
     pred.predicted_grade === "B" ||

@@ -27,6 +27,7 @@ import {
   AlertCircle,
   Download,
   Share2,
+  RefreshCw,
 } from "lucide-react";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
@@ -39,13 +40,53 @@ function FarmerClaimDetailContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { lang, getClaimById, farmerProfile, isLoading } = useFarmerData();
+  const { lang, getClaimById, farmerProfile, isLoading, refresh } = useFarmerData();
   const t = getFarmerT(lang);
 
   const claimId = (params?.id as string) || "";
   const claim = getClaimById(claimId);
   const justRecaptured = searchParams.get("recaptured") === "true";
   const justSubmitted = searchParams.get("submitted") === "true";
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Auto-refresh/polling when newly submitted, recaptured, or pending AI inference
+  useEffect(() => {
+    if (!claim) return;
+    const hasPrediction = Boolean(claim.aiPrediction?.cropIdentified);
+    const isPending =
+      !hasPrediction ||
+      claim.status === "submitted" ||
+      (claim as any).inference_status === "pending";
+
+    if (!isPending) return;
+
+    let cycles = 0;
+    const maxCycles = 20; // 60s at 3s intervals
+
+    const interval = setInterval(async () => {
+      cycles++;
+      if (cycles >= maxCycles) {
+        clearInterval(interval);
+        return;
+      }
+      try {
+        await refresh();
+      } catch {
+        // ignore background poll errors
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [claim?.id, claim?.status, claim?.aiPrediction?.cropIdentified, (claim as any)?.inference_status, refresh]);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -154,11 +195,46 @@ function FarmerClaimDetailContent() {
           <span>{t.backToClaims}</span>
         </Link>
 
-        <div className="flex max-w-full items-center gap-2 font-mono text-xs text-slate-500">
-          <span className="shrink-0">{t.claimId}:</span>
-          <strong className="truncate text-slate-900">{claim.id}</strong>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+            title={lang === "hi" ? "दावा स्थिति ताज़ा करें" : "Refresh claim status"}
+          >
+            <RefreshCw className={clsx("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+            <span>{lang === "hi" ? "ताज़ा करें" : "Refresh"}</span>
+          </button>
+          <div className="flex max-w-full items-center gap-2 font-mono text-xs text-slate-500">
+            <span className="shrink-0">{t.claimId}:</span>
+            <strong className="truncate text-slate-900">{claim.id}</strong>
+          </div>
         </div>
       </div>
+
+      {/* Active AI / Quality Check Running Indicator */}
+      {(!claim.aiPrediction?.cropIdentified || claim.status === "submitted" || (claim as any).inference_status === "pending") && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 animate-spin text-sky-700 shrink-0" />
+            <span className="font-medium">
+              {lang === "hi"
+                ? "स्वचालित गुणवत्ता व फसल क्षति विश्लेषण प्रगति पर है... (पृष्ठ स्वतः अपडेट होगा)"
+                : "Automated AI quality & damage analysis running... (Auto-refresh active)"}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-sky-800 hover:text-sky-950 px-2 py-1 rounded bg-sky-100 hover:bg-sky-200 transition-colors shrink-0"
+          >
+            <RefreshCw className={clsx("h-3 w-3", isRefreshing && "animate-spin")} />
+            <span>{lang === "hi" ? "रिफ्रेश" : "Refresh"}</span>
+          </button>
+        </div>
+      )}
 
       {/* Success Toasts on Redirect */}
       {justSubmitted && (
@@ -476,7 +552,14 @@ function FarmerClaimDetailContent() {
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-lg bg-slate-50 p-3">
               <div className="text-[11px] text-slate-500 font-medium">{t.cropIdentified}</div>
-              <div className="mt-1 font-bold text-slate-900">{claim.aiPrediction.cropIdentified}</div>
+              <div className="mt-1 font-bold text-slate-900">
+                {claim.aiPrediction.cropIdentified}
+                {(claim.aiPrediction.growthStage || claim.growthStage) ? (
+                  <span className="ml-1 text-xs font-normal text-slate-600">
+                    · {claim.aiPrediction.growthStage || claim.growthStage}
+                  </span>
+                ) : null}
+              </div>
               <div className="text-[10px] text-slate-400 font-mono">
                 {claim.aiPrediction.cropConfidence}%{" "}
                 {lang === "hi" ? "विश्वास" : "confidence"}

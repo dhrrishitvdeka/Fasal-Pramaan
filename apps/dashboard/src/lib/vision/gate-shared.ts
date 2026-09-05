@@ -8,6 +8,7 @@
  */
 
 import { resolveGeminiVisionModel } from "@/lib/gemini-models";
+import { isCropMatch } from "../crop-synonyms";
 
 export const ALLOWED_GATE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 
@@ -38,6 +39,7 @@ export type ImageEvidenceMetadata = {
   plotLon?: number | null;
   plotDistanceM?: number | null;
   farmerObservation?: string | null;
+  isDemoMode?: boolean | null;
 };
 
 export type GateResult = {
@@ -171,7 +173,8 @@ export function heuristicGate(
   if (
     cv?.hintCode === "crop_not_detected" &&
     !hasFreshCropSignal &&
-    peril !== "fire_burn"
+    peril !== "fire_burn" &&
+    !metadata?.isDemoMode
   ) {
     return {
       usable: false,
@@ -182,7 +185,7 @@ export function heuristicGate(
       fallback: true,
     };
   }
-  if (cropScore != null && cropScore < 75 && peril !== "fire_burn") {
+  if (cropScore != null && cropScore < 75 && peril !== "fire_burn" && !metadata?.isDemoMode) {
     return {
       usable: false,
       reason: "crop_not_detected",
@@ -195,7 +198,7 @@ export function heuristicGate(
   }
 
   const greenPct = cv?.greenPct;
-  if (greenPct != null && greenPct < 8 && peril !== "fire_burn") {
+  if (greenPct != null && greenPct < 8 && peril !== "fire_burn" && !metadata?.isDemoMode) {
     return {
       usable: false,
       reason: "not_crop",
@@ -220,10 +223,10 @@ export function heuristicGate(
     };
   }
 
-  // Without CV measurements, fail closed — expectedCrop must not auto-pass.
+  // Without CV measurements, fail closed — expectedCrop must not auto-pass (unless demo mode).
   const hasQualitySignal =
     cropScore != null || luma != null || blur != null || greenPct != null || cv?.hintCode != null;
-  if (!hasQualitySignal) {
+  if (!hasQualitySignal && !metadata?.isDemoMode) {
     return {
       usable: false,
       reason: "heuristic_unverified",
@@ -262,7 +265,7 @@ export async function geminiGate(
   if (!ALLOWED_GATE_TYPES.has(mime.toLowerCase())) return null;
 
   const cropInstruction = expectedCrop
-    ? `Expected declared crop is '${expectedCrop}'. If a completely different crop is evident, mark reason='wrong_crop'.`
+    ? `Expected declared crop is '${expectedCrop}' (including common regional/agronomic synonyms such as paddy/rice/dhan, maize/corn/makka, gram/chickpea/chana, wheat/gehun). If a completely different crop is evident, mark reason='wrong_crop'.`
     : "Identify the crop species or agricultural genus visible in the foliage/canopy.";
 
   const perilInstruction =
@@ -297,15 +300,21 @@ Capture Metadata Context:
 `
     : "";
 
+  const demoInstruction = metadata?.isDemoMode
+    ? "PRESENTATION / DEMO MODE ACTIVE: This photograph is captured during a live indoor stage demonstration. Relax rigid outdoor farm field requirements; do not reject with 'not_crop' or 'no_field' solely due to indoor room context if sample plants or agricultural materials are presented."
+    : "";
+
+
   const prompt = `You are the chief agricultural verification officer for the PMFBY crop insurance program.
 Conduct an authoritative multimodal and contextual audit of this field evidence photograph.
 
 ${cropInstruction}
 ${perilInstruction}
+${demoInstruction}
 ${metaContextLines}
 
 Evaluate:
-1. Visual Authenticity (fail closed): Reject photographs OF a phone, laptop, monitor, TV, or any second screen (bezels, status bar, moiré, pixel grid, UI chrome) with reason='screen_replay'. Reject AI-generated, stock, meme, or printed paper with reason='ai_generated'. Reject indoor rooms, selfies, and non-field objects with reason='not_crop' or 'no_field'. Ornamental hedge, garden shrub, lawn, houseplant, or decorative foliage that is not a farm crop stand → reason='not_crop' (or 'wrong_crop' if a crop was declared), usable=false.
+1. Visual Authenticity (fail closed): Reject photographs OF a phone, laptop, monitor, TV, or any second screen (bezels, status bar, moiré, pixel grid, UI chrome) with reason='screen_replay'. Reject AI-generated, stock, meme, or printed paper with reason='ai_generated'. Reject indoor rooms, selfies, and non-field objects with reason='not_crop' or 'no_field' (unless in Demo Mode). Ornamental hedge, garden shrub, lawn, houseplant, or decorative foliage that is not a farm crop stand → reason='not_crop' (or 'wrong_crop' if a crop was declared), usable=false.
 2. Exposure & Focus: Reject if completely pitch dark or washed out (reason='too_dark' or 'too_blurry').
 3. Crop Evidence Verification: Accept any clear photograph showing the crop stand, agricultural field, or crop damage/symptoms (${angleType}). Do NOT enforce rigid camera angle constraints. Flag retake ONLY if photo quality is unusable (pitch dark, blurry, fake, screen replay, non-crop, or exact duplicate angle).
 4. Peril Consistency: Confirm if visual loss indicators match declared peril '${peril || "normal"}'.
@@ -372,19 +381,13 @@ Angle: ${angleType}, Peril: ${peril || "normal"}`;
       recommendations?: string[];
     };
 
-    const usable = Boolean(parsed.usable);
-    const reason = String(parsed.reason || (usable ? "ok" : "unusable"));
+    let usable = Boolean(parsed.usable);
+    let reason = String(parsed.reason || (usable ? "ok" : "unusable"));
+    let warnings = Array.isArray(parsed.warnings) ? parsed.warnings.map(String) : [];
 
     // Enforce crop check if expectedCrop mismatch and not fire peril
     if (expectedCrop && parsed.crop_detected && peril !== "fire_burn") {
-      const detected = String(parsed.crop_detected).toLowerCase();
-      const expected = expectedCrop.toLowerCase();
-      if (
-        detected !== "unknown" &&
-        detected !== expected &&
-        !detected.includes(expected) &&
-        !expected.includes(detected)
-      ) {
+      if (!isCropMatch(expectedCrop, parsed.crop_detected)) {
         return {
           usable: false,
           reason: "wrong_crop",
@@ -394,10 +397,17 @@ Angle: ${angleType}, Peril: ${peril || "normal"}`;
           authenticity_score: parsed.authenticity_score ?? 0.85,
           confidence: parsed.confidence ?? 0.4,
           visual_reason: parsed.visual_reason || `Detected ${parsed.crop_detected} instead of declared ${expectedCrop}.`,
-          warnings: ["wrong_crop", ...(parsed.warnings || [])],
+          warnings: ["wrong_crop", ...warnings],
           recommendations: parsed.recommendations || [],
           raw: parsed,
         };
+      } else {
+        // Disarm false-positive wrong_crop from LLM if synonym matched (e.g. paddy <-> rice)
+        if (reason === "wrong_crop") {
+          reason = "ok";
+          usable = true;
+        }
+        warnings = warnings.filter((w) => w !== "wrong_crop" && w !== "crop_mismatch");
       }
     }
 
@@ -411,7 +421,7 @@ Angle: ${angleType}, Peril: ${peril || "normal"}`;
         typeof parsed.authenticity_score === "number" ? parsed.authenticity_score : usable ? 0.95 : 0.4,
       confidence: typeof parsed.confidence === "number" ? parsed.confidence : usable ? 0.85 : 0.3,
       visual_reason: parsed.visual_reason,
-      warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map(String) : [],
+      warnings,
       recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations.map(String) : [],
       raw: parsed,
     };

@@ -20,6 +20,7 @@ import { PERIL_OPTIONS } from "@/lib/claim-routing";
 import { TableSkeleton } from "@/components/LoadingAnimation";
 import ErrorMessage from "@/components/ErrorMessage";
 import { Search, Download } from "lucide-react";
+import { isCropMatch } from "@/lib/crop-synonyms";
 
 type QueueSort = "newest" | "evidence_asc" | "evidence_desc" | "model_desc";
 
@@ -115,6 +116,9 @@ function ReviewQueuePage() {
           item.submission.crop_cycle_id.toLowerCase().includes(q) ||
           (item.submission.plot_name || "").toLowerCase().includes(q) ||
           (item.submission.crop_type || "").toLowerCase().includes(q) ||
+          isCropMatch(q, item.submission.crop_type) ||
+          isCropMatch(q, item.submission.latest_prediction?.predicted_crop) ||
+          (item.submission.latest_prediction?.predicted_crop || "").toLowerCase().includes(q) ||
           item.submission.severity?.toLowerCase().includes(q) ||
           item.submission.latest_prediction?.primary_damage?.toLowerCase().includes(q) ||
           item.submission.peril?.toLowerCase().includes(q) ||
