@@ -172,7 +172,7 @@ export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
       },
       {
         q: "Why do I need a Khasra number before filing a claim?",
-        a: "Under PMFBY rules every claim must be linked to a registered land parcel. Register your plot once with its Khasra number, and all future claims on that plot become quicker.",
+        a: "Under PMFBY rules every claim must be linked to a registered land parcel. Register your plot once with its name, village, and GPS location — the Khasra links automatically from your mobile-verified land record, you never have to type it.",
       },
       {
         q: "What happens if the reviewer sends my claim back?",
@@ -330,7 +330,7 @@ export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
       },
       {
         q: "दावा करने से पहले खसरा संख्या क्यों ज़रूरी है?",
-        a: "PMFBY नियमों के अनुसार हर दावा पंजीकृत भूखंड से जुड़ा होना चाहिए। अपना भूखंड खसरा संख्या के साथ एक बार पंजीकृत करें, आगे के दावे आसान हो जाएंगे।",
+        a: "PMFBY नियमों के अनुसार हर दावा पंजीकृत भूखंड से जुड़ा होना चाहिए। अपना भूखंड नाम, गांव और GPS स्थान के साथ एक बार पंजीकृत करें — खसरा आपके मोबाइल-सत्यापित भूलेख से अपने आप जुड़ जाता है, टाइप करने की जरूरत नहीं।",
       },
       {
         q: "समीक्षक ने मेरा दावा वापस भेज दिया तो क्या होगा?",
