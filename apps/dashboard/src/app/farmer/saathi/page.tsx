@@ -8,14 +8,16 @@ import {
   Sprout,
   Loader2,
   ArrowRight,
-  ShieldCheck,
   Camera,
   Volume2,
   Flame,
   Waves,
   Bug,
-  CloudHail,
-  PawPrint,
+  CloudRain,
+  Compass,
+  SunMedium,
+  Layers,
+  Wind,
   RotateCcw,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -71,12 +73,14 @@ export default function SaathiIntakePage() {
   const route = saathiRouteLabel(slots);
 
   const quickPerils = [
-    { peril: "fire_burn", label: t.perilFire, icon: Flame, phrase: t.perilFirePhrase },
-    { peril: "animal_damage", label: t.perilAnimals, icon: PawPrint, phrase: t.perilAnimalsPhrase },
-    { peril: "flood", label: t.perilFlood, icon: Waves, phrase: t.perilFloodPhrase },
-    { peril: "pest_disease", label: t.perilPest, icon: Bug, phrase: t.perilPestPhrase },
-    { peril: "hailstorm", label: t.perilHail, icon: CloudHail, phrase: t.perilHailPhrase },
-    { peril: "normal", label: t.perilOther, icon: Sprout, phrase: t.perilOtherPhrase },
+    { peril: "normal", label: "Normal damage", icon: Layers, phrase: "I have normal crop damage", color: "bg-emerald-700 hover:bg-emerald-800", labelColor: "text-emerald-800" },
+    { peril: "fire_burn", label: "Fire / Burn", icon: Flame, phrase: t.perilFirePhrase, color: "bg-red-700 hover:bg-red-800", labelColor: "text-red-800" },
+    { peril: "animal_damage", label: "Animal damage", icon: Compass, phrase: t.perilAnimalsPhrase, color: "bg-amber-700 hover:bg-amber-800", labelColor: "text-amber-800" },
+    { peril: "flood", label: "Flood", icon: Waves, phrase: t.perilFloodPhrase, color: "bg-blue-700 hover:bg-blue-800", labelColor: "text-blue-800" },
+    { peril: "drought", label: "Drought", icon: SunMedium, phrase: "Dry spell damaged my crop", color: "bg-orange-700 hover:bg-orange-800", labelColor: "text-orange-800" },
+    { peril: "pest_disease", label: "Pest / Disease", icon: Bug, phrase: t.perilPestPhrase, color: "bg-fuchsia-700 hover:bg-fuchsia-800", labelColor: "text-fuchsia-800" },
+    { peril: "hailstorm", label: "Hailstorm", icon: CloudRain, phrase: t.perilHailPhrase, color: "bg-sky-700 hover:bg-sky-800", labelColor: "text-sky-800" },
+    { peril: "lodging", label: "Lodging", icon: Wind, phrase: "Wind lodged my crop", color: "bg-violet-700 hover:bg-violet-800", labelColor: "text-violet-800" },
   ];
 
   return (
@@ -113,17 +117,8 @@ export default function SaathiIntakePage() {
               <RotateCcw className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{t.saathiReset}</span>
             </button>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 whitespace-nowrap">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-700" />
-              <span>{lang === "hi" ? "सहायता पोर्टल" : "PMFBY Intake"}</span>
-            </span>
           </div>
         </div>
-        <p className="mt-3 text-xs text-slate-600 leading-relaxed border-t border-stone-100 pt-2.5">
-          {lang === "hi"
-            ? "गोल बटन और यह पेज एक ही साथी हैं। पेज बदलने पर बातचीत बनी रहती है।"
-            : "The circle button and this page are the same Saathi. Your conversation stays when you change pages."}
-        </p>
       </div>
 
       <div className="fp-panel rounded-2xl p-6 text-center sm:p-7 border border-stone-200/90 bg-[#fffdf9] shadow-2xs">
@@ -134,7 +129,10 @@ export default function SaathiIntakePage() {
               <span className="absolute -inset-2 rounded-full bg-rose-400/20 animate-pulse pointer-events-none" />
             </>
           ) : liveStatus === "connecting" ? (
-            <span className="absolute inset-0 rounded-full bg-amber-400/20 animate-ping pointer-events-none" />
+            <>
+              <span className="absolute inset-0 rounded-full border border-cyan-400/30 bg-cyan-400/10 animate-ping pointer-events-none" />
+              <span className="absolute -inset-2 rounded-full border border-slate-400/20 animate-pulse pointer-events-none" />
+            </>
           ) : (
             <>
               <span className="absolute inset-0 rounded-full bg-emerald-500/15 mic-breathe-ring pointer-events-none" />
@@ -151,12 +149,12 @@ export default function SaathiIntakePage() {
               liveStatus === "live"
                 ? "bg-rose-600 shadow-rose-500/30 ring-4 ring-rose-200/80"
                 : liveStatus === "connecting"
-                  ? "bg-amber-600 shadow-amber-500/30 ring-4 ring-amber-200/80"
+                  ? "bg-slate-950 border-2 border-cyan-300/70 shadow-[0_0_0_5px_rgba(34,211,238,0.12),0_12px_30px_rgba(15,23,42,0.35)]"
                   : "bg-[var(--ink)] border-2 border-emerald-500/40 hover:border-emerald-400 hover:shadow-emerald-500/20 hover:shadow-lg",
             )}
           >
             {liveStatus === "connecting" ? (
-              <Loader2 className="h-8 w-8 animate-spin text-white" />
+              <Loader2 className="h-8 w-8 animate-spin text-cyan-300" />
             ) : liveStatus === "live" ? (
               <div className="flex flex-col items-center justify-center gap-1">
                 <Mic className="h-7 w-7 animate-pulse text-white" />
@@ -183,8 +181,8 @@ export default function SaathiIntakePage() {
               </>
             ) : liveStatus === "connecting" ? (
               <>
-                <span className="h-2 w-2 animate-spin rounded-full bg-amber-500" />
-                <span className="text-amber-700">{t.saathiConnecting}</span>
+                <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-500" />
+                <span className="text-cyan-800">{t.saathiConnecting}</span>
               </>
             ) : (
               <>
@@ -196,11 +194,11 @@ export default function SaathiIntakePage() {
           <p className="text-[11px] text-slate-500">{t.saathiLangSupported}</p>
         </div>
 
-        <div className="mt-6 w-full pt-4 border-t border-stone-100">
-          <p className="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+        <div className="mt-6 w-full border-t border-stone-100 pt-5">
+          <p className="mx-auto mb-5 w-fit text-center text-[10px] font-semibold uppercase leading-[1.35] tracking-[0.2em] text-slate-600 sm:text-[11px] sm:tracking-[0.16em]">
             {t.saathiCommonIssues}
           </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 max-w-lg mx-auto">
+          <div className="mx-auto grid max-w-md grid-cols-2 gap-x-5 gap-y-6 sm:grid-cols-4 sm:gap-x-7 sm:gap-y-7">
             {quickPerils.map((q) => {
               const Icon = q.icon;
               const isSelected = slots.peril === q.peril;
@@ -212,22 +210,21 @@ export default function SaathiIntakePage() {
                     void sendText(q.phrase, "voice");
                     if (liveStatus === "idle" || liveStatus === "error") void connectVoice();
                   }}
-                  className={clsx(
-                    "flex items-center gap-2 rounded-xl border p-2.5 text-xs font-semibold transition-all text-left shadow-2xs",
-                    isSelected
-                      ? "border-[var(--ink)] bg-[var(--ink)] text-white"
-                      : "border-stone-200 bg-white text-stone-700 hover:bg-stone-50 hover:border-emerald-300",
-                  )}
+                  className="group flex w-full flex-col items-center gap-2 text-center"
+                  aria-pressed={isSelected}
                 >
                   <span
                     className={clsx(
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs",
-                      isSelected ? "bg-white/20 text-white" : "bg-stone-100 text-stone-600",
+                      "flex h-14 w-14 items-center justify-center rounded-full text-white shadow-md transition-all duration-200 group-hover:scale-110 group-hover:shadow-lg sm:h-16 sm:w-16",
+                      q.color,
+                      isSelected && "ring-4 ring-[var(--ink)]/20 ring-offset-2"
                     )}
                   >
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon className="h-6 w-6 transition-transform duration-200 group-hover:scale-110 sm:h-7 sm:w-7" />
                   </span>
-                  <span className="truncate">{q.label}</span>
+                  <span className={clsx("text-[11px] font-semibold leading-tight sm:text-xs", q.labelColor)}>
+                    {q.label}
+                  </span>
                 </button>
               );
             })}
@@ -235,18 +232,18 @@ export default function SaathiIntakePage() {
         </div>
       </div>
 
-      <div className="fp-panel rounded-2xl p-4 sm:p-5 border border-stone-200/90 bg-[#fffdf9] shadow-2xs">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-100 text-emerald-800 text-xs font-bold">
-              <Sprout className="h-3 w-3" />
+      <div className="rounded-2xl border border-stone-200 bg-[#fffdf9] p-4 shadow-[0_8px_24px_rgba(41,37,36,0.06)] sm:p-5">
+        <div className="mb-4 flex items-center justify-between border-b border-stone-200 pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ink)] text-emerald-300">
+              <Sprout className="h-3.5 w-3.5" />
             </span>
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-700 sm:text-xs">
               {t.saathiAssessmentConvo}
             </span>
           </div>
           {isAnalyzing && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[var(--accent)]">
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
               <Loader2 className="h-3 w-3 animate-spin" />
               {t.saathiAnalyzing}
             </span>
@@ -255,21 +252,21 @@ export default function SaathiIntakePage() {
 
         <div
           ref={scrollRef}
-          className="max-h-[36vh] min-h-[16vh] space-y-2.5 overflow-y-auto rounded-xl border border-stone-200/80 bg-stone-50/70 p-3.5"
+          className="max-h-[36vh] min-h-[16vh] space-y-3 overflow-y-auto rounded-xl border border-stone-200 bg-stone-50/45 p-3 sm:p-4"
         >
           {messages.map((m) => (
             <div key={m.id} className={clsx("flex", m.role === "farmer" ? "justify-end" : "justify-start gap-2.5")}>
               {m.role !== "farmer" && (
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800 text-[10px] font-bold mt-0.5">
-                  <Sprout className="h-3.5 w-3.5" />
+                <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
+                  <Sprout className="h-3 w-3" />
                 </div>
               )}
               <div
                 className={clsx(
-                  "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed sm:text-sm shadow-2xs",
+                  "max-w-[88%] px-3.5 py-2.5 text-xs leading-relaxed sm:text-sm",
                   m.role === "farmer"
-                    ? "bg-[var(--ink)] text-white rounded-tr-xs"
-                    : "border border-stone-200/90 bg-white text-slate-800 rounded-tl-xs",
+                    ? "rounded-2xl rounded-br-md bg-[var(--ink)] text-white"
+                    : "rounded-2xl rounded-bl-md border border-stone-200 bg-white text-slate-800",
                 )}
               >
                 {m.text}
@@ -293,12 +290,12 @@ export default function SaathiIntakePage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={t.saathiPlaceholder}
-            className="fp-input flex-1 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs sm:text-sm"
+            className="flex-1 rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 sm:text-sm"
           />
           <button
             type="submit"
             disabled={!input.trim()}
-            className="fp-btn-primary rounded-xl px-4 py-2 text-xs font-semibold disabled:opacity-40 flex items-center gap-1.5"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-35"
           >
             <Send className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t.saathiSend}</span>
