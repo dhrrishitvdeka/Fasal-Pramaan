@@ -246,7 +246,10 @@ function FarmerClaimsContent() {
                   {/* Left info — stacked meta */}
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="max-w-full truncate font-mono text-sm font-bold text-slate-900">
+                      <span
+                        className="min-w-0 max-w-full flex-1 basis-full truncate font-mono text-xs font-bold text-slate-900 sm:basis-auto sm:text-sm"
+                        title={claim.id}
+                      >
                         {claim.id}
                       </span>
                       {/* Peril Badge */}
@@ -279,7 +282,8 @@ function FarmerClaimsContent() {
 
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-700">
                       <span className="font-bold text-slate-900">
-                        {lang === "hi" ? claim.cropTypeHi : claim.cropType} ({claim.cropVariety})
+                        {lang === "hi" ? claim.cropTypeHi : claim.cropType}
+                        {claim.cropVariety ? ` (${claim.cropVariety})` : ""}
                       </span>
                       <span className="text-slate-500">·</span>
                       <span className="flex items-center gap-1 text-slate-600">
@@ -323,16 +327,27 @@ function FarmerClaimsContent() {
 
                     {/* Verified Payout Banner */}
                     {isVerified && typeof claim.payoutAmountInr === "number" && claim.payoutAmountInr > 0 && (
-                      <div className="fp-panel mt-2 flex items-center justify-between p-2.5 text-xs">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-                          <span className="font-semibold">
-                            {lang === "hi" ? "दावा स्वीकृत राशि:" : "Approved Claim Payout:"}
-                          </span>
+                      <div className="mt-2 overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50/70">
+                        <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+                              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                            </span>
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-800">
+                                {lang === "hi" ? "स्वीकृत दावा राशि" : "Approved payout"}
+                              </div>
+                              <div className="mt-0.5 text-[11px] leading-snug text-emerald-700">
+                                {lang === "hi" ? "डीबीटी बैंक खाते में स्वीकृत" : "Sanctioned to DBT bank account"}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="shrink-0 pl-10 sm:pl-0 sm:text-right">
+                            <div className="font-mono text-lg font-extrabold tabular-nums text-emerald-900">
+                              ₹{claim.payoutAmountInr.toLocaleString("en-IN")}
+                            </div>
+                          </div>
                         </div>
-                        <span className="font-mono text-sm font-bold text-emerald-900">
-                          ₹{claim.payoutAmountInr.toLocaleString("en-IN")}
-                        </span>
                       </div>
                     )}
                   </div>
