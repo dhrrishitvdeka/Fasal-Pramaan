@@ -71,6 +71,29 @@ export default function FarmerHomePage() {
     }
   };
 
+  // Periodic background synchronization: keeps recapture & payout alerts fresh without manual refresh
+  React.useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        void refresh().catch(() => {});
+      }
+    };
+    window.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleVisibilityChange);
+
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        void refresh().catch(() => {});
+      }
+    }, 10_000);
+
+    return () => {
+      window.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [refresh]);
+
   const recaptureClaims = claims.filter((c) => c.status === "needs_recapture");
   const verifiedCount = claims.filter((c) => c.status === "verified").length;
   const upcoming = milestones
@@ -169,7 +192,7 @@ export default function FarmerHomePage() {
                   <button
                     type="button"
                     onClick={() => dismissNotice(notice.claimId)}
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-200/60 hover:text-stone-800 transition-colors"
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-200/60 hover:text-stone-800 transition-colors"
                     aria-label={lang === "hi" ? "हटाएँ" : "Dismiss notice"}
                     title={lang === "hi" ? "हटाएँ" : "Dismiss"}
                   >
@@ -204,7 +227,7 @@ export default function FarmerHomePage() {
                   <Link
                     href={`/farmer/capture?recapture=${notice.claimId}&angles=${angles.join(",")}`}
                     onClick={() => dismissNotice(notice.claimId)}
-                    className="fp-btn-primary min-h-9 gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-2xs"
+                    className="fp-btn-primary min-h-11 gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-2xs"
                   >
                     <Camera className="h-3.5 w-3.5" />
                     {lang === "hi" ? "फ़ोटो लें — अभी कैप्चर करें" : "Capture Required Photos Now"}
@@ -212,7 +235,7 @@ export default function FarmerHomePage() {
                   <button
                     type="button"
                     onClick={() => dismissNotice(notice.claimId)}
-                    className="min-h-9 rounded-lg border border-[#d4cfc4] bg-white/80 px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] hover:bg-white hover:text-[var(--ink)] transition-colors"
+                    className="min-h-11 rounded-lg border border-[#d4cfc4] bg-white/80 px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] hover:bg-white hover:text-[var(--ink)] transition-colors"
                   >
                     {lang === "hi" ? "हटाएँ" : "Dismiss"}
                   </button>
@@ -254,7 +277,7 @@ export default function FarmerHomePage() {
                   <button
                     type="button"
                     onClick={() => dismissPayoutNotice(notice.claimId)}
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-200/60 hover:text-stone-800 transition-colors"
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-200/60 hover:text-stone-800 transition-colors"
                     aria-label={lang === "hi" ? "हटाएँ" : "Dismiss notice"}
                     title={lang === "hi" ? "हटाएँ" : "Dismiss"}
                   >
@@ -284,7 +307,7 @@ export default function FarmerHomePage() {
                   <Link
                     href={`/farmer/claims/${notice.claimId}`}
                     onClick={() => dismissPayoutNotice(notice.claimId)}
-                    className="fp-btn-primary min-h-9 gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-2xs"
+                    className="fp-btn-primary min-h-11 gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-2xs"
                   >
                     <span>{lang === "hi" ? "स्वीकृति पत्र व विवरण देखें" : "View Approval & Payout Details"}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -292,7 +315,7 @@ export default function FarmerHomePage() {
                   <button
                     type="button"
                     onClick={() => dismissPayoutNotice(notice.claimId)}
-                    className="min-h-9 rounded-lg border border-[#b8d5be] bg-white/80 px-3 py-1.5 text-xs font-medium text-emerald-950 hover:bg-white transition-colors"
+                    className="min-h-11 rounded-lg border border-[#b8d5be] bg-white/80 px-3 py-1.5 text-xs font-medium text-emerald-950 hover:bg-white transition-colors"
                   >
                     {lang === "hi" ? "हटाएँ" : "Dismiss"}
                   </button>
@@ -357,7 +380,7 @@ export default function FarmerHomePage() {
             <div>
               <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">
                 <span>{t.statPlots}</span>
-                <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-emerald-700" />
+                <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-emerald-700" />
               </div>
               <div className="mt-1.5 text-2xl font-bold sm:text-3xl text-slate-900 font-mono">
                 {isLoading ? "—" : plots.length}
@@ -377,7 +400,7 @@ export default function FarmerHomePage() {
             <div>
               <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">
                 <span>{t.statClaims}</span>
-                <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-emerald-700" />
+                <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-emerald-700" />
               </div>
               <div className="mt-1.5 text-2xl font-bold sm:text-3xl text-slate-900 font-mono">
                 {isLoading ? "—" : claims.length}
@@ -397,7 +420,7 @@ export default function FarmerHomePage() {
             <div>
               <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-500 sm:text-[11px]">
                 <span>{t.statVerified}</span>
-                <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-emerald-700" />
+                <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-emerald-700" />
               </div>
               <div className={clsx("mt-1.5 text-2xl font-bold sm:text-3xl font-mono", verifiedCount > 0 ? "text-emerald-800" : "text-slate-900")}>
                 {isLoading ? "—" : verifiedCount}
@@ -673,11 +696,11 @@ export default function FarmerHomePage() {
               <li key={m.id} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50/80 px-3 py-2 text-xs overflow-hidden">
                 <span className="min-w-0 flex-1 truncate font-medium text-slate-800">
                   {lang === "hi" ? m.stageNameHi || m.stageName : m.stageName}
-                  {isMilestoneOverdue(m) ? (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">{t.overdueBadge}</span>
-                  ) : null}
                 </span>
-                <Link href={milestoneCaptureHref(m)} className="fp-link shrink-0 font-semibold">
+                {isMilestoneOverdue(m) ? (
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">{t.overdueBadge}</span>
+                ) : null}
+                <Link href={milestoneCaptureHref(m)} className="fp-link inline-flex min-h-11 shrink-0 items-center font-semibold">
                   {m.dueDate} →
                 </Link>
               </li>

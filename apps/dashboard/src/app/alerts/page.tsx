@@ -83,7 +83,7 @@ export default function AlertsPage() {
               {a.submission_id && (
                 <Link
                   href={`/review/${a.submission_id}`}
-                  className="shrink-0 self-start rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--accent-soft)]"
+                  className="inline-flex min-h-11 w-full shrink-0 items-center justify-center self-start rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--accent-soft)] sm:w-auto"
                 >
                   Open case →
                 </Link>

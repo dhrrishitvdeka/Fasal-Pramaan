@@ -141,7 +141,7 @@ export default function HomePage() {
       </header>
 
       {/* 8 Perils Quick Intake — circular color-coded buttons */}
-      <section className="mt-16 border-b border-[var(--line)] pb-16 sm:mt-18 sm:pb-16 md:mt-20 md:pb-20">
+      <section className="mt-16 border-b border-[var(--line)] pb-16 sm:pb-16 md:mt-20 md:pb-20">
         <div className="text-center">
           <span className="fp-kicker text-[10px] font-mono sm:text-xs">{t.perilsKicker}</span>
           <h2 className="fp-page-title mt-1 text-base font-semibold sm:mt-1.5 sm:text-xl">

@@ -111,7 +111,7 @@ export default function SaathiIntakePage() {
             <button
               type="button"
               onClick={resetSession}
-              className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-800"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-800 sm:min-h-0"
               aria-label={t.saathiReset}
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -145,7 +145,7 @@ export default function SaathiIntakePage() {
             onClick={toggleVoice}
             aria-label={liveStatus === "live" ? t.saathiVoiceOff : t.saathiTapToSpeak}
             className={clsx(
-              "group relative z-10 flex h-20 w-20 sm:h-22 sm:w-22 items-center justify-center rounded-full text-white transition-all duration-200 hover:scale-105 active:scale-95 shadow-md",
+              "group relative z-10 flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full text-white transition-all duration-200 hover:scale-105 active:scale-95 shadow-md",
               liveStatus === "live"
                 ? "bg-rose-600 shadow-rose-500/30 ring-4 ring-rose-200/80"
                 : liveStatus === "connecting"
@@ -263,7 +263,7 @@ export default function SaathiIntakePage() {
               )}
               <div
                 className={clsx(
-                  "max-w-[88%] px-3.5 py-2.5 text-xs leading-relaxed sm:text-sm",
+                  "max-w-[88%] break-words px-3.5 py-2.5 text-xs leading-relaxed sm:text-sm",
                   m.role === "farmer"
                     ? "rounded-2xl rounded-br-md bg-[var(--ink)] text-white"
                     : "rounded-2xl rounded-bl-md border border-stone-200 bg-white text-slate-800",
@@ -290,12 +290,12 @@ export default function SaathiIntakePage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={t.saathiPlaceholder}
-            className="flex-1 rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 sm:text-sm"
+            className="min-h-11 flex-1 rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
           />
           <button
             type="submit"
             disabled={!input.trim()}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-35"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl bg-[var(--ink)] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-35"
           >
             <Send className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">{t.saathiSend}</span>
@@ -305,7 +305,7 @@ export default function SaathiIntakePage() {
 
       {route && (
         <div className="fp-panel rounded-2xl border-emerald-300 bg-emerald-50/50 p-4 sm:p-5 shadow-2xs">
-          <div className="flex items-center justify-between">
+          <div className="flex min-w-0 items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-700 text-white">
                 <Camera className="h-4 w-4" />
@@ -359,7 +359,7 @@ export default function SaathiIntakePage() {
             </button>
             <button
               type="button"
-              className="fp-btn-secondary py-2.5 text-xs rounded-xl"
+              className="fp-btn-secondary min-h-11 py-2.5 text-xs rounded-xl"
               onClick={() => {
                 if (canProceed) proceedToCapture();
                 else window.location.assign("/farmer/capture");

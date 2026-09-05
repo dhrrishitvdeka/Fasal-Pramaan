@@ -292,7 +292,7 @@ function ReviewQueuePage() {
           <Link
             key={tab.id}
             href={queueTabHref(tab.id)}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition-colors ${
+              className={`flex min-h-11 items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium transition-colors sm:min-h-9 ${
               filterTab === tab.id
                 ? "bg-slate-900 text-white"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
@@ -300,7 +300,7 @@ function ReviewQueuePage() {
           >
             <span>{tab.label}</span>
             <span
-              className={`rounded-full px-1.5 py-0.2 font-mono text-[10px] ${
+              className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
                 filterTab === tab.id
                   ? "bg-slate-700 text-slate-100"
                   : tab.tone === "rose" && tab.count > 0
@@ -337,7 +337,7 @@ function ReviewQueuePage() {
               id="peril-filter"
               value={perilFilter}
               onChange={(e) => setParam("peril", e.target.value === "all" ? "" : e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-2xs focus:border-slate-800 focus:outline-none w-auto sm:w-36"
+              className="min-h-11 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-2xs focus:border-slate-800 focus:outline-none w-auto sm:min-h-9 sm:w-36"
             >
               <option value="all">All perils</option>
               {PERIL_OPTIONS.map((p) => (
@@ -354,7 +354,7 @@ function ReviewQueuePage() {
               id="sort-filter"
               value={sortBy}
               onChange={(e) => setParam("sort", e.target.value === "newest" ? "" : e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-2xs focus:border-slate-800 focus:outline-none w-auto sm:w-52"
+              className="min-h-11 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-2xs focus:border-slate-800 focus:outline-none w-auto sm:min-h-9 sm:w-52"
             >
               <option value="newest">Newest First</option>
               <option value="evidence_asc">Evidence Confidence (Lowest First)</option>
@@ -368,7 +368,7 @@ function ReviewQueuePage() {
             onClick={handleExportCsv}
             disabled={filteredItems.length === 0}
             title="Export filtered cases to CSV"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-2xs"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-2xs sm:min-h-9"
           >
             <Download className="h-3.5 w-3.5 text-slate-500" />
             <span>Export CSV</span>
@@ -448,7 +448,7 @@ function ReviewQueuePage() {
                   checked={allVisibleSelected}
                   onChange={toggleAllRows}
                   disabled={bulkBusy || selectableIds.length === 0}
-                  className="h-3.5 w-3.5 rounded border-[var(--line)] align-middle"
+                  className="h-5 w-5 cursor-pointer rounded border-[var(--line)] align-middle"
                 />
               </th>
               <th>Case</th>
@@ -484,7 +484,7 @@ function ReviewQueuePage() {
                         !canQueueAccept(s, ev) ||
                         (!isSelected && selectedIds.length >= MAX_BULK_SELECT)
                       }
-                      className="h-3.5 w-3.5 rounded border-[var(--line)] align-middle"
+                      className="h-5 w-5 cursor-pointer rounded border-[var(--line)] align-middle"
                     />
                   </td>
                   <td className="min-w-[11rem] max-w-[15rem] align-top">
@@ -573,7 +573,7 @@ function ReviewQueuePage() {
                   <td className="whitespace-nowrap text-right align-top">
                     <Link
                       href={`/review/${s.id}`}
-                      className="inline-block whitespace-nowrap rounded bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold px-2.5 py-1 border border-slate-300"
+                      className="inline-flex min-h-9 items-center whitespace-nowrap rounded bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold px-2.5 py-1 border border-slate-300"
                     >
                       Review →
                     </Link>

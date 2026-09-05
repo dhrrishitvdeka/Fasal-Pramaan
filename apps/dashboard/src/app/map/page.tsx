@@ -57,7 +57,7 @@ export default function MapPage() {
           <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             Status
             <select
-              className="w-full border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
+              className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-2xs"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
             >
@@ -72,7 +72,7 @@ export default function MapPage() {
           <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             Severity
             <select
-              className="w-full border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900"
+              className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 shadow-2xs"
               value={severity}
               onChange={(e) => setSeverity(e.target.value)}
             >
@@ -85,7 +85,7 @@ export default function MapPage() {
           </label>
           <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             Crop
-            <select className="w-full border border-slate-300 bg-white px-2 py-1.5 text-sm" value={crop} onChange={(e) => setCrop(e.target.value)}>
+            <select className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm shadow-2xs" value={crop} onChange={(e) => setCrop(e.target.value)}>
               <option value="">All</option>
               <option value="paddy">Paddy</option>
               <option value="wheat">Wheat</option>
@@ -96,7 +96,7 @@ export default function MapPage() {
           </label>
           <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             Damage
-            <select className="w-full border border-slate-300 bg-white px-2 py-1.5 text-sm" value={damage} onChange={(e) => setDamage(e.target.value)}>
+            <select className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm shadow-2xs" value={damage} onChange={(e) => setDamage(e.target.value)}>
               <option value="">All</option>
               <option value="healthy">Healthy</option>
               <option value="disease">Disease</option>
@@ -110,11 +110,11 @@ export default function MapPage() {
           </label>
           <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             From
-            <input type="date" className="w-full border border-slate-300 px-2 py-1.5 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <input type="date" className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm shadow-2xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
           </label>
           <label className="flex min-w-0 flex-col gap-1 text-xs text-slate-600">
             To
-            <input type="date" className="w-full border border-slate-300 px-2 py-1.5 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            <input type="date" className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm shadow-2xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </label>
         </div>
       </div>

@@ -56,7 +56,7 @@ export default function FarmerHelpPage() {
           }}
           placeholder={lang === "hi" ? "प्रश्न खोजें…" : "Search questions…"}
           aria-label={lang === "hi" ? "प्रश्न खोजें" : "Search questions"}
-          className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-xs sm:text-sm text-slate-900 shadow-xs outline-none placeholder:text-slate-400 focus:border-emerald-600"
+          className="min-h-11 w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 shadow-xs outline-none placeholder:text-slate-400 focus:border-emerald-600"
         />
       </div>
 
@@ -125,21 +125,21 @@ export default function FarmerHelpPage() {
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
           <Link
             href="/farmer/saathi"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--line)] px-3 py-2 text-[var(--ink-muted)] hover:text-[var(--ink)]"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--line)] px-3 py-2 text-[var(--ink-muted)] hover:text-[var(--ink)]"
           >
             <Bot className="h-3.5 w-3.5" />
             <span>{t.talkToSaathiBtn}</span>
           </Link>
           <Link
             href="/farmer/claims"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--line)] px-3 py-2 text-[var(--ink-muted)] hover:text-[var(--ink)]"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--line)] px-3 py-2 text-[var(--ink-muted)] hover:text-[var(--ink)]"
           >
             <FileText className="h-3.5 w-3.5" />
             <span>{t.viewClaimsBtn}</span>
           </Link>
           <Link
             href="/farmer/capture"
-            className="fp-btn-primary rounded-lg px-4 py-2 text-xs"
+            className="fp-btn-primary min-h-11 rounded-lg px-4 py-2 text-xs"
           >
             <Camera className="h-3.5 w-3.5" />
             <span>{t.startClaimBtn}</span>

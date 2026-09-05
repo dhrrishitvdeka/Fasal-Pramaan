@@ -137,10 +137,10 @@ export default function FasalSaathiOverlay() {
               <div className="min-w-0">
                 <div className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
                   <span>{lang === "hi" ? "फसल साथी" : "Fasal Saathi"}</span>
-                  <span className="text-[10px] font-medium text-emerald-400 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/30">
+                  <span className="text-[10px] font-medium text-emerald-400 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/30">
                     {lang === "hi" ? "सहायक" : "Assistant"}
                   </span>
-                  <span className="text-[10px] font-semibold text-amber-300 bg-amber-950/80 px-1.5 py-0.2 rounded border border-amber-500/30">
+                  <span className="text-[10px] font-semibold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/30">
                     {nativeLabelForLang(lang)}
                   </span>
                 </div>
@@ -208,7 +208,7 @@ export default function FasalSaathiOverlay() {
                 )}
                 <div
                   className={clsx(
-                    "rounded-2xl p-3 shadow-2xs leading-relaxed max-w-[88%] text-xs sm:text-sm",
+                    "rounded-2xl p-3 shadow-2xs leading-relaxed break-words max-w-[88%] text-xs sm:text-sm",
                     line.role === "farmer"
                       ? "rounded-tr-xs bg-[#1c1915] text-white"
                       : "rounded-tl-xs bg-white border border-stone-200/90 text-slate-800",

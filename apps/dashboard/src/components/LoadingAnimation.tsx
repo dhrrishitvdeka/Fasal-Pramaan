@@ -59,7 +59,7 @@ export function TableSkeleton({
       role="status"
       aria-label="Loading data table"
       className={clsx(
-        "overflow-hidden border border-[var(--line)] bg-[var(--surface)]",
+        "overflow-x-auto border border-[var(--line)] bg-[var(--surface)]",
         className,
       )}
     >
@@ -125,7 +125,7 @@ export function CardSkeleton({ count = 4, className }: CardSkeletonProps) {
       {Array.from({ length: count }).map((_, idx) => (
         <div
           key={idx}
-          className="border border-[var(--line)] bg-[var(--surface)] p-4"
+          className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4"
         >
           <div className="flex items-center justify-between">
             <div className="h-7 w-7 animate-pulse rounded-sm bg-slate-200 dark:bg-slate-700" />

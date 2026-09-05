@@ -255,7 +255,7 @@ export default function OverviewPage() {
             type="button"
             onClick={handleExportPerilCsv}
             disabled={!claims || claims.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-2xs"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors shadow-2xs sm:min-h-9"
             title="Download CSV report of all claims and analytics"
           >
             <Download className="h-3.5 w-3.5 text-slate-500" />
@@ -287,7 +287,7 @@ export default function OverviewPage() {
               aria-selected={isActive}
               onClick={() => switchSection(tab.id)}
               className={clsx(
-                "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors border",
+                "inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors border sm:min-h-9",
                 isActive
                   ? "bg-[var(--surface)] text-[var(--ink)] border-[var(--line)] font-semibold shadow-2xs"
                   : "bg-transparent text-slate-500 border-transparent hover:bg-white hover:text-slate-900 hover:border-slate-200",

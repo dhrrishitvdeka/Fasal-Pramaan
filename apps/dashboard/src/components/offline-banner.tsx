@@ -22,7 +22,7 @@ export default function OfflineBanner() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-x-0 top-0 z-[60] bg-amber-400 px-3 py-1.5 text-center text-xs font-semibold text-slate-900 shadow-sm sm:text-sm"
+      className="sticky inset-x-0 top-0 z-[60] bg-amber-400 px-3 py-1.5 text-center text-xs font-semibold text-slate-900 shadow-sm sm:text-sm"
     >
       {lang === "hi"
         ? "ऑफ़लाइन — दावा जमा नहीं होगा। प्रारूप इस सत्र में डिवाइस पर रह सकता है; कैप्चर कतार में नहीं जाते।"

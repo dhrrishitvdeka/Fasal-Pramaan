@@ -70,7 +70,7 @@ export default function ModalShell({
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledById}
-        className="max-h-[92vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-t-lg border border-slate-200 bg-white p-4 shadow-xl sm:rounded-lg sm:p-5"
+        className="max-h-[92vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-t-2xl border border-slate-200 bg-white p-4 shadow-xl sm:rounded-2xl sm:p-5"
       >
         {children}
       </div>

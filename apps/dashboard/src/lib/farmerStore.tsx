@@ -22,6 +22,7 @@ import type { ClaimIntent, Peril } from "./claim-routing";
 import { INTENT_STORAGE_KEY } from "./claim-routing";
 import { webCaptureBridge } from "./voice/capture-bridge";
 import { katthaToHectares, toKattha, type AreaUnit } from "./land-units";
+import { saveDraftImagesToDb, clearDraftImagesFromDb } from "./draft-db";
 
 export type PlotRegistrationInput = {
   name: string;
@@ -785,9 +786,13 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     const draftId = draft.id || `DRAFT-${Date.now()}`;
     const images = (draft.images || []).map((img) => ({
       ...img,
-      // data URLs blow the sessionStorage quota; keep metadata only
+      // data URLs blow the sessionStorage quota; keep metadata only in sessionStorage
       imageUrl: typeof img.imageUrl === "string" && img.imageUrl.startsWith("data:") ? "" : img.imageUrl,
     }));
+    // Persist full images with data URLs to IndexedDB asynchronously so large blobs survive tab reload
+    if (draft.images && draft.images.length > 0) {
+      void saveDraftImagesToDb(draft.images as any);
+    }
     try {
       sessionStorage.setItem(
         STORAGE_KEY_DRAFT,
@@ -817,6 +822,7 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   const clearClaimDraft = () => {
     try {
       sessionStorage.removeItem(STORAGE_KEY_DRAFT);
+      void clearDraftImagesFromDb();
     } catch {
       // ignore
     }

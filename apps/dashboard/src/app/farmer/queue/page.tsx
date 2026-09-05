@@ -24,23 +24,23 @@ export default function FarmerQueuePage() {
         <p className="text-sm text-slate-600">{t.queueEmpty}</p>
       ) : (
         <div className="fp-panel space-y-3 p-3 sm:p-5">
-          <div className="text-sm font-bold">
+          <div className="break-words text-sm font-bold">
             {lang === "hi" ? draft.plotNameHi || draft.plotName : draft.plotName || t.draftsQueue}
           </div>
           <p className="text-xs text-slate-600">
             {imageCount} {lang === "hi" ? "कोण सहेजे" : "angles saved"}
           </p>
           {draft.farmerObservations ? (
-            <p className="text-xs text-slate-600">{draft.farmerObservations}</p>
+            <p className="line-clamp-4 break-words text-xs text-slate-600">{draft.farmerObservations}</p>
           ) : null}
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Link href="/farmer/capture" className="fp-btn-primary text-xs">
+            <Link href="/farmer/capture" className="fp-btn-primary min-h-11 px-4 text-xs">
               {t.resumeDraft}
             </Link>
             <button
               type="button"
               onClick={handleDiscard}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition-colors"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition-colors"
             >
               <Trash2 className="h-3.5 w-3.5" />
               <span>{lang === "hi" ? "ड्राफ्ट हटाएं" : "Discard draft"}</span>

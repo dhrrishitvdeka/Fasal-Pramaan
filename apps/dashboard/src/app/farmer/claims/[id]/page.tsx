@@ -189,7 +189,7 @@ function FarmerClaimDetailContent() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
         <Link
           href="/farmer/claims"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+          className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>{t.backToClaims}</span>
@@ -200,7 +200,7 @@ function FarmerClaimDetailContent() {
             type="button"
             onClick={handleManualRefresh}
             disabled={isRefreshing}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+            className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
             title={lang === "hi" ? "दावा स्थिति ताज़ा करें" : "Refresh claim status"}
           >
             <RefreshCw className={clsx("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
@@ -682,7 +682,7 @@ function FarmerClaimDetailContent() {
                   </div>
                   <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
                     <MapPin className="h-2.5 w-2.5 shrink-0" aria-hidden="true" />
-                    <span>
+                    <span className="min-w-0 break-all">
                       {img.lat != null && img.lon != null
                         ? `${img.lat.toFixed(4)}, ${img.lon.toFixed(4)} (±${img.accuracyM ?? "?"}m)`
                         : lang === "hi"
@@ -738,7 +738,7 @@ function FarmerClaimDetailContent() {
                   onClick={showPrevImage}
                   disabled={!hasPrev}
                   aria-label={lang === "hi" ? "पिछली फोटो" : "Previous photo"}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
                   title={lang === "hi" ? "पिछली फोटो (←)" : "Previous (←)"}
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -748,7 +748,7 @@ function FarmerClaimDetailContent() {
                   onClick={showNextImage}
                   disabled={!hasNext}
                   aria-label={lang === "hi" ? "अगली फोटो" : "Next photo"}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-neutral-800 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
                   title={lang === "hi" ? "अगली फोटो (→)" : "Next (→)"}
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -760,7 +760,7 @@ function FarmerClaimDetailContent() {
                   type="button"
                   onClick={() => setSelectedImage(null)}
                   aria-label={lang === "hi" ? "बंद करें" : "Close photo preview"}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-rose-950/60 hover:border-rose-700/60 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white transition-colors"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-neutral-800 bg-neutral-900 text-neutral-300 hover:bg-rose-950/60 hover:border-rose-700/60 hover:text-rose-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white transition-colors"
                   title={lang === "hi" ? "बंद करें (Esc)" : "Close (Esc)"}
                 >
                   <X className="h-4 w-4" aria-hidden="true" />

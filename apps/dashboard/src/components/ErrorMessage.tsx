@@ -40,13 +40,13 @@ export default function ErrorMessage({
             className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400"
             aria-hidden="true"
           />
-          <span className="truncate">{message}</span>
+          <span className="break-words line-clamp-2">{message}</span>
         </div>
         {onRetry && (
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex shrink-0 items-center gap-1.5 font-medium underline hover:text-amber-900 dark:hover:text-white"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 font-medium underline hover:text-amber-900 dark:hover:text-white"
           >
             <RefreshCw className="h-3 w-3" />
             <span>Retry</span>
@@ -85,7 +85,7 @@ export default function ErrorMessage({
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex h-9 items-center justify-center gap-2 border border-[var(--ink)] bg-[var(--ink)] px-4 text-xs font-semibold text-[var(--surface)] transition-all hover:bg-[var(--accent)] hover:border-[var(--accent)]"
+            className="inline-flex min-h-11 items-center justify-center gap-2 border border-[var(--ink)] bg-[var(--ink)] px-4 text-xs font-semibold text-[var(--surface)] transition-all hover:bg-[var(--accent)] hover:border-[var(--accent)]"
           >
             <RefreshCw className="h-3.5 w-3.5" />
             <span>{retryLabel}</span>
@@ -95,7 +95,7 @@ export default function ErrorMessage({
         {actionHref && (
           <Link
             href={actionHref}
-            className="inline-flex h-9 items-center justify-center gap-1.5 border border-[var(--line)] bg-[var(--surface)] px-4 text-xs font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--canvas)]"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 border border-[var(--line)] bg-[var(--surface)] px-4 text-xs font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--canvas)]"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>{actionLabel}</span>
@@ -125,13 +125,13 @@ export function InlineError({
     >
       <div className="flex items-center gap-2 min-w-0">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-600 dark:text-rose-400" />
-        <span className="truncate">{message}</span>
+        <span className="break-words line-clamp-2">{message}</span>
       </div>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="shrink-0 font-mono text-[11px] font-semibold underline hover:text-rose-950"
+          className="inline-flex min-h-11 shrink-0 items-center font-mono text-[11px] font-semibold underline hover:text-rose-950"
         >
           Retry
         </button>

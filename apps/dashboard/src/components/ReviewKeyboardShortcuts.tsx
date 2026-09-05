@@ -107,10 +107,10 @@ export function ReviewKeyboardShortcuts({
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
           onClick={() => setIsOpen(false)}
         >
-          <div
-            className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-5 shadow-xl transition-all"
-            onClick={(e) => e.stopPropagation()}
-          >
+            <div
+              className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl transition-all"
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <span className="text-base">⌨️</span>
@@ -120,8 +120,9 @@ export function ReviewKeyboardShortcuts({
               </div>
               <button
                 type="button"
-                className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                 onClick={() => setIsOpen(false)}
+                aria-label="Close shortcuts"
               >
                 ✕
               </button>

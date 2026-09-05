@@ -425,6 +425,7 @@ export type ReviewerActionInput = {
   action: string;
   notes?: string;
   reason?: string;
+  reason_hi?: string;
   override_reason?: string;
   required_angles?: string[];
   actor?: string;
@@ -1531,6 +1532,7 @@ export async function recaptureAndInfer(
     farmer_observations: input.farmerObservations ?? existing.farmer_observations,
     missing_angles: preview.missingAngles,
     recapture_reason: null,
+    recapture_reason_hi: null,
     quality_score: preview.qualityScore,
     coverage_score: preview.coverageScore,
     context_score: preview.contextScore,
@@ -1901,8 +1903,16 @@ export async function applyReviewerAction(
     reviewer_notes: payload.notes || existing.reviewer_notes,
     recapture_reason:
       payload.action === "request_recapture"
-        ? payload.reason || payload.notes
-        : existing.recapture_reason,
+        ? payload.reason || payload.notes || existing.recapture_reason
+        : payload.action === "accept" || payload.action === "correct" || payload.action === "reject"
+          ? null
+          : existing.recapture_reason,
+    recapture_reason_hi:
+      payload.action === "request_recapture"
+        ? payload.reason_hi ?? existing.recapture_reason_hi ?? null
+        : payload.action === "accept" || payload.action === "correct" || payload.action === "reject"
+          ? null
+          : existing.recapture_reason_hi,
     missing_angles:
       payload.action === "request_recapture"
         ? payload.required_angles || existing.missing_angles

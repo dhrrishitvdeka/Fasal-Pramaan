@@ -164,7 +164,7 @@ export default function FarmerRemindersPage() {
                       type="button"
                       onClick={() => setSelectedPlotId(item.plotId)}
                       className={clsx(
-                        "shrink-0 rounded-lg border px-3 py-2 text-xs font-bold",
+                        "shrink-0 rounded-lg border px-3 py-2 text-xs font-bold min-h-11 inline-flex items-center",
                         selectedPlotId === item.plotId
                           ? "border-[var(--ink)] bg-[var(--ink)] text-[var(--surface)]"
                           : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]",
@@ -183,7 +183,7 @@ export default function FarmerRemindersPage() {
             <div className="mt-6 space-y-2">
               <div className="flex justify-between text-[10px] font-medium text-slate-500 sm:text-[11px]">
                 <span>{lang === "hi" ? "बुवाई" : "Sowing"}</span>
-                <span className="hidden sm:inline">{section?.plot?.cropType || ""}</span>
+                <span>{section?.plot?.cropType || ""}</span>
                 <span>{lang === "hi" ? "कटाई" : "Harvest"}</span>
               </div>
               <div className="h-3 w-full overflow-hidden rounded-full border border-slate-200 bg-slate-100">
@@ -237,9 +237,9 @@ export default function FarmerRemindersPage() {
                     </div>
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-bold text-slate-900 sm:text-base">
+                        <h2 className="text-sm font-bold text-slate-900 sm:text-base">
                           {lang === "hi" ? m.stageNameHi || m.stageName : m.stageName}
-                        </h3>
+                        </h2>
                         {state === "completed" && <span className="fp-badge-ok">{t.completedBadge}</span>}
                         {state === "next" && <span className="fp-badge-alert">{t.nextDueBadge}</span>}
                         {state === "overdue" && <span className="fp-badge-alert">{t.overdueBadge}</span>}
@@ -270,7 +270,7 @@ export default function FarmerRemindersPage() {
                             event.currentTarget.value = "";
                             handleSnooze(m.id, days);
                           }}
-                          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+                          className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
                         >
                           <option value="" disabled>
                             {t.snoozeDays}
@@ -281,7 +281,7 @@ export default function FarmerRemindersPage() {
                             </option>
                           ))}
                         </select>
-                        <Link href={milestoneCaptureHref(m)} className="fp-btn-primary gap-1.5 px-4 py-2 text-xs">
+                        <Link href={milestoneCaptureHref(m)} className="fp-btn-primary min-h-11 gap-1.5 px-4 py-2 text-xs">
                           <Camera className="h-3.5 w-3.5" />
                           <span>{t.captureMilestoneNow}</span>
                         </Link>
@@ -329,7 +329,7 @@ export default function FarmerRemindersPage() {
                   type="checkbox"
                   checked={prefs.sms}
                   onChange={(e) => savePrefs({ ...prefs, sms: e.target.checked })}
-                  className="h-4 w-4 rounded border-[var(--line)]"
+                  className="h-6 w-6 shrink-0 rounded border-[var(--line)]"
                 />
               </label>
               <label className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-2">
@@ -341,7 +341,7 @@ export default function FarmerRemindersPage() {
                   type="checkbox"
                   checked={prefs.whatsapp}
                   onChange={(e) => savePrefs({ ...prefs, whatsapp: e.target.checked })}
-                  className="h-4 w-4 rounded border-[var(--line)]"
+                  className="h-6 w-6 shrink-0 rounded border-[var(--line)]"
                 />
               </label>
               <p className="text-[11px] text-slate-500">{t.alertPrefsDeviceOnly}</p>

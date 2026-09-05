@@ -16,7 +16,7 @@ export default function EmptyState({ icon: Icon, title, body, action }: EmptySta
       <h3 className="text-sm font-semibold text-[var(--ink)]">{title}</h3>
       {body ? <p className="max-w-sm text-xs text-[var(--ink-muted)]">{body}</p> : null}
       {action ? (
-        <Link href={action.href} className="fp-btn-secondary mt-2 text-xs">
+        <Link href={action.href} className="fp-btn-secondary mt-2 min-h-11 px-4 text-xs">
           {action.label}
         </Link>
       ) : null}

@@ -45,6 +45,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       action,
       notes: payload.notes,
       reason: payload.reason || payload.override_reason,
+      reason_hi: payload.reason_hi ? String(payload.reason_hi) : undefined,
       required_angles: Array.isArray(payload.required_angles) ? payload.required_angles.map(String) : undefined,
       actor: auth.actor.email || auth.actor.userId,
       corrected_crop: payload.corrected_crop == null ? undefined : String(payload.corrected_crop),

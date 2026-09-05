@@ -97,7 +97,7 @@ export default function ClaimNotificationBanner({
               type="button"
               onClick={onDismiss}
               aria-label="Dismiss notification"
-              className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30"
             >
               <X className="h-4 w-4" />
             </button>

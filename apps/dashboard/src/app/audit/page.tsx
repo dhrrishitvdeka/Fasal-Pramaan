@@ -63,7 +63,7 @@ export default function AuditPage() {
 
       {/* md+: table */}
       <div className="fp-panel hidden overflow-x-auto md:block">
-        <table className="fp-table">
+        <table className="fp-table min-w-[36rem]">
           <thead>
             <tr>
               <th>When</th>

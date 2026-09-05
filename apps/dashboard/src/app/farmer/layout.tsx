@@ -118,7 +118,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link
               href="/farmer/help"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-600 shadow-2xs transition-colors hover:bg-slate-100 hover:text-slate-900 sm:px-2.5"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-600 shadow-2xs transition-colors hover:bg-slate-100 hover:text-slate-900 sm:min-h-0 sm:px-2.5"
               title={t.help}
               aria-label={t.help}
             >

@@ -22,7 +22,7 @@ export default function FarmerProfilePage() {
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
             {navLabel.initial}
           </div>
-          <span>{navLabel.name}</span>
+          <span className="min-w-0 break-words">{navLabel.name}</span>
         </div>
         <dl className="grid gap-2 text-xs text-slate-700 sm:grid-cols-2">
           <div>
@@ -35,7 +35,7 @@ export default function FarmerProfilePage() {
           </div>
           <div className="sm:col-span-2">
             <dt className="text-slate-500">{lang === "hi" ? "पता" : "Address"}</dt>
-            <dd>{[farmerProfile.village, farmerProfile.district, farmerProfile.state].filter(Boolean).join(", ") || "—"}</dd>
+            <dd className="break-words">{[farmerProfile.village, farmerProfile.district, farmerProfile.state].filter(Boolean).join(", ") || "—"}</dd>
           </div>
         </dl>
       </div>
@@ -54,15 +54,15 @@ export default function FarmerProfilePage() {
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Link href="/farmer/help" className="fp-btn-secondary text-xs">
+        <Link href="/farmer/help" className="fp-btn-secondary min-h-11 px-4 text-xs">
           {t.help}
         </Link>
-        <Link href="/farmer/queue" className="fp-btn-secondary text-xs">
+        <Link href="/farmer/queue" className="fp-btn-secondary min-h-11 px-4 text-xs">
           {t.draftsQueue}
         </Link>
         <button
           type="button"
-          className="fp-btn-secondary text-xs"
+          className="fp-btn-secondary min-h-11 px-4 text-xs"
           onClick={async () => {
             await logoutSession();
             router.push("/login?next=/farmer");

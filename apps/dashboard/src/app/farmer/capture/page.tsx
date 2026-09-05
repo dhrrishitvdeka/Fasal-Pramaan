@@ -26,6 +26,7 @@ import {
   Lock,
   Upload,
 } from "lucide-react";
+import { loadDraftImagesFromDb } from "@/lib/draft-db";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
 import PlotRegistrationForm from "@/components/PlotRegistrationForm";
 import { getFarmerT, CANONICAL_ANGLES as ANGLE_DEFS } from "@/lib/farmerI18n";
@@ -316,11 +317,28 @@ function CaptureStudioContent() {
             if (!url) return;
             map[img.angleType] = { ...img, imageUrl: url };
           });
-          setCapturedImages(map);
+          if (Object.keys(map).length > 0) {
+            setCapturedImages(map);
+          }
         }
+        // Also hydrate full data URLs from IndexedDB so offline drafts survive tab switches
+        void loadDraftImagesFromDb().then((idbImages) => {
+          if (idbImages && idbImages.length > 0) {
+            setCapturedImages((prev) => {
+              const updated = { ...prev };
+              idbImages.forEach((img) => {
+                const url = safeDisplayUrl(img.imageUrl);
+                if (url && img.angleType) {
+                  updated[img.angleType] = { ...(img as ClaimImageEvidence), imageUrl: url };
+                }
+              });
+              return updated;
+            });
+          }
+        });
       }
     }
-  }, [isTargetedRecapture]);
+  }, [isTargetedRecapture, milestoneId]);
 
   const stopCamera = () => {
     cameraGenRef.current += 1;
@@ -1496,7 +1514,7 @@ function CaptureStudioContent() {
                 <select
                   value={selectedPlotId}
                   onChange={(e) => setSelectedPlotId(e.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-xs font-bold text-[var(--ink)] focus:outline-none cursor-pointer"
+                  className="min-h-11 min-w-0 flex-1 bg-transparent text-xs font-bold text-[var(--ink)] focus:outline-none cursor-pointer"
                 >
                   {plots.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -1659,9 +1677,9 @@ function CaptureStudioContent() {
                     <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--ink-muted)]">
                       {lang === "hi" ? "सक्रिय कोण" : "Active Angle"} · {currentAngleIndex + 1}/{activeAngleDefs.length}
                     </span>
-                    <h3 className="text-sm sm:text-base font-bold text-[var(--ink)]">
+                    <h2 className="text-sm sm:text-base font-bold text-[var(--ink)]">
                       {getLocalizedAngleInfo(currentAngle.id, lang).name}
-                    </h3>
+                    </h2>
                   </div>
                   {capturedImages[currentAngle.id] ? (
                     <span className="inline-flex items-center gap-1 border border-[var(--ink)] bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--ink)]">
@@ -1925,7 +1943,7 @@ function CaptureStudioContent() {
                     />
 
                     {/* Anti-Screen / Person Alert or Localized Guidance Text */}
-                    <span className="font-semibold tracking-wide truncate">
+                    <span className="font-semibold tracking-wide line-clamp-2 leading-snug">
                       {cvResult?.isPersonDetected && !isDemoMode
                         ? (lang === "hi" ? "व्यक्ति का चेहरा / शरीर दिखा — केवल असली फसल दिखाएँ" : "Person detected — Aim camera at field crop")
                         : cvResult?.isScreenDetected && !isDemoMode
@@ -1947,7 +1965,7 @@ function CaptureStudioContent() {
                   <button
                     type="button"
                     onClick={() => deleteCapturedAngle(currentAngle.id)}
-                    className="flex items-center gap-1 text-red-300 hover:text-red-100 text-[11px] font-semibold bg-red-950/60 px-2 py-1 rounded"
+                    className="flex min-h-11 items-center gap-1 text-red-300 hover:text-red-100 text-[11px] font-semibold bg-red-950/60 px-2 py-1 rounded"
                   >
                     <Trash2 className="h-3 w-3" />
                     <span>{t.retakePhoto}</span>

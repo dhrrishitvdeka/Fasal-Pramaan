@@ -802,6 +802,57 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect((updated2?.gate_result as any)?.overridden).toBe(true);
   });
 
+  it("clears recapture_reason and recapture_reason_hi on accept, correct, or reject in applyReviewerAction", async () => {
+    const { store, claimId } = await persistSeed();
+    const claim = store.claims.get(claimId)!;
+    claim.recapture_reason = "Blurry leaf close-up";
+    claim.recapture_reason_hi = "धुंधली पत्ती की फोटो";
+
+    // Requesting recapture updates reasons
+    await applyReviewerAction(store, claimId, {
+      action: "request_recapture",
+      reason: "Need photo 3 again",
+      reason_hi: "फ़ोटो 3 पुनः चाहिए",
+      required_angles: ["photo_3"],
+    });
+    const afterReq = store.claims.get(claimId)!;
+    expect(afterReq.recapture_reason).toBe("Need photo 3 again");
+    expect(afterReq.recapture_reason_hi).toBe("फ़ोटो 3 पुनः चाहिए");
+
+    // Correct clears both reasons
+    await applyReviewerAction(store, claimId, {
+      action: "correct",
+      override_reason: "Verified by local officer",
+      corrected_crop: "wheat",
+    });
+    const afterCorrect = store.claims.get(claimId)!;
+    expect(afterCorrect.recapture_reason).toBeNull();
+    expect(afterCorrect.recapture_reason_hi).toBeNull();
+  });
+
+  it("clears both recapture_reason and recapture_reason_hi on claim resubmission in recaptureAndInfer", async () => {
+    const { store, claimId } = await persistSeed();
+    const claim = store.claims.get(claimId)!;
+    claim.status = "needs_recapture";
+    claim.recapture_reason = "Please retake closeup";
+    claim.recapture_reason_hi = "कृपया क्लोज़-अप पुनः लें";
+
+    await recaptureAndInfer(
+      store,
+      {
+        claimId,
+        images: [usableImage({ angleType: "photo_3", bytes: jpegLikeBytes() })],
+      },
+      async () => geminiSuccess as any,
+      { skipInference: true },
+    );
+
+    const updated = store.claims.get(claimId)!;
+    expect(updated.status).toBe("under_review");
+    expect(updated.recapture_reason).toBeNull();
+    expect(updated.recapture_reason_hi).toBeNull();
+  });
+
   it("loadAllClaimImages merges existing stored images with newly submitted angle images", async () => {
     const store = createMemoryClaimStore();
     const persisted = await persistFarmerSubmission(store, {
@@ -814,3 +865,4 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(angles).toContain("photo_2");
   });
 });
+
