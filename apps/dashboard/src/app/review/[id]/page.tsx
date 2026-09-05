@@ -27,6 +27,7 @@ import {
   Camera,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
@@ -770,9 +771,12 @@ export default function ReviewDetailPage() {
           </section>
 
           {/* SATELLITE CROSS-CHECK & BHUVAN LAND-USE */}
-          <details className="rounded-sm border border-[var(--line)] bg-white">
+          <details className="group rounded-sm border border-[var(--line)] bg-white">
             <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2">
-              <span className="text-sm font-semibold text-slate-900">Satellite and land-use</span>
+              <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+                <ChevronDown className="h-3.5 w-3.5 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
+                Satellite and land-use
+              </span>
               <span className="flex items-center gap-1.5">
                 {contextSignals.length > 0 && (
                   <span className="flex gap-1">
