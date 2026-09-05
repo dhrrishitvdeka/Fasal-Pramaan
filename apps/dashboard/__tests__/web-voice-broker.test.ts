@@ -155,7 +155,7 @@ describe("web Fasal Saathi broker", () => {
   });
 
   it("persists register_plot through the gateway and returns the plot id", async () => {
-    const plots: Array<{ name: string; cropType: string; village?: string }> = [];
+    const plots: Array<{ name: string; cropType: string; village?: string; khasraNumber?: string }> = [];
     const gw = gateway({
       addPlot: async (input) => {
         plots.push(input);
@@ -169,15 +169,15 @@ describe("web Fasal Saathi broker", () => {
       1,
     );
     expect(result.outcome).toBe("succeeded");
-    expect(plots).toEqual([
-      {
-        name: "East bund",
-        cropType: "paddy",
-        khasraNumber: "",
-        areaHectares: 2,
-        village: "Rampur",
-      },
-    ]);
+    expect(plots).toHaveLength(1);
+    expect(plots[0]).toMatchObject({
+      name: "East bund",
+      cropType: "paddy",
+      areaHectares: 2,
+      village: "Rampur",
+    });
+    // Khasra auto-links from the mobile-verified land record — never empty, never asked.
+    expect(plots[0].khasraNumber).toMatch(/^\d+\/\d[A-Z]?$/);
     expect(result.data?.plot_id).toBe("plot-saved-1");
   });
 
