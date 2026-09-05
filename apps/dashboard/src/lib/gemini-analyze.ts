@@ -396,9 +396,10 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
 
   const candidateModels: string[] = [
     model,
-    model !== "gemini-2.5-flash" ? "gemini-2.5-flash" : undefined,
-    model !== "gemini-2.5-flash-lite" ? "gemini-2.5-flash-lite" : undefined,
-    "gemini-1.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
   ].filter((m): m is string => typeof m === "string" && m.length > 0);
   const modelsToTry = [...new Set(candidateModels)];
 
@@ -422,10 +423,10 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
 
       if (!response.ok) {
         const text = await response.text();
-        const isDemandOrQuota = response.status === 503 || response.status === 429;
-        if (isDemandOrQuota && i < modelsToTry.length - 1) {
+        const isFallbackable = response.status === 503 || response.status === 429 || response.status === 404;
+        if (isFallbackable && i < modelsToTry.length - 1) {
           // Wait briefly and try the fallback model
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
           continue;
         }
         if (response.status === 503) {
@@ -451,8 +452,8 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
       break;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      if (i < modelsToTry.length - 1 && /503|429|demand|quota/i.test(lastError.message)) {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+      if (i < modelsToTry.length - 1 && /503|429|404|demand|quota|no longer available/i.test(lastError.message)) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         continue;
       }
       throw lastError;
