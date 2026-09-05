@@ -179,6 +179,43 @@ describe("web Fasal Saathi broker", () => {
     // Khasra auto-links from the mobile-verified land record — never empty, never asked.
     expect(plots[0].khasraNumber).toMatch(/^\d+\/\d[A-Z]?$/);
     expect(result.data?.plot_id).toBe("plot-saved-1");
+    expect(result.data?.newly_created).toBe(true);
+    expect(result.message).toContain("ACTION COMPLETED");
+  });
+
+  it("handles test/developer plot registration with minimal args and sensible defaults", async () => {
+    const plots: Array<{ name: string; cropType: string; village?: string; khasraNumber?: string; areaHectares?: number }> = [];
+    const gw = gateway({
+      farmerProfile: {
+        name: "Test Dev",
+        kisanId: "DEV-1",
+        phone: "9999999999",
+        village: "Test Village",
+        district: "Patna",
+        state: "Bihar",
+      },
+      addPlot: async (input) => {
+        plots.push(input);
+        return { plotId: "test-plot-id-123" };
+      },
+    });
+    const broker = new WebVoiceBroker(gw);
+    const result = await broker.execute("register_plot", { name: "Test Plot" }, 1);
+
+    expect(result.outcome).toBe("succeeded");
+    expect(plots).toHaveLength(1);
+    expect(plots[0].name).toBe("Test Plot");
+    expect(plots[0].cropType).toBe("wheat"); // Default crop
+    expect(plots[0].areaHectares).toBe(1.0); // Default area
+    expect(plots[0].village).toBe("Test Village"); // Fallback to profile village
+    expect(plots[0].khasraNumber).toMatch(/^\d+\/\d[A-Z]?$/);
+
+    // Explicit anti-gaslighting instructions in tool response
+    expect(result.message).toContain("ACTION COMPLETED");
+    expect(result.message).toContain("Do NOT claim it was already there previously");
+    expect(result.data?.newly_created).toBe(true);
+    expect(result.data?.action_status).toBe("newly_created");
+    expect(result.data?.created_by).toBe("Fasal Saathi in this conversation");
   });
 
   it("does not claim plot registration succeeded when addPlot is missing", async () => {
@@ -476,5 +513,12 @@ describe("web voice tool declarations", () => {
     expect(WEB_VOICE_SYSTEM_INSTRUCTION).toMatch(/wide_field/);
     expect(WEB_VOICE_SYSTEM_INSTRUCTION).toMatch(/confirm_pending_action/);
     expect(WEB_VOICE_SYSTEM_INSTRUCTION).toMatch(/\/farmer\/capture\?recapture=/);
+    expect(WEB_VOICE_SYSTEM_INSTRUCTION).toMatch(/ACTION-SPEECH SYNCHRONIZATION/);
+    expect(WEB_VOICE_SYSTEM_INSTRUCTION).toMatch(/ABSOLUTE TRUTHFULNESS & TOOL ACCOUNTABILITY/);
+    expect(WEB_VOICE_SYSTEM_INSTRUCTION).toMatch(/Test\/Demo Plot Protocol/);
+
+    const regPlotDecl = WEB_FUNCTION_DECLARATIONS.find((d) => d.name === "register_plot");
+    expect(regPlotDecl).toBeDefined();
+    expect((regPlotDecl?.parameters as { required?: string[] }).required).toEqual(["name"]);
   });
 });

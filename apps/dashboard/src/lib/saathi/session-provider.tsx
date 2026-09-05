@@ -251,9 +251,9 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
             cropType: input.cropType,
             khasraNumber: input.khasraNumber,
             areaHectares: input.areaHectares,
-            village: input.village || farmerProfile.village,
-            district: farmerProfile.district,
-            state: farmerProfile.state,
+            village: input.village || farmerProfile.village || "Local Village",
+            district: farmerProfile.district || "",
+            state: farmerProfile.state || "",
             lat,
             lon,
           });
