@@ -74,6 +74,7 @@ export const claimImageSchema = z.object({
   facing: z.string().nullish(),
   dimensions: z.object({ width: z.number().finite(), height: z.number().finite() }).nullish(),
   capturedAt: z.string().nullish(),
+  isDemoMode: z.boolean().nullish(),
 });
 
 /** Body of POST /api/claims (1..6 images; data-URL/MIME/size checks stay in-route). */
@@ -98,6 +99,7 @@ export const claimSubmissionSchema = z.object({
   plotLon: optionalBounded(-180, 180),
   sowingDate: optionalIsoDate,
   growthStage: z.string().optional(),
+  isDemoMode: z.boolean().nullish(),
 });
 
 export type ClaimSubmissionBody = z.infer<typeof claimSubmissionSchema>;

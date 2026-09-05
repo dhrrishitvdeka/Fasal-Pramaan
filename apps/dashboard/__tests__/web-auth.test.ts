@@ -39,4 +39,27 @@ describe("hosted web roles", () => {
     expect(reviewerLoginHref("/farmer")).toBe("/login?next=%2Foverview");
     expect(reviewerLoginHref("/review/abc")).toBe("/login?next=%2Freview%2Fabc");
   });
+
+  it("resolves demo tokens to proper reviewer and farmer roles", async () => {
+    const { requireWebActor } = await import("../src/lib/web-auth");
+    const reviewerReq = new Request("http://localhost:3000/api/test", {
+      headers: { Authorization: "Bearer demo-jwt-reviewer-12345" },
+    });
+    const reviewerAuth = await requireWebActor(reviewerReq);
+    expect(reviewerAuth.ok).toBe(true);
+    if (reviewerAuth.ok) {
+      expect(reviewerAuth.actor.role).toBe("reviewer");
+      expect(reviewerAuth.actor.email).toBe("reviewer@fasalpramaan.local");
+    }
+
+    const farmerReq = new Request("http://localhost:3000/api/test", {
+      headers: { Authorization: "Bearer demo-jwt-farmer-12345" },
+    });
+    const farmerAuth = await requireWebActor(farmerReq);
+    expect(farmerAuth.ok).toBe(true);
+    if (farmerAuth.ok) {
+      expect(farmerAuth.actor.role).toBe("farmer");
+      expect(farmerAuth.actor.email).toBe("demo@fasalpramaan.local");
+    }
+  });
 });

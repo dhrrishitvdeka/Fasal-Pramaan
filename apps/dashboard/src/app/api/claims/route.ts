@@ -122,6 +122,7 @@ export async function POST(request: Request) {
           dimensions: img.dimensions ?? undefined,
           capturedAt: img.capturedAt || undefined,
           farmerObservation: data.farmerObservations?.trim() || undefined,
+          isDemoMode: Boolean(img.isDemoMode || data.isDemoMode),
         };
       });
   } catch (error) {
@@ -231,6 +232,7 @@ export async function POST(request: Request) {
       sowingDate: data.sowingDate,
       growthStage: data.growthStage,
       createdBy: auth.actor.userId,
+      isDemoMode: Boolean(data.isDemoMode),
       images,
     };
     const result = await persistAndInfer(store, input, inferCropDisease, {
