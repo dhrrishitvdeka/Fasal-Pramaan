@@ -287,10 +287,10 @@ export default function OverviewPage() {
               aria-selected={isActive}
               onClick={() => switchSection(tab.id)}
               className={clsx(
-                "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors border",
                 isActive
-                  ? "bg-slate-900 text-white shadow-xs font-semibold"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900",
+                  ? "bg-[var(--surface)] text-[var(--ink)] border-[var(--line)] font-semibold shadow-2xs"
+                  : "bg-transparent text-slate-500 border-transparent hover:bg-white hover:text-slate-900 hover:border-slate-200",
               )}
             >
               <Icon className="h-3.5 w-3.5 opacity-80" />

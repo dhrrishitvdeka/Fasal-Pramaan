@@ -2,7 +2,7 @@ import Link from "next/link";
 
 /**
  * Compact KPI tile for government dashboards.
- * Status is communicated by left border weight + text, not loud colour fills.
+ * Clean neutral card — no side accent strip; status via small neutral badge only.
  */
 export default function MetricCard({
   label,
@@ -17,12 +17,6 @@ export default function MetricCard({
   tone?: "default" | "warn" | "danger" | "ok";
   href?: string;
 }) {
-  const border = {
-    default: "border-l-slate-300",
-    warn: "border-l-slate-600",
-    danger: "border-l-slate-900",
-    ok: "border-l-slate-500",
-  }[tone];
 
   const badge =
     tone === "warn"
@@ -50,7 +44,7 @@ export default function MetricCard({
     </>
   );
 
-  const className = `fp-panel border-l-4 px-2.5 py-2.5 sm:px-3 sm:py-3 ${border}`;
+  const className = `fp-panel px-2.5 py-2.5 sm:px-3 sm:py-3`;
   if (href) {
     return (
       <Link href={href} className={`${className} block hover:bg-[var(--accent-soft)]`}>
