@@ -57,6 +57,15 @@ import { runVoiceShutter, runVoiceSubmitDraft } from "@/lib/voice/capture-action
 import { webCaptureBridge } from "@/lib/voice/capture-bridge";
 import { anglesForPeril, normalizePeril, routeForPeril } from "@/lib/claim-routing";
 import { apiFetch } from "@/lib/auth-headers";
+import ClaimNotificationBanner from "@/components/ClaimNotificationBanner";
+import {
+  getLocalizedNotification,
+  mapApiErrorToNotificationCode,
+  notificationDebouncer,
+  type ClaimNotificationItem,
+  type NotificationCode,
+  type NotificationType,
+} from "@/lib/claim-notifications";
 import clsx from "clsx";
 
 function CaptureStudioContent() {
@@ -171,9 +180,122 @@ function CaptureStudioContent() {
   const [isListening, setIsListening] = useState<boolean>(false);
   const [speechSupported, setSpeechSupported] = useState<boolean>(false);
 
-  // Submission / draft state
+  // Submission / draft state & notification management
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [activeNotification, setActiveNotification] = useState<ClaimNotificationItem | null>(null);
+
+  const notify = React.useCallback(
+    (
+      codeOrType: NotificationCode | NotificationType,
+      customMessage?: string,
+      actionHint?: string,
+      title?: string,
+    ) => {
+      const knownCodes = new Set<string>([
+        "invalid_session",
+        "submission_failed",
+        "duplicate_images",
+        "unusable_lighting",
+        "blurry_image",
+        "no_plot_selected",
+        "missing_angles",
+        "draft_saved",
+        "draft_save_failed",
+        "photo_upload_failed",
+        "camera_switched",
+        "retake_cleared",
+        "claim_submitted",
+        "supabase_not_configured",
+        "gps_unavailable",
+        "voice_unavailable",
+      ]);
+
+      const isCode = knownCodes.has(codeOrType);
+      const dedupeKey = isCode ? codeOrType : customMessage || codeOrType;
+
+      if (!notificationDebouncer.shouldShow(dedupeKey, 3000)) {
+        return;
+      }
+
+      if (isCode) {
+        const loc = getLocalizedNotification(codeOrType as NotificationCode, lang);
+        setActiveNotification({
+          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type: loc.type,
+          code: codeOrType as NotificationCode,
+          title: title || loc.title,
+          message: customMessage || loc.message,
+          actionHint: actionHint || loc.actionHint,
+          timestamp: Date.now(),
+        });
+      } else {
+        const type = codeOrType as NotificationType;
+        const defaultTitle =
+          type === "success"
+            ? lang === "hi"
+              ? "सफल"
+              : "Success"
+            : type === "error"
+            ? lang === "hi"
+              ? "त्रुटि"
+              : "Error"
+            : type === "warning"
+            ? lang === "hi"
+              ? "चेतावनी"
+              : "Warning"
+            : lang === "hi"
+            ? "सूचना"
+            : "Info";
+
+        setActiveNotification({
+          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type,
+          title: title || defaultTitle,
+          message: customMessage || "",
+          actionHint,
+          timestamp: Date.now(),
+        });
+      }
+    },
+    [lang],
+  );
+
+  const showToast = React.useCallback(
+    (msg: string, type: NotificationType = "info") => {
+      const lower = msg.toLowerCase();
+      let inferredType = type;
+      if (
+        lower.includes("विफल") ||
+        lower.includes("fail") ||
+        lower.includes("त्रुटि") ||
+        lower.includes("error")
+      ) {
+        inferredType = "error";
+      } else if (
+        lower.includes("चेतावनी") ||
+        lower.includes("warn") ||
+        lower.includes("अँधेरी") ||
+        lower.includes("dark") ||
+        lower.includes("स्क्रीन") ||
+        lower.includes("screen") ||
+        lower.includes("duplicate") ||
+        lower.includes("समान")
+      ) {
+        inferredType = "warning";
+      } else if (
+        lower.includes("कैप्चर हो गया") ||
+        lower.includes("captured") ||
+        lower.includes("सहेजे") ||
+        lower.includes("saved") ||
+        lower.includes("सफल") ||
+        lower.includes("success")
+      ) {
+        inferredType = "success";
+      }
+      notify(inferredType, msg);
+    },
+    [notify],
+  );
 
   // Capture mode: Live Camera vs Field Photo Upload
   const [captureMode, setCaptureMode] = useState<"camera" | "upload">("camera");
@@ -433,16 +555,16 @@ function CaptureStudioContent() {
         };
         recognition.onerror = () => {
           setIsListening(false);
-          showToast(t.saathiVoiceUnsupported || (lang === "hi" ? "आवाज उपलब्ध नहीं है — नोट खुद लिखें" : "Voice unavailable — type the note instead"));
+          notify("voice_unavailable");
         };
         recognition.onend = () => setIsListening(false);
         recognition.start();
       } catch {
         setIsListening(false);
-        showToast(t.saathiVoiceUnsupported || (lang === "hi" ? "आवाज उपलब्ध नहीं है — नोट खुद लिखें" : "Voice unavailable — type the note instead"));
+        notify("voice_unavailable");
       }
     } else {
-      showToast(t.saathiVoiceUnsupported || (lang === "hi" ? "आवाज उपलब्ध नहीं है — नोट खुद लिखें" : "Voice unavailable — type the note instead"));
+      notify("voice_unavailable");
     }
   };
 
@@ -552,11 +674,7 @@ function CaptureStudioContent() {
     });
 
     if (isExactDup) {
-      showToast(
-        lang === "hi"
-          ? "यह फ़ोटो पहले से कैप्चर की गई फ़ोटो जैसी ही है — कृपया अलग स्थान या कोण से फ़ोटो लें।"
-          : "Exact duplicate photo or angle already captured — please retake from a different viewpoint."
-      );
+      notify("duplicate_images");
     }
 
     // Unmeasured quality must not count as failed: coverage excludes only
@@ -957,7 +1075,7 @@ function CaptureStudioContent() {
       }
     } catch (err) {
       console.error("Upload failed:", err);
-      showToast(lang === "hi" ? "फोटो अपलोड विफल रहा।" : "Photo upload failed.");
+      notify("photo_upload_failed");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -985,11 +1103,6 @@ function CaptureStudioContent() {
     await handleFileUpload(fakeEvent);
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
-
   // Check completion
   const requiredAngleIds = isTargetedRecapture
     ? activeAngleDefs.map((a) => a.id)
@@ -1012,7 +1125,11 @@ function CaptureStudioContent() {
       farmerObservations: observations,
       images: imagesList,
     });
-    showToast(result.saved ? t.draftSavedMsg : t.draftSaveFailedMsg);
+    if (result.saved) {
+      notify("draft_saved");
+    } else {
+      notify("draft_save_failed");
+    }
   };
 
   const handleSubmitClaim = async () => {
@@ -1021,11 +1138,7 @@ function CaptureStudioContent() {
       return Boolean(img && isUnusableLighting(img.lightingScore));
     });
     if (unusable) {
-      showToast(
-        lang === "hi"
-          ? "कुछ तस्वीरें बहुत अँधेरी या अयोग्य हैं — पहले साफ़ फोटो लें।"
-          : "Some frames are too dark or unusable. Recapture them before submitting.",
-      );
+      notify("unusable_lighting");
       return { ok: false as const, message: "Unusable frames" };
     }
 
@@ -1041,20 +1154,12 @@ function CaptureStudioContent() {
       })),
     );
     if (dupCheck.hasDuplicates) {
-      showToast(
-        lang === "hi"
-          ? "एक ही फ़ोटो या कोण बार-बार अपलोड किया गया है। कृपया अलग-अलग 3 तस्वीरें लें।"
-          : "Duplicate or exact same angle images detected. Please upload 3 distinct photos.",
-      );
+      notify("duplicate_images");
       return { ok: false as const, message: "Duplicate images detected" };
     }
 
     if (!isTargetedRecapture && !selectedPlot) {
-      showToast(
-        lang === "hi"
-          ? "दावा जमा करने से पहले कृपया एक भूखंड पंजीकृत या चयनित करें।"
-          : "Please register or select a plot before submitting a claim.",
-      );
+      notify("no_plot_selected");
       return { ok: false as const, message: "No registered plot selected" };
     }
     const result = await runVoiceSubmitDraft({
@@ -1120,14 +1225,27 @@ function CaptureStudioContent() {
             },
             payoutStatus: "pending_review",
           });
+          notify("claim_submitted");
           router.push(`/farmer/claims/${newClaim.id}?submitted=true`);
           return { id: newClaim.id };
+        } catch (submitErr) {
+          const errMsg = submitErr instanceof Error ? submitErr.message : String(submitErr);
+          const code = mapApiErrorToNotificationCode(0, errMsg);
+          notify(code, errMsg);
+          throw submitErr;
         } finally {
           setIsSubmitting(false);
         }
       },
     });
-    if (!result.ok) showToast(result.message);
+    if (!result.ok) {
+      if (result.message === t.captureAllRequired) {
+        notify("missing_angles");
+      } else {
+        const code = mapApiErrorToNotificationCode(0, result.message);
+        notify(code, result.message);
+      }
+    }
     return result;
   };
 
@@ -1268,13 +1386,11 @@ function CaptureStudioContent() {
 
   return (
     <div className="space-y-4">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fp-panel fixed left-3 right-3 top-20 z-50 flex items-center gap-2 px-3 py-2.5 text-sm sm:left-auto sm:right-4 sm:max-w-sm">
-          <CheckCircle2 className="h-5 w-5" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      {/* Polished, accessible, multilingual claim notification banner */}
+      <ClaimNotificationBanner
+        notification={activeNotification}
+        onDismiss={() => setActiveNotification(null)}
+      />
       {persistError && (
         <div className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-2 text-xs text-rose-900">
           {persistError}
