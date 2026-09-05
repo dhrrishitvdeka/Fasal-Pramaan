@@ -4,6 +4,7 @@ import { CANONICAL_ANGLES, LEGACY_CANONICAL_ANGLES } from "@/lib/farmerI18n";
 import { getLocalizedAngleInfo } from "@/lib/help-i18n";
 import { classifyPerilWithLLM } from "@/lib/saathi/classify-server";
 import { createServerSupabase } from "@/lib/supabase";
+import { autoLinkedKhasra } from "@/lib/plot-identity";
 import { resolveSaathiToolName } from "@/lib/saathi/tool-catalog";
 
 export type SaathiToolResult = {
@@ -451,7 +452,8 @@ async function registerPlotServer(
   if (!client) return { ok: false, error: "Supabase is not configured" };
   const name = String(args.name || args.plot_name || "Farm Plot").trim();
   const cropType = String(args.crop_type || args.crop || "wheat").trim().toLowerCase();
-  const khasra = args.khasra_number ? String(args.khasra_number).trim() : "";
+  // Khasra auto-links from the mobile-verified land record; never ask the farmer for it.
+  const khasra = args.khasra_number ? String(args.khasra_number).trim() : autoLinkedKhasra();
   const area = args.area_hectares ? Number(args.area_hectares) : 1.0;
   const village = args.village ? String(args.village).trim() : "";
   const plotId = `plot_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;

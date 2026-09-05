@@ -3,6 +3,7 @@ import { apiFetch } from "@/lib/auth-headers";
 import { resolveSaathiToolName } from "@/lib/saathi/tool-catalog";
 import { webCaptureBridge } from "./capture-bridge";
 import { normalizePeril } from "@/lib/claim-routing";
+import { autoLinkedKhasra } from "@/lib/plot-identity";
 
 export type VoiceOutcome = "succeeded" | "failed" | "confirmation_required" | "cancelled";
 
@@ -348,7 +349,8 @@ export class WebVoiceBroker {
   private async registerPlot(args: Record<string, unknown>): Promise<VoiceToolResult> {
     const name = String(args.name || args.plot_name || "Farm Plot").trim();
     const cropType = String(args.crop_type || args.crop || "wheat").trim().toLowerCase();
-    const khasra = args.khasra_number ? String(args.khasra_number).trim() : "";
+    // Khasra auto-links from the mobile-verified land record; never ask the farmer for it.
+    const khasra = args.khasra_number ? String(args.khasra_number).trim() : autoLinkedKhasra();
     const area = args.area_hectares ? Number(args.area_hectares) : 1.0;
     const village = args.village ? String(args.village).trim() : undefined;
 
@@ -766,8 +768,8 @@ export class WebVoiceBroker {
       return {
         outcome: "failed",
         message: isHi
-          ? "बीमा दावा शुरू करने से पहले आपका भूखंड (खेत) पंजीकृत होना अनिवार्य है। कृपया मुझे अपने खेत का नाम, फसल और खसरा नंबर बताएं ताकि मैं उसे अभी जोड़ सकूँ।"
-          : "Every claim requires a registered plot. You do not have any registered plots yet. Please provide your plot name, crop type, and khasra number so I can register it for you first.",
+          ? "बीमा दावा शुरू करने से पहले आपका भूखंड (खेत) पंजीकृत होना अनिवार्य है। कृपया मुझे अपने खेत का नाम, फसल, क्षेत्रफल और गांव बताएं, और खेत में GPS चालू रखें — खसरा अपने आप जुड़ जाएगा, बताने की जरूरत नहीं।"
+          : "Every claim requires a registered plot. You do not have any registered plots yet. Please tell me your plot name, crop, area, and village, and keep GPS ON in your field — the Khasra links automatically, you don't need to provide it.",
       };
     }
 
