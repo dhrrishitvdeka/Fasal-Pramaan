@@ -437,9 +437,9 @@ function ReviewQueuePage() {
       </div>
 
       <div className="fp-panel hidden overflow-x-auto shadow-sm md:block">
-        <table className="fp-table min-w-[68rem] text-xs">
+        <table className="fp-table min-w-[64rem] text-xs">
           <thead>
-            <tr>
+            <tr className="whitespace-nowrap">
               <th className="w-9">
                 <input
                   type="checkbox"
@@ -451,16 +451,13 @@ function ReviewQueuePage() {
                   className="h-3.5 w-3.5 rounded border-[var(--line)] align-middle"
                 />
               </th>
-              <th>Reference</th>
-              <th>Plot / crop</th>
+              <th>Case</th>
               <th>Status</th>
-              <th>Severity</th>
-              <th>AI Damage</th>
-              <th>Evidence Conf.</th>
-              <th>Uncertainty</th>
-              <th>Recommended Action</th>
+              <th>AI finding</th>
+              <th>Evidence</th>
+              <th>Signal</th>
               <th>Integrity</th>
-              <th>Model Conf.</th>
+              <th>Model</th>
               <th className="text-right">Action</th>
             </tr>
           </thead>
@@ -471,10 +468,12 @@ function ReviewQueuePage() {
               const integrityScore = ev.integrity.score;
               const isIntegrityIssue = integrityScore < 70;
               const isSelected = selectedIds.includes(s.id);
+              const damage = s.latest_prediction?.primary_damage?.replaceAll("_", " ") || null;
+              const severity = s.severity || s.latest_prediction?.severity || null;
 
               return (
                 <tr key={s.id} className={`transition-colors ${isSelected ? "bg-[var(--accent-soft)]" : "hover:bg-slate-50"}`}>
-                  <td>
+                  <td className="align-top">
                     <input
                       type="checkbox"
                       aria-label={`Select case ${s.id.slice(0, 8)}`}
@@ -488,28 +487,40 @@ function ReviewQueuePage() {
                       className="h-3.5 w-3.5 rounded border-[var(--line)] align-middle"
                     />
                   </td>
-                  <td className="font-mono text-[11px] font-semibold text-slate-700">
-                    {s.id.slice(0, 8)}…
-                  </td>
-                  <td className="max-w-[10rem]">
-                    <div className="truncate font-medium text-slate-800">{s.plot_name || s.crop_cycle_id || "—"}</div>
+                  <td className="min-w-[11rem] max-w-[15rem] align-top">
+                    <div className="font-mono text-[11px] font-semibold text-slate-700" title={s.id}>
+                      {s.id.length > 14 ? `${s.id.slice(0, 14)}…` : s.id}
+                    </div>
+                    <div className="mt-0.5 truncate font-medium text-slate-800" title={s.plot_name || s.crop_cycle_id || ""}>
+                      {s.plot_name || s.crop_cycle_id || "—"}
+                    </div>
                     <div className="truncate capitalize text-[10px] text-slate-500">{s.crop_type || "—"}</div>
                   </td>
-                  <td>
-                    <div className="flex flex-col gap-1">
-                      <span className="fp-badge-neutral uppercase text-[10px]">{s.status}</span>
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] uppercase text-slate-600 w-fit">{s.peril || "normal"}</span>
-                      {adaptiveBadge(s)}
+                  <td className="align-top">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="fp-badge-neutral whitespace-nowrap uppercase text-[10px]">
+                        {s.status.replaceAll("_", " ")}
+                      </span>
+                      <span className="whitespace-nowrap rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] uppercase text-slate-600">
+                        {s.peril || "normal"}
+                      </span>
+                    </div>
+                    {adaptiveBadge(s) ? <div className="mt-1">{adaptiveBadge(s)}</div> : null}
+                  </td>
+                  <td className="min-w-[9rem] max-w-[13rem] align-top">
+                    <div className="truncate font-medium capitalize text-slate-800" title={damage || severity || "Not assessed"}>
+                      {damage || "—"}
+                    </div>
+                    <div className="mt-0.5 text-[10px] capitalize text-slate-500">
+                      {severity ? `Severity: ${severity}` : "Severity: —"}
                     </div>
                   </td>
-                  <td className="capitalize">{s.severity || s.latest_prediction?.severity || "—"}</td>
-                  <td className="capitalize">{s.latest_prediction?.primary_damage?.replaceAll("_", " ") || "—"}</td>
 
-                  <td className="tabular-nums font-medium">
+                  <td className="whitespace-nowrap align-top tabular-nums font-medium">
                     <div className="flex items-center gap-1.5">
                       <span className="font-bold text-slate-900">{finalConf}%</span>
                       <span
-                        className={`rounded px-1.5 py-0.5 text-[9px] font-bold border ${
+                        className={`whitespace-nowrap rounded px-1.5 py-0.5 text-[9px] font-bold border ${
                           isLowConf
                             ? "bg-amber-50 text-amber-700 border-amber-200"
                             : "fp-badge-ok"
@@ -520,47 +531,49 @@ function ReviewQueuePage() {
                     </div>
                   </td>
 
-                  <td>
-                    <div className="flex items-center gap-1">
-                      <span className="capitalize font-semibold text-slate-800">
+                  <td className="min-w-[10rem] max-w-[15rem] align-top">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="whitespace-nowrap font-semibold capitalize text-slate-800">
                         {ev.uncertainty.type || "None"}
                       </span>
                       {ev.uncertainty.severity && ev.uncertainty.severity !== "low" && (
-                        <span className="rounded bg-rose-50 px-1 text-[9px] font-bold text-rose-700 border border-rose-200 uppercase">
+                        <span className="whitespace-nowrap rounded bg-rose-50 px-1 text-[9px] font-bold text-rose-700 border border-rose-200 uppercase">
                           {ev.uncertainty.severity}
                         </span>
                       )}
                     </div>
+                    <div
+                      className="mt-0.5 truncate capitalize text-[10px] text-slate-500"
+                      title={ev.uncertainty.recommended_action ? ev.uncertainty.recommended_action.replaceAll("_", " ") : "Normal review"}
+                    >
+                      {ev.uncertainty.recommended_action
+                        ? ev.uncertainty.recommended_action.replaceAll("_", " ")
+                        : "Normal review"}
+                    </div>
                   </td>
 
-                  <td className="text-slate-700 capitalize max-w-[160px] truncate">
-                    {ev.uncertainty.recommended_action
-                      ? ev.uncertainty.recommended_action.replaceAll("_", " ")
-                      : "Normal Review"}
-                  </td>
-
-                  <td>
+                  <td className="whitespace-nowrap align-top">
                     <span
-                      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold border ${
+                      className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold border ${
                         isIntegrityIssue
                           ? "bg-rose-50 text-rose-800 border-rose-200"
                           : "fp-badge-ok"
                       }`}
                     >
-                      <span>{isIntegrityIssue ? "⚠️ Flagged" : "✓ Passed"}</span>
+                      {isIntegrityIssue ? "⚠️ Flagged" : "✓ Passed"}
                     </span>
                   </td>
 
-                  <td className="tabular-nums text-slate-600 font-mono text-[11px]">
+                  <td className="whitespace-nowrap align-top tabular-nums text-slate-600 font-mono text-[11px]">
                     {s.latest_prediction?.overall_confidence != null
                       ? `${(s.latest_prediction.overall_confidence * 100).toFixed(0)}%`
                       : "—"}
                   </td>
 
-                  <td className="text-right">
+                  <td className="whitespace-nowrap text-right align-top">
                     <Link
                       href={`/review/${s.id}`}
-                      className="rounded bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold px-2.5 py-1 inline-block border border-slate-300"
+                      className="inline-block whitespace-nowrap rounded bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold px-2.5 py-1 border border-slate-300"
                     >
                       Review →
                     </Link>
@@ -570,7 +583,7 @@ function ReviewQueuePage() {
             })}
             {!isLoading && filteredItems.length === 0 && (
               <tr>
-                <td colSpan={12} className="py-12 text-center text-slate-500">
+                <td colSpan={9} className="py-12 text-center text-slate-500">
                   No cases found matching the selected filter criteria.
                 </td>
               </tr>
