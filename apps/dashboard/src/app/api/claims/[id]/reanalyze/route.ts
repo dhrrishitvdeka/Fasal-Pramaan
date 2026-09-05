@@ -16,23 +16,21 @@ import { checkRateLimit } from "@/lib/server/rate-limit";
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
-  if (!isReviewerRole(auth.actor.role)) {
-    return actorUnauthorized("Reviewer role required");
-  }
-  const limit = checkRateLimit(`claim-reanalyze:${auth.actor.userId}`, 5, 60_000);
-  if (!limit.ok) {
-    return NextResponse.json(
-      { error: "Too many re-analysis requests. Try again shortly." },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
-    );
-  }
   const { id } = await context.params;
   const supabase = createServerSupabase();
   if (!supabase) {
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
   }
+  const store = createSupabaseClaimStore(supabase);
+  const existingClaim = await store.getClaim(id);
+  if (!existingClaim) {
+    return NextResponse.json({ error: "Claim not found" }, { status: 404 });
+  }
+  if (!isReviewerRole(auth.actor.role) && existingClaim.created_by !== auth.actor.userId) {
+    return actorUnauthorized("Access denied");
+  }
   try {
-    const result = await retryPendingInference(createSupabaseClaimStore(supabase), id, inferCropDisease, {
+    const result = await retryPendingInference(store, id, inferCropDisease, {
       force: true,
     });
     if (!result) {

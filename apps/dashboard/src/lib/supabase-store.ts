@@ -38,6 +38,7 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
             inference_started_at: _t,
             growth_stage: _gs,
             predicted_growth_stage: _pgs,
+            corrected_growth_stage: _cgs,
             sowing_date: _sd,
             ...stripped
           } = row as any;
@@ -58,7 +59,8 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
       if (error) throw new Error(error.message);
     },
     async updateClaim(id, patch, opts) {
-      const apply = async (body: Partial<WebClaimRow>) => {
+      const currentBody: Record<string, unknown> = { ...(patch as Record<string, unknown>) };
+      const apply = async (body: Record<string, unknown>) => {
         let query = client.from("web_claims").update(body).eq("id", id);
         if (opts?.expectedStatus) {
           query = query.eq("status", opts.expectedStatus);
@@ -69,25 +71,46 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
           throw new Error("Claim status changed");
         }
       };
-      try {
-        await apply(patch);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg === "Claim status changed") throw err;
-        if (/peril|intent_id|gate_result|context_signals|adaptive_result|inference_/i.test(msg)) {
-          const {
-            peril: _p,
-            intent_id: _i,
-            gate_result: _g,
-            context_signals: _c,
-            adaptive_result: _a,
-            inference_status: _s,
-            inference_error: _e,
-            inference_started_at: _t,
-            ...stripped
-          } = patch as any;
-          await apply(stripped);
-        } else {
+
+      for (let attempt = 0; attempt < 6; attempt++) {
+        try {
+          await apply(currentBody);
+          return;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          const code = (err as { code?: string })?.code;
+          if (msg === "Claim status changed") throw err;
+
+          const colMatch =
+            msg.match(/Could not find the '([^']+)' column/i) ||
+            msg.match(/column "?([^"\s]+)"? does not exist/i) ||
+            msg.match(/column "?([^"\s]+)"? of relation/i);
+
+          if (colMatch && colMatch[1] && colMatch[1] in currentBody) {
+            delete currentBody[colMatch[1]];
+            continue;
+          }
+
+          if (
+            code === "42703" ||
+            code === "PGRST204" ||
+            /growth_stage|predicted_growth_stage|corrected_growth_stage|sowing_date|peril|intent_id|gate_result|context_signals|adaptive_result|inference_|column.*does not exist|Could not find the '.*' column/i.test(msg)
+          ) {
+            delete currentBody.growth_stage;
+            delete currentBody.predicted_growth_stage;
+            delete currentBody.corrected_growth_stage;
+            delete currentBody.sowing_date;
+            delete currentBody.peril;
+            delete currentBody.intent_id;
+            delete currentBody.gate_result;
+            delete currentBody.context_signals;
+            delete currentBody.adaptive_result;
+            delete currentBody.inference_status;
+            delete currentBody.inference_error;
+            delete currentBody.inference_started_at;
+            continue;
+          }
+
           throw err;
         }
       }

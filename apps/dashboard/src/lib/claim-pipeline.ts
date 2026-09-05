@@ -119,6 +119,7 @@ async function gateSingleImage(
     capturedAt: input.capturedAt,
     facing: input.facing,
     dimensions: input.dimensions,
+    isDemoMode: input.isDemoMode ?? (input as any).is_demo_mode ?? undefined,
     cvAnalysis: {
       cropScore: input.cropScore,
       greenPct: input.greenPct,
@@ -327,6 +328,7 @@ export type PersistedImageInput = {
   facing?: string | null;
   dimensions?: { width: number; height: number } | null;
   farmerObservation?: string | null;
+  isDemoMode?: boolean | null;
 };
 
 export type PersistClaimInput = {
@@ -351,6 +353,7 @@ export type PersistClaimInput = {
   growthStage?: string | null;
   createdBy?: string | null;
   contextSignals?: ContextSignal[];
+  isDemoMode?: boolean | null;
   images: PersistedImageInput[];
 };
 
@@ -1701,7 +1704,7 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
     })),
     inference_status: (claim as { inference_status?: string | null }).inference_status ?? null,
     inference_error: (claim as { inference_error?: string | null }).inference_error ?? null,
-    latest_prediction: claim.hf_label || geminiAnalysisFromGate(claim.gate_result)
+    latest_prediction: claim.hf_label || claim.crop_identified || claim.disease_detected || geminiAnalysisFromGate(claim.gate_result)
       ? (() => {
           const analysis = geminiAnalysisFromGate(claim.gate_result);
           const unusable = workflowGrade(claim.severity_grade) === "U";
@@ -1712,8 +1715,8 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
             predicted_crop: unusable
               ? "unknown"
               : claim.corrected_crop || analysis?.predicted_crop || claim.crop_identified,
-            crop_confidence: unusable ? 0 : (claim.crop_confidence ?? 0) / 100,
-            predicted_growth_stage: claim.corrected_growth_stage || analysis?.growth_stage || (claim as any).growth_stage || null,
+            crop_confidence: unusable ? 0 : ((claim.crop_confidence ?? 0) > 1 ? (claim.crop_confidence ?? 0) / 100 : (claim.crop_confidence ?? 0.85)),
+            predicted_growth_stage: claim.corrected_growth_stage || analysis?.growth_stage || (claim as any).growth_stage || (claim as any).predicted_growth_stage || null,
             predicted_grade: workflowGrade(claim.severity_grade),
             grade_label:
               analysis?.grade_label ||
@@ -1722,7 +1725,7 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
               ? "unknown"
               : claim.disease_detected || analysis?.primary_damage || claim.hf_label,
             severity: claim.corrected_severity ?? analysis?.severity ?? null,
-            overall_confidence: unusable ? 0 : claim.hf_score ?? 0,
+            overall_confidence: unusable ? 0 : (claim.hf_score ?? ((claim.model_confidence ?? 0) > 1 ? (claim.model_confidence ?? 0) / 100 : (claim.model_confidence ?? 0.85))),
             affected_area_pct:
               claim.corrected_affected_area_pct ??
               analysis?.affected_area_pct ??

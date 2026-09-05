@@ -271,7 +271,17 @@ export function imageFromRow(row: WebClaimImageRow): ClaimImageEvidence {
 }
 
 export function claimFromRow(row: WebClaimRow, images: ClaimImageEvidence[]): FarmerClaim {
-  const hasPrediction = Boolean(row.crop_identified || row.disease_detected || (row.model_confidence ?? 0) > 0);
+  const gateRes = (row as any).gate_result as any;
+  const analysis = gateRes?.geminiAnalysis || gateRes?.analysis || null;
+  const hasPrediction = Boolean(
+    row.crop_identified ||
+    row.disease_detected ||
+    (row.model_confidence ?? 0) > 0 ||
+    row.hf_label ||
+    analysis?.predicted_crop ||
+    analysis?.primary_damage ||
+    analysis?.plant_disease_class
+  );
   let extra: Partial<FarmerClaim> = {};
   try {
     extra = {
@@ -288,8 +298,6 @@ export function claimFromRow(row: WebClaimRow, images: ClaimImageEvidence[]): Fa
     extra = {};
   }
 
-  const gateRes = (row as any).gate_result as any;
-  const analysis = gateRes?.geminiAnalysis || gateRes?.analysis || null;
   const growthStage =
     row.corrected_growth_stage ||
     analysis?.growth_stage ||
@@ -304,7 +312,7 @@ export function claimFromRow(row: WebClaimRow, images: ClaimImageEvidence[]): Fa
     plotName: row.plot_name || "",
     plotNameHi: row.plot_name_hi || "",
     khasraNumber: row.khasra_number || "",
-    cropType: row.crop_type || "",
+    cropType: row.crop_type || row.crop_identified || analysis?.predicted_crop || "",
     cropTypeHi: row.crop_type_hi || "",
     cropVariety: row.crop_variety || "",
     status: asStatus(row.status),
@@ -330,18 +338,34 @@ export function claimFromRow(row: WebClaimRow, images: ClaimImageEvidence[]): Fa
     },
     aiPrediction: hasPrediction
       ? {
-          cropIdentified: row.corrected_crop || row.crop_identified || "",
-          cropConfidence: row.crop_confidence ?? 0,
+          cropIdentified: row.corrected_crop || row.crop_identified || analysis?.predicted_crop || "",
+          cropConfidence: row.crop_confidence ?? (analysis?.crop_confidence ? Math.round(analysis.crop_confidence * 100) : 0),
           diseaseDetected:
             (row.corrected_damage_codes && row.corrected_damage_codes.length > 0
               ? row.corrected_damage_codes[0]
-              : row.disease_detected) || "",
+              : row.disease_detected) ||
+            analysis?.primary_damage ||
+            analysis?.plant_disease_class ||
+            row.hf_label ||
+            "",
           diseaseDetectedHi: row.disease_detected_hi || "",
-          severityPercentage: row.corrected_affected_area_pct ?? row.severity_percentage ?? 0,
-          severityGrade: asSeverityGrade(row.corrected_grade || row.corrected_severity || row.severity_grade),
+          severityPercentage:
+            row.corrected_affected_area_pct ??
+            row.severity_percentage ??
+            analysis?.affected_area_pct ??
+            0,
+          severityGrade: asSeverityGrade(
+            row.corrected_grade ||
+            row.corrected_severity ||
+            row.severity_grade ||
+            analysis?.predicted_grade
+          ),
           affectedAreaHectares: row.affected_area_hectares ?? 0,
           estimatedLossInr: row.estimated_loss_inr ?? 0,
-          modelConfidence: row.model_confidence ?? 0,
+          modelConfidence:
+            row.model_confidence ??
+            (analysis?.score ? Math.round(analysis.score * 100) : 0) ??
+            (row.hf_score ? Math.round(row.hf_score * 100) : 0),
           growthStage: growthStage || undefined,
         }
       : { ...EMPTY_AI_PREDICTION, growthStage: growthStage || undefined },

@@ -105,6 +105,8 @@ export default function ReviewDetailPage() {
   // Recapture modal & Lightbox state
   const [selectedAngles, setSelectedAngles] = useState<string[]>([]);
   const [recaptureModalOpen, setRecaptureModalOpen] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [gateRerunning, setGateRerunning] = useState(false);
 
@@ -477,11 +479,7 @@ export default function ReviewDetailPage() {
   };
 
   const handleCorrect = () => {
-    const why = (reason || notes || "").trim();
-    if (!why) {
-      setMessage("Add an override reason before correcting and verifying.");
-      return;
-    }
+    const why = (reason || notes || "Reviewer verified with field corrections").trim();
     action.mutate({
       action: "correct",
       override_reason: why,
@@ -491,7 +489,7 @@ export default function ReviewDetailPage() {
       corrected_crop: crop || undefined,
       corrected_growth_stage: growthStage || undefined,
       corrected_grade: grade || undefined,
-      notes,
+      notes: notes || why,
     });
   };
 
@@ -525,10 +523,11 @@ export default function ReviewDetailPage() {
     });
   };
 
-  const handleReject = () => {
-    const why = (reason || notes || "").trim();
+  const handleReject = (explicitReason?: string | React.MouseEvent) => {
+    const reasonStr = typeof explicitReason === "string" ? explicitReason : undefined;
+    const why = (reasonStr || rejectReason || reason || notes || "").trim();
     if (!why) {
-      setMessage("Add a reason before rejecting this claim.");
+      setRejectModalOpen(true);
       return;
     }
     action.mutate({
@@ -536,6 +535,7 @@ export default function ReviewDetailPage() {
       override_reason: why,
       notes: notes || why,
     });
+    setRejectModalOpen(false);
   };
 
   const handleOverrideGate = () => {
@@ -1316,6 +1316,91 @@ export default function ReviewDetailPage() {
                 onClick={handleConfirmRecapture}
               >
                 {action.isPending ? "Sending Request…" : `Request ${selectedAngles.length} Angle(s)`}
+              </button>
+            </div>
+          </div>
+        </ModalShell>
+      )}
+
+      {/* REJECT CONFIRMATION MODAL */}
+      {rejectModalOpen && (
+        <ModalShell labelledById="reject-dialog-title" onClose={() => setRejectModalOpen(false)}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 id="reject-dialog-title" className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <XCircle className="h-4 w-4 text-rose-600" />
+                Reject Claim
+              </h3>
+              <button
+                type="button"
+                onClick={() => setRejectModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Select or provide a reason for rejecting this claim. This rejection is recorded permanently in the official audit trail.
+            </p>
+
+            <div className="space-y-1.5">
+              <span className="text-xs font-bold text-slate-700 block uppercase tracking-wider">
+                Quick Reason Presets:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  "Fraudulent evidence / screen capture detected",
+                  "Crop mismatch (evidence does not match policy)",
+                  "Evidence unidentifiable or inadequate quality",
+                  "Location outside registered plot perimeter",
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setRejectReason(preset)}
+                    className={clsx(
+                      "rounded border px-2 py-1 text-xs transition-colors text-left",
+                      rejectReason === preset
+                        ? "border-rose-300 bg-rose-50 text-rose-900 font-medium"
+                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    )}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" htmlFor="modal-reject-reason">
+                Rejection Reason (Required):
+              </label>
+              <textarea
+                id="modal-reject-reason"
+                rows={3}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g. Evidence photos show digital screen replay and lack field context..."
+                className="w-full rounded border border-slate-300 p-2.5 text-xs text-slate-900 focus:border-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-800"
+              />
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setRejectModalOpen(false)}
+                className="rounded border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={action.isPending || !rejectReason.trim()}
+                onClick={() => handleReject(rejectReason)}
+                className="rounded bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 disabled:opacity-50 transition-colors shadow-xs"
+              >
+                {action.isPending ? "Rejecting…" : "Confirm Rejection"}
               </button>
             </div>
           </div>

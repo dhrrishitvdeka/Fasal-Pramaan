@@ -15,11 +15,11 @@ import clsx from "clsx";
 
 function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { lang, setLang, farmerProfile, claims, newRecaptureNotices } = useFarmerData();
+  const { lang, setLang, farmerProfile, claims, newRecaptureNotices, newPayoutNotices } = useFarmerData();
   const t = getFarmerT(lang);
 
   const pendingRecaptures = claims.filter((c) => c.status === "needs_recapture").length;
-  const hasNewRecaptureNotices = newRecaptureNotices.length > 0;
+  const hasNewNotices = (newRecaptureNotices?.length ?? 0) > 0 || (newPayoutNotices?.length ?? 0) > 0;
 
   const navItems = [
     {
@@ -44,7 +44,7 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
       label: t.claims,
       icon: FileText,
       badge: pendingRecaptures > 0 ? pendingRecaptures : undefined,
-      dot: hasNewRecaptureNotices,
+      dot: hasNewNotices,
     },
     {
       href: "/farmer/reminders",
@@ -103,6 +103,11 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
                     >
                       {item.badge}
                     </span>
+                  ) : item.dot ? (
+                    <span
+                      aria-hidden="true"
+                      className="ml-0.5 h-2 w-2 rounded-full bg-amber-500 animate-pulse"
+                    />
                   ) : null}
                 </Link>
               );
@@ -194,6 +199,11 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
                       <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-amber-400" />
                     ) : null}
                   </span>
+                ) : item.dot && !isActive ? (
+                  <span
+                    aria-hidden="true"
+                    className="absolute right-2.5 top-1.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-[var(--surface)]"
+                  />
                 ) : null}
               </Link>
             );

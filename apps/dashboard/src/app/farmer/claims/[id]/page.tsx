@@ -318,20 +318,29 @@ function FarmerClaimDetailContent() {
 
           {/* Right Payout / CTA Box */}
           <div className="shrink-0 flex flex-col items-start md:items-end justify-center">
-            {isVerified && typeof claim.payoutAmountInr === "number" && claim.payoutAmountInr > 0 && (
-              <div className="fp-panel p-4 text-left md:text-right">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  {t.recommendedPayout}
+            {(() => {
+              const amount =
+                typeof claim.payoutAmountInr === "number" && claim.payoutAmountInr > 0
+                  ? claim.payoutAmountInr
+                  : typeof claim.aiPrediction?.estimatedLossInr === "number" && claim.aiPrediction.estimatedLossInr > 0
+                    ? claim.aiPrediction.estimatedLossInr
+                    : 0;
+              if (!isVerified || amount <= 0) return null;
+              return (
+                <div className="fp-panel p-4 text-left md:text-right">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    {t.recommendedPayout}
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-emerald-800 font-mono">
+                    ₹{amount.toLocaleString("en-IN")}
+                  </div>
+                  <div className="mt-1 text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>{lang === "hi" ? "डीबीटी बैंक खाता सत्यापित" : "DBT Bank Sanctioned"}</span>
+                  </div>
                 </div>
-                <div className="text-2xl sm:text-3xl font-extrabold text-emerald-800 font-mono">
-                  ₹{claim.payoutAmountInr.toLocaleString("en-IN")}
-                </div>
-                <div className="mt-1 text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>{lang === "hi" ? "डीबीटी बैंक खाता सत्यापित" : "DBT Bank Sanctioned"}</span>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {isRecapture && (
               <Link

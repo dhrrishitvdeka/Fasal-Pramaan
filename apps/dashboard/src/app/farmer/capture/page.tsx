@@ -1205,6 +1205,7 @@ function CaptureStudioContent() {
             plotLon: plot?.lon ?? null,
             sowingDate: plot?.sowingDate || activeIntent?.sowingDate || null,
             growthStage: plot?.currentStage || activeIntent?.growthStage || undefined,
+            isDemoMode: Boolean(isDemoMode),
             evidenceTrust: {
               qualityScore: 0,
               coverageScore: 0,

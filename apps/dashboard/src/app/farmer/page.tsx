@@ -14,6 +14,9 @@ import {
   Layers,
   RefreshCw,
   PlusCircle,
+  RotateCcw,
+  CheckCircle2,
+  X,
 } from "lucide-react";
 import { useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
@@ -23,6 +26,22 @@ import { sanitizeMojibake } from "@/lib/name-sanitizer";
 import FarmerLoading from "./loading";
 import { InlineError } from "@/components/ErrorMessage";
 import clsx from "clsx";
+
+function getAngleDisplayName(angle: string, lang: string): string {
+  const map: Record<string, { hi: string; en: string }> = {
+    photo_1: { hi: "खेत दृश्य (Overview)", en: "Field Overview (Photo 1)" },
+    photo_2: { hi: "फसल स्थिति (Canopy)", en: "Crop Canopy (Photo 2)" },
+    photo_3: { hi: "क्षति विस्तार (Damage Detail)", en: "Damage Detail (Photo 3)" },
+    closeup_damage: { hi: "क्षति का क्लोज़अप (Closeup)", en: "Damage Closeup" },
+    mid_canopy: { hi: "मध्य कैनोपी (Canopy)", en: "Mid Canopy" },
+    wide_field: { hi: "विहंगम दृश्य (Wide Field)", en: "Wide Field" },
+    left_context: { hi: "बायाँ संदर्भ (Left Context)", en: "Left Context" },
+    right_context: { hi: "दायाँ संदर्भ (Right Context)", en: "Right Context" },
+  };
+  const item = map[angle];
+  if (item) return lang === "hi" ? item.hi : item.en;
+  return angle.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export default function FarmerHomePage() {
   const {
@@ -34,7 +53,9 @@ export default function FarmerHomePage() {
     isLoading,
     persistError,
     newRecaptureNotices,
+    newPayoutNotices,
     dismissNotice,
+    dismissPayoutNotice,
     refresh,
   } = useFarmerData();
   const t = getFarmerT(lang);
@@ -115,54 +136,163 @@ export default function FarmerHomePage() {
         />
       )}
 
-      {/* Notification toasts */}
+      {/* Action & Status Notifications */}
       {newRecaptureNotices.length > 0 && (
-        <div className="space-y-2.5" role="status" aria-live="polite">
+        <div className="space-y-3" role="status" aria-live="polite">
           {newRecaptureNotices.map((notice) => {
             const reason =
               (lang === "hi" ? notice.reasonHi || notice.reason : notice.reason) ||
               (lang === "hi" ? "साक्ष्य की दोबारा समीक्षा आवश्यक है" : "Evidence needs another look");
+            const angles =
+              notice.missingAngles.length > 0
+                ? notice.missingAngles
+                : ["closeup_damage", "mid_canopy"];
             return (
               <div
                 key={notice.claimId}
-                className="rounded-xl border border-amber-300 bg-amber-50/90 p-4 shadow-2xs"
+                className="relative overflow-hidden rounded-xl border border-[#d9cbb2] bg-gradient-to-r from-[#fffcf8] via-[#faf5ec] to-[#f5eee2] p-4 text-[var(--ink)] shadow-xs"
               >
-                <div className="flex items-start gap-2.5">
-                  <span aria-hidden="true" className="text-base">🔔</span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-amber-950">
-                      {lang === "hi"
-                        ? `🔔 नया पुनः फोटो अनुरोध — ${reason}`
-                        : `🔔 New recapture request — ${reason}`}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {(notice.missingAngles.length > 0
-                        ? notice.missingAngles
-                        : ["closeup_damage", "mid_canopy"]
-                      ).map((angle) => (
-                        <span
-                          key={angle}
-                          className="rounded-full border border-amber-300/80 bg-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900"
-                        >
-                          {angle.replaceAll("_", " ")}
-                        </span>
-                      ))}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100/90 text-amber-900 border border-amber-300/70">
+                      <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span className="text-xs font-bold uppercase tracking-wider text-amber-950">
+                        {lang === "hi" ? "पुनः फ़ोटो अनुरोध" : "Recapture Requested"}
+                      </span>
+                      <span className="font-mono text-xs text-stone-500">
+                        #{notice.claimId.slice(-8)}
+                      </span>
                     </div>
                   </div>
-                </div>
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Link
-                    href={`/farmer/capture?recapture=${notice.claimId}&angles=${notice.missingAngles.join(",") || "closeup_damage,mid_canopy"}`}
+                  <button
+                    type="button"
                     onClick={() => dismissNotice(notice.claimId)}
-                    className="fp-btn-primary min-h-11 w-full gap-2 rounded-lg px-3.5 py-2 text-xs sm:min-h-0 sm:w-auto font-semibold"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-200/60 hover:text-stone-800 transition-colors"
+                    aria-label={lang === "hi" ? "हटाएँ" : "Dismiss notice"}
+                    title={lang === "hi" ? "हटाएँ" : "Dismiss"}
                   >
-                    <Camera className="h-4 w-4" />
-                    {lang === "hi" ? "अभी कैप्चर करें" : "Capture now"}
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-2.5">
+                  <p className="text-sm font-semibold text-[var(--ink)] leading-snug">
+                    {reason}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--ink-muted)]">
+                    {lang === "hi"
+                      ? "समीक्षक अधिकारी द्वारा दावे के त्वरित निपटान हेतु निम्नलिखित कोणों से स्पष्ट फ़ोटो मांगी गई है:"
+                      : "The reviewing officer requires clear replacement captures for the specified angles to proceed with sanctioning:"}
+                  </p>
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {angles.map((angle) => (
+                    <span
+                      key={angle}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-amber-900/15 bg-white/90 px-2.5 py-1 text-xs font-medium text-amber-950 shadow-2xs"
+                    >
+                      <Camera className="h-3 w-3 text-amber-800 shrink-0" />
+                      {getAngleDisplayName(angle, lang)}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="mt-3.5 flex flex-wrap items-center gap-2 pt-2.5 border-t border-[#e8dfcf]">
+                  <Link
+                    href={`/farmer/capture?recapture=${notice.claimId}&angles=${angles.join(",")}`}
+                    onClick={() => dismissNotice(notice.claimId)}
+                    className="fp-btn-primary min-h-9 gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-2xs"
+                  >
+                    <Camera className="h-3.5 w-3.5" />
+                    {lang === "hi" ? "फ़ोटो लें — अभी कैप्चर करें" : "Capture Required Photos Now"}
                   </Link>
                   <button
                     type="button"
                     onClick={() => dismissNotice(notice.claimId)}
-                    className="min-h-11 w-full rounded-lg border border-amber-300 bg-white px-3.5 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100/60 sm:min-h-0 sm:w-auto transition-colors"
+                    className="min-h-9 rounded-lg border border-[#d4cfc4] bg-white/80 px-3 py-1.5 text-xs font-medium text-[var(--ink-muted)] hover:bg-white hover:text-[var(--ink)] transition-colors"
+                  >
+                    {lang === "hi" ? "हटाएँ" : "Dismiss"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {newPayoutNotices.length > 0 && (
+        <div className="space-y-3" role="status" aria-live="polite">
+          {newPayoutNotices.map((notice) => {
+            const plotTitle =
+              (lang === "hi" && notice.plotNameHi ? notice.plotNameHi : notice.plotName) ||
+              (lang === "hi" ? "खेत" : "Plot");
+            const cropTitle =
+              (lang === "hi" && notice.cropTypeHi ? notice.cropTypeHi : notice.cropType) ||
+              (lang === "hi" ? "फसल" : "Crop");
+            return (
+              <div
+                key={notice.claimId}
+                className="relative overflow-hidden rounded-xl border border-[#b8d5be] bg-gradient-to-r from-[#fbfdfa] via-[#f1f8f3] to-[#eaf5ec] p-4 text-[var(--ink)] shadow-xs"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300/70">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-700" aria-hidden="true" />
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+                        {lang === "hi" ? "दावा स्वीकृत • डीबीटी संस्तुत" : "Claim Approved • Payout Sanctioned"}
+                      </span>
+                      <span className="font-mono text-xs text-stone-500">
+                        #{notice.claimId.slice(-8)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => dismissPayoutNotice(notice.claimId)}
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-200/60 hover:text-stone-800 transition-colors"
+                    aria-label={lang === "hi" ? "हटाएँ" : "Dismiss notice"}
+                    title={lang === "hi" ? "हटाएँ" : "Dismiss"}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-3 flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+                  <div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-emerald-950">
+                        ₹{notice.payoutAmountInr > 0 ? notice.payoutAmountInr.toLocaleString("en-IN") : "0"}
+                      </span>
+                      <span className="text-xs font-semibold text-emerald-900">
+                        {lang === "hi" ? "स्वीकृत मुआवज़ा राशि (DBT)" : "Sanctioned Direct Benefit Transfer"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-[var(--ink-muted)]">
+                      {lang === "hi"
+                        ? `${plotTitle} (${cropTitle}) के फसल नुकसान के साक्ष्य सत्यापित कर लिए गए हैं।`
+                        : `Crop loss evidence for ${plotTitle} (${cropTitle}) has been verified and sanctioned.`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3.5 flex flex-wrap items-center gap-2 pt-2.5 border-t border-[#cde0d2]">
+                  <Link
+                    href={`/farmer/claims/${notice.claimId}`}
+                    onClick={() => dismissPayoutNotice(notice.claimId)}
+                    className="fp-btn-primary min-h-9 gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-2xs"
+                  >
+                    <span>{lang === "hi" ? "स्वीकृति पत्र व विवरण देखें" : "View Approval & Payout Details"}</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => dismissPayoutNotice(notice.claimId)}
+                    className="min-h-9 rounded-lg border border-[#b8d5be] bg-white/80 px-3 py-1.5 text-xs font-medium text-emerald-950 hover:bg-white transition-colors"
                   >
                     {lang === "hi" ? "हटाएँ" : "Dismiss"}
                   </button>
