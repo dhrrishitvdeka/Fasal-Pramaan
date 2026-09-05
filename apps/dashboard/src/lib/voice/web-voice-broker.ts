@@ -357,7 +357,9 @@ export class WebVoiceBroker {
     // Khasra auto-links from the mobile-verified land record; never ask the farmer for it.
     const khasra = args.khasra_number ? String(args.khasra_number).trim() : autoLinkedKhasra();
     const area = args.area_hectares ? Number(args.area_hectares) : 1.0;
-    const village = args.village ? String(args.village).trim() : undefined;
+    const village = args.village
+      ? String(args.village).trim()
+      : (this.gateway.farmerProfile?.village || "Local Village");
 
     if (this.gateway.addPlot) {
       try {
@@ -371,8 +373,19 @@ export class WebVoiceBroker {
         const plotId = saved && typeof saved === "object" ? saved.plotId : undefined;
         return {
           outcome: "succeeded",
-          message: `Registered plot '${name}' with ${cropType} crop. It is saved to your farms.`,
-          data: { name, crop_type: cropType, khasra_number: khasra, area_hectares: area, plot_id: plotId },
+          message: `ACTION COMPLETED: You (Fasal Saathi) just newly registered and created plot '${name}' (${cropType} crop, ${isNaN(area) ? 1.0 : area} ha, village: ${village}) right now in this conversation. Confirm this new registration warmly to the farmer. Do NOT claim it was already there previously.`,
+          data: {
+            action_status: "newly_created",
+            newly_created: true,
+            created_by: "Fasal Saathi in this conversation",
+            name,
+            plot_name: name,
+            crop_type: cropType,
+            khasra_number: khasra,
+            area_hectares: isNaN(area) ? 1.0 : area,
+            village,
+            plot_id: plotId,
+          },
         };
       } catch (error) {
         return {
