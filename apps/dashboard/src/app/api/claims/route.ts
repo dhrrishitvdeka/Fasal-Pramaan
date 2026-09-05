@@ -4,6 +4,7 @@ import {
   persistAndInfer,
   recaptureAndInfer,
   inferAndAttachToClaim,
+  loadAllClaimImages,
   claimToSubmission,
   type PersistClaimInput,
 } from "@/lib/claim-pipeline";
@@ -176,12 +177,23 @@ export async function POST(request: Request) {
       if (result.pendingInference) {
         const cropType = existing.crop_type || undefined;
         after(() =>
-          inferAndAttachToClaim(store, result.claimId, images, cropType, inferCropDisease, inferOptions).then(
-            () => undefined,
-            (err) => {
-              console.error("deferred recapture inference failed:", err instanceof Error ? err.message : err);
-            },
-          ),
+          loadAllClaimImages(store, result.claimId, images)
+            .then((mergedImages: any) =>
+              inferAndAttachToClaim(
+                store,
+                result.claimId,
+                mergedImages,
+                cropType,
+                inferCropDisease,
+                inferOptions,
+              ),
+            )
+            .then(
+              () => undefined,
+              (err: unknown) => {
+                console.error("deferred recapture inference failed:", err instanceof Error ? err.message : err);
+              },
+            ),
         );
       }
       return NextResponse.json({ claimId: result.claimId, prediction: result.prediction ?? null });
@@ -204,6 +216,7 @@ export async function POST(request: Request) {
       plotLat: clampNumber(data.plotLat, -90, 90) ?? null,
       plotLon: clampNumber(data.plotLon, -180, 180) ?? null,
       sowingDate: data.sowingDate,
+      growthStage: data.growthStage,
       createdBy: auth.actor.userId,
       images,
     };

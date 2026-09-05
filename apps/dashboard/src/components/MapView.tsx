@@ -34,12 +34,16 @@ function severityColor(severity?: string | null, status?: string) {
     case "high":
     case "severe":
     case "critical":
+    case "c":
       return "#0f172a";
     case "medium":
+    case "b":
       return "#475569";
     case "low":
+    case "a":
       return "#64748b";
     case "none":
+    case "u":
       return "#94a3b8";
     default:
       return "#64748b";

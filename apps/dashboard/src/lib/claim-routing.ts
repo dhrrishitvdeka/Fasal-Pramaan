@@ -196,6 +196,7 @@ export type ClaimIntent = {
   district?: string;
   plotId?: string;
   sowingDate?: string;
+  growthStage?: string;
   farmerNote?: string;
   createdAt: string;
   source: "saathi_voice" | "saathi_text" | "manual";

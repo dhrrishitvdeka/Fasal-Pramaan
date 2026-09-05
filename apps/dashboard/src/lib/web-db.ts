@@ -108,6 +108,8 @@ export interface WebClaimRow {
   corrected_damage_codes?: string[] | null;
   corrected_affected_area_pct?: number | null;
   corrected_growth_stage?: string | null;
+  growth_stage?: string | null;
+  predicted_growth_stage?: string | null;
 }
 
 export interface WebClaimImageRow {
@@ -285,6 +287,17 @@ export function claimFromRow(row: WebClaimRow, images: ClaimImageEvidence[]): Fa
   } catch {
     extra = {};
   }
+
+  const gateRes = (row as any).gate_result as any;
+  const analysis = gateRes?.geminiAnalysis || gateRes?.analysis || null;
+  const growthStage =
+    row.corrected_growth_stage ||
+    analysis?.growth_stage ||
+    row.growth_stage ||
+    row.predicted_growth_stage ||
+    ((row as any).context_signals as any)?.growth_stage ||
+    undefined;
+
   return {
     id: row.id,
     plotId: row.plot_id || "",
@@ -303,6 +316,7 @@ export function claimFromRow(row: WebClaimRow, images: ClaimImageEvidence[]): Fa
     recaptureReason: row.recapture_reason || undefined,
     recaptureReasonHi: row.recapture_reason_hi || undefined,
     reviewerNotes: row.reviewer_notes || undefined,
+    growthStage: growthStage || undefined,
     evidenceTrust: {
       qualityScore: row.quality_score ?? 0,
       coverageScore: row.coverage_score ?? 0,
@@ -328,8 +342,9 @@ export function claimFromRow(row: WebClaimRow, images: ClaimImageEvidence[]): Fa
           affectedAreaHectares: row.affected_area_hectares ?? 0,
           estimatedLossInr: row.estimated_loss_inr ?? 0,
           modelConfidence: row.model_confidence ?? 0,
+          growthStage: growthStage || undefined,
         }
-      : { ...EMPTY_AI_PREDICTION },
+      : { ...EMPTY_AI_PREDICTION, growthStage: growthStage || undefined },
     payoutStatus:
       row.payout_status === "approved" ||
       row.payout_status === "pending_review" ||
@@ -420,6 +435,8 @@ function claimRowFromFarmer(claim: FarmerClaim, createdBy: string | null): Parti
     capture_lon: gps?.lon ?? null,
     capture_accuracy_m: gps?.accuracyM ?? null,
     gps_status: (claim as any).gpsStatus ?? null,
+    growth_stage: pred.growthStage || claim.growthStage || null,
+    predicted_growth_stage: pred.growthStage || claim.growthStage || null,
     created_at: claim.createdAt,
     updated_at: claim.updatedAt,
     created_by: createdBy,
@@ -720,6 +737,15 @@ export function overviewFromClaims(claims: FarmerClaim[]): Overview {
   };
 }
 
+function mapSeverityGrade(grade?: string | null): string {
+  const g = (grade || "").trim().toLowerCase();
+  if (g === "c" || g === "high" || g === "severe" || g === "critical") return "high";
+  if (g === "b" || g === "medium") return "medium";
+  if (g === "a" || g === "low") return "low";
+  if (g === "u" || g === "none") return "none";
+  return g || "low";
+}
+
 export function markersFromClaims(claims: FarmerClaim[]): MapMarker[] {
   const markers: MapMarker[] = [];
   for (const claim of claims) {
@@ -732,7 +758,7 @@ export function markersFromClaims(claims: FarmerClaim[]): MapMarker[] {
       lat,
       lon,
       status: claim.status,
-      severity: claim.aiPrediction.severityGrade?.toLowerCase() || null,
+      severity: mapSeverityGrade(claim.aiPrediction.severityGrade),
       crop_code: claim.cropType || null,
       primary_damage: claim.aiPrediction.diseaseDetected || null,
       confidence: claim.evidenceTrust.overallConfidence / 100,

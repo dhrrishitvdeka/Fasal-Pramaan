@@ -10,6 +10,8 @@ import { heuristicGate, geminiGate, type GateResult } from "./vision/gate-shared
 import type { ContextSignal } from "./context/types";
 import { adaptiveConfidence, type AdaptiveResult } from "./context/adaptive-engine";
 import { ROUTE_CONFIG, type Peril } from "./claim-routing";
+import { isCropMatch } from "./crop-synonyms";
+
 
 // ---------- Vision gate helpers (shared with /api/vision/gate) ----------
 
@@ -346,6 +348,7 @@ export type PersistClaimInput = {
   plotLat?: number | null;
   plotLon?: number | null;
   sowingDate?: string | null;
+  growthStage?: string | null;
   createdBy?: string | null;
   contextSignals?: ContextSignal[];
   images: PersistedImageInput[];
@@ -411,12 +414,15 @@ export type WebClaimRow = {
   corrected_damage_codes?: string[] | null;
   corrected_affected_area_pct?: number | null;
   corrected_growth_stage?: string | null;
+  growth_stage?: string | null;
+  predicted_growth_stage?: string | null;
 };
 
 export type ReviewerActionInput = {
   action: string;
   notes?: string;
   reason?: string;
+  override_reason?: string;
   required_angles?: string[];
   actor?: string;
   corrected_crop?: string;
@@ -539,6 +545,7 @@ export type ClaimStore = {
   deleteClaim?(id: string): Promise<void>;
   updateClaim(id: string, patch: Partial<WebClaimRow>, opts?: ClaimUpdateOptions): Promise<void>;
   getClaim(id: string): Promise<WebClaimRow | null>;
+  getPlot?(plotId: string): Promise<{ id?: string; area_hectares?: number | null; crop_type?: string | null } | null>;
   listClaims(): Promise<WebClaimRow[]>;
   insertImages(rows: WebImageRow[]): Promise<void>;
   replaceAngleImages(claimId: string, rows: WebImageRow[]): Promise<void>;
@@ -555,6 +562,71 @@ export type ClaimStore = {
     actor?: string;
   }): Promise<void>;
 };
+
+/**
+ * PMFBY Scale of Finance benchmark rates (INR per hectare).
+ * Standardized indicative benchmarks used for claim assessment and settlement.
+ */
+export const PMFBY_SCALE_OF_FINANCE: Record<string, number> = {
+  paddy: 65_000,
+  rice: 65_000,
+  wheat: 60_000,
+  maize: 45_000,
+  corn: 45_000,
+  mustard: 42_000,
+  rapeseed: 42_000,
+  cotton: 70_000,
+  soybean: 48_000,
+  sugarcane: 110_000,
+  potato: 120_000,
+  gram: 45_000,
+  chickpea: 45_000,
+  chana: 45_000,
+  groundnut: 52_000,
+  peanut: 52_000,
+  onion: 85_000,
+  pulses: 40_000,
+  dal: 40_000,
+  bajra: 38_000,
+  jowar: 38_000,
+  barley: 42_000,
+};
+
+export const DEFAULT_SCALE_OF_FINANCE = 50_000;
+export const DEFAULT_PLOT_AREA_HECTARES = 1.0;
+
+export function getCropScaleOfFinance(crop?: string | null): number {
+  if (!crop) return DEFAULT_SCALE_OF_FINANCE;
+  const norm = crop.toLowerCase().trim();
+  if (PMFBY_SCALE_OF_FINANCE[norm] != null) return PMFBY_SCALE_OF_FINANCE[norm];
+  for (const [key, rate] of Object.entries(PMFBY_SCALE_OF_FINANCE)) {
+    if (isCropMatch(crop, key)) return rate;
+  }
+  return DEFAULT_SCALE_OF_FINANCE;
+}
+
+
+export function computeFinancialLoss(
+  crop: string | null | undefined,
+  affectedPct: number | null | undefined,
+  plotAreaHectares: number | null | undefined,
+): { affectedAreaHectares: number | null; estimatedLossInr: number | null } {
+  if (affectedPct == null || !Number.isFinite(affectedPct)) {
+    return { affectedAreaHectares: null, estimatedLossInr: null };
+  }
+  const pct = Math.max(0, Math.min(100, affectedPct));
+  const areaHa =
+    plotAreaHectares != null && Number.isFinite(plotAreaHectares) && plotAreaHectares > 0
+      ? plotAreaHectares
+      : DEFAULT_PLOT_AREA_HECTARES;
+  const affectedHa = Number(((pct / 100) * areaHa).toFixed(4));
+  const rate = getCropScaleOfFinance(crop);
+  const estimatedLoss = Math.round(affectedHa * rate);
+  return {
+    affectedAreaHectares: affectedHa,
+    estimatedLossInr: estimatedLoss,
+  };
+}
 
 function imageIsPresent(image: PersistedImageInput): boolean {
   if (image.present) return true;
@@ -864,6 +936,8 @@ export async function persistFarmerSubmission(
     intent_id: (input.intentId as any) || null,
     context_signals: (input.contextSignals as any) ?? null,
     payout_status: "pending_review",
+    growth_stage: input.growthStage ?? null,
+    predicted_growth_stage: input.growthStage ?? null,
     created_by: input.createdBy ?? null,
     created_at: now,
     updated_at: now,
@@ -963,6 +1037,23 @@ export async function attachHfPrediction(
     await store.updateClaim(claimId, modelPatch);
     return;
   }
+
+  const cropForLoss = safe.predictedCrop || current.crop_type || undefined;
+  let plotAreaHa: number | undefined;
+  if (typeof (store as any).getPlot === "function" && current.plot_id) {
+    try {
+      const plot = await (store as any).getPlot(current.plot_id);
+      if (plot?.area_hectares != null && Number.isFinite(Number(plot.area_hectares))) {
+        plotAreaHa = Number(plot.area_hectares);
+      }
+    } catch {}
+  }
+  const { affectedAreaHectares, estimatedLossInr } = computeFinancialLoss(
+    cropForLoss,
+    safe.affectedAreaPct,
+    plotAreaHa,
+  );
+
   await store.updateClaim(
     claimId,
     {
@@ -971,8 +1062,10 @@ export async function attachHfPrediction(
       crop_identified: safe.predictedCrop || null,
       severity_grade: safe.predictedGrade || null,
       severity_percentage: safe.affectedAreaPct ?? null,
-      affected_area_hectares: null,
-      estimated_loss_inr: null,
+      affected_area_hectares: affectedAreaHectares,
+      estimated_loss_inr: estimatedLossInr,
+      growth_stage: safe.growthStage || current.growth_stage || null,
+      predicted_growth_stage: safe.growthStage || current.predicted_growth_stage || null,
       ...(warningNote ? { quality_notes: warningNote } : {}),
       ...(safe.reasoning ? { context_notes: safe.reasoning.slice(0, 1500) } : {}),
     },
@@ -1344,6 +1437,54 @@ async function uploadNewImages(
   return buildImageRows(store, claimId, images, new Date().toISOString(), perImageGate);
 }
 
+export async function loadAllClaimImages(
+  store: ClaimStore,
+  claimId: string,
+  freshImages: PersistedImageInput[] = [],
+): Promise<PersistedImageInput[]> {
+  const rows = await store.listImages(claimId);
+  const result: PersistedImageInput[] = [];
+  const freshMap = new Map<string, PersistedImageInput>();
+  for (const img of freshImages) {
+    if (img.bytes && img.bytes.byteLength > 0) {
+      freshMap.set(img.angleType, img);
+    }
+  }
+  const visitedAngles = new Set<string>();
+  for (const row of rows) {
+    visitedAngles.add(row.angle_type);
+    if (freshMap.has(row.angle_type)) {
+      result.push(freshMap.get(row.angle_type)!);
+    } else if (row.storage_path) {
+      try {
+        const bytes = await store.downloadImage(row.storage_path);
+        if (bytes && bytes.byteLength > 0) {
+          result.push({
+            angleType: row.angle_type,
+            bytes,
+            sha256: row.sha256 || undefined,
+            lat: row.lat,
+            lon: row.lon,
+            accuracyM: row.accuracy_m,
+            blurScore: row.blur_score,
+            lightingScore: row.lighting_score,
+            qualityPassed: row.quality_passed,
+          });
+        }
+      } catch {
+        // Skip unreadable blobs
+      }
+    }
+  }
+  for (const img of freshImages) {
+    if (!visitedAngles.has(img.angleType) && img.bytes && img.bytes.byteLength > 0) {
+      result.push(img);
+      visitedAngles.add(img.angleType);
+    }
+  }
+  return result.length > 0 ? result : freshImages;
+}
+
 export async function recaptureAndInfer(
   store: ClaimStore,
   input: RecaptureInput,
@@ -1450,8 +1591,9 @@ export async function recaptureAndInfer(
     // adaptive is best-effort; never block pipeline
   }
 
+  const mergedImagesForInference = await loadAllClaimImages(store, input.claimId, input.images);
   if (inferOptions?.skipInference) {
-    if (imagesAreUnusable(input.images)) {
+    if (imagesAreUnusable(mergedImagesForInference)) {
       const prediction = unusablePrediction();
       await attachHfPrediction(store, input.claimId, prediction);
       return { claimId: input.claimId, prediction };
@@ -1461,7 +1603,7 @@ export async function recaptureAndInfer(
   const inferred = await inferAndAttachToClaim(
     store,
     input.claimId,
-    input.images,
+    mergedImagesForInference,
     existing.crop_type || undefined,
     infer,
     inferOptions,
@@ -1569,7 +1711,7 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
               ? "unknown"
               : claim.corrected_crop || analysis?.predicted_crop || claim.crop_identified,
             crop_confidence: unusable ? 0 : (claim.crop_confidence ?? 0) / 100,
-            predicted_growth_stage: analysis?.growth_stage ?? null,
+            predicted_growth_stage: claim.corrected_growth_stage || analysis?.growth_stage || (claim as any).growth_stage || null,
             predicted_grade: workflowGrade(claim.severity_grade),
             grade_label:
               analysis?.grade_label ||
@@ -1662,6 +1804,10 @@ export function claimToSubmission(claim: WebClaimRow, images: WebImageRow[]): Su
           : "none",
       },
     },
+    payout_status: (claim as any).payout_status ?? null,
+    payout_amount_inr: (claim as any).payout_amount_inr ?? null,
+    affected_area_hectares: (claim as any).affected_area_hectares ?? null,
+    estimated_loss_inr: (claim as any).estimated_loss_inr ?? null,
   };
 }
 
@@ -1724,7 +1870,7 @@ export async function applyReviewerAction(
         "Cannot accept claim: integrity score is below 50. Request physical inspection or recapture.",
       );
     }
-    if (existing.severity_grade === "U") {
+    if (existing.severity_grade === "U" && !gateResult?.overridden) {
       throw new Error(
         "Cannot accept claim: model analysis is unusable (grade U). Correct the grade or request recapture first.",
       );
@@ -1761,6 +1907,10 @@ export async function applyReviewerAction(
     updated_at: new Date().toISOString(),
   };
 
+  if (payload.action === "accept" && existing.severity_grade === "U") {
+    patch.severity_grade = "B";
+  }
+
   if (payload.action === "correct") {
     if (payload.corrected_crop) {
       patch.corrected_crop = payload.corrected_crop;
@@ -1787,6 +1937,56 @@ export async function applyReviewerAction(
     }
   }
 
+  if (payload.action === "accept" || payload.action === "correct") {
+    patch.payout_status = "approved";
+    const effectiveCrop =
+      patch.corrected_crop ||
+      existing.corrected_crop ||
+      existing.crop_identified ||
+      existing.crop_type ||
+      "wheat";
+    const effectivePct =
+      patch.severity_percentage ??
+      existing.severity_percentage ??
+      (patch.severity_grade === "A" || existing.severity_grade === "A" ? 0 : 50);
+
+    let plotAreaHa: number | undefined;
+    if (typeof (store as any).getPlot === "function" && existing.plot_id) {
+      try {
+        const plot = await (store as any).getPlot(existing.plot_id);
+        if (plot?.area_hectares != null && Number.isFinite(Number(plot.area_hectares))) {
+          plotAreaHa = Number(plot.area_hectares);
+        }
+      } catch {}
+    }
+
+    if (payload.action === "correct" || existing.estimated_loss_inr == null || existing.estimated_loss_inr <= 0) {
+      const financial = computeFinancialLoss(effectiveCrop, effectivePct, plotAreaHa);
+      patch.affected_area_hectares = financial.affectedAreaHectares ?? existing.affected_area_hectares ?? null;
+      patch.estimated_loss_inr = financial.estimatedLossInr ?? existing.estimated_loss_inr ?? null;
+      patch.payout_amount_inr = patch.estimated_loss_inr ?? 0;
+    } else {
+      patch.payout_amount_inr = existing.estimated_loss_inr;
+      if (existing.affected_area_hectares != null) {
+        patch.affected_area_hectares = existing.affected_area_hectares;
+      }
+    }
+
+    const existingGate = (existing as any).gate_result as Record<string, unknown> | null | undefined;
+    if (existingGate && typeof existingGate === "object" && existingGate.gateFailed && !existingGate.overridden) {
+      (patch as any).gate_result = {
+        ...existingGate,
+        overridden: true,
+        overriddenBy: payload.actor || "reviewer",
+        overriddenAt: new Date().toISOString(),
+        overrideReason: payload.override_reason || payload.notes || "Reviewer verification override",
+      };
+    }
+  } else if (payload.action === "reject") {
+    patch.payout_status = "rejected";
+    patch.payout_amount_inr = 0;
+  }
+
   if (payload.action === "override_gate") {
     // Reviewer explicitly marks gate-blocked evidence as usable — keep status unchanged,
     // stamp the override into gate_result and clear the blocking quality note.
@@ -1803,6 +2003,9 @@ export async function applyReviewerAction(
       overriddenAt: new Date().toISOString(),
       ...(sanitizedReason ? { overrideReason: sanitizedReason } : {}),
     };
+    if (existing.severity_grade === "U") {
+      patch.severity_grade = "B";
+    }
     patch.quality_notes = existing.quality_notes
       ? `${existing.quality_notes} (gate overridden)`
       : "(gate overridden)";
@@ -1872,6 +2075,7 @@ export async function applyReviewerAction(
 
 export function createMemoryClaimStore(): ClaimStore & {
   claims: Map<string, WebClaimRow>;
+  plots: Map<string, { id?: string; area_hectares?: number | null; crop_type?: string | null }>;
   images: Map<string, WebImageRow[]>;
   blobs: Map<string, Uint8Array>;
   reviewActions: Array<{
@@ -1885,6 +2089,7 @@ export function createMemoryClaimStore(): ClaimStore & {
   }>;
 } {
   const claims = new Map<string, WebClaimRow>();
+  const plots = new Map<string, { id?: string; area_hectares?: number | null; crop_type?: string | null }>();
   const images = new Map<string, WebImageRow[]>();
   const blobs = new Map<string, Uint8Array>();
   const reviewActions: Array<{
@@ -1898,6 +2103,7 @@ export function createMemoryClaimStore(): ClaimStore & {
   }> = [];
   return {
     claims,
+    plots,
     images,
     blobs,
     reviewActions,
@@ -1920,6 +2126,9 @@ export function createMemoryClaimStore(): ClaimStore & {
     },
     async getClaim(id) {
       return claims.get(id) ?? null;
+    },
+    async getPlot(plotId) {
+      return plots.get(plotId) ?? null;
     },
     async listClaims() {
       return [...claims.values()].sort((a, b) =>

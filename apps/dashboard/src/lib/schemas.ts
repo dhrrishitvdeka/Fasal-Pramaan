@@ -97,6 +97,7 @@ export const claimSubmissionSchema = z.object({
   plotLat: optionalBounded(-90, 90),
   plotLon: optionalBounded(-180, 180),
   sowingDate: optionalIsoDate,
+  growthStage: z.string().optional(),
 });
 
 export type ClaimSubmissionBody = z.infer<typeof claimSubmissionSchema>;

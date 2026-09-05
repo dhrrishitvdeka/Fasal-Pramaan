@@ -120,6 +120,7 @@ export interface ClaimAiPrediction {
   affectedAreaHectares: number;
   estimatedLossInr: number;
   modelConfidence: number;
+  growthStage?: string;
 }
 
 export type ClaimStatus =
@@ -163,6 +164,7 @@ export interface FarmerClaim {
   gateResult?: unknown;
   contextSignals?: unknown;
   adaptive_result?: unknown;
+  growthStage?: string;
   // compat aliases for DB column names
   gate_result?: unknown;
   context_signals?: unknown;
@@ -331,11 +333,17 @@ function submissionToClaim(item: Awaited<ReturnType<typeof listWebClaims>>[numbe
       cropIdentified: item.latest_prediction?.predicted_crop || "",
       cropConfidence: Math.round((item.latest_prediction?.crop_confidence || 0) * 100),
       diseaseDetected: item.latest_prediction?.primary_damage || "",
+      severityPercentage: item.latest_prediction?.affected_area_pct ?? 0,
+      affectedAreaHectares: item.affected_area_hectares ?? 0,
+      estimatedLossInr: item.estimated_loss_inr ?? 0,
       modelConfidence: Math.round((item.latest_prediction?.overall_confidence || 0) * 100),
       severityGrade: workflowGradeFromPrediction(item.latest_prediction),
+      growthStage: item.latest_prediction?.predicted_growth_stage || undefined,
     },
-    payoutStatus: "pending_review",
+    payoutStatus: (item.payout_status as any) || "pending_review",
+    payoutAmountInr: item.payout_amount_inr ?? undefined,
     adaptive_result: item.adaptive_result ?? undefined,
+    growthStage: item.latest_prediction?.predicted_growth_stage || undefined,
   };
 }
 
@@ -636,6 +644,7 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
       plotLat: claimData.plotLat ?? undefined,
       plotLon: claimData.plotLon ?? undefined,
       sowingDate: claimData.sowingDate || undefined,
+      growthStage: claimData.growthStage || undefined,
       images: claimData.images.map((img) => ({
         angleType: img.angleType,
         imageDataUrl: img.imageUrl,

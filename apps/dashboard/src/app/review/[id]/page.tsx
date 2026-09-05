@@ -15,6 +15,7 @@ import { EvidenceConfidenceSection, resolveEvidenceEvaluation } from "@/componen
 import { SatelliteCrossCheckCard } from "@/components/SatelliteCrossCheckCard";
 import ModalShell from "@/components/ModalShell";
 import { predictionIsAcceptable } from "@/lib/review-accept";
+import { isCropMatch } from "@/lib/crop-synonyms";
 import { normalizePeril, PERIL_OPTIONS } from "@/lib/claim-routing";
 import { apiFetch } from "@/lib/auth-headers";
 import { DetailSkeleton } from "@/components/LoadingAnimation";
@@ -457,7 +458,8 @@ export default function ReviewDetailPage() {
   const pred = data.latest_prediction;
   const liveStatus = optimisticStatus ?? data.status;
   const isClosed = liveStatus === "verified" || liveStatus === "rejected";
-  const canAccept = !isClosed && predictionIsAcceptable(pred, hasIntegrityFailure);
+  const isGateOverridden = Boolean(gateInfo?.overridden);
+  const canAccept = !isClosed && predictionIsAcceptable(pred, hasIntegrityFailure, isGateOverridden);
   const busy = action.isPending;
   const busyLabel = (key: string) =>
     pendingAction === key ? (
@@ -830,8 +832,7 @@ export default function ReviewDetailPage() {
               Boolean(declared) &&
               Boolean(detected) &&
               detected.toLowerCase() !== "unknown" &&
-              !detected.toLowerCase().includes(declared.toLowerCase().split(/\s+/)[0] || "\0") &&
-              !declared.toLowerCase().includes(detected.toLowerCase());
+              !isCropMatch(declared, detected);
 
             return (
               <section className="rounded-xl border border-slate-200 bg-white shadow-2xs">

@@ -82,6 +82,19 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
       if (error) throw new Error(error.message);
       return (data as WebClaimRow) ?? null;
     },
+    async getPlot(plotId) {
+      try {
+        const { data, error } = await client
+          .from("web_plots")
+          .select("id, area_hectares, crop_type")
+          .eq("id", plotId)
+          .maybeSingle();
+        if (error) return null;
+        return data ?? null;
+      } catch {
+        return null;
+      }
+    },
     async listClaims() {
       const { data, error } = await client
         .from("web_claims")

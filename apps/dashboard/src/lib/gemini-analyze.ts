@@ -8,6 +8,7 @@ import {
   resolveGeminiApiKey,
   resolveGeminiVisionModel,
 } from "./gemini-models";
+import { isCropMatch } from "./crop-synonyms";
 
 export type WorkflowGrade = "A" | "B" | "C" | "U";
 
@@ -303,7 +304,7 @@ Hard authenticity rules (fail closed):
 - Accept ANY 3 distinct, clear crop evidence photos of the damaged field/crop stand. Do NOT enforce rigid camera angle constraints. Flag retake ONLY if photo quality is bad (dark, non-crop, invalid), blurry, or exact same angle / duplicate images are uploaded.
 
 Then, only if the photos look like a real outdoor agricultural field:
-- Identify the crop you see (declared crop is "${crop}"). If it is a different species, say so — do not rubber-stamp the declared crop.
+- Identify the crop you see (declared crop is "${crop}", note common regional synonyms such as paddy/rice/dhan, maize/corn, gram/chickpea, wheat/gehun). If it is a different species, say so — do not rubber-stamp the declared crop.
 - Describe damage visible (or healthy canopy) and whether it matches peril "${peril}".
 - Estimate severity as none|low|medium|high and affected_area_pct 0-100 if you can see a plot; otherwise null.
 - Screening grade: A healthy field crop, B uncertain, C clear damage/disease pattern, U unusable or not a farm crop.
@@ -407,18 +408,23 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
     throw new Error("Gemini vision returned an empty analysis");
   }
   const parsed = parseGeminiAnalysis(rawOut, model);
-  const declared = (input.expectedCrop || "").trim().toLowerCase();
-  const seen = (parsed.predictedCrop || "").trim().toLowerCase();
-  if (
-    declared &&
-    seen &&
-    seen !== "unknown" &&
-    !seen.includes(declared) &&
-    !declared.includes(seen)
-  ) {
-    parsed.qualityWarnings = [...new Set([...(parsed.qualityWarnings || []), "crop_mismatch"])];
-    if (parsed.predictedGrade === "A") parsed.predictedGrade = "B";
-    parsed.perilMatch = false;
+  const declared = (input.expectedCrop || "").trim();
+  const seen = (parsed.predictedCrop || "").trim();
+  if (declared && seen && seen.toLowerCase() !== "unknown") {
+    if (!isCropMatch(declared, seen)) {
+      parsed.qualityWarnings = [...new Set([...(parsed.qualityWarnings || []), "crop_mismatch"])];
+      if (parsed.predictedGrade === "A") parsed.predictedGrade = "B";
+      parsed.perilMatch = false;
+    } else {
+      if (parsed.qualityWarnings) {
+        parsed.qualityWarnings = parsed.qualityWarnings.filter(
+          (w) => w !== "crop_mismatch" && w !== "wrong_crop",
+        );
+      }
+      if (parsed.predictedGrade === "U" && parsed.authenticity?.authentic !== false) {
+        parsed.predictedGrade = "B";
+      }
+    }
   }
   return { ...parsed, modelId: model };
 }

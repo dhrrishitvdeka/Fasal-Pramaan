@@ -7,8 +7,10 @@ import {
   createMemoryClaimStore,
   gateCacheKey,
   gateImagesGate,
+  getCropScaleOfFinance,
   getReviewerClaim,
   listReviewerQueue,
+  loadAllClaimImages,
   persistAndInfer,
   persistFarmerSubmission,
   recaptureAndInfer,
@@ -743,5 +745,72 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(outcome.gateFailed).toBe(false);
     expect(outcome.blockingReason).toBeUndefined();
     expect((outcome.gateResult as { duplicateAngles: string[] }).duplicateAngles).toEqual(["photo_2"]);
+  });
+
+  it("allows acceptance on Grade U claims when gate is overridden", () => {
+    expect(predictionIsAcceptable({ predicted_grade: "U" }, false, true)).toBe(true);
+    expect(predictionIsAcceptable({ predicted_grade: "U" }, true, true)).toBe(false);
+    expect(predictionIsAcceptable({ predicted_grade: "U" }, false, false)).toBe(false);
+  });
+
+  it("resolves scale of finance for regional and Hindi crop names", () => {
+    expect(getCropScaleOfFinance("dhan")).toBe(65000);
+    expect(getCropScaleOfFinance("paddy")).toBe(65000);
+    expect(getCropScaleOfFinance("rice")).toBe(65000);
+    expect(getCropScaleOfFinance("gehun")).toBe(60000);
+    expect(getCropScaleOfFinance("wheat")).toBe(60000);
+    expect(getCropScaleOfFinance("makka")).toBe(45000);
+    expect(getCropScaleOfFinance("corn")).toBe(45000);
+    expect(getCropScaleOfFinance("maize")).toBe(45000);
+    expect(getCropScaleOfFinance("sarson")).toBe(42000);
+    expect(getCropScaleOfFinance("mustard")).toBe(42000);
+    expect(getCropScaleOfFinance("kapas")).toBe(70000);
+    expect(getCropScaleOfFinance("cotton")).toBe(70000);
+  });
+
+  it("sets payout_status to approved, populates payout_amount_inr, and overrides gate upon accept or correct", async () => {
+    const { store, claimId } = await persistSeed();
+    const stored = store.claims.get(claimId)!;
+    stored.gate_result = { gateFailed: true, blockingReason: "green_below_threshold" };
+
+    // Reviewer overrides the gate
+    await applyReviewerAction(store, claimId, { action: "override_gate", notes: "Indoor presentation verification" });
+    const afterOverride = store.claims.get(claimId);
+    expect((afterOverride?.gate_result as any)?.overridden).toBe(true);
+
+    // Now accept succeeds and settles payout
+    const res = await applyReviewerAction(store, claimId, { action: "accept", notes: "Verified in field" });
+    expect(res.status).toBe("verified");
+    const updated = store.claims.get(claimId);
+    expect(updated?.payout_status).toBe("approved");
+    expect(updated?.payout_amount_inr).toBeGreaterThan(0);
+
+    // Correct action also directly overrides the gate and approves payout
+    const { store: s2, claimId: c2 } = await persistSeed();
+    const stored2 = s2.claims.get(c2)!;
+    stored2.gate_result = { gateFailed: true, blockingReason: "green_below_threshold" };
+    const correctRes = await applyReviewerAction(s2, c2, {
+      action: "correct",
+      override_reason: "Manual field check confirmed",
+      corrected_crop: "wheat",
+      corrected_affected_area_pct: 35,
+    });
+    expect(correctRes.status).toBe("verified");
+    const updated2 = s2.claims.get(c2);
+    expect(updated2?.payout_status).toBe("approved");
+    expect(updated2?.payout_amount_inr).toBeGreaterThan(0);
+    expect((updated2?.gate_result as any)?.overridden).toBe(true);
+  });
+
+  it("loadAllClaimImages merges existing stored images with newly submitted angle images", async () => {
+    const store = createMemoryClaimStore();
+    const persisted = await persistFarmerSubmission(store, {
+      images: [usableImage({ angleType: "photo_1" })],
+    });
+    const freshNewAngle = usableImage({ angleType: "photo_2" });
+    const merged = await loadAllClaimImages(store, persisted.claimId, [freshNewAngle]);
+    const angles = merged.map((img) => img.angleType);
+    expect(angles).toContain("photo_1");
+    expect(angles).toContain("photo_2");
   });
 });

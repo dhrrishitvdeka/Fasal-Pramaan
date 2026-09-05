@@ -4,6 +4,8 @@ import { resolveClaimClientPath } from "./claim-routes";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
 import { emptyOverview, type PerilAnalytics, type ReviewActionPayload } from "./web-db";
 import { clearRoleCache } from "./use-require-role";
+import { isCropMatch } from "./crop-synonyms";
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/backend";
 
@@ -359,6 +361,10 @@ export type Submission = {
   } | null;
   latest_evaluation?: EvidenceEvaluation | null;
   evidence_evaluation?: EvidenceEvaluation | null;
+  payout_status?: string | null;
+  payout_amount_inr?: number | null;
+  affected_area_hectares?: number | null;
+  estimated_loss_inr?: number | null;
 };
 
 export type AlertItem = {
@@ -442,6 +448,7 @@ export async function submitWebClaim(input: {
   plotLat?: number | null;
   plotLon?: number | null;
   sowingDate?: string | null;
+  growthStage?: string | null;
   images: Array<{
     angleType: string;
     imageDataUrl: string;
@@ -560,10 +567,35 @@ export async function mapMarkers(params?: Record<string, string>): Promise<MapMa
         markers = markers.filter((m) => m.status === params.status);
       }
     }
-    if (params?.severity) markers = markers.filter((m) => m.severity === params.severity);
-    if (params?.crop) markers = markers.filter((m) => (m.crop_code || "").toLowerCase().includes(params.crop.toLowerCase()));
+    if (params?.severity) {
+      const target = params.severity.toLowerCase().trim();
+      markers = markers.filter((m) => {
+        const s = (m.severity || "").toLowerCase().trim();
+        if (s === target) return true;
+        if (target === "high" && (s === "c" || s === "severe" || s === "critical")) return true;
+        if (target === "medium" && s === "b") return true;
+        if (target === "low" && s === "a") return true;
+        if (target === "none" && s === "u") return true;
+        if (target === "c" && s === "high") return true;
+        if (target === "b" && s === "medium") return true;
+        if (target === "a" && s === "low") return true;
+        if (target === "u" && s === "none") return true;
+        return false;
+      });
+    }
+    if (params?.crop) {
+      markers = markers.filter((m) => isCropMatch(params.crop, m.crop_code));
+    }
     if (params?.damage) {
-      markers = markers.filter((m) => (m.primary_damage || "").toLowerCase().includes(params.damage.toLowerCase()));
+      const dTarget = params.damage.toLowerCase().trim();
+      markers = markers.filter((m) => {
+        const d = (m.primary_damage || "").toLowerCase().trim();
+        if (d.includes(dTarget) || dTarget.includes(d)) return true;
+        if ((dTarget === "drought_stress" || dTarget === "drought") && d.includes("drought")) return true;
+        if ((dTarget === "waterlogging" || dTarget === "flood") && (d.includes("flood") || d.includes("waterlog"))) return true;
+        if ((dTarget === "fire" || dTarget === "fire_burn") && (d.includes("fire") || d.includes("burn"))) return true;
+        return false;
+      });
     }
     if (params?.district) {
       markers = markers.filter((m) => (m.district || "").toLowerCase().includes(params.district.toLowerCase()));
