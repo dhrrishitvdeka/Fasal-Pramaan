@@ -386,16 +386,23 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
     "x-goog-api-key": apiKey || "test",
   };
 
-  const modelsToTry = [
+  type GeminiCandidateEnvelope = {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<{ text?: string }>;
+      };
+    }>;
+  };
+
+  const candidateModels: string[] = [
     model,
     model !== "gemini-2.5-flash" ? "gemini-2.5-flash" : undefined,
     model !== "gemini-2.5-flash-lite" ? "gemini-2.5-flash-lite" : undefined,
     "gemini-1.5-flash",
-  ]
-    .filter((m): m is string => Boolean(m) && m.length > 0)
-    .filter((m, i, arr) => arr.indexOf(m) === i);
+  ].filter((m): m is string => typeof m === "string" && m.length > 0);
+  const modelsToTry = [...new Set(candidateModels)];
 
-  let envelope: { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> } | null = null;
+  let envelope: GeminiCandidateEnvelope | null = null;
   let usedModel = model;
   let lastError: Error | null = null;
 
@@ -436,7 +443,7 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
 
       const text = await response.text();
       try {
-        envelope = JSON.parse(text) as typeof envelope;
+        envelope = JSON.parse(text) as GeminiCandidateEnvelope;
       } catch {
         return parseGeminiAnalysis(text, candidateModel);
       }
@@ -457,7 +464,8 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
     throw new Error("Gemini vision returned an empty analysis");
   }
 
-  const rawOut = envelope?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("\n") || "";
+  const partsList: Array<{ text?: string }> = envelope?.candidates?.[0]?.content?.parts || [];
+  const rawOut = partsList.map((p) => p.text || "").join("\n");
   if (!rawOut.trim()) {
     throw new Error("Gemini vision returned an empty analysis");
   }
