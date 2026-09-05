@@ -73,6 +73,24 @@ describe("Gemini Live Indian language allowlist", () => {
     expect(persistAppLang("fr", "en")).toBe("en");
     expect(persistAppLang("ta", "en")).toBe("ta");
   });
+
+  it("normalizes language names and BCP-47 tags to allowlisted AppLang codes", () => {
+    expect(parseAppLang("hindi")).toBe("hi");
+    expect(parseAppLang("Hindi")).toBe("hi");
+    expect(parseAppLang("hi-IN")).toBe("hi");
+    expect(parseAppLang("english")).toBe("en");
+    expect(parseAppLang("English")).toBe("en");
+    expect(parseAppLang("en-US")).toBe("en");
+    expect(parseAppLang("bengali")).toBe("bn");
+    expect(parseAppLang("bangla")).toBe("bn");
+    expect(parseAppLang("tamil")).toBe("ta");
+    expect(parseAppLang("gujarati")).toBe("gu");
+    expect(parseAppLang("marathi")).toBe("mr");
+    expect(parseAppLang("punjabi")).toBe("pa");
+    expect(parseAppLang("telugu")).toBe("te");
+    expect(parseAppLang("french")).toBeNull();
+    expect(parseAppLang("spanish")).toBeNull();
+  });
 });
 
 describe("shipped change_language action", () => {

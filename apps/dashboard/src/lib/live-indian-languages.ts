@@ -44,15 +44,42 @@ export const GEMINI_LIVE_INDIAN_LANGUAGES: readonly LiveIndianLanguage[] = [
 
 const CODE_SET = new Set<string>(GEMINI_LIVE_INDIAN_LANGUAGE_CODES);
 
+const NAME_TO_CODE: Record<string, AppLang> = {
+  assamese: "as",
+  bengali: "bn",
+  bangla: "bn",
+  english: "en",
+  gujarati: "gu",
+  gujrati: "gu",
+  hindi: "hi",
+  kannada: "kn",
+  malayalam: "ml",
+  marathi: "mr",
+  nepali: "ne",
+  odia: "or",
+  oriya: "or",
+  punjabi: "pa",
+  sindhi: "sd",
+  tamil: "ta",
+  telugu: "te",
+  urdu: "ur",
+};
+
 export function isAppLang(value: unknown): value is AppLang {
   return typeof value === "string" && CODE_SET.has(value);
 }
 
-/** Persist / tool validator. Unknown and non-allowlisted codes are rejected. */
+/** Persist / tool validator. Normalizes codes, names, and BCP-47 locales. Unknown and non-allowlisted codes are rejected. */
 export function parseAppLang(value: unknown): AppLang | null {
   if (typeof value !== "string") return null;
-  const code = value.trim().toLowerCase();
-  return isAppLang(code) ? code : null;
+  const raw = value.trim().toLowerCase();
+  if (!raw) return null;
+  if (isAppLang(raw)) return raw;
+  if (NAME_TO_CODE[raw]) return NAME_TO_CODE[raw];
+  const bcp = raw.split(/[-_]/)[0];
+  if (isAppLang(bcp)) return bcp;
+  if (NAME_TO_CODE[bcp]) return NAME_TO_CODE[bcp];
+  return null;
 }
 
 export function persistAppLang(value: unknown, fallback: AppLang = "en"): AppLang {
