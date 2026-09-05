@@ -48,16 +48,18 @@ sequenceDiagram
   Pipeline->>Evidence Engine: 4. Evaluates: Q=94, C=100, X=85, I=100 -> Final = 92.6
   Pipeline->>Gemini: 5. Field analysis -> Grade C + written rationale
   Reviewer->>Dashboard: 6. Inspects Review Queue (High Confidence 92.6/100)
-  Reviewer->>Dashboard: 7. Clicks 'Accept & Verify' -> Status = VERIFIED
+  Reviewer->>Dashboard: 7. Clicks 'Accept & Verify' -> Status = VERIFIED (Payout Approved)
+  Dashboard->>Farmer Web: 8. Real-time DBT Sanctioned card appears on Farmer portal (₹ payout)
 ```
 
-1. **Farmer Action**: On the Farmer web (`:3000/farmer`), open **Farms** $\rightarrow$ **Add Farm** (*"Green Valley"*), **Add Plot** (*"Plot A1"*), and start **Paddy Cycle**. Tap **Capture Crop Evidence** (or start from `/farmer/saathi`). Capture the required angles and tap **Save & Submit**.
-2. **Reviewer Action**: In the Command Centre (`:3000/review`), open **Review Queue**. Click the case to show:
+1. **Farmer Action**: On the Farmer web (`:3000/farmer`), open **Farms** $\rightarrow$ **Add Farm** (*"Green Valley"*), **Add Plot** (*"Plot A1"*), and start **Paddy Cycle**. Tap **Capture Crop Evidence** (or start from `/farmer/saathi`). *(Tip: For indoor hackathon stage testing, add `?demo=true` to the URL to relax foliage color checks).* Capture the required angles and tap **Save & Submit**.
+2. **Reviewer Action**: In the Command Centre (`:3000/review`), open **Review Queue**. Notice that "Paddy" declared and "Rice" identified match cleanly via `crop-synonyms.ts` without triggering any `wrong_crop` gates. Click the case to show:
    - **Final Evidence Confidence**: `92.6 / 100` (Evidence Sufficient).
    - **Component Breakdown**: Quality `94.0`, Coverage `100.0`, Context `85.0`, Integrity `100.0`.
-   - **Gemini field analysis**: Grade `C` plus a written rationale (assistive).
+   - **Gemini field analysis**: Grade `C`, primary damage, and estimated loss in INR (calculated via PMFBY Scale-of-Finance).
    - **GIS Overlay**: Plot polygon boundary matching the GPS capture pin.
-3. Click **Accept & Verify**. Show the updated status and immutable audit record.
+3. **Adjudicate Claim**: Click **Accept & Verify**. Show the updated status (`verified`), approved payout status, and immutable audit record.
+4. **Closed Feedback Loop (Farmer Portal)**: Switch back to `/farmer/claims/[id]`. The page displays the official green **DBT Bank Sanctioned** payout card with the calculated settlement (e.g. `₹48,750`), completing the end-to-end evidence-to-payout journey live on stage.
 
 ---
 

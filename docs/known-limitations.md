@@ -2,7 +2,10 @@
 
 ## Models
 
-- **Gemini 3.8 Flash** (`gemini-3.8-flash`) analyses submitted stills. A/B/C/U are **workflow buckets**, not payout, disease identity, or yield loss.
+- **Gemini 3.8 Flash** (`gemini-3.8-flash`) analyses submitted stills. Severity grades (A/B/C/U) drive PMFBY Scale-of-Finance calculations (`estimated_loss_inr` and `affected_area_hectares`), leading to approved DBT payouts upon reviewer verification. Note: this visual damage assessment is distinct from formal YESTECH crop cutting experiment (CCE) statistical yield modeling.
+- **Crop Synonym Mapping**: Common Indian crop variations (paddy $\leftrightarrow$ rice, maize $\leftrightarrow$ corn, gram $\leftrightarrow$ chickpea) are mapped via `crop-synonyms.ts` to prevent false `wrong_crop` gate blocks.
+- **Reviewer Gate Override**: When a claim is flagged by the gate, the reviewer can override the verdict to verify the claim; overridden claims can be accepted.
+- **Demo Mode Camera Capture**: An optional `?demo=true` URL parameter relaxes strict on-device 75% crop foliage and screen-detection locks for indoor stage presentations.
 - **Gemini 3.1 Flash Live** is audio-only. The viewfinder is not streamed.
 - **On-device OpenCV** is colour/texture/screen heuristics. It can miss a clever fake; Gemini on the still is the real authenticity check.
 - `gemini-2.0-flash` is **shut down**. Do not pin it on Vercel.

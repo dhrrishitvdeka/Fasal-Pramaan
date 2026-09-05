@@ -2,6 +2,28 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] — 2026-09-05
+
+### Added — PMFBY Scale of Finance & DBT Payout Settlement
+- **Automated Financial Loss Calculation (`claim-pipeline.ts`)**: `attachHfPrediction` now computes `affected_area_hectares` and `estimated_loss_inr` using PMFBY benchmark Scale of Finance rates (Paddy: ₹65,000/Ha, Wheat: ₹60,000/Ha, Maize: ₹45,000/Ha, Mustard: ₹42,000/Ha, Gram: ₹40,000/Ha) combined with plot acreage and damage severity percentage.
+- **DBT Bank Sanctioned Card (`farmer/claims/[id]`)**: Reviewer acceptance (`accept` / `correct`) now sets `payout_status = "approved"` and populates `payout_amount_inr`, immediately rendering the green DBT Bank Sanctioned payout card on the farmer portal.
+- **Smart Background Polling (`farmer/claims/[id]`)**: Farmer claim detail screen now polls every 3 seconds while inference is pending, automatically terminating once predictions arrive to eliminate manual browser refresh (F5).
+
+### Fixed — Indian Agricultural Crop Synonym Matching
+- **Cross-Dialect Agronomic Clustering (`crop-synonyms.ts`)**: Implemented synonym mapping covering Paddy $\leftrightarrow$ Rice $\leftrightarrow$ Dhan $\leftrightarrow$ Oryza; Maize $\leftrightarrow$ Corn $\leftrightarrow$ Makka; Gram $\leftrightarrow$ Chickpea $\leftrightarrow$ Chana; Mustard $\leftrightarrow$ Sarson $\leftrightarrow$ Raya, etc.
+- **Eliminated False-Positive `wrong_crop` Gate Rejections (`gate-shared.ts`, `gemini-analyze.ts`)**: Disarmed false mismatches between farmer-declared and AI-identified crop species.
+- **Reviewer Queue Search**: Queue search query now matches across synonyms (e.g. searching "rice" surfaces declared "paddy" claims).
+
+### Fixed — Reviewer Adjudication & Workbench Workflow
+- **Resolved Gate-Override Deadlock (`review-accept.ts`, `review/[id]`)**: `predictionIsAcceptable` now respects `gateOverridden = true` even when `predicted_grade === "U"`, enabling reviewers to verify claims after overriding authenticity gate warnings.
+- **Auto-Override on Verification (`claim-pipeline.ts`)**: When an officer accepts or corrects a claim, any existing gate failure is automatically stamped with `overridden = true` and logged with the reviewer's audit note.
+- **Recapture Multi-Angle Merging (`claim-pipeline.ts`, `api/claims`)**: Submitting a recaptured angle now merges with previously stored valid angles, passing full multi-perspective context (`photo_1`, `photo_2`, `photo_3`) to Gemini vision.
+- **Map Dashboard Severity Filter (`web-db.ts`, `map/page.tsx`)**: Mapped AI severity grades (C $\to$ High, B $\to$ Medium, A $\to$ Low, U $\to$ None) so filtering by severity displays correctly without dropping pins.
+
+### Added — Presentation Demo Mode for Stage Showcases
+- **Indoor Shutter Relaxation (`farmer/capture`)**: Supported `?demo=true` and `NEXT_PUBLIC_DEMO_MODE=true` to relax strict 75% foliage match and screen detection checks when presenting indoors with sample demonstration cards or screen photos.
+- **Zero Rate Limiting**: Preserved zero rate limiting across all API endpoints for uninterrupted live hackathon evaluations.
+
 ## [2.7.0] — 2026-09-03
 
 ### Changed — Hosted analysis is Gemini-only
