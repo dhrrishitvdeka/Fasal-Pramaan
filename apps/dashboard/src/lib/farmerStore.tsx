@@ -354,6 +354,9 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     try {
       const stored = localStorage.getItem("fasal_lang") || localStorage.getItem(STORAGE_KEY_LANG);
       const parsed = persistAppLang(stored, "hi");
+      if (typeof document !== "undefined") {
+        document.documentElement.lang = parsed;
+      }
       if (parsed && parsed !== lang) {
         setLangState(parsed);
       }
@@ -367,6 +370,9 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
       const custom = e as CustomEvent<string>;
       const next = parseAppLang(custom.detail || localStorage.getItem("fasal_lang") || localStorage.getItem(STORAGE_KEY_LANG));
       if (next && next !== lang) {
+        if (typeof document !== "undefined") {
+          document.documentElement.lang = next;
+        }
         setLangState(next);
       }
     };
@@ -452,6 +458,9 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     if (!next) return;
     setLangState(next);
     try {
+      if (typeof document !== "undefined") {
+        document.documentElement.lang = next;
+      }
       localStorage.setItem(STORAGE_KEY_LANG, next);
       localStorage.setItem("fasal_lang", next);
       window.dispatchEvent(new CustomEvent("fasal:lang-change", { detail: next }));

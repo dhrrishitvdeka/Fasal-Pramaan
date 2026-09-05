@@ -33,7 +33,7 @@ function newMsg(role: SaathiMessage["role"], text: string, textHi?: string): Saa
   return { id: `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`, role, text, textHi, at: new Date().toISOString() };
 }
 
-export function initialSaathiGreeting(lang: string): SaathiMessage {
+export function initialSaathiGreeting(lang: string = "hi"): SaathiMessage {
   const t = getFarmerT(lang as AppLang);
   const greeting = t.saathiGreeting || "Hi, I am Fasal Saathi. What happened to your crop? Tell me in your words — e.g., fire/burn, animal grazing, flood, pest/disease, hail, lodging.";
   return newMsg("saathi", greeting, greeting);
@@ -75,7 +75,7 @@ export function mergeSlots(a: SaathiSlot, b: Partial<SaathiSlot>): SaathiSlot {
   return { ...a, ...b, farmerNote: b.farmerNote || a.farmerNote };
 }
 
-export function buildSaathiReply(slots: SaathiSlot, lang: string): SaathiMessage {
+export function buildSaathiReply(slots: SaathiSlot, lang: string = "hi"): SaathiMessage {
   const peril = slots.peril || "normal";
   const cfg = routeForPeril(peril);
   if (!slots.peril) {
@@ -102,12 +102,12 @@ export function buildSaathiReply(slots: SaathiSlot, lang: string): SaathiMessage
   );
 }
 
-export function nextQuestion(slots: SaathiSlot, lang: string): SaathiMessage | null {
+export function nextQuestion(slots: SaathiSlot, lang: string = "hi"): SaathiMessage | null {
   if (!slots.crop) {
     return newMsg(
       "saathi",
       lang === "hi" ? "कौन सी फसल प्रभावित है? जैसे: गेहूँ, धान, सरसों।" : "Which crop is affected? e.g., Wheat, Paddy, Mustard.",
-      "कौन सी फसल प्रभावित है? जैसे: गेहूँ, धान, सरसों。"
+      "कौन सी फसल प्रभावित है? जैसे: गेहूँ, धान, सरसों।"
     );
   }
   return null;
@@ -150,79 +150,177 @@ export type AgentResolution = {
   slots: SaathiSlot;
 };
 
+type ExplicitSwitchSpec = {
+  lang: AppLang;
+  label: string;
+  labelHi: string;
+  pattern: RegExp;
+  ackText: string;
+  alreadyText: string;
+};
+
+const EXPLICIT_LANGUAGE_SWITCHES: readonly ExplicitSwitchSpec[] = [
+  {
+    lang: "hi",
+    label: "Hindi",
+    labelHi: "हिंदी",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?hindi|(?:talk|speak|reply|converse)\s+(?:in\s+)?hindi|(?:हिंदी|हिन्दी)\s*(?:में\s*(?:बात\s*करो|बोलो|बताओ|समझाइए)|बोलो|बताओ)|hindi\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|hindi\s+please)/i,
+    ackText: "जी, अब मैं हिंदी में बात करूँगा। आपकी फसल में क्या समस्या है?",
+    alreadyText: "जी, मैं पहले से ही हिन्दी में बात कर रहा हूँ। आपकी फसल में क्या समस्या है?",
+  },
+  {
+    lang: "en",
+    label: "English",
+    labelHi: "अंग्रेज़ी",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?english|(?:talk|speak|reply|converse)\s+(?:in\s+)?english|(?:अंग्रेजी|अंग्रेज़ी)\s*(?:में\s*(?:बात\s*करो|बोलो|बताओ|समझाइए)|बोलो|बताओ)|english\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|english\s+please)/i,
+    ackText: "Sure, I will assist you in English now. What issue did you face with your crop?",
+    alreadyText: "I am already speaking in English. What issue did you face with your crop?",
+  },
+  {
+    lang: "gu",
+    label: "Gujarati",
+    labelHi: "गुजराती",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?gujarati|(?:talk|speak|reply|converse)\s+(?:in\s+)?gujarati|ગુજરાતી(?:માં)?\s*(?:વાત\s*કરો|બોલો)|gujarati\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|गुजराती\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|gujarati\s+please)/i,
+    ackText: "હા, હું હવે ગુજરાતીમાં વાત કરીશ. તમારા પાકમાં શું સમસ્યા છે?",
+    alreadyText: "હું પહેલાથી જ ગુજરાતીમાં વાત કરી રહ્યો છું. તમારા પાકમાં શું સમસ્યા છે?",
+  },
+  {
+    lang: "ta",
+    label: "Tamil",
+    labelHi: "तमिल",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?tamil|(?:talk|speak|reply|converse)\s+(?:in\s+)?tamil|தமிழ்(?:இல்)?\s*(?:பேசு|பேசுங்கள்)|tamil\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|तमिल\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|tamil\s+please)/i,
+    ackText: "சரி, நான் இப்போது தமிழில் பேசுகிறேன். உங்கள் பயிரில் என்ன பிரச்சனை?",
+    alreadyText: "நான் ஏற்கனவே தமிழில் பேசுகிறேன். உங்கள் பயிரில் என்ன பிரச்சனை?",
+  },
+  {
+    lang: "bn",
+    label: "Bengali",
+    labelHi: "बंगाली",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?(?:bengali|bangla)|(?:talk|speak|reply|converse)\s+(?:in\s+)?(?:bengali|bangla)|বাংলা(?:য়)?\s*(?:কথা\s*বলুন|বলুন)|(?:bengali|bangla)\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|बंगाली\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|bengali\s+please)/i,
+    ackText: "হ্যাঁ, আমি এখন বাংলায় কথা বলব। আপনার ফসলে কী समस्या হয়েছে?",
+    alreadyText: "আমি ইতিমধ্যেই বাংলায় কথা বলছি। আপনার ফসলে কী समस्या হয়েছে?",
+  },
+  {
+    lang: "mr",
+    label: "Marathi",
+    labelHi: "मराठी",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?marathi|(?:talk|speak|reply|converse)\s+(?:in\s+)?marathi|मराठी(?:त|मध्ये)?\s*(?:बोला|सांगा)|marathi\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|मराठी\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|marathi\s+please)/i,
+    ackText: "होय, मी आता मराठीत बोलेन. आपल्या पिकाचे काय नुकसान झाले आहे?",
+    alreadyText: "मी आधीपासूनच मराठीत बोलत आहे. आपल्या पिकाचे काय नुकसान झाले आहे?",
+  },
+  {
+    lang: "pa",
+    label: "Punjabi",
+    labelHi: "पंजाबी",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?punjabi|(?:talk|speak|reply|converse)\s+(?:in\s+)?punjabi|ਪੰਜਾਬੀ\s*(?:ਵਿੱਚ\s*(?:ਗੱਲ\s*ਕਰੋ|ਬੋਲੋ)|ਬੋਲੋ)|punjabi\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|पंजाबी\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|punjabi\s+please)/i,
+    ackText: "ਹਾਂਜੀ, ਹੁਣ ਮੈਂ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰਾਂਗਾ। ਤੁਹਾਡੀ ਫ਼ਸਲ ਦਾ ਕੀ ਨੁਕਸਾਨ ਹੋਇਆ ਹੈ?",
+    alreadyText: "ਮੈਂ ਪਹਿਲਾਂ ਹੀ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰ ਰਿਹਾ ਹਾਂ। ਤੁਹਾਡੀ ਫ਼ਸਲ ਦਾ ਕੀ ਨੁਕਸਾਨ ਹੋਇਆ ਹੈ?",
+  },
+  {
+    lang: "te",
+    label: "Telugu",
+    labelHi: "तेलुगु",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?telugu|(?:talk|speak|reply|converse)\s+(?:in\s+)?telugu|తెలుగు(?:లో)?\s*(?:మాట్లాడు|మాట్లాడండి)|telugu\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|तेलुगु\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|telugu\s+please)/i,
+    ackText: "సరే, నేను ఇప్పుడు తెలుగులో మాట్లాడతాను. మీ పంటకు ఏమి సమస్య వచ్చింది?",
+    alreadyText: "నేను ఇప్పటికే తెలుగులో మాట్లాడుతున్నాను. మీ పంటకు ఏమి సమస్య వచ్చింది?",
+  },
+  {
+    lang: "kn",
+    label: "Kannada",
+    labelHi: "कन्नड़",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?kannada|(?:talk|speak|reply|converse)\s+(?:in\s+)?kannada|ಕನ್ನಡ(?:ದಲ್ಲಿ)?\s*(?:ಮಾತನಾಡಿ|ಮಾತಾಡು)|kannada\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|कन्नड़\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|kannada\s+please)/i,
+    ackText: "ಸರಿ, ನಾನು ಈಗ ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡುತ್ತೇನೆ. ನಿಮ್ಮ ಬೆಳೆಗೆ ಏನು ಸಮಸ್ಯೆಯಾಗಿದೆ?",
+    alreadyText: "ನಾನು ಈಗಾಗಲೇ ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡುತ್ತಿದ್ದೇನೆ. ನಿಮ್ಮ ಬೆಳೆಗೆ ಏನು ಸಮಸ್ಯೆಯಾಗಿದೆ?",
+  },
+  {
+    lang: "ml",
+    label: "Malayalam",
+    labelHi: "मलयालम",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?malayalam|(?:talk|speak|reply|converse)\s+(?:in\s+)?malayalam|മലയാള(?:ത്തിൽ)?\s*(?:സംസാരിക്കൂ|പറയൂ)|malayalam\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|मलयालम\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|malayalam\s+please)/i,
+    ackText: "ശരി, ഞാൻ ഇനി മലയാളത്തിൽ സംസാരിക്കാം. നിങ്ങളുടെ വിളയ്ക്ക് എന്ത് പ്രശ്നമാണ് സംഭവിച്ചത്?",
+    alreadyText: "ഞാൻ ഇതിനകം മലയാളത്തിലാണ് സംസാരിക്കുന്നത്. നിങ്ങളുടെ വിളയ്ക്ക് എന്ത് പ്രശ്നമാണ് സംഭവിച്ചത്?",
+  },
+  {
+    lang: "as",
+    label: "Assamese",
+    labelHi: "असमिया",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?assamese|(?:talk|speak|reply|converse)\s+(?:in\s+)?assamese|অসমীয়া(?:ত)?\s*(?:কথা\s*পাতক|কওক)|assamese\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|असमिया\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|assamese\s+please)/i,
+    ackText: "নিশ্চয়, মই এতিয়া অসমীয়াত কথা কম। আপোনাৰ শস্যৰ কি ক্ষতি হৈছে?",
+    alreadyText: "মই ইতিমধ্যে অসমীয়াত কথা পাতি আছো। আপোনাৰ শস্যৰ কি ক্ষতি হৈছে?",
+  },
+  {
+    lang: "or",
+    label: "Odia",
+    labelHi: "ओड़िया",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?(?:odia|oriya)|(?:talk|speak|reply|converse)\s+(?:in\s+)?(?:odia|oriya)|ଓଡ଼ିଆ(?:ରେ)?\s*(?:କୁହନ୍ତୁ|କଥା\s*ହୁଅନ୍ତୁ)|(?:odia|oriya)\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|ओड़िया\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|odia\s+please)/i,
+    ackText: "ହଁ, ମୁଁ ଏବେ ଓଡ଼ିଆରେ କଥା ହେବି। ଆପଣଙ୍କ ଫସଲରେ କ’ଣ କ୍ଷତି ହୋଇଛି?",
+    alreadyText: "ମୁଁ ପୂର୍ବରୁ ଓଡ଼ିଆରେ କଥା ହେଉଛି। ଆପଣଙ୍କ ଫସଲରେ କ’ଣ କ୍ଷତି ହୋଇଛି?",
+  },
+  {
+    lang: "ne",
+    label: "Nepali",
+    labelHi: "नेपाली",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?nepali|(?:talk|speak|reply|converse)\s+(?:in\s+)?nepali|नेपाली(?:मा)?\s*(?:बोल्नुहोस्|कुरा\s*गर्नुहोस्)|nepali\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|नेपाली\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|nepali\s+please)/i,
+    ackText: "हजुर, म अब नेपालीमा कुरा गर्नेछु। तपाईंको बालीमा के समस्या भयो?",
+    alreadyText: "म पहिले नै नेपालीमा कुरा गरिरहेको छु। तपाईंको बालीमा के समस्या भयो?",
+  },
+  {
+    lang: "ur",
+    label: "Urdu",
+    labelHi: "उर्दू",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?urdu|(?:talk|speak|reply|converse)\s+(?:in\s+)?urdu|اردو\s*(?:میں\s*(?:बात\s*کریں|بولیں|बात\s*کرو|بولو)|بولیں)|urdu\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|उर्दू\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|urdu\s+please)/i,
+    ackText: "جی، اب میں اردو میں بات کروں گا۔ آپ کی فصل میں کیا مسئلہ ہوا ہے؟",
+    alreadyText: "میں پہلے سے ہی اردو میں بات کر رہا ہوں۔ آپ کی فصل میں کیا مسئلہ ہوا ہے؟",
+  },
+  {
+    lang: "sd",
+    label: "Sindhi",
+    labelHi: "सिंधी",
+    pattern:
+      /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?sindhi|(?:talk|speak|reply|converse)\s+(?:in\s+)?sindhi|سنڌي\s*(?:۾\s*ڳالهايو|ڳالهايو)|sindhi\s+(?:me|mein|mai)\s+(?:baat\s+karo|bolo|batao)|सिंधी\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|sindhi\s+please)/i,
+    ackText: "ها، هاڻي مان سنڌي ۾ ڳالهائيندس. اوهان جي فصل کي ڪهڙو نقصان پهتو آهي؟",
+    alreadyText: "مان اڳ ۾ ئي سنڌي ۾ ڳالهائي رهيو آهيان. اوهان جي فصل کي ڪهڙو نقصان پهتو آهي؟",
+  },
+];
+
 export function resolveAgenticAction(
   text: string,
   currentSlots: SaathiSlot,
   plots: Array<{ id: string; name: string; nameHi: string; cropType: string; cropTypeHi: string; village: string }>,
-  currentLang: string,
+  currentLang: string = "hi",
 ): AgentResolution {
   const t = text.toLowerCase().trim();
   const extracted = extractSlotsFromText(text, plots);
   const nextSlots = mergeSlots(currentSlots, extracted);
 
   // 1. Language switch orders - ONLY trigger on explicit commands, NEVER on incidental words
-  if (
-    /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?hindi|(?:talk|speak|reply)\s+(?:in\s+)?hindi|(?:हिंदी|हिन्दी)\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|hindi\s+me\s+(?:baat\s+karo|bolo))/i.test(
-      t,
-    )
-  ) {
+  const explicitSwitch = EXPLICIT_LANGUAGE_SWITCHES.find((item) => item.pattern.test(t));
+  if (explicitSwitch) {
+    const isAlready = currentLang === explicitSwitch.lang;
+    const replyText = isAlready ? explicitSwitch.alreadyText : explicitSwitch.ackText;
     return {
-      replyMessage: newMsg(
-        "saathi",
-        "जी, अब मैं हिंदी में बात करूँगा। आपकी फसल में क्या समस्या है?",
-        "जी, अब मैं हिंदी में बात करूँगा। आपकी फसल में क्या समस्या है?",
-      ),
-      action: { type: "switch_language", lang: "hi" },
-      actionSummary: "Language switched to Hindi",
-      actionSummaryHi: "भाषा हिंदी में बदली गई",
-      slots: nextSlots,
-    };
-  }
-  if (
-    /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?english|(?:talk|speak|reply)\s+(?:in\s+)?english|(?:अंग्रेजी|अंग्रेज़ी)\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|english\s+me\s+(?:baat\s+karo|bolo))/i.test(
-      t,
-    )
-  ) {
-    return {
-      replyMessage: newMsg(
-        "saathi",
-        "Sure, I will assist you in English now. What issue did you face with your crop?",
-      ),
-      action: { type: "switch_language", lang: "en" },
-      actionSummary: "Language switched to English",
-      actionSummaryHi: "भाषा अंग्रेज़ी में बदली गई",
-      slots: nextSlots,
-    };
-  }
-  if (
-    /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?gujarati|(?:talk|speak|reply)\s+(?:in\s+)?gujarati|ગુજરાતી(?:માં)?\s*(?:વાત\s*કરો|બોલો)|gujarati\s+me\s+(?:baat\s+karo|bolo))/i.test(
-      t,
-    )
-  ) {
-    return {
-      replyMessage: newMsg(
-        "saathi",
-        "હા, હું હવે ગુજરાતીમાં વાત કરીશ. તમારા પાકમાં શું સમસ્યા છે?",
-      ),
-      action: { type: "switch_language", lang: "gu" },
-      actionSummary: "Language switched to Gujarati",
-      actionSummaryHi: "ભાષા ગુજરાતીમાં બદલી",
-      slots: nextSlots,
-    };
-  }
-  if (
-    /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?tamil|(?:talk|speak|reply)\s+(?:in\s+)?tamil|தமிழ்(?:இல்)?\s*(?:பேசு|பேசுங்கள்)|tamil\s+me\s+(?:baat\s+karo|bolo))/i.test(
-      t,
-    )
-  ) {
-    return {
-      replyMessage: newMsg(
-        "saathi",
-        "சரி, நான் இப்போது தமிழில் பேசுகிறேன். உங்கள் பயிரில் என்ன பிரச்சனை?",
-      ),
-      action: { type: "switch_language", lang: "ta" },
-      actionSummary: "Language switched to Tamil",
-      actionSummaryHi: "மொழி தமிழில் மாற்றப்பட்டது",
+      replyMessage: newMsg("saathi", replyText, replyText),
+      action: { type: "switch_language", lang: explicitSwitch.lang },
+      actionSummary: isAlready
+        ? `Language is already ${explicitSwitch.label}`
+        : `Language switched to ${explicitSwitch.label}`,
+      actionSummaryHi: isAlready
+        ? `भाषा पहले से ही ${explicitSwitch.labelHi} है`
+        : `भाषा ${explicitSwitch.labelHi} में बदली गई`,
       slots: nextSlots,
     };
   }
@@ -325,7 +423,7 @@ export function resolveAgenticAction(
 // This module stays client-safe: no API keys are read here.
 // ---------------------------------------------------------------------------
 
-export function buildSystemPrompt(intent: ClaimIntent | null, lang: string = "en"): string {
+export function buildSystemPrompt(intent: ClaimIntent | null, lang: string = "hi"): string {
   const base =
     "You are Fasal Saathi (फसल साथी), a frontier autonomous agent for Fasal-Pramaan. " +
     "You route crop-damage claims to evidence capture, call context signals, and guide the farmer angle-by-angle. " +
