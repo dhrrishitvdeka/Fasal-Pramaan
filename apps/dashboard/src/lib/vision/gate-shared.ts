@@ -335,13 +335,12 @@ Return ONLY valid JSON matching this schema:
 Angle: ${angleType}, Peril: ${peril || "normal"}`;
 
   const model = resolveGeminiVisionModel();
-  const modelsToTry = [
+  const candidateModels: string[] = [
     model,
     model !== "gemini-2.5-flash" ? "gemini-2.5-flash" : undefined,
     model !== "gemini-2.5-flash-lite" ? "gemini-2.5-flash-lite" : undefined,
-  ]
-    .filter((m): m is string => Boolean(m) && m.length > 0)
-    .filter((m, i, arr) => arr.indexOf(m) === i);
+  ].filter((m): m is string => typeof m === "string" && m.length > 0);
+  const modelsToTry = [...new Set(candidateModels)];
 
   try {
     let rawOut = "";
