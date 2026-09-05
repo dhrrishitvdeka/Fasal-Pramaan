@@ -166,6 +166,30 @@ export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
         q: "Why is GPS coordinate verification required?",
         a: "PMFBY regulations require geospatial proof that the photos were captured inside your registered land plot. The system matches your coordinates with government land records.",
       },
+      {
+        q: "What photos do I need to take for a claim?",
+        a: "The app guides you step by step — a wide field view, context angles showing healthy vs damaged crop, and a close-up of the damage. Take every photo it asks for; missing ones delay approval.",
+      },
+      {
+        q: "Why do I need a Khasra number before filing a claim?",
+        a: "Under PMFBY rules every claim must be linked to a registered land parcel. Register your plot once with its Khasra number, and all future claims on that plot become quicker.",
+      },
+      {
+        q: "What happens if the reviewer sends my claim back?",
+        a: "Nothing is lost. The reviewer marks exactly which photo or detail needs fixing, and you only recapture that one item. Track the status on the Track My Claims page.",
+      },
+      {
+        q: "How is my payout amount calculated?",
+        a: "The app estimates the loss from official PMFBY Scale-of-Finance rates for your crop, your plot area, and the visible damage severity. The reviewer verifies it before the payout is sanctioned to your bank account.",
+      },
+      {
+        q: "Do I need mobile internet while taking photos in the field?",
+        a: "Keep GPS location ON while capturing so each photo is geo-tagged inside your plot. Photos upload whenever you have a connection; the voice assistant needs internet to talk to you.",
+      },
+      {
+        q: "Are my photos and personal details safe?",
+        a: "Yes. Every photo is sealed with a tamper-proof digital signature at capture and stored privately. Only the assigned insurance reviewer can open your claim.",
+      },
     ],
     startClaimBtn: "Start Guided 3-Photo Capture",
     talkToSaathiBtn: "Talk to Fasal Saathi (Voice AI)",
@@ -299,6 +323,30 @@ export const HELP_TRANSLATIONS: Record<AppLang, HelpTranslations> = {
       {
         q: "जीपीएस (GPS) लोकेशन क्यों जरूरी है?",
         a: "प्रधानमंत्री फसल बीमा योजना के नियमों के अनुसार फोटो आपके पंजीकृत खसरे के अंदर ली गई होनी चाहिए।",
+      },
+      {
+        q: "दावे के लिए मुझे कौन-सी फ़ोटो लेनी होंगी?",
+        a: "ऐप आपको चरण-दर-चरण बताएगा — पूरे खेत का दृश्य, स्वस्थ बनाम क्षतिग्रस्त फसल दिखाने वाले कोण, और क्षति का नज़दीकी फ़ोटो। मांगी गई सभी फ़ोटो लें; अधूरी फ़ोटो से स्वीकृति में देरी होती है।",
+      },
+      {
+        q: "दावा करने से पहले खसरा संख्या क्यों ज़रूरी है?",
+        a: "PMFBY नियमों के अनुसार हर दावा पंजीकृत भूखंड से जुड़ा होना चाहिए। अपना भूखंड खसरा संख्या के साथ एक बार पंजीकृत करें, आगे के दावे आसान हो जाएंगे।",
+      },
+      {
+        q: "समीक्षक ने मेरा दावा वापस भेज दिया तो क्या होगा?",
+        a: "घबराएं नहीं। समीक्षक बताता है कि कौन-सी फ़ोटो या जानकारी ठीक करनी है, और आपको केवल वही दोबारा देना होता है। 'मेरे दावे देखें' पेज पर स्थिति देखते रहें।",
+      },
+      {
+        q: "मेरी भरपाई की राशि कैसे तय होती है?",
+        a: "आपकी फसल की आधिकारिक PMFBY दर, खेत के क्षेत्रफल और दिख रही क्षति के आधार पर अनुमान लगाया जाता है। भुगतान से पहले समीक्षक इसकी जांच करता है।",
+      },
+      {
+        q: "क्या खेत में फ़ोटो लेते समय इंटरनेट ज़रूरी है?",
+        a: "फ़ोटो लेते समय GPS चालू रखें ताकि लोकेशन दर्ज हो सके। फ़ोटो कनेक्शन मिलने पर अपलोड हो जाती हैं; आवाज़ सहायक से बात करने के लिए इंटरनेट चाहिए।",
+      },
+      {
+        q: "क्या मेरी फ़ोटो और जानकारी सुरक्षित हैं?",
+        a: "हाँ। हर फ़ोटो पर छेड़छाड़-रोक डिजिटल मोहर लगती है और वे निजी तौर पर संग्रहित होती हैं। आपका दावा केवल अधिकृत बीमा समीक्षक ही खोल सकता है।",
       },
     ],
     startClaimBtn: "3-फ़ोटो कैमरा से फोटो लें",
