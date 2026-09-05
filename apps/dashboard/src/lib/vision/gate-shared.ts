@@ -337,8 +337,9 @@ Angle: ${angleType}, Peril: ${peril || "normal"}`;
   const model = resolveGeminiVisionModel();
   const candidateModels: string[] = [
     model,
-    model !== "gemini-2.5-flash" ? "gemini-2.5-flash" : undefined,
-    model !== "gemini-2.5-flash-lite" ? "gemini-2.5-flash-lite" : undefined,
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
   ].filter((m): m is string => typeof m === "string" && m.length > 0);
   const modelsToTry = [...new Set(candidateModels)];
 
