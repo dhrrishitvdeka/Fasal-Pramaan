@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { Home, Camera, FileText, Calendar, Sprout, HelpCircle } from "lucide-react";
 import { FarmerProvider, useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
-import { useOnlineStatus } from "@/lib/use-online-status";
 import FasalSaathiOverlay from "@/components/FasalSaathiOverlay";
 import OfflineBanner from "@/components/offline-banner";
 import { SaathiSessionProvider } from "@/lib/saathi/session-provider";
@@ -18,7 +17,6 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { lang, setLang, farmerProfile, claims, newRecaptureNotices } = useFarmerData();
   const t = getFarmerT(lang);
-  const isOnline = useOnlineStatus();
 
   const pendingRecaptures = claims.filter((c) => c.status === "needs_recapture").length;
   const hasNewRecaptureNotices = newRecaptureNotices.length > 0;
@@ -58,27 +56,6 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
       <OfflineBanner />
-      <div className="border-b border-[var(--line)] bg-[var(--ink)] px-4 py-1 text-[11px] text-[var(--surface)] sm:px-6 lg:px-8 sm:text-xs">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
-          <span className="min-w-0 truncate font-medium">
-            {t.pmfbyBanner}
-          </span>
-          <div className="flex shrink-0 items-center gap-2 opacity-85 sm:gap-3">
-            <span className="inline-flex items-center gap-1">
-              <span className={clsx("h-1.5 w-1.5 rounded-full", isOnline ? "bg-emerald-400" : "bg-amber-400")} />
-              {isOnline ? t.onlineNotice : t.offlineNotice}
-            </span>
-            <span className="text-white/30">|</span>
-            <Link
-              href="/login?next=/overview"
-              className="underline-offset-2 hover:underline hover:text-white"
-            >
-              {t.reviewerSignIn}
-            </Link>
-          </div>
-        </div>
-      </div>
-
       <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--surface)]/95 backdrop-blur-md shadow-2xs">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-2.5 sm:px-6 lg:px-8">
           {/* Brand Logo */}
@@ -90,9 +67,6 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-bold tracking-tight text-[var(--ink)] sm:text-base">
                   Fasal-Pramaan
-                </span>
-                <span className="rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.2 text-[10px] font-bold uppercase tracking-wider text-emerald-800">
-                  {t.farmerPortalLabel}
                 </span>
               </div>
             </div>
@@ -139,11 +113,12 @@ function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link
               href="/farmer/help"
-              className="hidden lg:inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-medium text-slate-600 shadow-2xs transition-colors hover:bg-slate-100 hover:text-slate-900 sm:px-2.5"
               title={t.help}
+              aria-label={t.help}
             >
-              <HelpCircle className="h-3.5 w-3.5 text-slate-500" />
-              <span>{t.help}</span>
+              <HelpCircle className="h-4 w-4 text-slate-500" />
+              <span className="hidden lg:inline">{t.help}</span>
             </Link>
 
             {(() => {

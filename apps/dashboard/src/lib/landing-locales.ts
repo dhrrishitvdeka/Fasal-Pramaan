@@ -67,9 +67,8 @@ const EN_BASE: LandingTranslation = {
   brandSub: "फसल प्रमाण",
   badgePortal: "Claim Evidence Portal",
   badgePipeline: "8-Step Pipeline",
-  heroTitle: "AI Crop Evidence Analytics. Multi-Signal Triangulation. Human Decision.",
-  heroSub:
-    "Conversational intake via Fasal Saathi routes claims across 8 peril protocols. Real-time on-device computer vision and multi-signal triangulation (Copernicus Sentinel-2, IMD weather, ISRO Bhuvan) provide verifiable ground truth for crop insurance assessment.",
+  heroTitle: "Fasal Pramaan: AI Crop Evidence Analytics",
+  heroSub: "AI-powered crop insurance assessment with field evidence, computer vision, satellite data, and weather signals.",
   startSaathi: "Start with Fasal Saathi",
   aiGuideBadge: "AI Guide",
   reviewerCentre: "Reviewer Centre",
