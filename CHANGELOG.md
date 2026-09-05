@@ -2,6 +2,23 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.1] — 2026-09-05
+
+### Added — Multilingual Farmer-Friendly Claim Notifications
+- **16-Scenario Typed Notification System (`claim-notifications.ts`, `ClaimNotificationBanner.tsx`)**: Full typed dictionary of notification codes (`invalid_session`, `submission_failed`, `duplicate_images`, `unusable_lighting`, `blurry_image`, `no_plot_selected`, `missing_angles`, `draft_saved`, `draft_save_failed`, `photo_upload_failed`, `camera_switched`, `retake_cleared`, `claim_submitted`, `supabase_not_configured`, `gps_unavailable`, `voice_unavailable`) covering error, warning, success, and info states.
+- **15 Indian Languages Native Localization**: Every notification provides actionable, farmer-friendly explanations ("what happened" + "what to do next") translated across Assamese (`as`), Bengali (`bn`), English (`en`), Gujarati (`gu`), Hindi (`hi`), Kannada (`kn`), Malayalam (`ml`), Marathi (`mr`), Nepali (`ne`), Odia (`or`), Punjabi (`pa`), Sindhi (`sd`), Tamil (`ta`), Telugu (`te`), and Urdu (`ur`).
+- **Accessible Non-Obstructive Banner**: Docked at top of `/farmer/capture` so as not to interfere with camera shutter or angle tabs; includes ARIA live alerts (`role="alert"` for errors, `role="status"` for warnings/info) and an accessible dismiss button with 4-second debouncing to prevent repeated alerts.
+
+### Fixed — Saathi Voice Page-Awareness Without Audio Interruption
+- **Active Playback Detection (`live-audio.ts`)**: Added `LiveAudioSession.isPlaying()` to monitor scheduled Web Audio PCM buffers.
+- **Decoupled Navigation Synchronization (`session-provider.tsx`, `web-voice-broker.ts`)**: Route transitions initiated by agent tools (`open_camera`, `navigate`, `begin_guided_capture`, `begin_recapture`, `open_claim`) update the broker silently without emitting a barge-in context turn that cuts off active speech. User-initiated route changes defer context updates until turn completion if the assistant is speaking, eliminating self-interruption loops and repeated greetings.
+
+### Added — Grounded Agentic Tools & Cross-Screen Camera Launch
+- **Camera Studio Grounding (`web-voice-broker.ts`)**: Calling `capture_current_angle` (e.g. speaking *"Take a photo"* / *"फोटो खींचो"*) from any screen checks registered plots and opens the capture studio (`/farmer/capture?plotId=...`), guiding the farmer to frame the crop before shutter capture.
+- **Crop Milestone Seeding (`tools-server.ts`)**: Server-side `register_plot` now automatically generates crop-specific growth stage milestones (`web_milestones`) matching client state.
+- **Grounded Tool Feedback**: Added localized Hindi and English responses to haversine GPS geofence checks (`check_plot_geofence`), 72-hour Open-Meteo agro-weather radar (`fetch_agro_weather_alerts`), and 3-stage claim audit breakdowns (`explain_claim_audit`).
+- **Comprehensive Test Coverage**: Added 14 new automated unit tests in `claim-notifications.test.ts` and `saathi-navigation-awareness.test.ts`, bringing the total test suite to 36 test files and 283 passing tests.
+
 ## [2.8.0] — 2026-09-05
 
 ### Added — PMFBY Scale of Finance & DBT Payout Settlement

@@ -249,10 +249,17 @@ Server-side dispatcher for the Fasal Saathi function tools (`SAATHI_FUNCTION_DEC
 
 | Tool | Args (sanitized/clamped server-side) | Returns |
 |---|---|---|
-| `register_plot` | `name`, `crop_type`, `khasra_number`, `area_hectares`, `village` | Registers plot in state with complete agronomic metadata |
-| `check_plot_geofence` | `plot_id` (optional) | Validates GPS coordinates against cadastral parcel boundaries |
-| `fetch_agro_weather_alerts` | `plot_id` (optional) | Fetches 72-hour precipitation, hail probability, temperature stress |
-| `explain_claim_audit` | `claim_id` | Full plain-language breakdown of 3-stage AI & satellite verification |
+| `register_plot` | `name`, `crop_type`, `khasra_number`, `area_hectares`, `village` | Registers plot in database and automatically seeds PMFBY stage milestones (`web_milestones`) |
+| `check_plot_geofence` | `plot_id` (optional), `lat`, `lon`, `accuracy_m` | Haversine distance and parcel boundary containment against registered plot coordinates |
+| `fetch_agro_weather_alerts` | `plot_id` (optional), `lat`, `lon` | Fetches 72-hour precipitation sum, temperature extremes, and wind gusts via Open-Meteo |
+| `explain_claim_audit` | `claim_id`, `lang` | 3-stage breakdown (Stage 1 Vision Gate, Stage 2 Gemini analysis, Stage 3 Sentinel-2 crosscheck) and missing angles for recapture |
+| `capture_current_angle` | None | Dispatches shutter capture to camera studio; if called outside capture studio, navigates to studio for registered plot |
+| `switch_camera` | None | Dispatches camera flip (`user` vs `environment`) to capture studio |
+| `select_capture_angle` | `angle` | Sets active target photo angle in viewfinder |
+| `retake_capture_angle` | `angle` | Clears specified angle frame and opens for recapture |
+| `set_capture_observation` | `observation` (≤1000 chars) | Records spoken field observation into the open claim draft |
+| `prepare_submit_claim` | None | Prepares claim draft submission for confirmation |
+| `check_evidence_quality` | None | Inspects realtime CV quality scores (canopy %, blur, luma) on open viewfinder |
 | `request_evidence_angles` | `peril: string` | ROUTE_CONFIG for the peril: required/optional angles, context checks, minConfidence, needsSatellite, bilingual guidance |
 | `call_context_signal` | `lat` (±90), `lon` (±180), `peril`, optional `sowingDate` | Compact context signals (source/status/summary), overall status, `imdRainfallMm` |
 | `guide_capture` | `angle` (canonical id whitelist), `lang` | Localized angle name, instructions, tips |
