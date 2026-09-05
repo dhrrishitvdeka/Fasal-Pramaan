@@ -265,7 +265,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen flex-col bg-[var(--canvas)] text-[var(--ink)]">
         <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--surface)]/95 backdrop-blur-md shadow-2xs">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-6 sm:py-3.5">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-6 sm:py-3.5">
             <Link
               href="/"
               className="flex shrink-0 items-center gap-1 text-sm font-semibold tracking-tight text-[var(--ink)] sm:gap-1.5 sm:text-base"
@@ -273,7 +273,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <span>Fasal-Pramaan</span>
               <span className="hidden text-xs font-normal text-[var(--ink-muted)] sm:inline">· फसल प्रमाण</span>
             </Link>
-            <div className="flex items-center gap-1 sm:gap-2">
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 sm:gap-2">
               <Link
                 href="/farmer"
                 className="fp-ui rounded px-2 py-1 text-xs font-medium text-[var(--ink-muted)] transition-colors hover:bg-[var(--canvas)] hover:text-[var(--ink)] sm:px-2.5 sm:text-sm"
