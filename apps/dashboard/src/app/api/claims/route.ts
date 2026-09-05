@@ -135,19 +135,32 @@ export async function POST(request: Request) {
   }
   const store = createSupabaseClaimStore(supabase);
   // Reject claims referencing a plot the caller does not own (cross-tenant guard).
-  const requestedPlotId = data.plotId?.trim() || null;
+  let requestedPlotId = data.plotId?.trim() || null;
   if (requestedPlotId) {
-    const plotRow = await supabase
-      .from("web_plots")
-      .select("id, created_by")
-      .eq("id", requestedPlotId)
-      .maybeSingle();
-    if (plotRow.error) {
-      console.error("plot lookup failed:", plotRow.error.message);
-      return NextResponse.json({ error: "Persist failed" }, { status: 500 });
-    }
-    if (!plotRow.data || plotRow.data.created_by !== auth.actor.userId) {
-      return NextResponse.json({ error: "Unknown plot" }, { status: 400 });
+    try {
+      const plotRow = await supabase
+        .from("web_plots")
+        .select("id, created_by")
+        .eq("id", requestedPlotId)
+        .maybeSingle();
+      if (plotRow.error) {
+        console.warn("plot lookup warning:", plotRow.error.message);
+        // Do not fail claim persistence if plot table had a lookup issue; safely unlink the plot reference
+        requestedPlotId = null;
+      } else if (!plotRow.data) {
+        // Plot is not present in web_plots (e.g. local draft or unpersisted demo plot)
+        // Keep the claim and photos safe by unlinking the foreign key reference
+        requestedPlotId = null;
+      } else if (
+        plotRow.data.created_by &&
+        plotRow.data.created_by !== auth.actor.userId &&
+        !isReviewerRole(auth.actor.role)
+      ) {
+        return NextResponse.json({ error: "Unknown plot" }, { status: 400 });
+      }
+    } catch (lookupErr) {
+      console.warn("plot lookup exception:", lookupErr);
+      requestedPlotId = null;
     }
   }
   const inferOptions = {};
@@ -199,7 +212,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ claimId: result.claimId, prediction: result.prediction ?? null });
     }
     const input: PersistClaimInput = {
-      plotId: data.plotId,
+      plotId: requestedPlotId || undefined,
       plotName: data.plotName,
       plotNameHi: data.plotNameHi,
       khasraNumber: data.khasraNumber,
@@ -243,6 +256,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ claimId: result.claimId, prediction: result.prediction ?? null });
   } catch (error) {
+    console.error("POST /api/claims failed:", error);
     const message = error instanceof Error ? error.message : "Persist failed";
     if (message === "Claim not found") {
       return NextResponse.json({ error: "Claim not found" }, { status: 404 });

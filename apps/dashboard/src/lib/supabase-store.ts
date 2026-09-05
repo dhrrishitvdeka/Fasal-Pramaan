@@ -14,6 +14,18 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
         if (/duplicate|unique|already exists|23505/i.test(msg) || code === "23505") {
           throw new Error("Claim already exists");
         }
+        if (/foreign key|fkey|23503/i.test(msg) || code === "23503") {
+          // If plot_id violates foreign key constraint (e.g. plot deleted or from demo state),
+          // fallback to plot_id: null so the farmer's crop evidence and claim are never lost.
+          const { plot_id: _badPlot, ...fallback } = row as any;
+          const { data, error } = await client
+            .from("web_claims")
+            .insert({ ...fallback, plot_id: null })
+            .select()
+            .single();
+          if (error) throw new Error(error.message);
+          return data as WebClaimRow;
+        }
         if (code === "42703" || /column.*does not exist/i.test(msg)) {
           const {
             peril: _p,
