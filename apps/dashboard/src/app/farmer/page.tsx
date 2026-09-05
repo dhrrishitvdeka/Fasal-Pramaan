@@ -16,6 +16,7 @@ import {
   PlusCircle,
   RotateCcw,
   CheckCircle2,
+  XCircle,
   X,
 } from "lucide-react";
 import { useFarmerData } from "@/lib/farmerStore";
@@ -54,8 +55,10 @@ export default function FarmerHomePage() {
     persistError,
     newRecaptureNotices,
     newPayoutNotices,
+    newRejectionNotices,
     dismissNotice,
     dismissPayoutNotice,
+    dismissRejectionNotice,
     refresh,
   } = useFarmerData();
   const t = getFarmerT(lang);
@@ -316,6 +319,87 @@ export default function FarmerHomePage() {
                     type="button"
                     onClick={() => dismissPayoutNotice(notice.claimId)}
                     className="min-h-11 rounded-lg border border-[#b8d5be] bg-white/80 px-3 py-1.5 text-xs font-medium text-emerald-950 hover:bg-white transition-colors"
+                  >
+                    {lang === "hi" ? "हटाएँ" : "Dismiss"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {newRejectionNotices.length > 0 && (
+        <div className="space-y-3" role="status" aria-live="polite">
+          {newRejectionNotices.map((notice) => {
+            const plotTitle =
+              (lang === "hi" && notice.plotNameHi ? notice.plotNameHi : notice.plotName) ||
+              (lang === "hi" ? "खेत" : "Plot");
+            const cropTitle =
+              (lang === "hi" && notice.cropTypeHi ? notice.cropTypeHi : notice.cropType) ||
+              (lang === "hi" ? "फसल" : "Crop");
+            const reason =
+              notice.reason ||
+              (lang === "hi"
+                ? "प्रस्तुत साक्ष्य सत्यापन मानदंड पूरे नहीं करते।"
+                : "Submitted photographic evidence did not meet verification criteria.");
+            return (
+              <div
+                key={notice.claimId}
+                className="relative overflow-hidden rounded-xl border border-[#e8c6c6] bg-gradient-to-r from-[#fffbfb] via-[#faf3f3] to-[#f6ecec] p-4 text-[var(--ink)] shadow-xs"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-900 border border-rose-300/70">
+                      <XCircle className="h-4 w-4 text-rose-700" aria-hidden="true" />
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span className="text-xs font-bold uppercase tracking-wider text-rose-950">
+                        {lang === "hi" ? "दावा अस्वीकृत • समीक्षा पूर्ण" : "Claim Rejected • Review Complete"}
+                      </span>
+                      <span className="font-mono text-xs text-stone-500">
+                        #{notice.claimId.slice(-8)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => dismissRejectionNotice(notice.claimId)}
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-200/60 hover:text-stone-800 transition-colors"
+                    aria-label={lang === "hi" ? "हटाएँ" : "Dismiss notice"}
+                    title={lang === "hi" ? "हटाएँ" : "Dismiss"}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-3">
+                  <div className="text-xs font-semibold text-rose-900">
+                    {plotTitle} ({cropTitle})
+                  </div>
+                  <p className="mt-1 text-xs text-slate-800 font-medium leading-relaxed">
+                    {reason}
+                  </p>
+                  <p className="mt-1 text-[11px] text-[var(--ink-muted)]">
+                    {lang === "hi"
+                      ? "समीक्षा अधिकारी द्वारा प्रस्तुत साक्ष्य की विस्तृत जांच के पश्चात यह निर्णय लिया गया है।"
+                      : "The reviewing officer reached this determination following detailed examination of your submitted evidence."}
+                  </p>
+                </div>
+
+                <div className="mt-3.5 flex flex-wrap items-center gap-2 pt-2.5 border-t border-[#ebd0d0]">
+                  <Link
+                    href={`/farmer/claims/${notice.claimId}`}
+                    onClick={() => dismissRejectionNotice(notice.claimId)}
+                    className="fp-btn-primary min-h-11 gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold shadow-2xs"
+                  >
+                    <span>{lang === "hi" ? "दावा विवरण व समीक्षा रिपोर्ट देखें" : "View Claim Details & Review Report"}</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => dismissRejectionNotice(notice.claimId)}
+                    className="min-h-11 rounded-lg border border-[#dfbebe] bg-white/80 px-3 py-1.5 text-xs font-medium text-rose-950 hover:bg-white transition-colors"
                   >
                     {lang === "hi" ? "हटाएँ" : "Dismiss"}
                   </button>

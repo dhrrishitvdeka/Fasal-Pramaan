@@ -16,8 +16,19 @@ export type PayoutNotice = {
   at: string;
 };
 
+export type RejectionNotice = {
+  claimId: string;
+  plotName: string;
+  plotNameHi?: string;
+  cropType: string;
+  cropTypeHi?: string;
+  reason?: string;
+  at: string;
+};
+
 export const SEEN_RECAPTURE_NOTICES_KEY = "fp_seen_recapture_notices_v1";
 export const SEEN_PAYOUT_NOTICES_KEY = "fp_seen_payout_notices_v1";
+export const SEEN_REJECTION_NOTICES_KEY = "fp_seen_rejection_notices_v1";
 
 const SEEN_NOTICES_CAP = 200;
 
@@ -66,6 +77,31 @@ export function markPayoutSeen(claimId: string): void {
     seen.push(claimId);
     const trimmed = seen.length > SEEN_NOTICES_CAP ? seen.slice(seen.length - SEEN_NOTICES_CAP) : seen;
     localStorage.setItem(SEEN_PAYOUT_NOTICES_KEY, JSON.stringify(trimmed));
+  } catch {
+    // ignore quota / privacy-mode errors
+  }
+}
+
+export function loadSeenRejectionNotices(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(SEEN_REJECTION_NOTICES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === "string");
+  } catch {
+    return [];
+  }
+}
+
+export function markRejectionSeen(claimId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const seen = loadSeenRejectionNotices().filter((id) => id !== claimId);
+    seen.push(claimId);
+    const trimmed = seen.length > SEEN_NOTICES_CAP ? seen.slice(seen.length - SEEN_NOTICES_CAP) : seen;
+    localStorage.setItem(SEEN_REJECTION_NOTICES_KEY, JSON.stringify(trimmed));
   } catch {
     // ignore quota / privacy-mode errors
   }
@@ -138,3 +174,37 @@ export function diffNewPayoutApprovals(claims: PayoutNoticeSource[]): PayoutNoti
     })
     .sort((a, b) => (b.at || "").localeCompare(a.at || ""));
 }
+
+export interface RejectionNoticeSource {
+  id: string;
+  status: string;
+  payoutStatus?: string | null;
+  reviewerNotes?: string | null;
+  plotName?: string | null;
+  plotNameHi?: string | null;
+  cropType?: string | null;
+  cropTypeHi?: string | null;
+  updatedAt?: string;
+  createdAt?: string;
+}
+
+export function diffNewRejections(claims: RejectionNoticeSource[]): RejectionNotice[] {
+  const seen = new Set(loadSeenRejectionNotices());
+  return claims
+    .filter(
+      (claim) =>
+        (claim.status === "rejected" || claim.payoutStatus === "rejected") &&
+        !seen.has(claim.id),
+    )
+    .map((claim) => ({
+      claimId: claim.id,
+      plotName: claim.plotName || "Plot",
+      plotNameHi: claim.plotNameHi || undefined,
+      cropType: claim.cropType || "Crop",
+      cropTypeHi: claim.cropTypeHi || undefined,
+      reason: claim.reviewerNotes || undefined,
+      at: claim.updatedAt || claim.createdAt || "",
+    }))
+    .sort((a, b) => (b.at || "").localeCompare(a.at || ""));
+}
+

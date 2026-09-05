@@ -15,11 +15,14 @@ import clsx from "clsx";
 
 function FarmerLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { lang, setLang, farmerProfile, claims, newRecaptureNotices, newPayoutNotices } = useFarmerData();
+  const { lang, setLang, farmerProfile, claims, newRecaptureNotices, newPayoutNotices, newRejectionNotices } = useFarmerData();
   const t = getFarmerT(lang);
 
   const pendingRecaptures = claims.filter((c) => c.status === "needs_recapture").length;
-  const hasNewNotices = (newRecaptureNotices?.length ?? 0) > 0 || (newPayoutNotices?.length ?? 0) > 0;
+  const hasNewNotices =
+    (newRecaptureNotices?.length ?? 0) > 0 ||
+    (newPayoutNotices?.length ?? 0) > 0 ||
+    (newRejectionNotices?.length ?? 0) > 0;
 
   const navItems = [
     {

@@ -9,10 +9,13 @@ import { buildRecaptureSubmitInput, computeEvidencePreview } from "./claim-pipel
 import {
   diffNewPayoutApprovals,
   diffNewRecaptures,
+  diffNewRejections,
   markPayoutSeen,
   markSeen,
+  markRejectionSeen,
   type PayoutNotice,
   type RecaptureNotice,
+  type RejectionNotice,
 } from "./farmer-notifications";
 import { isSupabaseConfigured } from "./supabase";
 import { EMPTY_FARMER_PROFILE } from "./web-db";
@@ -245,8 +248,10 @@ interface FarmerContextType {
   clearActiveIntent: () => void;
   newRecaptureNotices: RecaptureNotice[];
   newPayoutNotices: PayoutNotice[];
+  newRejectionNotices: RejectionNotice[];
   dismissNotice: (claimId: string) => void;
   dismissPayoutNotice: (claimId: string) => void;
+  dismissRejectionNotice: (claimId: string) => void;
 }
 
 const FarmerContext = createContext<FarmerContextType | null>(null);
@@ -411,6 +416,7 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const [newRecaptureNotices, setNewRecaptureNotices] = useState<RecaptureNotice[]>([]);
   const [newPayoutNotices, setNewPayoutNotices] = useState<PayoutNotice[]>([]);
+  const [newRejectionNotices, setNewRejectionNotices] = useState<RejectionNotice[]>([]);
 
   const refresh = async () => {
     try {
@@ -455,10 +461,11 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
     void refresh();
   }, []);
 
-  // Recompute unseen recapture & payout notices whenever the claims list changes (refresh flow).
+  // Recompute unseen recapture, payout, and rejection notices whenever the claims list changes (refresh flow).
   useEffect(() => {
     setNewRecaptureNotices(diffNewRecaptures(claims));
     setNewPayoutNotices(diffNewPayoutApprovals(claims));
+    setNewRejectionNotices(diffNewRejections(claims));
   }, [claims]);
 
   const dismissNotice = (claimId: string) => {
@@ -469,6 +476,11 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   const dismissPayoutNotice = (claimId: string) => {
     markPayoutSeen(claimId);
     setNewPayoutNotices((prev) => prev.filter((notice) => notice.claimId !== claimId));
+  };
+
+  const dismissRejectionNotice = (claimId: string) => {
+    markRejectionSeen(claimId);
+    setNewRejectionNotices((prev) => prev.filter((notice) => notice.claimId !== claimId));
   };
 
   const setLang = (newLang: FarmerLang) => {
@@ -918,8 +930,10 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         clearActiveIntent,
         newRecaptureNotices,
         newPayoutNotices,
+        newRejectionNotices,
         dismissNotice,
         dismissPayoutNotice,
+        dismissRejectionNotice,
       }}
     >
       {children}

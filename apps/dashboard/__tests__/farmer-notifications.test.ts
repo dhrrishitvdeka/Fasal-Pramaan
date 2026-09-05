@@ -2,12 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   diffNewPayoutApprovals,
   diffNewRecaptures,
+  diffNewRejections,
   loadSeenNotices,
   loadSeenPayoutNotices,
+  loadSeenRejectionNotices,
   markPayoutSeen,
+  markRejectionSeen,
   markSeen,
   SEEN_PAYOUT_NOTICES_KEY,
   SEEN_RECAPTURE_NOTICES_KEY,
+  SEEN_REJECTION_NOTICES_KEY,
 } from "../src/lib/farmer-notifications";
 
 class MemoryStorage {
@@ -56,6 +60,28 @@ function payoutClaim(partial: {
     payoutAmountInr: 25000,
     plotName: "North Wheat Plot",
     cropType: "Wheat",
+    ...partial,
+  };
+}
+
+function rejectedClaim(partial: {
+  id: string;
+  status?: string;
+  payoutStatus?: string | null;
+  reviewerNotes?: string | null;
+  plotName?: string | null;
+  plotNameHi?: string | null;
+  cropType?: string | null;
+  cropTypeHi?: string | null;
+  updatedAt?: string;
+  createdAt?: string;
+}) {
+  return {
+    status: "rejected",
+    payoutStatus: "rejected",
+    reviewerNotes: "Non-agricultural subject detected",
+    plotName: "West Paddy Field",
+    cropType: "Paddy",
     ...partial,
   };
 }
@@ -182,4 +208,23 @@ describe("farmer-notifications", () => {
     markPayoutSeen("p-test");
     expect(diffNewPayoutApprovals([payoutClaim({ id: "p-test" })])).toEqual([]);
   });
+
+  it("diffNewRejections surfaces rejected claims with reason, newest first", () => {
+    markRejectionSeen("seen-rej");
+    const notices = diffNewRejections([
+      rejectedClaim({ id: "r-old", updatedAt: "2026-01-01T00:00:00Z" }),
+      rejectedClaim({ id: "r-newer", updatedAt: "2026-02-01T00:00:00Z", reviewerNotes: "Screen capture detected" }),
+      rejectedClaim({ id: "seen-rej", updatedAt: "2026-03-01T00:00:00Z" }),
+      rejectedClaim({ id: "approved", status: "verified", payoutStatus: "approved", updatedAt: "2026-04-01T00:00:00Z" }),
+    ]);
+    expect(notices.map((n) => n.claimId)).toEqual(["r-newer", "r-old"]);
+    expect(notices[0].reason).toBe("Screen capture detected");
+  });
+
+  it("dismissed rejected claims disappear after markRejectionSeen", () => {
+    expect(diffNewRejections([rejectedClaim({ id: "r-dismiss" })]).map((n) => n.claimId)).toEqual(["r-dismiss"]);
+    markRejectionSeen("r-dismiss");
+    expect(diffNewRejections([rejectedClaim({ id: "r-dismiss" })])).toEqual([]);
+  });
 });
+
