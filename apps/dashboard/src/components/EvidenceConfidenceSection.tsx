@@ -416,18 +416,15 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
   const iStatus = getStatusBadge(integrity.score, iDetails.tamper_check_passed === false || iDetails.duplicate_detected === true);
 
   return (
-    <section className="fp-panel space-y-2.5 p-3 border-l-4 border-l-emerald-600 shadow-sm" aria-labelledby="evidence-confidence-heading">
-      {/* Explicit Section Header with Clear Distinction */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+    <section className="fp-panel space-y-2 p-4" aria-labelledby="evidence-confidence-heading">
+      {/* Section header */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] pb-2">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--ink)]" aria-hidden="true" />
-            <h3 id="evidence-confidence-heading" className="text-sm font-bold uppercase tracking-wider text-slate-800">
-              Evidence Confidence & Trust Layer
-            </h3>
-          </div>
+          <h3 id="evidence-confidence-heading" className="text-sm font-semibold text-slate-900">
+            Evidence confidence
+          </h3>
           <p className="mt-0.5 text-xs text-slate-500">
-            Authoritative evaluation of evidence reliability, authenticity & completeness · Distinct from Model Prediction
+            Reliability, authenticity and completeness of submitted evidence
           </p>
         </div>
         {evaluation.evaluation_version && (
@@ -438,7 +435,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
       </div>
 
       {/* Compact Evidence Confidence strip — subpart, not hero */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-sm border border-[var(--line)] px-3 py-2 text-xs">
         <div className="flex items-center gap-2">
           <span className="font-semibold uppercase tracking-wider text-slate-500 text-[11px]">Final evidence confidence</span>
           <span className="font-mono text-lg font-extrabold tabular-nums text-slate-900">{finalScore}<span className="text-xs font-semibold text-slate-400">/100</span></span>
@@ -588,8 +585,8 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
 
       {/* Four Component Cards Header & Filter Tabs */}
       <div className="flex items-center justify-between pt-1">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-          Component Breakdown (4 Pillars)
+        <h4 className="text-sm font-semibold text-slate-900">
+          Component breakdown
         </h4>
         <div className="flex gap-1 text-[11px]">
           {(["all", "quality", "coverage", "context", "integrity"] as const).map((tab) => (
@@ -597,10 +594,10 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`rounded px-2 py-0.5 font-medium capitalize transition-colors ${
+              className={`rounded-sm border px-2 py-0.5 font-medium capitalize transition-colors ${
                 activeTab === tab
-                  ? "bg-slate-800 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "bg-[var(--surface)] text-[var(--ink)] border-[var(--line)] font-semibold"
+                  : "bg-transparent text-slate-500 border-transparent hover:bg-white hover:text-slate-900 hover:border-slate-200"
               }`}
             >
               {tab}
@@ -610,10 +607,10 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
       </div>
 
       {/* 4 Component Cards Grid */}
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-2 md:grid-cols-2">
         {/* Card 1: Evidence Quality */}
         {(activeTab === "all" || activeTab === "quality") && (
-          <div className="rounded-lg border border-slate-200 bg-white p-3.5 space-y-2.5 shadow-sm">
+          <div className="rounded-sm border border-[var(--line)] bg-white p-4 space-y-2">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div>
                 <span className="text-xs font-bold text-slate-800">1. Evidence Quality</span>
@@ -667,7 +664,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
 
         {/* Card 2: Evidence Coverage */}
         {(activeTab === "all" || activeTab === "coverage") && (
-          <div className="rounded-lg border border-slate-200 bg-white p-3.5 space-y-2.5 shadow-sm">
+          <div className="rounded-sm border border-[var(--line)] bg-white p-4 space-y-2">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div>
                 <span className="text-xs font-bold text-slate-800">2. Evidence Coverage</span>
@@ -713,7 +710,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
 
         {/* Card 3: Context */}
         {(activeTab === "all" || activeTab === "context") && (
-          <div className="rounded-lg border border-slate-200 bg-white p-3.5 space-y-2.5 shadow-sm">
+          <div className="rounded-sm border border-[var(--line)] bg-white p-4 space-y-2">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div>
                 <span className="text-xs font-bold text-slate-800">3. Contextual Verification</span>
@@ -759,7 +756,7 @@ export function EvidenceConfidenceSection({ submission }: EvidenceConfidenceSect
 
         {/* Card 4: Integrity */}
         {(activeTab === "all" || activeTab === "integrity") && (
-          <div className="rounded-lg border border-slate-200 bg-white p-3.5 space-y-2.5 shadow-sm">
+          <div className="rounded-sm border border-[var(--line)] bg-white p-4 space-y-2">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div>
                 <span className="text-xs font-bold text-slate-800">4. Integrity & Anti-Fraud</span>
