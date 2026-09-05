@@ -29,9 +29,10 @@ This guide provides a structured, presentation-ready script and walkthrough for 
 **Narrative**: The farmer opens `/farmer/saathi` or the floating assistant widget. Saathi immediately introduces itself aloud with a warm Hindi/English greeting (*"नमस्ते किसान भाई! मैं फसल साथी हूँ। आपके खेत में क्या समस्या हुई है?"*), registers a plot hands-free on spoken command, and acts as a real-time multimodal viewfinder co-pilot during 5-angle capture.
 
 1. **Automatic Spoken Greeting**: Open `/farmer/saathi` and toggle voice or open `FasalSaathiOverlay`. Notice Saathi automatically speaks the welcome greeting aloud immediately on connection.
-2. **Spoken Plot Registration**: Say *"मेरा नया गेहूँ का खेत जोड़ो"* (or *"Register a new wheat plot in Rampur"*). Saathi executes `register_plot` and confirms the cadastral landholding is saved.
-3. **Guided capture**: Tap **Guided Capture** (`/farmer/capture`). On-device OpenCV locks the shutter until the frame looks like a real crop (not a screen). After submit, Gemini writes the reviewer analysis.
-4. **Hands-Free Shutter**: Say *"फोटो खींचो"* (*"Take the photo"*). The camera triggers, passes the anti-screen authenticity gate, and guides the next angle smoothly.
+2. **Spoken Plot Registration**: Say *"मेरा नया गेहूँ का खेत जोड़ो"* (or *"Register a new wheat plot in Rampur"*). Saathi executes `register_plot`, automatically seeds PMFBY crop growth milestones into the database, and confirms the cadastral landholding is saved.
+3. **Seamless Screen Navigation**: Switch to Home or Claims while Saathi is speaking. Notice that Saathi's voice never cuts out or restarts — background context synchronization is decoupled from active audio playback.
+4. **Hands-Free Studio Launch & Shutter**: Anywhere on the portal, say *"फोटो खींचो"* (*"Take the photo"*). Saathi automatically launches the Guided Capture Studio (`/farmer/capture?plotId=...`) for the registered plot.
+5. **Multilingual Guidance & Realtime CV**: On the capture studio, on-device OpenCV locks the shutter until the frame satisfies crop quality and anti-screen checks. If lighting is low or a duplicate image is detected, the accessible **ClaimNotificationBanner** immediately alerts the farmer in their selected Indian language (across 15 languages) with actionable next steps.
 
 ---
 

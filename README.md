@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan/releases">
-    <img src="https://img.shields.io/badge/Release-v2.8.0-blue?style=for-the-badge" alt="Latest Release v2.8.0" />
+    <img src="https://img.shields.io/badge/Release-v2.8.1-blue?style=for-the-badge" alt="Latest Release v2.8.1" />
   </a>
   <img src="https://img.shields.io/badge/Next.js%2016-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
   <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
@@ -82,14 +82,17 @@ flowchart TB
 ### 1. Fasal Saathi (फसल साथी) v3.0 — Spoken Multimodal Co-Pilot
 - **Hands-Free AudioWorklet Pipeline:** Samples audio off the main thread via `AudioWorkletNode`, downsamples to 16 kHz PCM16 mono, and features acoustic half-duplex echo gating with instant barge-in support.
 - **Audio-only Live voice:** Saathi talks over Gemini Live. The camera stays on-device; OpenCV guides framing. Gemini sees stills only when the farmer submits.
+- **Anti-Self-Interruption Navigation:** Decouples silent route changes from Gemini Live WebSocket context synchronization, eliminating speech cutoffs, re-triggered greetings, and barge-in loops when moving across app screens.
 - **Proactive Opening Spoken Greeting:** Automatically welcomes the farmer aloud immediately upon connect (*"नमस्ते किसान भाई! मैं फसल साथी हूँ..."*).
-- **Hierarchical Multi-Agent Tools:** Spoken plot registration (`register_plot`), GPS parcel geofencing (`check_plot_geofence`), 72-hour agro-weather radar (`fetch_agro_weather_alerts`), and plain-language AI audit explanations (`explain_claim_audit`).
+- **Hierarchical Multi-Agent Tools:** Spoken plot registration (`register_plot` with automatic milestone seeding), GPS parcel geofencing (`check_plot_geofence`), 72-hour agro-weather radar (`fetch_agro_weather_alerts`), and plain-language AI audit explanations (`explain_claim_audit`).
+- **Grounded Cross-Screen Camera Actions:** Spoken camera orders (*"फोटो खींचो"* / *"Take photo"*) anywhere on the platform automatically verify plot registration and launch the capture studio.
 - **15 Indian Languages:** Dynamic native translation across Hindi, Bengali, Tamil, Telugu, Marathi, Gujarati, Punjabi, Kannada, Malayalam, Odia, Assamese, and more.
 
 ### 2. Peril-Aware Capture Studio & Edge CV
 - **Real-Time On-Device OpenCV:** Excess Green / GLI / Excess Red, Laplacian texture, skin rejection, and scanline/moiré screen detection at a few FPS in a Web Worker. No cloud model on the live viewfinder.
 - **Anti-Screen & Anti-Spoofing Filter:** Detects digital display scanlines, pixel subgrids, and Moiré interference patterns ($0^\circ/90^\circ$ gradient ratio $> 0.80$) to reject monitor re-captures and fake images before upload.
 - **Strict 75%+ Crop Quality Shutter Lock:** Disables the shutter button unless the live frame achieves $\ge 75\%$ crop match (relaxed to $\ge 40\%$ for charred fire burn scars, with `?demo=true` stage relaxation for indoor hackathon demos).
+- **Multilingual Accessible Claim Banner (`ClaimNotificationBanner`):** Farmer-friendly guidance ("what happened" + "what to do next") across all 15 Indian languages with distinct visual states (Error, Warning, Success, Info), non-obstructive top docking, and 4-second debouncing.
 
 ### 3. 3-Stage Ground Truth Verification Pipeline
 1. **Stage 1 — Gemini 3.8 Flash Vision Gate & Crop Synonym Engine:** Evaluates submitted stills for authenticity and peril congruence, rejecting AI-generated images and screen displays. Incorporates multi-dialect Indian crop synonym mapping (`crop-synonyms.ts`) so Paddy $\leftrightarrow$ Rice, Maize $\leftrightarrow$ Corn, etc. match without false `wrong_crop` gate rejections.

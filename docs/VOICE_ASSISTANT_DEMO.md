@@ -15,17 +15,23 @@
    - Camera frames stay on-device for the OpenCV shutter lock. Gemini Live is microphone + speaker only. Submitted stills are analysed after capture.
    - Saathi guides framing by voice and capture tools; it does not receive live video.
 
-3. **Proactive Spoken Opening Greeting:**
+3. **Anti-Self-Interruption & Decoupled Navigation Awareness:**
+   - Active audio playback is monitored at the PCM buffer layer via `LiveAudioSession.isPlaying()`.
+   - Route transitions initiated by agent commands (`navigate_to_screen`, `open_claim`, `begin_recapture`, `begin_guided_capture`, `capture_current_angle`) update the broker silently via `updateCurrentPath(pathname)` without dispatching barge-in context turns that would cut off the assistant mid-sentence.
+   - User-initiated route changes during active speech defer context synchronization until turn completion (`turnComplete`), completely preventing self-interruption loops and repeated greetings.
+
+4. **Proactive Spoken Opening Greeting:**
    - As soon as the WebSocket connection completes its handshake (`setupComplete`), Saathi automatically greets the farmer aloud without waiting for the user to speak first (*"नमस्ते किसान भाई! मैं फसल साथी हूँ। आपके खेत में क्या समस्या हुई है? मुझे बताएं।"*).
 
-4. **Voice (`Kore`):**
+5. **Voice (`Kore`):**
    - Default Gemini Live voice is `Kore` (`GEMINI_LIVE_VOICE`).
 
-5. **Hierarchical Multi-Agent Tools:**
-   - `register_plot`: Spoken parcel registration with automatic khasra/crop assignment.
-   - `check_plot_geofence`: GPS boundary validation against cadastral survey records.
-   - `fetch_agro_weather_alerts`: Live 72-hour precipitation, hail probability, and temperature stress.
-   - `explain_claim_audit`: Plain-language explanation of the 3-stage breakdown (Gemini vision gate + Gemini field analysis + Sentinel-2 / weather cross-check).
+6. **Hierarchical Multi-Agent Tools:**
+   - `register_plot`: Spoken parcel registration with automatic khasra assignment and automated PMFBY growth milestone seeding (`web_milestones`).
+   - `capture_current_angle`: Shutter capture on the active studio angle; if called from non-capture screens (Home/Claims), it automatically opens the capture studio for the farmer's registered plot.
+   - `check_plot_geofence`: Haversine GPS boundary validation against cadastral plot coordinates with localized feedback.
+   - `fetch_agro_weather_alerts`: Live 72-hour precipitation, hail probability, temperature stress, and wind gusts from Open-Meteo.
+   - `explain_claim_audit`: Plain-language explanation of the 3-stage breakdown (Gemini vision gate + Gemini field analysis + Sentinel-2 / weather cross-check), including missing angle guidance on claims needing recapture.
 
 ---
 
@@ -101,7 +107,7 @@ SENTINEL_TOKEN=optional_cdse_process_api_bearer
 | **Check Geofence** | *"खेत की सीमा जांचो"* | *"Check my plot geofence."* | Calls `check_plot_geofence` and checks GPS accuracy. |
 | **Weather Alerts** | *"मौसम का हाल बताओ"* | *"Check agro-weather alerts."* | Calls `fetch_agro_weather_alerts` for 72h precipitation & hail. |
 | **Explain Audit** | *"मेरे दावे का स्कोर समझाओ"* | *"Explain my claim AI audit."* | Calls `explain_claim_audit` for 3-stage breakdown. |
-| **Capture Shutter** | *"फोटो खींचो"* | *"Take the photo."* | Triggers camera shutter for active angle with metadata. |
+| **Capture Shutter / Camera** | *"फोटो खींचो"* | *"Take the photo."* | Triggers camera shutter for active angle; if called from non-capture screens, automatically opens the capture studio for the registered plot. |
 | **Switch Camera** | *"कैमरा बदलो"* | *"Switch camera."* | Toggles between front and back environment cameras. |
 | **Select Angle** | *"नजदीकी फोटो दिखाओ"* | *"Select closeup damage angle."* | Switches active capture angle in the viewfinder. |
 | **Retake Angle** | *"यह फोटो दोबारा लो"* | *"Retake this angle."* | Clears current frame and opens angle for recapture. |
