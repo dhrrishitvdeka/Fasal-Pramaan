@@ -1,0 +1,64 @@
+# Fasal-Pramaan Webapp
+
+The **Fasal-Pramaan webapp** is a Next.js application for crop-evidence capture, AI-assisted screening, and insurance claim adjudication — serving both farmers (guided capture + Fasal Saathi intake) and reviewers (Command Centre) from one deployable on Vercel.
+
+---
+
+## 1. Core Features
+
+- **Fasal Saathi Autonomous Agent & Webapp Controller** (`/farmer/saathi`): Autonomous first-contact agent — text or full-duplex Gemini Live voice (mic toggle) — with full agentic function calling (`take_photo`, `switch_camera`, `select_angle`, `retake_angle`, `set_observation`, `submit_claim`, `check_evidence_quality`) and autonomous task routing (`resolveAgenticAction`) to launch the camera, switch languages, inspect plots, and filter verified claims. Voice tool calls execute **server-side** via auth-gated `POST /api/saathi/tool` with client synchronization over `webCaptureBridge` across 15 Indian languages.
+- **Comprehensive Evidence Metadata Bundling**: Each shutter capture automatically bundles high-precision GPS (`lat`, `lon`, `accuracyM`), camera facing mode (`environment` vs `user`), video resolution (`width x height`), ISO 8601 timestamps, live agronomic indices (**ExG**, **GLI**, **ExR** canopy %), luma, 2D Laplacian sharpness, phenology tags, screen detection flags, and client-side SHA-256 cryptographic hashes.
+- **Two-Stage Sequential Verification Pipeline**:
+  - **Stage 1 (Gemini Multimodal Vision & Metadata Gate)**: Evaluates raw image bytes + comprehensive metadata + spatial context (`POST /api/vision/gate`). Cross-verifies peril congruence (fire charred ash, flood standing water, hailstorm shredding, lodging, drought chlorosis) and rejects AI fakes, screen captures, and non-field artifacts.
+  - **Stage 2 (Gemini field analysis)**: Submitted stills are analysed by Gemini for authenticity, crop, visible damage, and a written rationale. Screen / AI / indoor fakes are graded U. Assistive only.
+- **Peril-Aware Capture Studio with Multi-Spectral CV & Anti-Screen Fraud** (`/farmer/capture`): Variable angle protocol driven by `src/lib/claim-routing.ts` (e.g., fire → 2 angles + satellite; normal → 5 angles), with realtime on-device multi-spectral CV guidance via `src/lib/vision/realtime-cv.ts` + Web Worker (`cv-worker.ts`). Computes normalized agronomic indices (**ExG**, **GLI**, **ExR**) for green foliage, golden wheat/paddy heads, mustard blooms, drought scorch, and fire charring. Features **screen anti-spoofing detection (`detectScreenArtifacts`)** to block digital displays, a **strict 75%+ crop quality shutter lock**, dynamic camera autofocus reticles, a floating translucent glassmorphism HUD chip with live pulse dot indicator, real-time phenology badges, and responsive shutter ring feedback.
+- **Sensor-Only Plot Geo-Tagging & Ascending States** (`/farmer/reminders`): Restricts cadastral plot GPS capture to verified device hardware sensors (`navigator.geolocation`) without manual overrides to prevent spoofing, and organizes Indian States in ascending alphabetical order (A to Z).
+- **Multi-Signal Context** (`POST /api/context/assemble`): Live free-tier sources — Sentinel-2 burn-scar NDVI process API (with token) or Open-Meteo extreme-heat proxy (without), open-meteo rainfall/hail/wind-gust weather, ISRO Bhuvan WMS reachability probe, OpenStreetMap Overpass wildlife proximity (10 km) and nearby farmland count (2 km), GPS — assembled per claim and persisted to `web_claims.context_signals`. Adds a **`plot_match` haversine containment signal** (capture GPS vs registered plot center; 200 m default radius via `plotProximityMeters`, clamped 10–5000) and **sowing-date-aware windows**: drought claims ≥30 days past sowing sum archive rainfall since sowing (`meta.windowRainfallMm/windowDays/daysSinceSowing`; <25 mm/month ⇒ weak corroboration) and hailstorm summaries append an estimated growth stage.
+- **Adaptive Confidence Engine**: Per-peril thresholds (`fire 70`, `normal 85`, …) producing High/Medium/Low levels with next-step actions (`proceed`, `request_missing`, `retake`, `escalate_to_human`). `request_missing` now **auto-creates a recapture request** — the claim moves straight to `needs_recapture` with bilingual adaptive reasons — and re-evaluations track `previousConfidence` + `confidence_delta` in `adaptive_result`, rendered as ▲/▼ delta chips on the review detail and farmer claim page. Farmers see new recapture requests as **amber toast panels** on `/farmer` (`src/lib/farmer-notifications.ts` localStorage diffing, Capture-now deep link + Dismiss) plus a nav badge dot for unseen notices.
+- **Reviewer Command Centre & Session Isolation** (`/review`): Triage queue with peril + adaptive-level filters, Evidence Trust inspector (Quality/Coverage/Context/Integrity), multi-angle viewer, Authenticity Gate card with reviewer `override_gate` override (stamps `overriddenBy`/`overriddenAt`) plus a **Gate re-run button** (re-gates stored photos through `/api/vision/gate`, audited as "Gate re-run recorded: X/Y usable"), human-in-the-loop adjudication (`Accept`, `Correct`, `Request Recapture`, `Physical Inspection`) with audit history. Overriding the gate cleanly unblocks `predictionIsAcceptable`, allowing immediate claim verification. Decouples reviewer sessions via `sessionStorage` (`review-session.ts`). Claim detail adds a **Multi-Signal Context & Satellite Cross-Check card** — per-signal status chips, side-by-side `wide_field` photo vs Bhuvan WMS tile, and a Copernicus Browser deep-link to Sentinel-2 L2A imagery from the last 3 days. The queue and executive overview both **export CSV** of the filtered rows via dependency-free `src/lib/csv.ts`; overview per-peril rows show average confidence (color-coded) and recapture rate from `analyticsFromClaims().byPeril`.
+- **PMFBY Financial Settlement & DBT Payout**: Connects Gemini visual damage percentages with plot area and PMFBY benchmark Scale-of-Finance rates (Paddy: ₹65,000/Ha, Wheat: ₹60,000/Ha, Maize: ₹45,000/Ha, Mustard: ₹42,000/Ha, Gram: ₹40,000/Ha) to compute `affected_area_hectares` and `estimated_loss_inr`. Reviewer acceptance marks `payout_status = "approved"` and populates `payout_amount_inr`, instantly activating the live green **DBT Bank Sanctioned** payout card on the farmer portal.
+- **Indian Agricultural Crop Synonym Engine** (`src/lib/crop-synonyms.ts`): Resolves multi-dialect variations across Indian crops (Paddy $\leftrightarrow$ Rice $\leftrightarrow$ Dhan, Maize $\leftrightarrow$ Corn $\leftrightarrow$ Makka, Gram $\leftrightarrow$ Chickpea $\leftrightarrow$ Chana, etc.) across both the vision gate and reviewer queue search queries, preventing false-positive `wrong_crop` gate rejections.
+- **Interactive 4-Card Farmer Summary Dashboard & 15-Language Localization**: Actionable dashboard cards with deep-links for registered plots, filed claims, verified claims, and needs-action tasks, fully localized across 15 official Indian languages.
+- **Presentation Demo Mode**: Optional `?demo=true` parameter relaxes camera crop score and screen detection locks for indoor hackathon stage demonstrations.
+- **Hardened API surface**: all evidence routes require a Supabase JWT (`requireWebActor`); inputs are clamped server-side; rate limiting is disabled by default for hackathon demonstrations.
+
+---
+
+## 2. Local Development
+
+```bash
+cd apps/dashboard
+npm ci
+cp .env.example .env.local   # fill in Supabase keys at minimum
+npm run dev                  # http://localhost:3000
+```
+
+### Required env (see `.env.example`)
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only)
+- `SITE_LOCK_PASSWORD` (server-only site gate; required on Vercel)
+- `GEMINI_API_KEY` (server-only; vision gate + field analysis + Saathi Live + classify)
+- `GEMINI_VISION_MODEL` (optional; default `gemini-3.8-flash` — do not use shut-down `gemini-2.0-flash`)
+- `SENTINEL_TOKEN` (optional upgrade — with it, fire checks run the real Sentinel-2 burn-scar NDVI process API; without it a free Open-Meteo extreme-heat proxy answers instead) / `IMD_API_KEY` (reserved hook for paid IMD weather; free open-meteo rain/hail/gust works without it)
+- `REVIEWER_EMAILS` (comma-separated reviewer emails; everyone else is a farmer)
+
+Apply the Supabase SQL files in order: [scripts/setup_supabase.sql](../../scripts/setup_supabase.sql) then [scripts/setup_web_schema.sql](../../scripts/setup_web_schema.sql) (which includes schema, peril columns, and RLS lockdown). See [docs/supabase-integration.md](../../docs/supabase-integration.md).
+
+---
+
+## 3. Deploy (Vercel)
+
+GitHub → Vercel: set **Root Directory** to `apps/dashboard`. Set the env vars above in Project Settings. Do not change the Root Directory.
+
+---
+
+## 4. Quality Checks
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```

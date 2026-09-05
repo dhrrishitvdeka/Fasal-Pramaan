@@ -1,0 +1,122 @@
+# ==========================================
+# Fasal-Pramaan Webapp — .gitignore
+# ==========================================
+
+# ------------------------------------------
+# Environment files & Secrets
+# ------------------------------------------
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+.envrc
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+private/
+# Local agent/IDE session caches (do not publish)
+.agents/
+.codex/
+.grok/
+.commandcode/
+.gemini/
+.antigravity/
+.cursor/
+.claude/
+.windsurf/
+apps/dashboard/AGENTS.md
+apps/dashboard/CLAUDE.md
+
+# ------------------------------------------
+# Node / Next.js / Frontend
+# ------------------------------------------
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+**/out/
+build/
+dist/
+.turbo/
+.cache/
+.vercel/
+apps/dashboard/.vercel/
+**/.vercel/
+*.orig
+.npm
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+coverage/
+
+# ------------------------------------------
+# Playwright E2E artifacts
+# ------------------------------------------
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+.nyc_output/
+
+# ------------------------------------------
+# Python & ML / Machine Learning Models
+# ------------------------------------------
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.onnx
+*.tflite
+*.safetensors
+
+# ------------------------------------------
+# IDE & Text Editors
+# ------------------------------------------
+.idea/
+.vscode/
+*.suo
+*.swp
+*.swo
+*~
+*.bak
+
+# ------------------------------------------
+# System & OS Specific
+# ------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ------------------------------------------
+# Temp, Scratch & Nested Artifacts
+# ------------------------------------------
+tmp/
+temp/
+*.tmp
+*.log
+.scratch/
+.scratch_*
+reports/
+artifacts/
+Fasal-Pramaan-main/

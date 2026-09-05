@@ -1,0 +1,273 @@
+import { describe, expect, it } from "vitest";
+import { routeForPeril } from "../src/lib/claim-routing";
+import {
+  SAATHI_FUNCTION_DECLARATIONS,
+  buildSystemPrompt,
+  buildSaathiReply,
+  extractSlotsFromText,
+  initialSaathiGreeting,
+  mergeSlots,
+  nextQuestion,
+  slotsToIntent,
+  resolveAgenticAction,
+  type SaathiSlot,
+} from "../src/lib/saathi-agent";
+
+const emptyPlots: Parameters<typeof extractSlotsFromText>[1] = [];
+
+describe("saathi agent", () => {
+  it("extracts peril and crop slots from farmer free text", () => {
+    const slots = extractSlotsFromText("fire burnt my wheat field", emptyPlots);
+    expect(slots.peril).toBe("fire_burn");
+    expect(slots.crop).toBe("Wheat");
+    expect(slots.farmerNote).toBe("fire burnt my wheat field");
+  });
+
+  it("does not lock a peril on a short prompt such as बताइए", () => {
+    expect(extractSlotsFromText("बताइए।", emptyPlots).peril).toBeUndefined();
+    expect(extractSlotsFromText("ok", emptyPlots).peril).toBeUndefined();
+    expect(extractSlotsFromText("hello", emptyPlots).peril).toBeUndefined();
+  });
+
+  it("mergeSlots keeps the newest farmer note from b over a", () => {
+    const a: SaathiSlot = { peril: "fire_burn", farmerNote: "older note" };
+    const merged = mergeSlots(a, { crop: "Wheat", farmerNote: "newer note" });
+    expect(merged.farmerNote).toBe("newer note");
+    expect(merged.crop).toBe("Wheat");
+    expect(merged.peril).toBe("fire_burn");
+  });
+
+  it("slotsToIntent produces a ClaimIntent wired to the route config", () => {
+    const intent = slotsToIntent(
+      { peril: "fire_burn", crop: "Wheat", village: "Rampur" },
+      "saathi_text",
+    );
+    expect(intent.source).toBe("saathi_text");
+    expect(intent.peril).toBe("fire_burn");
+    expect(intent.perilLabelEn).toBe(routeForPeril("fire_burn").labelEn);
+    expect(intent.perilLabelHi).toBe(routeForPeril("fire_burn").labelHi);
+    expect(intent.crop).toBe("Wheat");
+    expect(intent.village).toBe("Rampur");
+    expect(intent.id).toMatch(/^intent-/);
+  });
+
+  it("initial greeting differs between hi and en", () => {
+    const hi = initialSaathiGreeting("hi");
+    const en = initialSaathiGreeting("en");
+    expect(hi.text).not.toBe(en.text);
+    expect(hi.text).toContain("नमस्ते! मैं फसल साथी हूँ।");
+    expect(hi.textHi).toBe(hi.text);
+    expect(en.text).toContain("Hi, I am Fasal Saathi");
+    expect(hi.role).toBe("saathi");
+  });
+
+  it("buildSystemPrompt lists required angles for an active intent", () => {
+    const intent = slotsToIntent({ peril: "animal_damage" });
+    const cfg = routeForPeril("animal_damage");
+    const prompt = buildSystemPrompt(intent, "hi");
+    expect(prompt).toContain(intent.id);
+    expect(prompt).toContain(cfg.requiredAngles.join(", "));
+    expect(prompt).toContain(`Required angles (${cfg.requiredAngles.length})`);
+    expect(buildSaathiReply({ peril: "animal_damage" }, "en").text).toContain(
+      cfg.requiredAngles.join(", "),
+    );
+  });
+
+  it("declares the complete autonomous agent tool suite", () => {
+    expect(SAATHI_FUNCTION_DECLARATIONS.map((fn) => fn.name)).toEqual([
+      "request_evidence_angles",
+      "call_context_signal",
+      "guide_capture",
+      "classify_claim",
+      "take_photo",
+      "switch_camera",
+      "select_angle",
+      "retake_angle",
+      "set_observation",
+      "submit_claim",
+      "check_evidence_quality",
+    ]);
+  });
+
+  describe("Autonomous Agentic Intent Resolution", () => {
+    it("resolves direct camera capture order with peril angles", () => {
+      const res = resolveAgenticAction("खेत में आग लग गई है, फोटो खींचनी है", {}, emptyPlots, "hi");
+      expect(res.action).toBeDefined();
+      expect(res.action?.type).toBe("open_camera");
+      expect(res.slots.peril).toBe("fire_burn");
+      expect(res.actionSummaryHi).toContain("कैमरा");
+    });
+
+    it("resolves navigation orders for verified claims and plots", () => {
+      const resClaims = resolveAgenticAction("सत्यापित दावे दिखाओ", {}, emptyPlots, "hi");
+      expect(resClaims.action?.type).toBe("navigate");
+      if (resClaims.action?.type === "navigate") {
+        expect(resClaims.action.url).toBe("/farmer/claims?status=verified");
+      }
+
+      const resPlots = resolveAgenticAction("मेरे पंजीकृत खेत दिखाओ", {}, emptyPlots, "hi");
+      expect(resPlots.action?.type).toBe("navigate");
+      if (resPlots.action?.type === "navigate") {
+        expect(resPlots.action.url).toBe("/farmer#registered-plots");
+      }
+    });
+
+    it("does NOT switch language on incidental loanwords in Hindi or English", () => {
+      // Common farmer sentences with English technical/crop loanwords
+      const res1 = resolveAgenticAction(
+        "मेरा धान का crop damage हो गया है, photo लेनी है",
+        {},
+        emptyPlots,
+        "hi",
+      );
+      expect(res1.action?.type).not.toBe("switch_language");
+
+      const res2 = resolveAgenticAction(
+        "paddy crop damage insurance claim status",
+        {},
+        emptyPlots,
+        "hi",
+      );
+      expect(res2.action?.type).not.toBe("switch_language");
+
+      const res3 = resolveAgenticAction(
+        "khasra 402 photo upload karni hai",
+        {},
+        emptyPlots,
+        "hi",
+      );
+      expect(res3.action?.type).not.toBe("switch_language");
+
+      const res4 = resolveAgenticAction(
+        "my wheat crop has lodging damage",
+        {},
+        emptyPlots,
+        "en",
+      );
+      expect(res4.action?.type).not.toBe("switch_language");
+
+      // Rapid complex Hinglish with multiple loanwords
+      const res5 = resolveAgenticAction(
+        "mera paddy crop lodging damage ho gaya hai, photo camera se upload karo, insurance claim status check karo",
+        {},
+        emptyPlots,
+        "hi",
+      );
+      expect(res5.action?.type).not.toBe("switch_language");
+    });
+
+    it("resolves language switching orders only on explicit commands including Hinglish (mein/mai) and regional languages", () => {
+      const resHi = resolveAgenticAction("हिंदी में बात करो", {}, emptyPlots, "en");
+      expect(resHi.action?.type).toBe("switch_language");
+      if (resHi.action?.type === "switch_language") {
+        expect(resHi.action.lang).toBe("hi");
+      }
+
+      const resHi2 = resolveAgenticAction("switch to hindi", {}, emptyPlots, "en");
+      expect(resHi2.action?.type).toBe("switch_language");
+      if (resHi2.action?.type === "switch_language") {
+        expect(resHi2.action.lang).toBe("hi");
+      }
+
+      // Hinglish variants (mein, mai)
+      const resHiMein = resolveAgenticAction("hindi mein bolo", {}, emptyPlots, "en");
+      expect(resHiMein.action?.type).toBe("switch_language");
+      if (resHiMein.action?.type === "switch_language") {
+        expect(resHiMein.action.lang).toBe("hi");
+      }
+
+      const resHiMai = resolveAgenticAction("hindi mai baat karo", {}, emptyPlots, "en");
+      expect(resHiMai.action?.type).toBe("switch_language");
+      if (resHiMai.action?.type === "switch_language") {
+        expect(resHiMai.action.lang).toBe("hi");
+      }
+
+      const resEn = resolveAgenticAction("switch to english", {}, emptyPlots, "hi");
+      expect(resEn.action?.type).toBe("switch_language");
+      if (resEn.action?.type === "switch_language") {
+        expect(resEn.action.lang).toBe("en");
+      }
+
+      const resEn2 = resolveAgenticAction("अंग्रेजी में बात करो", {}, emptyPlots, "hi");
+      expect(resEn2.action?.type).toBe("switch_language");
+      if (resEn2.action?.type === "switch_language") {
+        expect(resEn2.action.lang).toBe("en");
+      }
+
+      const resEnMein = resolveAgenticAction("english mein baat karo", {}, emptyPlots, "hi");
+      expect(resEnMein.action?.type).toBe("switch_language");
+      if (resEnMein.action?.type === "switch_language") {
+        expect(resEnMein.action.lang).toBe("en");
+      }
+
+      const resGu = resolveAgenticAction("ગુજરાતીમાં વાત કરો", {}, emptyPlots, "hi");
+      expect(resGu.action?.type).toBe("switch_language");
+      if (resGu.action?.type === "switch_language") {
+        expect(resGu.action.lang).toBe("gu");
+      }
+
+      const resTa = resolveAgenticAction("speak in tamil", {}, emptyPlots, "hi");
+      expect(resTa.action?.type).toBe("switch_language");
+      if (resTa.action?.type === "switch_language") {
+        expect(resTa.action.lang).toBe("ta");
+      }
+
+      // Other supported Indian languages
+      const resMr = resolveAgenticAction("switch to marathi", {}, emptyPlots, "hi");
+      expect(resMr.action?.type).toBe("switch_language");
+      if (resMr.action?.type === "switch_language") {
+        expect(resMr.action.lang).toBe("mr");
+      }
+
+      const resMrNative = resolveAgenticAction("मराठीत बोला", {}, emptyPlots, "hi");
+      expect(resMrNative.action?.type).toBe("switch_language");
+      if (resMrNative.action?.type === "switch_language") {
+        expect(resMrNative.action.lang).toBe("mr");
+      }
+
+      const resPa = resolveAgenticAction("switch to punjabi", {}, emptyPlots, "hi");
+      expect(resPa.action?.type).toBe("switch_language");
+      if (resPa.action?.type === "switch_language") {
+        expect(resPa.action.lang).toBe("pa");
+      }
+
+      const resBn = resolveAgenticAction("speak in bengali", {}, emptyPlots, "hi");
+      expect(resBn.action?.type).toBe("switch_language");
+      if (resBn.action?.type === "switch_language") {
+        expect(resBn.action.lang).toBe("bn");
+      }
+
+      const resTe = resolveAgenticAction("switch to telugu", {}, emptyPlots, "hi");
+      expect(resTe.action?.type).toBe("switch_language");
+      if (resTe.action?.type === "switch_language") {
+        expect(resTe.action.lang).toBe("te");
+      }
+    });
+
+    it("handles idempotency when switching to the already active language", () => {
+      const resAlreadyHi = resolveAgenticAction("हिंदी में बात करो", {}, emptyPlots, "hi");
+      expect(resAlreadyHi.action?.type).toBe("switch_language");
+      expect(resAlreadyHi.replyMessage.text).toContain("पहले से ही हिन्दी");
+      expect(resAlreadyHi.actionSummary).toContain("already Hindi");
+
+      const resAlreadyEn = resolveAgenticAction("speak in english", {}, emptyPlots, "en");
+      expect(resAlreadyEn.action?.type).toBe("switch_language");
+      expect(resAlreadyEn.replyMessage.text).toContain("already speaking in English");
+      expect(resAlreadyEn.actionSummary).toContain("already English");
+    });
+
+    it("defaults to Hindi across all Saathi functions when no language is supplied", () => {
+      const prompt = buildSystemPrompt(null);
+      expect(prompt).toContain("ALWAYS reply strictly in Hindi (Devanagari script");
+
+      const greeting = initialSaathiGreeting();
+      expect(greeting.text).toContain("नमस्ते! मैं फसल साथी हूँ।");
+
+      const reply = buildSaathiReply({});
+      expect(reply.text).toContain("समझ गया");
+
+      const q = nextQuestion({});
+      expect(q?.text).toContain("कौन सी फसल प्रभावित है?");
+    });
+  });
+});
