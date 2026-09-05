@@ -1356,9 +1356,8 @@ function CaptureStudioContent() {
             </div>
           )}
           {!activeIntent && !isTargetedRecapture && !milestone && (
-            <div className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
-              {lang === "hi" ? "सुझाव: पहले फसल साथी से बात करें — वह आपके दावे के लिए मार्गदर्शन करेगा।" : "Tip: Talk to Fasal Saathi first — it will guide you through evidence capture."}{" "}
-              <Link href="/farmer/saathi" className="font-bold underline">Saathi →</Link>
+            <div className="mt-2 text-xs text-amber-800">
+              <Link href="/farmer/saathi" className="font-semibold underline underline-offset-2">Need help? Talk to Saathi →</Link>
             </div>
           )}
         </div>
@@ -1368,7 +1367,9 @@ function CaptureStudioContent() {
             <Layers className="h-4 w-4 text-[var(--accent)] shrink-0" />
             {plots.length === 0 ? (
               <span className="text-xs font-bold text-red-700">
-                {lang === "hi" ? "भूखंड आवश्यक (पंजीकरण आवश्यक)" : "Plot required (Registration required)"}
+                <Link href="/farmer/reminders#register-plot" className="underline underline-offset-2">
+                  {lang === "hi" ? "प्लॉट रजिस्टर करें" : "Register a plot first"}
+                </Link>
               </span>
             ) : (
               <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -1392,8 +1393,10 @@ function CaptureStudioContent() {
         )}
       </div>
 
-      {/* 3-Photo Stepper / Progress Bar */}
-      <div className="fp-panel p-2.5 sm:p-4">
+      {plots.length > 0 && (
+        <>
+          {/* 3-Photo Stepper / Progress Bar */}
+          <div className="fp-panel p-2.5 sm:p-4">
         <div className="flex items-center justify-between mb-3 text-xs font-semibold text-slate-600">
           <span>
             {lang === "hi" ? "फ़ोटो प्रगति" : "Photo Progress"}: {capturedCount} / {requiredCount}{" "}
@@ -1450,6 +1453,8 @@ function CaptureStudioContent() {
           })}
         </div>
       </div>
+        </>
+      )}
 
       {/* Mandatory Plot Registration Guard when farmer has 0 registered plots */}
       {!isTargetedRecapture && plots.length === 0 ? (

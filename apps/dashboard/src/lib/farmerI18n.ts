@@ -193,8 +193,8 @@ export const farmerTranslations = {
     gpsLocation: "GPS Coordinates",
 
     // 3-Screen Capture Studio
-    studioTitle: "3-Screen Crop Evidence Studio",
-    studioSub: "Capture 3 distinct clear photos of crop damage for verifiable insurance evidence.",
+    studioTitle: "Capture Crop Evidence",
+    studioSub: "",
     targetedModeNotice: "Targeted Recapture Mode active. Only requested angles need to be submitted.",
     switchCamera: "Flip Camera",
     takePhoto: "Take Photo",

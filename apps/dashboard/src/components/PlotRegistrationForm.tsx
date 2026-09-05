@@ -339,15 +339,6 @@ export default function PlotRegistrationForm({
       {!collapsible && (
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border-b border-[var(--line)] pb-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] sm:text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-900 bg-emerald-100/70 border border-emerald-300 px-2 py-0.5 rounded">
-              {lang === "hi" ? "राजस्व भूलेख (RoR)" : "PMFBY RoR Registry"}
-            </span>
-            <span className="text-[11px] text-[var(--ink-muted)]">·</span>
-            <span className="text-xs text-[var(--ink-muted)]">
-              {lang === "hi" ? "आधिकारिक भूखंड रिकॉर्ड" : "Official Cadastral Record"}
-            </span>
-          </div>
           <h2 className="text-base sm:text-lg font-bold text-[var(--ink)] tracking-tight">
             {headerTitle}
           </h2>
@@ -556,22 +547,45 @@ export default function PlotRegistrationForm({
         </div>
 
         {/* Collapsible Supplementary Cadastral Details */}
-        <div className="pt-2 border-t border-[var(--line)]">
+        <div className="border-t border-[var(--line)] pt-3">
           <button
             type="button"
             onClick={() => setShowMoreDetails((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors py-1"
+            aria-expanded={showMoreDetails}
+            className={clsx(
+              "flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition-all",
+              showMoreDetails
+                ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--ink)] hover:bg-[var(--canvas)]"
+            )}
           >
-            <ChevronDown className={clsx("h-3.5 w-3.5 transition-transform", showMoreDetails && "rotate-180")} />
-            <span>
-              {showMoreDetails
-                ? lang === "hi"
-                  ? "अतिरिक्त विवरण छुपाएँ"
-                  : "Hide additional details"
-                : lang === "hi"
-                  ? "+ अतिरिक्त राजस्व विवरण (जिला, राज्य, तहसील, हिस्सा, किस्म, मिट्टी, सिंचाई)"
-                  : "+ Additional revenue details (District, State, Tehsil, Hissa, Variety, Soil, Irrigation)"}
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className={clsx(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
+                showMoreDetails ? "bg-[var(--accent)] text-white" : "bg-[var(--canvas)] text-[var(--accent)]"
+              )}>
+                +
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs font-bold text-[var(--ink)] sm:text-sm">
+                  {showMoreDetails
+                    ? lang === "hi" ? "अतिरिक्त विवरण छुपाएँ" : "Hide additional details"
+                    : lang === "hi" ? "भूमि का अतिरिक्त विवरण" : "Add land details"}
+                </span>
+                <span className="mt-0.5 block text-[10px] leading-relaxed text-[var(--ink-muted)] sm:text-xs">
+                  {showMoreDetails
+                    ? lang === "hi" ? "वैकल्पिक जानकारी" : "Optional information"
+                    : lang === "hi" ? "जिला, राज्य, मिट्टी और सिंचाई" : "District, state, soil and irrigation"}
+                </span>
+              </span>
             </span>
+            <ChevronDown
+              className={clsx(
+                "h-4 w-4 shrink-0 text-[var(--ink-muted)] transition-transform",
+                showMoreDetails && "rotate-180 text-[var(--accent)]"
+              )}
+              aria-hidden="true"
+            />
           </button>
 
           {showMoreDetails && (
@@ -703,28 +717,34 @@ export default function PlotRegistrationForm({
       </div>
 
       {/* Footer / Submit Actions */}
-      <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[var(--line)]">
-        <p className="text-xs text-[var(--ink-muted)]">
-          {mode === "inline_capture"
-            ? lang === "hi"
-              ? "✓ पंजीकरण करते ही दावा स्टूडियो स्वतः खुल जाएगा।"
-              : "✓ Submitting will instantly unlock your photo capture studio."
-            : lang === "hi"
-              ? "✓ पंजीकरण करते ही 30, 60, 90 दिन एवं कटाई समय-सीमा सक्रिय हो जाएगी।"
-              : "✓ Submitting will activate your 30, 60, 90 day and harvest growth timeline."}
+      <div className="flex flex-col gap-3 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-[var(--ink-muted)] sm:max-w-xs sm:text-xs">
+          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
+          <span>
+            {mode === "inline_capture"
+              ? lang === "hi"
+                ? "पंजीकरण के बाद फोटो स्टूडियो खुलेगा।"
+                : "Register to open the photo studio."
+              : lang === "hi"
+                ? "पंजीकरण के बाद आपकी फसल टाइमलाइन शुरू होगी।"
+                : "Register to start your crop timeline."}
+          </span>
         </p>
 
-        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+        <div className="grid w-full gap-2.5 sm:flex sm:w-auto sm:items-center sm:justify-end">
           {cancelHref && (
-            <Link href={cancelHref} className="fp-btn-secondary rounded-lg text-xs px-4 py-2">
-              {lang === "hi" ? "समय-सीमा देखें" : "View Timeline"}
+            <Link
+              href={cancelHref}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-xs font-semibold text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--canvas)] sm:w-auto"
+            >
+              {lang === "hi" ? "टाइमलाइन देखें" : "View Timeline"}
             </Link>
           )}
           {onCancel && (
             <button
               type="button"
               onClick={onCancel}
-              className="fp-btn-secondary rounded-lg text-xs px-4 py-2"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-xs font-semibold text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--canvas)] sm:w-auto"
             >
               {lang === "hi" ? "रद्द करें" : "Cancel"}
             </button>
@@ -732,22 +752,22 @@ export default function PlotRegistrationForm({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="fp-btn-primary rounded-lg min-h-11 w-full sm:w-auto px-6 py-2.5 text-xs sm:text-sm font-bold shadow-xs transition-all active:scale-95 gap-1.5"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--ink)] bg-[var(--ink)] px-5 py-2.5 text-xs font-bold text-[var(--surface)] shadow-xs transition-all hover:bg-[var(--accent)] hover:border-[var(--accent)] active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:min-w-[190px]"
           >
             {isSubmitting ? (
-              <span>{lang === "hi" ? "पंजीकृत हो रहा है…" : "Registering…"}</span>
+              <span>{lang === "hi" ? "पंजीकरण हो रहा है…" : "Registering…"}</span>
             ) : (
               <>
-                <Check className="h-4 w-4" />
+                <Check className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span>
                   {submitLabel ||
                     (mode === "inline_capture"
                       ? lang === "hi"
-                        ? "भूखंड पंजीकृत करें और दावा शुरू करें"
-                        : "Register Plot & Unlock Studio"
+                        ? "पंजीकरण जारी रखें"
+                        : "Register & Continue"
                       : lang === "hi"
-                        ? "भूखंड एवं समय-सीमा पंजीकृत करें"
-                        : "Register Plot & Start Timeline")}
+                        ? "पंजीकरण और टाइमलाइन शुरू करें"
+                        : "Register & Start Timeline")}
                 </span>
               </>
             )}
