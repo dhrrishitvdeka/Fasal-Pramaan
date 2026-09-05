@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { listClaims, type Submission } from "@/lib/api";
 import { LANDING_ACTIONS } from "@/lib/landing-actions";
@@ -72,9 +73,11 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-12 md:py-16">
+    <div className="mx-auto max-w-5xl px-4 pb-6 pt-6 sm:px-6 sm:pb-12 sm:pt-8 md:pb-16 md:pt-10">
       {/* Hero Header */}
-      <header className="flex min-h-[calc(86vh-4rem)] flex-col justify-center border-b border-[var(--line)] py-10 sm:min-h-[calc(84vh-4.5rem)] sm:py-16 md:py-20">
+      <header className="flex flex-col border-b border-[var(--line)] py-8 sm:py-10">
+        <div className="grid items-center gap-10 md:grid-cols-12">
+          <div className="min-w-0 md:col-span-7">
         <div className="flex flex-wrap items-center gap-2">
           <span className="fp-kicker text-xs">{t.kicker} · {t.brandSub}</span>
           <span className="rounded bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent)]">
@@ -85,40 +88,55 @@ export default function HomePage() {
           </span>
         </div>
 
-        <h1 className="mt-5 text-[1.95rem] font-serif font-medium leading-[1.35] tracking-tight text-[var(--ink)] sm:text-4xl sm:leading-[1.25] lg:text-[3.25rem] lg:leading-[1.2]">
+        <h1 className="mt-5 text-balance break-words text-[1.95rem] font-serif font-medium leading-[1.35] tracking-tight text-[var(--ink)] sm:text-4xl sm:leading-[1.25] lg:text-[3.25rem] lg:leading-[1.2]">
           {t.heroTitle}
         </h1>
 
-        <p className="mt-5 max-w-3xl text-sm leading-relaxed text-[var(--ink-muted)] sm:text-base md:text-lg">
+        <p className="mt-5 max-w-3xl break-words text-sm leading-relaxed text-[var(--ink-muted)] sm:text-base md:text-lg">
           {t.heroSub}
         </p>
 
         {/* Primary Action Buttons */}
-        <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:items-center sm:gap-3.5">
+        <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3.5">
           <Link
             href="/farmer/saathi"
-            className="group inline-flex h-11 items-center justify-center gap-2.5 border border-[var(--ink)] bg-[var(--ink)] px-6 text-sm font-semibold text-[var(--surface)] shadow-xs transition-all hover:bg-[var(--accent)] hover:border-[var(--accent)]"
+            className="group inline-flex h-auto min-h-11 min-w-0 items-center justify-center gap-2.5 rounded-xl border border-[var(--ink)] bg-[var(--ink)] px-6 py-2.5 text-center text-sm font-semibold text-[var(--surface)] shadow-xs transition-all hover:bg-[var(--accent)] hover:border-[var(--accent)]"
           >
-            <Sprout className="h-4 w-4 text-emerald-400 transition-transform group-hover:scale-110" />
+            <Sprout className="h-4 w-4 shrink-0 text-emerald-400 transition-transform group-hover:scale-110" />
             <span>{t.startSaathi}</span>
           </Link>
 
-          <div className="grid grid-cols-2 gap-2.5 sm:flex sm:items-center sm:gap-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
             <Link
               href="/overview"
-              className="inline-flex h-11 items-center justify-center gap-2 border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--canvas)]"
+              className="inline-flex h-auto min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-center text-sm font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--canvas)]"
             >
-              <ShieldCheck className="h-4 w-4 text-[var(--accent)]" />
+              <ShieldCheck className="h-4 w-4 shrink-0 text-[var(--accent)]" />
               <span>{t.reviewerCentre}</span>
             </Link>
 
             <Link
               href="/farmer"
-              className="inline-flex h-11 items-center justify-center gap-2 border border-[var(--line)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--canvas)]"
+              className="inline-flex h-auto min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-center text-sm font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--canvas)]"
             >
-              <Camera className="h-4 w-4 text-[var(--ink-muted)]" />
+              <Camera className="h-4 w-4 shrink-0 text-[var(--ink-muted)]" />
               <span>{t.farmerPortal}</span>
             </Link>
+          </div>
+        </div>
+          </div>
+
+          {/* Hero illustration — transparent PNG, blends with the page background */}
+          <div className="min-w-0 md:col-span-5">
+            <Image
+              src="/farmer-sowing.png"
+              alt={lang === "hi" ? "बीज बोता हुआ किसान" : "Farmer sowing seeds by hand"}
+              width={1217}
+              height={1293}
+              priority
+              sizes="(max-width: 768px) 78vw, 380px"
+              className="mx-auto h-auto w-full max-w-[260px] sm:max-w-[300px] md:max-w-[380px]"
+            />
           </div>
         </div>
       </header>
