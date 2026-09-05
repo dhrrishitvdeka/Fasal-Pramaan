@@ -335,35 +335,46 @@ Return ONLY valid JSON matching this schema:
 Angle: ${angleType}, Peril: ${peril || "normal"}`;
 
   const model = resolveGeminiVisionModel();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const modelsToTry = [
+    model,
+    model !== "gemini-2.5-flash" ? "gemini-2.5-flash" : undefined,
+    model !== "gemini-2.5-flash-lite" ? "gemini-2.5-flash-lite" : undefined,
+  ]
+    .filter((m): m is string => Boolean(m) && m.length > 0)
+    .filter((m, i, arr) => arr.indexOf(m) === i);
 
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }, { inlineData: { mimeType: mime, data: b64 } }],
-          },
-        ],
-        generationConfig: {
-          maxOutputTokens: 768,
-          responseMimeType: "application/json",
+    let rawOut = "";
+    for (const candidateModel of modelsToTry) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:generateContent`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
         },
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }, { inlineData: { mimeType: mime, data: b64 } }],
+            },
+          ],
+          generationConfig: {
+            maxOutputTokens: 768,
+            responseMimeType: "application/json",
+          },
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
 
-    const text = await res.text();
-    if (!res.ok) return null;
+      if (!res.ok) continue;
 
-    const json = JSON.parse(text) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const rawOut = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const text = await res.text();
+      const json = JSON.parse(text) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+      rawOut = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      if (rawOut) break;
+    }
     if (!rawOut) return null;
 
     const outText = rawOut.replace(/```(?:json)?\s*/gi, "").replace(/```\s*$/gi, "").trim();
