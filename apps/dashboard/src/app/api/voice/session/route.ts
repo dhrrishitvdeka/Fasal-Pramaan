@@ -3,15 +3,19 @@ import { NextResponse } from "next/server";
 import { SITE_LOCK_COOKIE, isSiteLockActive, isValidSiteLockToken } from "@/lib/site-lock";
 import { assertNoSecretLeak, mintVoiceSession } from "@/lib/voice/gemini-session";
 import { requireWebActor } from "@/lib/web-auth";
+import { parseAppLang } from "@/lib/live-indian-languages";
 
 export async function POST(request: Request) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
   const jar = await cookies();
   const unlocked = await isValidSiteLockToken(jar.get(SITE_LOCK_COOKIE)?.value);
+  const jsonBody = (await request.json().catch(() => ({}))) as { lang?: unknown };
+  const lang = parseAppLang(jsonBody?.lang) ?? undefined;
   const result = await mintVoiceSession({
     lockActive: isSiteLockActive(),
     unlocked,
+    lang,
   });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });

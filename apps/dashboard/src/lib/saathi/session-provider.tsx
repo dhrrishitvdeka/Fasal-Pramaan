@@ -14,6 +14,7 @@ import {
   type SaathiSlot,
 } from "@/lib/saathi-agent";
 import { webCaptureBridge } from "@/lib/voice/capture-bridge";
+import { nativeLabelForLang } from "@/lib/live-indian-languages";
 import {
   decodeGeminiLiveFrame,
   parseGeminiLiveMessage,
@@ -135,6 +136,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
   const retryCountRef = useRef(0);
   const statusRef = useRef<SaathiLiveStatus>("idle");
   const langRef = useRef(lang);
+  const prevLangRef = useRef(lang);
   const slotsRef = useRef(slots);
   const pathnameRef = useRef(pathname);
   const registerPlotRef = useRef(registerPlot);
@@ -470,7 +472,11 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     setError(null);
     setLiveStatus("connecting");
     try {
-      const minted = await apiFetch("/api/voice/session", { method: "POST" });
+      const minted = await apiFetch("/api/voice/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lang: langRef.current }),
+      });
       // Guard: disconnect or unmount happened while minting the token
       if (intentionalCloseRef.current || !mountedRef.current) {
         connectingRef.current = false;
@@ -510,15 +516,20 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
                   liveAudioRef.current?.setHoldUplink(false);
                 }, 12_000);
                 hasGreetedRef.current = true;
-                const isHi = langRef.current === "hi";
+                const activeLang = langRef.current;
+                const isHi = activeLang === "hi";
+                const isEn = activeLang === "en";
+                const targetLabel = nativeLabelForLang(activeLang);
+                const greetingPrompt = isHi
+                  ? "किसान अभी जुड़े हैं। सत्र की सक्रिय भाषा केवल 'हिन्दी' (Hindi) है। किसान को संक्षेप में (1-2 वाक्यों में) नमस्ते कहें और पूछें कि उनकी फसल में क्या नुकसान हुआ है। पूरी बातचीत हिन्दी में ही करें, अंग्रेजी शब्दों (जैसे crop, paddy, photo, claim, damage, status) के कारण कभी अंग्रेजी में न बदलें।"
+                  : isEn
+                    ? "The farmer just joined. The active session language is strictly English. Greet them warmly and briefly (1-2 sentences) in English and ask what happened to their crop. Speak strictly in English unless explicitly commanded to switch."
+                    : `The farmer just joined. The active session language is strictly ${targetLabel} ('${activeLang}'). Greet them warmly and briefly (1-2 sentences) in ${targetLabel} and ask what happened to their crop. Speak strictly in ${targetLabel}. Do not switch languages on incidental loanwords.`;
                 try {
                   socket.send(
                     JSON.stringify({
                       realtimeInput: {
-                        text:
-                          isHi
-                            ? "किसान अभी जुड़े हैं। सत्र की सक्रिय भाषा केवल 'हिन्दी' (Hindi) है। किसान को संक्षेप में (1-2 वाक्यों में) नमस्ते कहें और पूछें कि उनकी फसल में क्या नुकसान हुआ है। पूरी बातचीत हिन्दी में ही करें, अंग्रेजी शब्दों (जैसे crop, photo, claim, damage) के कारण कभी अंग्रेजी में न बदलें।"
-                            : "The farmer just joined. Greet them warmly and briefly (1-2 sentences) and ask what happened to their crop. Keep the conversation strictly in this language.",
+                        text: greetingPrompt,
                       },
                     }),
                   );
@@ -831,6 +842,36 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     const timer = window.setTimeout(() => pushPortalContext("state_change"), 1500);
     return () => window.clearTimeout(timer);
   }, [liveStatus, pathname, lang, plots, claims, milestones, pushPortalContext]);
+
+  useEffect(() => {
+    const prevLang = prevLangRef.current;
+    if (prevLang === lang) return;
+    prevLangRef.current = lang;
+
+    // 1. If conversation has not started or is at initial greeting, update greeting to match new language
+    setMessages((prev) => {
+      if (prev.length <= 1) {
+        return [initialSaathiGreeting(lang)];
+      }
+      return prev;
+    });
+
+    // 2. If voice session is active, instruct Gemini Live immediately about language change
+    const socket = socketRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN && setupCompleteRef.current) {
+      const targetLabel = nativeLabelForLang(lang);
+      const directive =
+        lang === "hi"
+          ? "[SYSTEM DIRECTIVE: किसान ने पोर्टल की भाषा बदलकर 'हिन्दी' (hi) कर दी है। अब से आपको केवल और केवल शुद्ध एवं सरल हिन्दी (Hindi) में ही बात करनी है। अंग्रेजी शब्दों (crop, photo, claim, damage, status आदि) के कारण कभी अंग्रेजी में न बदलें। 1 छोटे वाक्य में हिन्दी में पुष्टि करें।]\n"
+          : `[SYSTEM DIRECTIVE: The user has switched the portal language to ${targetLabel} ('${lang}'). From now on, you MUST strictly speak and respond in ${targetLabel} ('${lang}'). Do not switch languages on incidental loanwords. Briefly acknowledge this language change in ${targetLabel} in 1 short sentence.]\n`;
+      try {
+        socket.send(JSON.stringify({ realtimeInput: { text: directive } }));
+      } catch {
+        // ignore
+      }
+      pushPortalContext("language_change");
+    }
+  }, [lang, pushPortalContext]);
 
   // Voice is audio-only. Live camera frames stay on-device for the OpenCV shutter
   // lock; Gemini sees stills only when the farmer submits a claim.

@@ -2,7 +2,7 @@
 
 import { useSaathiSession } from "@/lib/saathi/session-provider";
 import { useFarmerData } from "@/lib/farmerStore";
-import type { AppLang } from "@/lib/live-indian-languages";
+import { nativeLabelForLang, type AppLang } from "@/lib/live-indian-languages";
 import { getFarmerT } from "@/lib/farmerI18n";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -139,6 +139,9 @@ export default function FasalSaathiOverlay() {
                   <span>{lang === "hi" ? "फसल साथी" : "Fasal Saathi"}</span>
                   <span className="text-[10px] font-medium text-emerald-400 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/30">
                     {lang === "hi" ? "सहायक" : "Assistant"}
+                  </span>
+                  <span className="text-[10px] font-semibold text-amber-300 bg-amber-950/80 px-1.5 py-0.2 rounded border border-amber-500/30">
+                    {nativeLabelForLang(lang)}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">

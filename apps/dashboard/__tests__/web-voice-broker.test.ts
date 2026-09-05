@@ -433,6 +433,23 @@ describe("web Fasal Saathi broker aliases", () => {
     expect(result.outcome).toBe("succeeded");
     expect(gw.paths[0]).toMatch(/plotId=plot-sole/);
   });
+
+  it("executes change_language with idempotency check", async () => {
+    const gw = gateway({ language: "hi" });
+    const broker = new WebVoiceBroker(gw);
+
+    // 1. Changing to the currently active language should return early without triggering gateway change
+    const same = await broker.execute("change_language", { language_code: "hi" }, 1);
+    expect(same.outcome).toBe("succeeded");
+    expect(same.message).toContain("पहले से ही हिन्दी");
+    expect(gw.langs.length).toBe(0);
+
+    // 2. Changing to a different valid language triggers changeLanguage
+    const diff = await broker.execute("change_language", { language_code: "en" }, 2);
+    expect(diff.outcome).toBe("succeeded");
+    expect(diff.message).toContain("English");
+    expect(gw.langs).toEqual(["en"]);
+  });
 });
 
 describe("web voice tool declarations", () => {

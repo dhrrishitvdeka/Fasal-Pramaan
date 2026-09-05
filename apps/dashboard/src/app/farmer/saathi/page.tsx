@@ -21,6 +21,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
+import { nativeLabelForLang } from "@/lib/live-indian-languages";
 import { saathiRouteLabel, useSaathiSession } from "@/lib/saathi/session-provider";
 import clsx from "clsx";
 
@@ -96,6 +97,13 @@ export default function SaathiIntakePage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-900 whitespace-nowrap"
+              title={lang === "hi" ? "सक्रिय भाषा" : "Active Language"}
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              <span>{nativeLabelForLang(lang)}</span>
+            </span>
             <button
               type="button"
               onClick={resetSession}

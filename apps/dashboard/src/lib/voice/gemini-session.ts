@@ -3,7 +3,9 @@ import {
   GEMINI_LIVE_WEBSOCKET_URL,
   WEB_FUNCTION_DECLARATIONS,
   WEB_VOICE_SYSTEM_INSTRUCTION,
+  buildVoiceSystemInstruction,
 } from "./function-declarations";
+import type { AppLang } from "../live-indian-languages";
 import {
   resolveGeminiApiKey,
   resolveGeminiLiveModel,
@@ -49,13 +51,14 @@ function rfc3339(value: Date): string {
   return value.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-function liveSessionConfig() {
+function liveSessionConfig(lang?: AppLang) {
+  const instruction = lang ? buildVoiceSystemInstruction(lang) : WEB_VOICE_SYSTEM_INSTRUCTION;
   return {
     responseModalities: ["AUDIO"],
     speechConfig: {
       voiceConfig: { prebuiltVoiceConfig: { voiceName: geminiLiveVoice() } },
     },
-    systemInstruction: { parts: [{ text: WEB_VOICE_SYSTEM_INSTRUCTION }] },
+    systemInstruction: { parts: [{ text: instruction }] },
     tools: [{ functionDeclarations: WEB_FUNCTION_DECLARATIONS }],
     inputAudioTranscription: {},
     outputAudioTranscription: {},
@@ -63,7 +66,7 @@ function liveSessionConfig() {
   };
 }
 
-export function buildAuthTokenRequest(now = new Date()): {
+export function buildAuthTokenRequest(now = new Date(), lang?: AppLang): {
   body: Record<string, unknown>;
   legacyBody: Record<string, unknown>;
   expiresAt: Date;
@@ -74,7 +77,7 @@ export function buildAuthTokenRequest(now = new Date()): {
   // Window to *start* the Live socket — keep short; session length is expireTime.
   const newSessionExpireAt = new Date(now.getTime() + 2 * 60_000);
   const model = geminiLiveModel();
-  const liveConfig = liveSessionConfig();
+  const liveConfig = liveSessionConfig(lang);
   const shared = {
     uses: 20,
     expireTime: rfc3339(expiresAt),
@@ -115,6 +118,7 @@ export async function mintVoiceSession(input: {
   apiKey?: string;
   fetchImpl?: typeof fetch;
   now?: Date;
+  lang?: AppLang;
 }): Promise<VoiceSessionResult> {
   if (input.lockActive && !input.unlocked) {
     return { ok: false, status: 401, error: "Site locked" };
@@ -129,7 +133,7 @@ export async function mintVoiceSession(input: {
   if (input.voiceEnabled === false) {
     return { ok: false, status: 503, error: "Voice assistant is not configured" };
   }
-  const { body, legacyBody, expiresAt, model } = buildAuthTokenRequest(input.now);
+  const { body, legacyBody, expiresAt, model } = buildAuthTokenRequest(input.now, input.lang);
   const fetchImpl = input.fetchImpl ?? fetch;
   const postToken = (payload: Record<string, unknown>) =>
     fetchImpl(GEMINI_AUTH_TOKENS_URL, {
