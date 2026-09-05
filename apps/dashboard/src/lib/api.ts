@@ -480,7 +480,9 @@ export async function submitWebClaim(input: {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error((body as { error?: string }).error || "Failed to persist claim");
+    const errBody = body as { error?: string; details?: string };
+    const errDetail = errBody.details ? `${errBody.error || "Failed to persist claim"}: ${errBody.details}` : (errBody.error || "Failed to persist claim");
+    throw new Error(errDetail);
   }
   return body as { claimId: string };
 }

@@ -172,12 +172,23 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
         contentType,
         upsert: true,
       });
-      if (error) throw new Error(error.message);
-      const { data: signed, error: signError } = await client.storage
-        .from("fasal-web-evidence")
-        .createSignedUrl(path, 60 * 60 * 24 * 7);
-      if (signError) throw new Error(signError.message);
-      return { url: signed.signedUrl, storagePath: path };
+      if (error) throw new Error(`Storage upload failed: ${error.message}`);
+      let url = "";
+      try {
+        const { data: signed, error: signError } = await client.storage
+          .from("fasal-web-evidence")
+          .createSignedUrl(path, 60 * 60 * 24 * 7);
+        if (!signError && signed?.signedUrl) {
+          url = signed.signedUrl;
+        }
+      } catch {
+        // fallback to public url
+      }
+      if (!url) {
+        const { data: pub } = client.storage.from("fasal-web-evidence").getPublicUrl(path);
+        url = pub?.publicUrl || "";
+      }
+      return { url, storagePath: path };
     },
     async downloadImage(path) {
       const { data, error } = await client.storage.from("fasal-web-evidence").download(path);

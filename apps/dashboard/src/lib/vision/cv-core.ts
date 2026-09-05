@@ -205,9 +205,9 @@ export function detectScreenArtifacts(
     };
   }
 
-  if (totalEdges >= 20) {
+  if (totalEdges >= 20 && (hasStrongBezelLine || darkBezel)) {
     const orthogonalRatio = orthogonalGradients / totalEdges;
-    if (orthogonalRatio > 0.78 || (orthogonalRatio > 0.64 && hasStrongBezelLine)) {
+    if (orthogonalRatio > 0.68) {
       return {
         isScreen: true,
         confidence: Math.round(orthogonalRatio * 100),
@@ -233,7 +233,7 @@ function hintFor(
   },
   angleId?: string,
 ): { code: CvHintCode; en: string; hi: string; block: boolean } {
-  const { cropScore, totalCanopyPct, luma, blur, glareRatio, syntheticRatio, isScreenDetected, isPersonDetected } =
+  const { cropScore, totalCanopyPct, vegetativePct, luma, blur, glareRatio, syntheticRatio, isScreenDetected, isPersonDetected } =
     scores;
 
   const isCloseup = angleId === "closeup_damage";
@@ -249,12 +249,15 @@ function hintFor(
   }
 
   if (isScreenDetected) {
-    return {
-      code: "screen_detected",
-      en: "Screen / display detected — photograph real outdoor crop",
-      hi: "स्क्रीन / डिस्प्ले पहचानी गई — असली खेत व फसल की फोटो लें",
-      block: true,
-    };
+    const isOutdoorCanopy = (totalCanopyPct >= 35 && vegetativePct >= 20) || cropScore >= 60;
+    if (!isOutdoorCanopy) {
+      return {
+        code: "screen_detected",
+        en: "Screen / display detected — photograph real outdoor crop",
+        hi: "स्क्रीन / डिस्प्ले पहचानी गई — असली खेत व फसल की फोटो लें",
+        block: true,
+      };
+    }
   }
 
   const darkFloor = isFireRelax ? FIRE_DARK_LUMA_MIN : DARK_LUMA_MIN;
