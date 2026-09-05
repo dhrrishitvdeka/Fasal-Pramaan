@@ -267,6 +267,6 @@ export async function POST(request: Request) {
     if (/Cannot recapture|status changed/i.test(message)) {
       return NextResponse.json({ error: message }, { status: 409 });
     }
-    return NextResponse.json({ error: "Persist failed" }, { status: 500 });
+    return NextResponse.json({ error: "Persist failed", details: message }, { status: 500 });
   }
 }

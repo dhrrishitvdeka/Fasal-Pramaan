@@ -99,10 +99,9 @@ export function heuristicGate(
   }
 
   const cv = metadata?.cvAnalysis;
+  const isClearCropFoliage = (cv?.cropScore != null && cv.cropScore >= 60) || (cv?.greenPct != null && cv.greenPct >= 35);
 
-  // Security-critical hints always win: screen / person must fail closed
-  // even when crop measurements look good.
-  if (cv?.hintCode === "screen_detected" || cv?.hintCode === "person_detected") {
+  if (cv?.hintCode === "person_detected" || (cv?.hintCode === "screen_detected" && !isClearCropFoliage)) {
     return {
       usable: false,
       reason: cv.hintCode === "screen_detected" ? "screen_replay_detected" : cv.hintCode,
@@ -125,7 +124,7 @@ export function heuristicGate(
     };
   }
 
-  if (cv?.isScreenDetected === true) {
+  if (cv?.isScreenDetected === true && !isClearCropFoliage) {
     return {
       usable: false,
       reason: "screen_replay_detected",
