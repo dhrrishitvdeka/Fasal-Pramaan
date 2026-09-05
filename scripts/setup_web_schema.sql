@@ -87,6 +87,8 @@ CREATE TABLE IF NOT EXISTS public.web_claims (
   inference_status text,
   inference_error text,
   inference_started_at timestamptz,
+  growth_stage text,
+  predicted_growth_stage text,
   corrected_crop text,
   corrected_grade text,
   corrected_severity text,

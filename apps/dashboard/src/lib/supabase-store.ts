@@ -26,7 +26,7 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
           if (error) throw new Error(error.message);
           return data as WebClaimRow;
         }
-        if (code === "42703" || /column.*does not exist/i.test(msg)) {
+        if (code === "42703" || code === "PGRST204" || /column.*does not exist|Could not find the '.*' column/i.test(msg)) {
           const {
             peril: _p,
             intent_id: _i,
@@ -36,6 +36,9 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
             inference_status: _s,
             inference_error: _e,
             inference_started_at: _t,
+            growth_stage: _gs,
+            predicted_growth_stage: _pgs,
+            sowing_date: _sd,
             ...stripped
           } = row as any;
           const { data, error } = await client.from("web_claims").insert(stripped).select().single();

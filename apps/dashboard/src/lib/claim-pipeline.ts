@@ -952,13 +952,15 @@ export async function persistFarmerSubmission(
     if (isDuplicateKeyError(msg)) {
       throw new Error("Claim already exists");
     }
-    if (/context_signals|peril|intent_id|gate_result|sowing_date|inference_/i.test(msg)) {
+    if (/context_signals|peril|intent_id|gate_result|sowing_date|inference_|growth_stage/i.test(msg)) {
       const {
         context_signals: _cs,
         peril: _peril,
         intent_id: _intent,
         gate_result: _gate,
         sowing_date: _sowing,
+        growth_stage: _growth,
+        predicted_growth_stage: _pgrowth,
         inference_status: _inf,
         inference_error: _inferr,
         inference_started_at: _infat,
