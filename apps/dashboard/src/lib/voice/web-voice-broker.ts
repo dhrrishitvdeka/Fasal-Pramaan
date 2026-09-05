@@ -96,6 +96,7 @@ export type WebVoiceGateway = {
   currentPath?: string;
   language?: AppLang;
   navigate(path: string): void;
+  onAgentNavigate?: (path: string) => void;
   changeLanguage(code: AppLang): void;
   snoozeReminder(id: string, days: number): Promise<void> | void;
   completeReminder(id: string): Promise<void> | void;
@@ -199,6 +200,10 @@ export class WebVoiceBroker {
     return this.pending != null;
   }
 
+  updateCurrentPath(path: string): void {
+    this.gateway.currentPath = path;
+  }
+
   async execute(
     name: string,
     args: Record<string, unknown>,
@@ -267,7 +272,7 @@ export class WebVoiceBroker {
         case "read_capture_progress":
           return this.readCaptureProgress();
         case "capture_current_angle":
-          return this.fromCapture(await this.gateway.capture.captureCurrentAngle());
+          return this.captureCurrentAngle();
         case "switch_camera":
           return this.fromCapture(
             this.gateway.capture.switchCamera
@@ -527,6 +532,8 @@ export class WebVoiceBroker {
     }
     if (!found) return { outcome: "failed", message: "No claim found with that id." };
     const path = `/farmer/claims/${found.id}`;
+    this.gateway.currentPath = path;
+    this.gateway.onAgentNavigate?.(path);
     this.gateway.navigate(path);
     return { outcome: "succeeded", message: `Opened claim ${found.id}.`, data: { path }, entityId: found.id };
   }
@@ -544,6 +551,8 @@ export class WebVoiceBroker {
     const path = angles.length
       ? `/farmer/capture?recapture=${encodeURIComponent(found.id)}&angles=${angles.join(",")}`
       : `/farmer/capture?recapture=${encodeURIComponent(found.id)}`;
+    this.gateway.currentPath = path;
+    this.gateway.onAgentNavigate?.(path);
     this.gateway.navigate(path);
     return {
       outcome: "succeeded",
@@ -578,6 +587,8 @@ export class WebVoiceBroker {
     if (!path) {
       return { outcome: "failed", message: "That screen is not on the farmer website." };
     }
+    this.gateway.currentPath = path;
+    this.gateway.onAgentNavigate?.(path);
     this.gateway.navigate(path);
     return { outcome: "succeeded", message: `Opened the ${screen} screen.`, data: { screen, path } };
   }
@@ -700,7 +711,10 @@ export class WebVoiceBroker {
   }
 
   private async explainClaimAudit(args: Record<string, unknown>): Promise<VoiceToolResult> {
-    const server = await this.serverTool("explain_claim_audit", args);
+    const server = await this.serverTool("explain_claim_audit", {
+      lang: this.gateway.language,
+      ...args,
+    });
     if (server) return server;
     const rawId = String(args.claim_id || "").trim();
     const found = rawId ? this.findClaim(rawId) : this.gateway.claims[0];
@@ -709,9 +723,14 @@ export class WebVoiceBroker {
     }
 
     const isRecapture = found.status === "needs_recapture";
+    const isHi = this.gateway.language === "hi";
     const statusMsg = isRecapture
-      ? `Claim ${found.id} needs recapture for missing angle(s): ${(found.missingAngles || []).join(", ")}. Reason: ${found.recaptureReason || "Angle clarity needed"}.`
-      : `Claim ${found.id} status is '${found.status}'. The detailed 3-stage AI audit breakdown is unavailable right now.`;
+      ? isHi
+        ? `दावा ${found.id} में पुनः फोटो आवश्यक है। छूटे हुए कोण: ${(found.missingAngles || []).join(", ") || "निर्दिष्ट नहीं"}। कारण: ${found.recaptureReason || "फोटो स्पष्टता की आवश्यकता"}।`
+        : `Claim ${found.id} needs recapture for missing angle(s): ${(found.missingAngles || []).join(", ")}. Reason: ${found.recaptureReason || "Angle clarity needed"}.`
+      : isHi
+        ? `दावा ${found.id} की स्थिति '${found.status}' है। एआई व सैटेलाइट सत्यापन रिकॉर्ड सुरक्षित है।`
+        : `Claim ${found.id} status is '${found.status}'. The detailed 3-stage AI audit breakdown is unavailable right now.`;
 
     return {
       outcome: "succeeded",
@@ -811,6 +830,8 @@ export class WebVoiceBroker {
     if (intent?.crop) params.set("crop", intent.crop);
     const query = params.toString();
     const path = query ? `/farmer/capture?${query}` : "/farmer/capture";
+    this.gateway.currentPath = path;
+    this.gateway.onAgentNavigate?.(path);
     this.gateway.navigate(path);
     return {
       outcome: "succeeded",
@@ -818,6 +839,37 @@ export class WebVoiceBroker {
       entityId: plotId || undefined,
       data: { path, peril: peril || null, plot_id: plotId },
     };
+  }
+
+  private async captureCurrentAngle(): Promise<VoiceToolResult> {
+    const isCapture = (this.gateway.currentPath || "").startsWith("/farmer/capture");
+    const isHi = this.gateway.language === "hi";
+
+    if (!isCapture) {
+      const plots = this.gateway.plots || [];
+      if (plots.length === 0) {
+        return {
+          outcome: "failed",
+          message: isHi
+            ? "फ़ोटो लेने या दावा दर्ज करने से पहले आपका भूखंड (खेत) पंजीकृत होना अनिवार्य है। कृपया पहले मुझे अपने खेत का नाम और फसल बताएं।"
+            : "A registered plot is required before taking evidence photos. Please register your plot first.",
+        };
+      }
+      const nav = this.beginCapture({});
+      if (nav.outcome === "failed") {
+        return nav;
+      }
+      return {
+        outcome: "succeeded",
+        message: isHi
+          ? "कैमरा स्टूडियो खोल दिया गया है। कोण संरेखित होते ही फ़ोटो ली जा सकती है।"
+          : "Opened camera studio. You can take the photo once the angle is framed.",
+        data: nav.data,
+      };
+    }
+
+    const captureResult = await this.gateway.capture.captureCurrentAngle();
+    return this.fromCapture(captureResult);
   }
 
   private async setObservation(args: Record<string, unknown>): Promise<VoiceToolResult> {

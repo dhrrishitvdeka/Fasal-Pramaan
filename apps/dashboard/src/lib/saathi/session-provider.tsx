@@ -145,6 +145,8 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
   const hasGreetedRef = useRef(false);
   const openingRef = useRef(false);
   const openingTimerRef = useRef<number | null>(null);
+  const agentNavigatingRef = useRef(false);
+  const pendingContextSyncRef = useRef(false);
 
   statusRef.current = liveStatus;
   langRef.current = lang;
@@ -217,7 +219,11 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
         language: lang,
         navigate: (path) => {
           // Keep the live session — the provider lives in the farmer layout.
+          agentNavigatingRef.current = true;
           router.push(path);
+        },
+        onAgentNavigate: () => {
+          agentNavigatingRef.current = true;
         },
         changeLanguage: setLang,
         snoozeReminder: (id, days) => snoozeMilestone(id, days),
@@ -369,6 +375,14 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN || !setupCompleteRef.current) return;
     if (openingRef.current) return;
+
+    // Guard: Do not send context update if Gemini Live is actively playing audio or speaking.
+    // In Gemini Live duplex streaming, sending realtimeInput while the model outputs audio causes self-interruption.
+    if (liveAudioRef.current?.isPlaying()) {
+      pendingContextSyncRef.current = true;
+      return;
+    }
+
     const snap = snapshotRef.current;
     const recapture = snap.claims.filter((claim) => claim.status === "needs_recapture");
     const nextReminder = snap.milestones
@@ -571,6 +585,13 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
                 }
                 liveAudioRef.current?.setHoldUplink(false);
                 pushPortalContext("session_start");
+              } else if (pendingContextSyncRef.current) {
+                pendingContextSyncRef.current = false;
+                window.setTimeout(() => {
+                  if (!agentNavigatingRef.current && !liveAudioRef.current?.isPlaying()) {
+                    pushPortalContext("deferred_sync");
+                  }
+                }, 600);
               }
             }
             if (item.type === "error") {
@@ -771,6 +792,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
       if (res.action) {
         const action = res.action;
         if (action.type === "open_camera") {
+          agentNavigatingRef.current = true;
           const intent = slotsToIntent(res.slots, source === "voice" ? "saathi_voice" : "saathi_text");
           setActiveIntent(intent);
           webCaptureBridge.setIntent(intent);
@@ -780,6 +802,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
           }${res.slots.crop ? `&crop=${encodeURIComponent(res.slots.crop)}` : ""}`;
           setTimeout(() => router.push(cameraUrl), 800);
         } else if (action.type === "navigate") {
+          agentNavigatingRef.current = true;
           setTimeout(() => router.push(action.url), 600);
         } else if (action.type === "switch_language") {
           setLang(action.lang);
@@ -833,15 +856,41 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     const params = new URLSearchParams({ intentId: intent.id, peril: intent.peril });
     if (s.plotId) params.set("plotId", s.plotId);
     if (intent.crop) params.set("crop", intent.crop);
+    agentNavigatingRef.current = true;
     router.push(`/farmer/capture?${params.toString()}`);
   }, [router, setActiveIntent]);
 
   useEffect(() => {
+    // Keep broker's path awareness updated immediately without tearing down live state
+    brokerRef.current.updateCurrentPath(pathname);
+
     if (liveStatus !== "live") return;
     if (openingRef.current) return;
-    const timer = window.setTimeout(() => pushPortalContext("state_change"), 1500);
+
+    if (agentNavigatingRef.current) {
+      // Agent itself initiated this navigation. Do not interrupt active speech or send competing turns.
+      const resetTimer = window.setTimeout(() => {
+        agentNavigatingRef.current = false;
+      }, 2500);
+      return () => window.clearTimeout(resetTimer);
+    }
+
+    // User-initiated navigation or state update:
+    // If agent is currently speaking, defer context sync until speech finishes
+    if (liveAudioRef.current?.isPlaying() || isSpeaking) {
+      pendingContextSyncRef.current = true;
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (liveAudioRef.current?.isPlaying()) {
+        pendingContextSyncRef.current = true;
+      } else {
+        pushPortalContext("state_change");
+      }
+    }, 1500);
     return () => window.clearTimeout(timer);
-  }, [liveStatus, pathname, lang, plots, claims, milestones, pushPortalContext]);
+  }, [liveStatus, pathname, lang, plots, claims, milestones, pushPortalContext, isSpeaking]);
 
   useEffect(() => {
     const prevLang = prevLangRef.current;

@@ -22,6 +22,8 @@ export type LiveAudioSession = {
   interrupt: () => void;
   /** When true, microphone chunks are discarded and not sent to Gemini. */
   setHoldUplink: (hold: boolean) => void;
+  /** Returns true if audio playback is currently playing or scheduled. */
+  isPlaying: () => boolean;
   /** Full teardown: playback, mic graph, stream tracks, and the AudioContext. */
   stop: () => void;
 };
@@ -206,6 +208,9 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
       sendVideoFrame() {},
       interrupt() {},
       setHoldUplink() {},
+      isPlaying() {
+        return false;
+      },
     } satisfies LiveAudioSession;
   }
   stream = mediaStream;
@@ -281,5 +286,9 @@ export async function startLiveAudio(options: StartOptions): Promise<LiveAudioSe
     holdUplink = hold;
   };
 
-  return { context: ctx, playPcm24k, sendVideoFrame, interrupt, stop, setHoldUplink };
+  const isPlaying = () => {
+    return ctx.currentTime < playTime - 0.05 || activeNodes.size > 0;
+  };
+
+  return { context: ctx, playPcm24k, sendVideoFrame, interrupt, stop, setHoldUplink, isPlaying };
 }

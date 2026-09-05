@@ -217,6 +217,12 @@ export const farmerTranslations = {
     captureAllRequired: "Please capture all 3 required evidence photos before final submission.",
     draftSavedMsg: "Draft notes saved in this browser tab (photos are not stored in the draft).",
     draftSaveFailedMsg: "Could not save the draft on this device (storage full). Photos were not queued.",
+    notifInvalidSession: "Session expired. Please log in again to submit without losing progress.",
+    notifSubmissionFailed: "Could not submit claim due to a network or server issue. Your draft is safe.",
+    notifDuplicateImages: "Duplicate photos detected. Please take 3 distinct photos from different viewpoints.",
+    notifUnusableLighting: "Some photos are too dark or overexposed. Retake in balanced natural daylight.",
+    notifNoPlotSelected: "Please select or register a farm plot before submitting your claim.",
+    notifMissingAngles: "Please capture all required photo angles before submitting.",
 
     // Reminders & Timeline
     remindersTitle: "30-Day Crop Growth Timeline",
@@ -468,6 +474,12 @@ export const farmerTranslations = {
     captureAllRequired: "कृपया अंतिम सबमिशन से पहले सभी 3 आवश्यक साक्ष्य फ़ोटो लें।",
     draftSavedMsg: "प्रारूप नोट इस टैब में सहेजे गए (फ़ोटो प्रारूप में नहीं रहते)।",
     draftSaveFailedMsg: "प्रारूप सहेजा नहीं जा सका (स्टोरेज भर गया)। फ़ोटो कतार में नहीं गईं।",
+    notifInvalidSession: "लॉगिन सत्र समाप्त हो गया है। दोबारा लॉगिन करें, आपका ड्राफ्ट सुरक्षित है।",
+    notifSubmissionFailed: "दावा जमा नहीं हो सका। आपका ड्राफ्ट सुरक्षित है, कुछ देर बाद पुनः प्रयास करें।",
+    notifDuplicateImages: "एक ही फोटो बार-बार पहचानी गई है। कृपया अलग-अलग कोण से 3 भिन्न तस्वीरें लें।",
+    notifUnusableLighting: "कुछ तस्वीरें बहुत अँधेरी या अयोग्य हैं। प्राकृतिक रोशनी में पुनः फोटो लें।",
+    notifNoPlotSelected: "दावा जमा करने से पहले कृपया एक पंजीकृत खेत का चयन करें।",
+    notifMissingAngles: "दावा जमा करने से पहले सभी आवश्यक कोणों की तस्वीरें लेना अनिवार्य है।",
 
     // Reminders & Timeline
     remindersTitle: "30-दिवसीय फसल विकास समय-सीमा",
@@ -609,3 +621,12 @@ export function getFarmerT(lang: FarmerLang): FarmerCopy {
   const overlay = FARMER_LOCALES[lang];
   return overlay ? { ...farmerTranslations.en, ...overlay } : farmerTranslations.en;
 }
+
+export {
+  getLocalizedNotification,
+  mapApiErrorToNotificationCode,
+  notificationDebouncer,
+  type NotificationCode,
+  type NotificationType,
+  type ClaimNotificationItem,
+} from "./claim-notifications";

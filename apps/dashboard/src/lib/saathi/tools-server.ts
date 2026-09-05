@@ -6,6 +6,7 @@ import { classifyPerilWithLLM } from "@/lib/saathi/classify-server";
 import { createServerSupabase } from "@/lib/supabase";
 import { autoLinkedKhasra } from "@/lib/plot-identity";
 import { resolveSaathiToolName } from "@/lib/saathi/tool-catalog";
+import { buildDefaultMilestones } from "@/lib/growth-stages";
 
 export type SaathiToolResult = {
   ok: boolean;
@@ -308,6 +309,7 @@ async function checkPlotGeofence(
   const distanceM = Math.round(haversineMeters(lat, lon, plot.lat, plot.lon));
   const accuracyM = toFiniteNumber(args.accuracy_m) ?? 0;
   const inside = distanceM <= Math.max(accuracyM, GEOFENCE_RADIUS_M);
+  const isHi = String(args.lang || "").toLowerCase() === "hi";
   return {
     ok: true,
     data: {
@@ -320,8 +322,12 @@ async function checkPlotGeofence(
       distance_m: distanceM,
       radius_m: Math.max(accuracyM, GEOFENCE_RADIUS_M),
       message: inside
-        ? `Position is ${distanceM} m from the centre of plot '${plot.name}' — within the ${Math.max(accuracyM, GEOFENCE_RADIUS_M)} m parcel radius.`
-        : `Position is ${distanceM} m from plot '${plot.name}' — outside the ${Math.max(accuracyM, GEOFENCE_RADIUS_M)} m parcel radius.`,
+        ? isHi
+          ? `आपकी वर्तमान स्थिति खेत '${plot.name}' के केंद्र से ${distanceM} मीटर दूरी पर है — मान्य भूखंड परिधि के अंदर।`
+          : `Position is ${distanceM} m from the centre of plot '${plot.name}' — within the ${Math.max(accuracyM, GEOFENCE_RADIUS_M)} m parcel radius.`
+        : isHi
+          ? `आपकी वर्तमान स्थिति खेत '${plot.name}' से ${distanceM} मीटर दूरी पर है — मान्य ${Math.max(accuracyM, GEOFENCE_RADIUS_M)} मीटर परिधि से बाहर।`
+          : `Position is ${distanceM} m from plot '${plot.name}' — outside the ${Math.max(accuracyM, GEOFENCE_RADIUS_M)} m parcel radius.`,
     },
   };
 }
@@ -421,10 +427,15 @@ async function explainClaimAudit(
   const overall =
     typeof claim.overall_confidence === "number" ? Math.round(claim.overall_confidence * 10) / 10 : null;
   const stages = [stage1, stage2, stage3];
+  const isHi = String(args.lang || "").toLowerCase() === "hi";
   const message =
     claim.status === "needs_recapture"
-      ? `Claim ${claim.id} needs recapture for missing angle(s): ${(claim.missing_angles || []).join(", ") || "unspecified"}. Reason: ${claim.recapture_reason || "Angle clarity needed"}.`
-      : `Claim ${claim.id}: Stage 1 Vision Gate ${stage1}, Stage 2 Gemini analysis ${stage2}, Stage 3 satellite cross-check ${stage3}. Overall confidence ${overall == null ? "pending" : `${overall}%`}.`;
+      ? isHi
+        ? `दावा ${claim.id} में पुनः फोटो आवश्यक है। छूटे हुए कोण: ${(claim.missing_angles || []).join(", ") || "निर्दिष्ट नहीं"}। कारण: ${claim.recapture_reason || "तस्वीर की स्पष्टता आवश्यक"}।`
+        : `Claim ${claim.id} needs recapture for missing angle(s): ${(claim.missing_angles || []).join(", ") || "unspecified"}. Reason: ${claim.recapture_reason || "Angle clarity needed"}.`
+      : isHi
+        ? `दावा ${claim.id}: स्टेज 1 विज़न गेट (${stage1}), स्टेज 2 जेमिनी विश्लेषण (${stage2}), स्टेज 3 सैटेलाइट क्रॉस-चेक (${stage3})। कुल AI विश्वास ${overall == null ? "लंबित" : `${overall}%`}।`
+        : `Claim ${claim.id}: Stage 1 Vision Gate ${stage1}, Stage 2 Gemini analysis ${stage2}, Stage 3 satellite cross-check ${stage3}. Overall confidence ${overall == null ? "pending" : `${overall}%`}.`;
   return {
     ok: true,
     data: {
@@ -474,6 +485,18 @@ async function registerPlotServer(
   const { error } = await client.from("web_plots").insert(row);
   if (error) {
     return { ok: false, error: error.message };
+  }
+  try {
+    const milestones = buildDefaultMilestones({
+      plotId,
+      cropName: cropType,
+      cropNameHi: cropType,
+      sowingDate: row.sowing_date,
+      createdBy: context.userId,
+    });
+    await client.from("web_milestones").insert(milestones);
+  } catch {
+    // non-fatal milestone seeding
   }
   return {
     ok: true,
