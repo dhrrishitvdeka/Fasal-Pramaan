@@ -37,7 +37,9 @@ MANDATORY PLOT RULE (BEFORE CAPTURE OR CLAIM):
 - Before beginning capture or filing a claim, check plot_count in PORTAL CONTEXT or call list_plots.
 - IF 0 PLOTS EXIST (plot_count === 0):
   * You CANNOT start capture! Do NOT call begin_guided_capture.
-  * Inform the farmer warmly: every claim requires a registered plot. Prompt them for plot details (plot name, crop type, khasra number, area in hectares/bigha, village) and immediately call register_plot.
+  * Inform the farmer warmly: every claim requires a registered plot. Prompt them for plot details (plot name, crop type, area, village) and confirm field GPS is ON, then immediately call register_plot.
+  * NEVER ask the farmer for Khasra / Survey / Dag number — it auto-links from their mobile-verified land record. NEVER ask for Khata number — that field no longer exists.
+  * Village and field GPS are mandatory for registration: if the village is already in their farmer profile, confirm it instead of re-asking.
   * Only after register_plot succeeds may you proceed to begin_guided_capture.
 - IF MULTIPLE PLOTS EXIST (plot_count > 1):
   * If the farmer hasn't specified which plot suffered damage, ask: which plot was affected? Once identified, pass that plot_id to begin_guided_capture.
@@ -80,7 +82,8 @@ CLAIM STATUSES & AUDIT
 
 AGENTIC CAPABILITIES & TOOLS
 1. Plot Registration:
-   - When the farmer asks to register or add a plot, collect details (name, crop_type, khasra_number, area, village) and call register_plot.
+   - When the farmer asks to register or add a plot, collect details (name, crop_type, area, village) and call register_plot.
+   - Khasra auto-links from the mobile-verified land record and Khata was removed: never ask for either. Village + field GPS are mandatory.
 2. Camera & Shutter Control:
    - Call capture_current_angle, switch_camera, select_capture_angle, retake_capture_angle, or set_capture_observation.
    - If the farmer names a peril, call request_evidence_angles then begin_guided_capture with that peril and plot_id.
@@ -106,18 +109,17 @@ export const WEB_FUNCTION_DECLARATIONS = [
   {
     name: "register_plot",
     description:
-      "Register a new agricultural plot on the farmer's account with plot name, crop type, khasra number, area in hectares, and village.",
+      "Register a new agricultural plot with plot name, crop type, area in hectares, and village. The Khasra / Survey number auto-links from the mobile-verified land record (never ask the farmer for it); field GPS is verified live at capture time.",
     parameters: objectSchema(
       {
-        name: { type: "STRING", description: "Name of the plot (e.g. North Wheat Field, Khasra 402, Plot 1)" },
+        name: { type: "STRING", description: "Name of the plot (e.g. North Wheat Field, Canal Plot)" },
         crop_type: {
           type: "STRING",
           enum: ["wheat", "paddy", "maize", "potato"],
           description: "Crop type grown on this plot",
         },
-        khasra_number: { type: "STRING", description: "Land record Khasra / Survey number" },
         area_hectares: { type: "NUMBER", description: "Area in hectares (e.g. 1.2)" },
-        village: { type: "STRING", description: "Village where the plot is located" },
+        village: { type: "STRING", description: "Village / Mauza where the plot is located (mandatory)" },
       },
       ["name", "crop_type"],
     ),

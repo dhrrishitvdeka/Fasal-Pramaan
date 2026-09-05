@@ -8,11 +8,11 @@ import {
   ChevronDown,
   Compass,
   Landmark,
-  MapPin,
   RotateCcw,
 } from "lucide-react";
 import clsx from "clsx";
 import { useFarmerData } from "@/lib/farmerStore";
+import { autoLinkedKhasra } from "@/lib/plot-identity";
 import { getFarmerT } from "@/lib/farmerI18n";
 import { todayIsoDate } from "@/lib/farmer-timeline";
 import {
@@ -72,8 +72,6 @@ export default function PlotRegistrationForm({
     district: farmerProfile?.district || "",
     tehsil: "",
     village: farmerProfile?.village || "",
-    khataNumber: "",
-    khasraNumber: "",
     hissaNumber: "",
     ownershipType: "owner",
     areaValue: "10",
@@ -173,21 +171,30 @@ export default function PlotRegistrationForm({
     setFormError(null);
 
     const name = plotForm.name.trim();
-    const khasra = plotForm.khasraNumber.trim();
+    const village = plotForm.village.trim();
     const areaVal = parseFloat(plotForm.areaValue);
 
     if (!name) {
       setFormError(lang === "hi" ? "कृपया भूखंड / खेत का नाम दर्ज करें।" : "Please enter a plot / field name.");
       return;
     }
-    if (!khasra) {
+    if (!village) {
+      setFormError(lang === "hi" ? "कृपया गांव / मौजा दर्ज करें।" : "Please enter the village / mauza.");
+      return;
+    }
+    const gpsLat = plotForm.lat ? parseFloat(plotForm.lat) : NaN;
+    const gpsLon = plotForm.lon ? parseFloat(plotForm.lon) : NaN;
+    if (!Number.isFinite(gpsLat) || !Number.isFinite(gpsLon)) {
       setFormError(
         lang === "hi"
-          ? "पीएमएफबीवाई मानक अनुसार खसरा संख्या अनिवार्य है।"
-          : "Khasra number is required under PMFBY cadastral rules.",
+          ? "खेत का GPS स्थान अनिवार्य है — अपने खेत पर खड़े होकर 'लाइव जीपीएस लें' दबाएँ।"
+          : "Field GPS location is required — stand in your field and tap 'Detect Live GPS'.",
       );
       return;
     }
+    // Khasra auto-links from the farmer's mobile-linked land record at
+    // verification time; resolve the linked parcel reference for this plot.
+    const khasra = autoLinkedKhasra();
     if (!areaVal || areaVal <= 0) {
       setFormError(
         lang === "hi" ? "कृपया मान्य क्षेत्रफल (Area) दर्ज करें।" : "Please enter a valid area greater than zero.",
@@ -202,10 +209,9 @@ export default function PlotRegistrationForm({
         name,
         nameHi: name,
         khasraNumber: khasra,
-        khataNumber: plotForm.khataNumber.trim(),
         hissaNumber: plotForm.hissaNumber.trim(),
         tehsil: plotForm.tehsil.trim(),
-        village: plotForm.village.trim() || farmerProfile?.village || undefined,
+        village,
         district: plotForm.district.trim() || farmerProfile?.district || undefined,
         state: plotForm.state.trim() || farmerProfile?.state || undefined,
         ownershipType: plotForm.ownershipType,
@@ -222,8 +228,8 @@ export default function PlotRegistrationForm({
         irrigationTypeHi:
           IRRIGATION_TYPES.find((i) => i.value === plotForm.irrigationType)?.labelHi || plotForm.irrigationType,
         sowingDate: plotForm.sowingDate || todayIsoDate(),
-        lat: plotForm.lat ? parseFloat(plotForm.lat) : undefined,
-        lon: plotForm.lon ? parseFloat(plotForm.lon) : undefined,
+        lat: gpsLat,
+        lon: gpsLon,
       });
 
       if (mode === "timeline") {
@@ -233,8 +239,6 @@ export default function PlotRegistrationForm({
           district: farmerProfile?.district || "",
           tehsil: "",
           village: farmerProfile?.village || "",
-          khataNumber: "",
-          khasraNumber: "",
           hissaNumber: "",
           ownershipType: "owner",
           areaValue: "10",
@@ -370,7 +374,7 @@ export default function PlotRegistrationForm({
 
       {/* Clean, spacious primary form fields */}
       <div className="space-y-5">
-        {/* Row 1: Plot Name & Khasra Number (Essential Cadastral Identity) */}
+        {/* Row 1: Plot Name & Village (Essential Identity) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="font-semibold text-xs text-[var(--ink)] block mb-1">
@@ -388,34 +392,21 @@ export default function PlotRegistrationForm({
 
           <div>
             <label className="font-semibold text-xs text-[var(--ink)] block mb-1">
-              {t.addPlotKhasra} <span className="text-red-600">*</span>
+              {t.addPlotVillage} <span className="text-red-600">*</span>
             </label>
             <input
               type="text"
               required
-              value={plotForm.khasraNumber}
-              onChange={(e) => setPlotForm((p) => ({ ...p, khasraNumber: e.target.value }))}
-              placeholder={lang === "hi" ? "उदा. 125/2 / गाटा 340" : "e.g. 125/2 / Survey 340"}
+              value={plotForm.village}
+              onChange={(e) => setPlotForm((p) => ({ ...p, village: e.target.value }))}
+              placeholder={farmerProfile?.village || (lang === "hi" ? "उदा. जगदीशपुर" : "e.g. Jagdishpur")}
               className="fp-input rounded-lg text-xs sm:text-sm font-medium"
             />
           </div>
         </div>
 
-        {/* Row 2: Khata Number & Area with integrated unit conversion */}
+        {/* Row 2: Area with integrated unit conversion */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-          <div>
-            <label className="font-semibold text-xs text-[var(--ink)] block mb-1">
-              {t.addPlotKhata} <span className="text-[11px] font-normal text-[var(--ink-muted)]">({lang === "hi" ? "वैकल्पिक" : "Optional"})</span>
-            </label>
-            <input
-              type="text"
-              value={plotForm.khataNumber}
-              onChange={(e) => setPlotForm((p) => ({ ...p, khataNumber: e.target.value }))}
-              placeholder={lang === "hi" ? "उदा. खाता नं. 42 / 108" : "e.g. Khata 42 / 108"}
-              className="fp-input rounded-lg text-xs sm:text-sm font-medium"
-            />
-          </div>
-
           <div>
             <label className="font-semibold text-xs text-[var(--ink)] block mb-1">
               {t.addPlotArea} <span className="text-red-600">*</span>
@@ -506,39 +497,11 @@ export default function PlotRegistrationForm({
           </div>
         </div>
 
-        {/* Row 4: Village/Location & Field GPS Geotag */}
+        {/* Row 4: Field GPS Geotag (mandatory) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
           <div>
             <label className="font-semibold text-xs text-[var(--ink)] block mb-1">
-              {t.addPlotVillage}
-            </label>
-            <input
-              type="text"
-              value={plotForm.village}
-              onChange={(e) => setPlotForm((p) => ({ ...p, village: e.target.value }))}
-              placeholder={farmerProfile?.village || (lang === "hi" ? "उदा. जगदीशपुर" : "e.g. Jagdishpur")}
-              className="fp-input rounded-lg text-xs sm:text-sm font-medium"
-            />
-            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-[var(--ink-muted)]">
-              <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
-              <span>
-                {[plotForm.village || farmerProfile?.village, plotForm.district || farmerProfile?.district, plotForm.state || farmerProfile?.state]
-                  .filter(Boolean)
-                  .join(", ") || (lang === "hi" ? "स्थान दर्ज करें" : "Location profile")}
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowMoreDetails(true)}
-                className="underline hover:text-[var(--ink)] ml-1 font-semibold"
-              >
-                {lang === "hi" ? "बदलें" : "Edit"}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="font-semibold text-xs text-[var(--ink)] block mb-1">
-              {lang === "hi" ? "खेत का जीपीएस भू-स्थान (Geo-Tag)" : "Field GPS Coordinates"}
+              {lang === "hi" ? "खेत का जीपीएस भू-स्थान (Geo-Tag)" : "Field GPS Coordinates"} <span className="text-red-600">*</span>
             </label>
             {plotForm.lat && plotForm.lon ? (
               <div className="rounded-lg border border-emerald-300 bg-emerald-50/50 p-2.5 flex items-center justify-between gap-2">
