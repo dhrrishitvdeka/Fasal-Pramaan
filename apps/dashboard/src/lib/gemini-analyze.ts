@@ -403,7 +403,7 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
     const candidateModel = modelsToTry[i];
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:generateContent`;
     try {
-      let response = await fetchImpl(url, {
+      const response = await fetchImpl(url, {
         method: "POST",
         headers: requestHeaders,
         body: requestBody,
