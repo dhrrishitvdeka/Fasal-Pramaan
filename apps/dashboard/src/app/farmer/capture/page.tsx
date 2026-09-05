@@ -11,15 +11,9 @@ import {
   Mic,
   MicOff,
   MapPin,
-  Maximize2,
-  ArrowUpLeft,
-  ArrowUpRight,
-  Scan,
-  ZoomIn,
   ShieldCheck,
   ChevronRight,
   ChevronLeft,
-  ChevronDown,
   Save,
   Send,
   Trash2,
@@ -144,14 +138,6 @@ function CaptureStudioContent() {
   // Active step in stepper
   const [currentAngleIndex, setCurrentAngleIndex] = useState<number>(0);
   const currentAngle = activeAngleDefs[currentAngleIndex] || activeAngleDefs[0];
-
-  // Mobile guidance accordion — collapsed/expanded below the viewfinder; always
-  // open on lg+ (two-column studio). Re-opened when the angle auto-advances so
-  // guidance stays in sync with the viewfinder.
-  const [guidanceOpen, setGuidanceOpen] = useState<boolean>(true);
-  useEffect(() => {
-    setGuidanceOpen(true);
-  }, [currentAngleIndex]);
 
   // Captured images storage keyed by angle id
   const [capturedImages, setCapturedImages] = useState<Record<string, ClaimImageEvidence>>({});
@@ -1280,23 +1266,6 @@ function CaptureStudioContent() {
     });
   }, []);
 
-  const getAngleIcon = (iconName: string) => {
-    switch (iconName) {
-      case "Maximize2":
-        return <Maximize2 className="h-5 w-5" />;
-      case "ArrowUpLeft":
-        return <ArrowUpLeft className="h-5 w-5" />;
-      case "Scan":
-        return <Scan className="h-5 w-5" />;
-      case "ArrowUpRight":
-        return <ArrowUpRight className="h-5 w-5" />;
-      case "ZoomIn":
-        return <ZoomIn className="h-5 w-5" />;
-      default:
-        return <Camera className="h-5 w-5" />;
-    }
-  };
-
   return (
     <div className="space-y-4">
       {/* Toast Notification */}
@@ -1953,24 +1922,12 @@ function CaptureStudioContent() {
                     </button>
                   </div>
 
-                  {/* Realtime Live Camera Notice & Switcher Link */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] text-[var(--ink-muted)]">
+                  {/* Realtime Live Camera Notice */}
+                  <div className="flex flex-wrap items-center gap-2 px-1 text-[11px] text-[var(--ink-muted)]">
                     <div className="inline-flex items-center gap-1">
                       <ShieldCheck className="h-3.5 w-3.5 text-emerald-800" />
                       <span>{lang === "hi" ? "सीधा कैमरा एवं जीपीएस" : "Live Geotagged Camera"}</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCaptureMode("upload");
-                        stopCamera();
-                      }}
-                      className="underline hover:text-[var(--ink)] font-medium"
-                    >
-                      {lang === "hi"
-                        ? "या गैलरी से फ़ोटो अपलोड करें →"
-                        : "Or upload photos from device →"}
-                    </button>
                   </div>
                 </>
               ) : (
@@ -2057,79 +2014,6 @@ function CaptureStudioContent() {
 
         {/* Right Column (5 cols): Step Guidance, Voice Notes & Submission */}
         <div className="lg:col-span-5 space-y-4">
-          {/* Canonical Angle Guidance — collapsible accordion below the viewfinder
-              on phone so the camera stays near thumb zone; always open on lg+ */}
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-            <button
-              type="button"
-              onClick={() => setGuidanceOpen((open) => !open)}
-              aria-expanded={guidanceOpen}
-              aria-controls="capture-angle-guidance"
-              className="-m-1 flex w-full items-center justify-between gap-2 rounded border-b border-slate-100 p-1 pb-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] lg:pointer-events-none"
-            >
-              <span className="flex min-w-0 items-center gap-2 font-bold text-sm text-slate-900">
-                {getAngleIcon(currentAngle.illustrationIcon)}
-                <span className="min-w-0 truncate">{lang === "hi" ? currentAngle.nameHi : currentAngle.name}</span>
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
-                <span className="fp-badge-neutral font-mono text-[10px]">
-                  {currentAngle.id}
-                </span>
-                <ChevronDown
-                  aria-hidden="true"
-                  className={clsx("h-4 w-4 text-slate-500 transition-transform lg:hidden", guidanceOpen && "rotate-180")}
-                />
-              </span>
-            </button>
-
-            <div
-              id="capture-angle-guidance"
-              className={clsx(!guidanceOpen && "hidden lg:block")}
-            >
-            <p className="mt-3 text-xs text-slate-700 leading-relaxed font-medium">
-              {getLocalizedAngleInfo(currentAngle.id, lang).instructions}
-            </p>
-
-            {/* Best practice bullet points */}
-            <div className="mt-3 rounded-lg bg-slate-50 p-3 border border-slate-100">
-              <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                <span>{lang === "hi" ? "सर्वोत्तम फोटो सुझाव" : "Framing Tips"}</span>
-              </div>
-              <ul className="space-y-1 text-xs text-slate-600">
-                {getLocalizedAngleInfo(currentAngle.id, lang).tips.map((tip, i) => (
-                  <li key={i} className="flex items-start gap-1.5">
-                    <span className="text-[var(--ink)]">•</span>
-                    <span>{tip}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Stepper Navigation Buttons */}
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                disabled={currentAngleIndex === 0}
-                onClick={() => setCurrentAngleIndex(currentAngleIndex - 1)}
-                className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 lg:min-h-0"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-                <span>{lang === "hi" ? "पिछला" : "Previous"}</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={currentAngleIndex === activeAngleDefs.length - 1}
-                onClick={() => setCurrentAngleIndex(currentAngleIndex + 1)}
-                className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 lg:min-h-0"
-              >
-                <span>{lang === "hi" ? "अगला" : "Next"}</span>
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            </div>
-          </div>
-
           {/* Farmer Observation Notes with Voice Dictation */}
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
