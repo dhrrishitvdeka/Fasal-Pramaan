@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -39,6 +39,8 @@ export interface PlotRegistrationFormProps {
   description?: string;
   submitLabel?: string;
   className?: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 }
 
 export default function PlotRegistrationForm({
@@ -51,6 +53,8 @@ export default function PlotRegistrationForm({
   description,
   submitLabel,
   className,
+  collapsible = false,
+  defaultOpen = true,
 }: PlotRegistrationFormProps) {
   const { lang, registerPlot, farmerProfile } = useFarmerData();
   const t = getFarmerT(lang);
@@ -89,6 +93,39 @@ export default function PlotRegistrationForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [showMoreDetails, setShowMoreDetails] = useState(false);
+  const [isOpen, setIsOpen] = useState<boolean>(() => {
+    if (!collapsible || defaultOpen) return true;
+    if (typeof window !== "undefined" && window.location.hash === `#${id}`) return true;
+    return false;
+  });
+  // Tracks manual toggles so async default updates (e.g. plots finishing
+  // loading) never override an explicit user choice.
+  const [userToggled, setUserToggled] = useState(false);
+
+  // Follow the default until the user interacts: plot lists load
+  // asynchronously, so defaultOpen may flip (no plots -> plots exist) after
+  // mount. Expanded when there is nothing to show, collapsed otherwise.
+  useEffect(() => {
+    if (!collapsible || userToggled) return;
+    if (typeof window !== "undefined" && window.location.hash === `#${id}`) {
+      setIsOpen(true);
+      return;
+    }
+    setIsOpen(defaultOpen);
+  }, [collapsible, defaultOpen, id, userToggled]);
+
+  // Deep links (e.g. /farmer/reminders#register-plot) must reveal the form.
+  useEffect(() => {
+    if (!collapsible) return;
+    const onHashChange = () => {
+      if (window.location.hash === `#${id}`) {
+        setUserToggled(true);
+        setIsOpen(true);
+      }
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [collapsible, id]);
 
   // Live Kattha & metric conversions
   const currentKattha = useMemo(() => {
@@ -242,16 +279,60 @@ export default function PlotRegistrationForm({
         ? "PMFBY एवं राज्य भूलेख (Bhulekh / RoR) मानक अनुसार आधिकारिक विवरण भरें। पंजीकरण करते ही विकास समय-सीमा सक्रिय हो जाएगी।"
         : "Official cadastral and crop details as per PMFBY & State Bhulekh (RoR) standards.");
 
-  return (
-    <form
-      id={id}
-      onSubmit={handleSubmit}
-      className={clsx(
-        "fp-panel rounded-xl sm:rounded-2xl p-5 sm:p-7 border border-[var(--line)] space-y-6 transition-all shadow-xs",
-        className,
-      )}
+  // Minimal single-button trigger for collapsible mode. The whole
+  // registration box folds behind it; the title/description double as labels.
+  const trigger = (
+    <button
+      id={`${id}-trigger`}
+      type="button"
+      onClick={() => {
+        setUserToggled(true);
+        setIsOpen((prev) => !prev);
+      }}
+      aria-expanded={isOpen}
+      aria-controls={id}
+      className="flex w-full items-center gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-3 text-left shadow-xs"
     >
-      {/* Header - Minimalist Civic Style */}
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-800/10 text-emerald-900">
+        <Landmark className="h-4 w-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold tracking-tight text-[var(--ink)]">
+          {headerTitle}
+        </span>
+        <span className="block truncate text-xs text-[var(--ink-muted)]">
+          {isOpen
+            ? lang === "hi"
+              ? "विवरण छुपाने के लिए दबाएँ"
+              : "Tap to collapse"
+            : lang === "hi"
+              ? "नया भूखंड पंजीकृत करने के लिए खोलें"
+              : "Tap to expand and register a new plot"}
+        </span>
+      </span>
+      <ChevronDown
+        className={clsx(
+          "h-4 w-4 shrink-0 text-[var(--ink-muted)]",
+          isOpen && "rotate-180",
+        )}
+      />
+    </button>
+  );
+
+  return (
+    <div className={clsx(collapsible ? "space-y-3" : "contents", collapsible && className)}>
+      {collapsible && trigger}
+      <form
+        id={id}
+        onSubmit={handleSubmit}
+        className={clsx(
+          "fp-panel rounded-xl sm:rounded-2xl p-5 sm:p-7 border border-[var(--line)] space-y-6 transition-all shadow-xs",
+          !collapsible && className,
+          collapsible && !isOpen && "hidden",
+        )}
+      >
+      {/* Header - Minimalist Civic Style (hidden in collapsible mode: the trigger shows the title) */}
+      {!collapsible && (
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 border-b border-[var(--line)] pb-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -271,6 +352,7 @@ export default function PlotRegistrationForm({
           </p>
         </div>
       </div>
+      )}
 
       {/* Error Callout */}
       {formError && (
@@ -709,6 +791,7 @@ export default function PlotRegistrationForm({
           </button>
         </div>
       </div>
-    </form>
+      </form>
+    </div>
   );
 }
