@@ -374,7 +374,6 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
     throw new Error("No usable image bytes for Gemini vision");
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const requestBody = JSON.stringify({
     contents: [{ role: "user", parts }],
     generationConfig: {
@@ -387,50 +386,82 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
     "x-goog-api-key": apiKey || "test",
   };
 
-  let response = await fetchImpl(url, {
-    method: "POST",
-    headers: requestHeaders,
-    body: requestBody,
-    signal:
-      typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
-        ? AbortSignal.timeout(25_000)
-        : undefined,
-  });
+  const modelsToTry = [
+    model,
+    model !== "gemini-2.5-flash" ? "gemini-2.5-flash" : undefined,
+    model !== "gemini-2.5-flash-lite" ? "gemini-2.5-flash-lite" : undefined,
+    "gemini-1.5-flash",
+  ]
+    .filter((m): m is string => Boolean(m) && m.length > 0)
+    .filter((m, i, arr) => arr.indexOf(m) === i);
 
-  if (response.status === 429) {
-    // Free-tier burst rate limit: wait 2.5s and retry once
-    await new Promise((resolve) => setTimeout(resolve, 2500));
-    response = await fetchImpl(url, {
-      method: "POST",
-      headers: requestHeaders,
-      body: requestBody,
-      signal:
-        typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
-          ? AbortSignal.timeout(25_000)
-          : undefined,
-    });
-  }
+  let envelope: { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> } | null = null;
+  let usedModel = model;
+  let lastError: Error | null = null;
 
-  const text = await response.text();
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new Error(
-        "Gemini API rate limit reached (429 quota exceeded). Please wait a moment and click 'Re-run analysis'.",
-      );
+  for (let i = 0; i < modelsToTry.length; i++) {
+    const candidateModel = modelsToTry[i];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${candidateModel}:generateContent`;
+    try {
+      let response = await fetchImpl(url, {
+        method: "POST",
+        headers: requestHeaders,
+        body: requestBody,
+        signal:
+          typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+            ? AbortSignal.timeout(25_000)
+            : undefined,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        const isDemandOrQuota = response.status === 503 || response.status === 429;
+        if (isDemandOrQuota && i < modelsToTry.length - 1) {
+          // Wait briefly and try the fallback model
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          continue;
+        }
+        if (response.status === 503) {
+          throw new Error(
+            "Gemini vision models are temporarily experiencing high demand (503). Please click 'Re-run analysis' in a moment.",
+          );
+        }
+        if (response.status === 429) {
+          throw new Error(
+            "Gemini API rate limit reached (429 quota exceeded). Please wait a moment and click 'Re-run analysis'.",
+          );
+        }
+        throw new Error(`Gemini vision failed (${response.status}): ${text.slice(0, 280)}`);
+      }
+
+      const text = await response.text();
+      try {
+        envelope = JSON.parse(text) as typeof envelope;
+      } catch {
+        return parseGeminiAnalysis(text, candidateModel);
+      }
+      usedModel = candidateModel;
+      break;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (i < modelsToTry.length - 1 && /503|429|demand|quota/i.test(lastError.message)) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        continue;
+      }
+      throw lastError;
     }
-    throw new Error(`Gemini vision failed (${response.status}): ${text.slice(0, 280)}`);
   }
-  let envelope: { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  try {
-    envelope = JSON.parse(text) as typeof envelope;
-  } catch {
-    return parseGeminiAnalysis(text, model);
+
+  if (!envelope) {
+    if (lastError) throw lastError;
+    throw new Error("Gemini vision returned an empty analysis");
   }
+
   const rawOut = envelope?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("\n") || "";
   if (!rawOut.trim()) {
     throw new Error("Gemini vision returned an empty analysis");
   }
-  const parsed = parseGeminiAnalysis(rawOut, model);
+  const parsed = parseGeminiAnalysis(rawOut, usedModel);
   const declared = (input.expectedCrop || "").trim();
   const seen = (parsed.predictedCrop || "").trim();
   if (declared && seen && seen.toLowerCase() !== "unknown") {
