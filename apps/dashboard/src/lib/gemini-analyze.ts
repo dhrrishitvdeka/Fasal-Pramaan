@@ -375,26 +375,49 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const response = await fetchImpl(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey || "test",
+  const requestBody = JSON.stringify({
+    contents: [{ role: "user", parts }],
+    generationConfig: {
+      maxOutputTokens: 2048,
+      responseMimeType: "application/json",
     },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts }],
-      generationConfig: {
-        maxOutputTokens: 2048,
-        responseMimeType: "application/json",
-      },
-    }),
+  });
+  const requestHeaders = {
+    "Content-Type": "application/json",
+    "x-goog-api-key": apiKey || "test",
+  };
+
+  let response = await fetchImpl(url, {
+    method: "POST",
+    headers: requestHeaders,
+    body: requestBody,
     signal:
       typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
         ? AbortSignal.timeout(25_000)
         : undefined,
   });
+
+  if (response.status === 429) {
+    // Free-tier burst rate limit: wait 2.5s and retry once
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    response = await fetchImpl(url, {
+      method: "POST",
+      headers: requestHeaders,
+      body: requestBody,
+      signal:
+        typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function"
+          ? AbortSignal.timeout(25_000)
+          : undefined,
+    });
+  }
+
   const text = await response.text();
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error(
+        "Gemini API rate limit reached (429 quota exceeded). Please wait a moment and click 'Re-run analysis'.",
+      );
+    }
     throw new Error(`Gemini vision failed (${response.status}): ${text.slice(0, 280)}`);
   }
   let envelope: { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
