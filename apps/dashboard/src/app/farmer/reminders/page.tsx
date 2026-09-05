@@ -300,6 +300,8 @@ export default function FarmerRemindersPage() {
           <PlotRegistrationForm
             id="register-plot"
             mode="timeline"
+            collapsible
+            defaultOpen={plots.length === 0}
             onSuccess={(newPlotId) => {
               setSelectedPlotId(newPlotId);
               showToast(
