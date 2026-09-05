@@ -257,7 +257,7 @@ function CaptureStudioContent() {
         });
       }
     },
-    [lang],
+    [lang, setActiveNotification],
   );
 
   const showToast = React.useCallback(
