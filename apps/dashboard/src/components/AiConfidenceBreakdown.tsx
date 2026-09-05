@@ -133,8 +133,8 @@ export function AiConfidenceBreakdown({
     verdict.tone === "accept" ? "bg-emerald-500" : verdict.tone === "reject" ? "bg-rose-500" : "bg-amber-500";
 
   return (
-    <div className="space-y-2.5 text-slate-800">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+    <div className="space-y-2 text-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] pb-2">
         <div>
           <p className="text-[11px] text-slate-500">
             Vision model: <span className="font-mono text-slate-700">{prediction?.model_version || "gemini-3.8-flash"}</span>
@@ -142,15 +142,15 @@ export function AiConfidenceBreakdown({
           </p>
         </div>
         <div
-          className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium ${currentGradeStyle.bg} ${currentGradeStyle.text} ${currentGradeStyle.border}`}
+          className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 text-xs font-medium ${currentGradeStyle.bg} ${currentGradeStyle.text} ${currentGradeStyle.border}`}
         >
-          <span className="font-bold">{grade}</span>
+          <span className="font-semibold">{grade}</span>
           <span>·</span>
           <span>{currentGradeStyle.label}</span>
         </div>
       </div>
 
-      <div className={`flex items-start gap-2 rounded-md border px-2.5 py-2 text-xs leading-relaxed ${verdictStyle}`}>
+      <div className={`flex items-start gap-2 rounded-sm border px-2.5 py-2 text-xs leading-relaxed ${verdictStyle}`}>
         <span aria-hidden="true" className={`mt-1 h-2 w-2 shrink-0 rounded-full ${verdictDot}`} />
         <div>
           <div className="text-xs font-bold">{verdict.title}</div>
@@ -173,14 +173,14 @@ export function AiConfidenceBreakdown({
 
       {visualFindings && (
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">What Gemini saw</div>
+          <div className="text-xs font-medium text-slate-500">Model observations</div>
           <p className="mt-1 text-sm leading-relaxed text-slate-800">{visualFindings}</p>
         </div>
       )}
 
       {reasoning && (
-        <div className="rounded border border-slate-100 bg-slate-50 p-3">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Reviewer notes</div>
+        <div className="rounded-sm border border-[var(--line)] p-3">
+          <div className="text-xs font-medium text-slate-500">Reviewer notes</div>
           <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{reasoning}</p>
         </div>
       )}
@@ -201,14 +201,14 @@ export function AiConfidenceBreakdown({
       </div>
 
       {perImage.length > 0 && (
-        <div className="space-y-1.5">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Per-angle findings</div>
+        <div className="space-y-2">
+          <div className="text-xs font-medium text-slate-500">Per-angle findings</div>
           {perImage.map((item, idx) => {
             const row = asRecord(item);
             if (!row) return null;
             const angle = String(row.angleType || row.angle_type || `angle-${idx}`);
             return (
-              <div key={`${angle}-${idx}`} className="rounded border border-slate-100 bg-white p-2 text-xs">
+              <div key={`${angle}-${idx}`} className="rounded-sm border border-[var(--line)] bg-white p-2 text-xs">
                 <div className="font-semibold text-slate-800">
                   {ANGLE_LABELS[angle] || angle}
                   {row.usable === false ? " — unusable" : ""}
@@ -220,7 +220,7 @@ export function AiConfidenceBreakdown({
         </div>
       )}
 
-      <div className="rounded border border-slate-100 bg-slate-50/70 p-3">
+      <div className="rounded-sm border border-[var(--line)] p-3">
         <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-700">
           <span>Uploaded angles</span>
           <span className="font-mono text-slate-600">

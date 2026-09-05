@@ -602,7 +602,7 @@ export default function ReviewDetailPage() {
   const perilOption = PERIL_OPTIONS.find((p) => p.value === data.peril);
 
   return (
-    <div className="mx-auto max-w-[1440px] space-y-3 pb-8">
+    <div className="mx-auto max-w-[1440px] space-y-2 pb-8">
       {/* 1. TOP HEADER & BREADCRUMB NAVIGATION */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
         <div className="flex flex-wrap items-center gap-2.5">
@@ -663,7 +663,7 @@ export default function ReviewDetailPage() {
       </div>
 
       {/* 2. CASE SUMMARY — single compact strip */}
-      <section className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs shadow-2xs">
+      <section className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-sm border border-[var(--line)] bg-white px-4 py-2 text-xs">
         <span className="flex items-center gap-1.5">
           <Sprout className="h-3.5 w-3.5 text-emerald-600" />
           <strong className="text-slate-900">{data.plot_name || data.crop_cycle_id || "Plot 1"}</strong>
@@ -713,17 +713,14 @@ export default function ReviewDetailPage() {
       )}
 
       {/* 3. REVIEW WORKSPACE — main flow + sticky audit rail (right) */}
-      <div className="mx-auto grid w-full max-w-[1440px] items-start gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="mx-auto w-full max-w-3xl min-w-0 space-y-3">
+      <div className="mx-auto grid w-full max-w-[1440px] items-start gap-2 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="mx-auto w-full max-w-2xl min-w-0 space-y-2">
           {/* EVIDENCE PHOTO GALLERY */}
-          <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs space-y-2">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <div className="flex items-center gap-2">
-                <Camera className="h-3.5 w-3.5 text-slate-600" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Evidence Photos
-                </h3>
-              </div>
+          <section className="rounded-sm border border-[var(--line)] bg-white p-4 space-y-2">
+            <div className="flex items-center justify-between border-b border-[var(--line)] pb-2">
+              <h3 className="text-sm font-semibold text-slate-900">
+                Evidence photos
+              </h3>
               <span className="text-[11px] font-mono text-slate-500">
                 {inspectableImages.length} · click to inspect
               </span>
@@ -742,7 +739,7 @@ export default function ReviewDetailPage() {
                   return (
                     <div
                       key={img.id}
-                      className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-900 transition-all hover:border-slate-500 hover:shadow-md"
+                      className="group relative overflow-hidden rounded-sm border border-[var(--line)] bg-slate-900"
                     >
                       <div
                         onClick={() => setLightboxIndex(idx)}
@@ -773,12 +770,9 @@ export default function ReviewDetailPage() {
           </section>
 
           {/* SATELLITE CROSS-CHECK & BHUVAN LAND-USE */}
-          <details className="rounded-xl border border-slate-200 bg-white shadow-2xs">
-            <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5">
-              <span className="flex items-center gap-2">
-                <Layers className="h-3.5 w-3.5 text-blue-600" />
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">Satellite &amp; Land-Use</span>
-              </span>
+          <details className="rounded-sm border border-[var(--line)] bg-white">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2">
+              <span className="text-sm font-semibold text-slate-900">Satellite and land-use</span>
               <span className="flex items-center gap-1.5">
                 {contextSignals.length > 0 && (
                   <span className="flex gap-1">
@@ -790,11 +784,11 @@ export default function ReviewDetailPage() {
                 <span className="font-mono text-[11px] text-slate-400">{contextSignals.length} signals</span>
               </span>
             </summary>
-            <div className="space-y-2 border-t border-slate-100 p-3">
+            <div className="space-y-2 border-t border-[var(--line)] p-4">
               {contextSignals.length > 0 && (
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {contextSignals.map((s) => (
-                    <div key={s.source} className="flex items-start justify-between gap-2 rounded-md bg-slate-50/70 px-2 py-1.5 text-xs">
+                    <div key={s.source} className="flex items-start justify-between gap-2 rounded-sm border border-[var(--line)] px-2 py-1.5 text-xs">
                       <div className="min-w-0">
                         <span className="font-semibold text-slate-700 capitalize">{s.labelEn}</span>
                         <p className="truncate text-[11px] text-slate-500" title={s.summaryEn}>{s.summaryEn}</p>
@@ -835,13 +829,10 @@ export default function ReviewDetailPage() {
               !isCropMatch(declared, detected);
 
             return (
-              <section className="rounded-xl border border-slate-200 bg-white shadow-2xs">
-                <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-900 text-white">
-                    <ScanSearch className="h-3.5 w-3.5" />
-                  </span>
-                  <h3 className="text-[13px] font-bold tracking-tight text-slate-900">Crop Analysis</h3>
-                  <span className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-700">
+              <section className="rounded-sm border border-[var(--line)] bg-white">
+                <div className="flex flex-wrap items-center gap-2 border-b border-[var(--line)] px-4 py-2">
+                  <h3 className="text-sm font-semibold text-slate-900">Crop analysis</h3>
+                  <span className="rounded-sm border border-[var(--line)] bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-slate-700">
                     Grade {pred?.predicted_grade || data.inference_status || "U"}
                   </span>
                   <span className="font-mono text-[10px] text-slate-400">{pred?.model_version}</span>
@@ -852,8 +843,8 @@ export default function ReviewDetailPage() {
 
                 {/* Analyzed input — which photos the output below is based on */}
                 {inspectableImages.length > 0 && (
-                  <div className="flex items-center gap-1.5 overflow-x-auto border-b border-slate-100 px-3 py-2">
-                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">Input</span>
+                  <div className="flex items-center gap-1.5 overflow-x-auto border-b border-[var(--line)] px-4 py-2">
+                    <span className="shrink-0 text-[11px] font-medium text-slate-500">Input</span>
                     {inspectableImages.map((img, idx) => (
                       <button
                         key={img.id}
@@ -891,22 +882,22 @@ export default function ReviewDetailPage() {
                 )}
 
                 {pred && (
-                  <div className="grid grid-cols-4 gap-1.5 px-3 pt-2 text-center">
-                    <div className="rounded-md bg-slate-50 border border-slate-100 px-1 py-1.5">
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Damage</div>
-                      <div className="truncate text-xs font-bold capitalize text-slate-900" title={String(pred.primary_damage || "—")}>{String(pred.primary_damage || "—").replaceAll("_", " ")}</div>
+                  <div className="grid grid-cols-4 gap-2 px-4 pt-2 text-center">
+                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5">
+                      <div className="text-[11px] font-medium text-slate-500">Damage</div>
+                      <div className="truncate text-xs font-semibold capitalize text-slate-900" title={String(pred.primary_damage || "—")}>{String(pred.primary_damage || "—").replaceAll("_", " ")}</div>
                     </div>
-                    <div className="rounded-md bg-slate-50 border border-slate-100 px-1 py-1.5">
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Severity</div>
-                      <div className="text-xs font-bold capitalize text-slate-900">{pred.severity || "—"}</div>
+                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5">
+                      <div className="text-[11px] font-medium text-slate-500">Severity</div>
+                      <div className="text-xs font-semibold capitalize text-slate-900">{pred.severity || "—"}</div>
                     </div>
-                    <div className="rounded-md bg-slate-50 border border-slate-100 px-1 py-1.5">
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Area</div>
-                      <div className="font-mono text-xs font-extrabold text-slate-900">{pred.affected_area_pct != null ? `${pred.affected_area_pct}%` : "—"}</div>
+                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5">
+                      <div className="text-[11px] font-medium text-slate-500">Area</div>
+                      <div className="font-mono text-xs font-semibold text-slate-900">{pred.affected_area_pct != null ? `${pred.affected_area_pct}%` : "—"}</div>
                     </div>
-                    <div className="rounded-md bg-slate-50 border border-slate-100 px-1 py-1.5">
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Conf</div>
-                      <div className="font-mono text-xs font-extrabold text-slate-900">{pred.overall_confidence != null ? `${Math.round(pred.overall_confidence * 100)}%` : "—"}</div>
+                    <div className="rounded-sm border border-[var(--line)] px-1 py-1.5">
+                      <div className="text-[11px] font-medium text-slate-500">Conf</div>
+                      <div className="font-mono text-xs font-semibold text-slate-900">{pred.overall_confidence != null ? `${Math.round(pred.overall_confidence * 100)}%` : "—"}</div>
                     </div>
                   </div>
                 )}
@@ -956,9 +947,9 @@ export default function ReviewDetailPage() {
           })()}
 
           {/* Gate status — single inline row */}
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-2xs">
-            <span className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[11px] text-slate-500">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Gate
+          <div className="flex flex-wrap items-center gap-2 rounded-sm border border-[var(--line)] bg-white px-4 py-2 text-xs">
+            <span className="text-[11px] font-medium text-slate-500">
+              Gate
             </span>
             {gateInfo?.overridden ? (
               <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Overridden</span>
@@ -988,10 +979,9 @@ export default function ReviewDetailPage() {
           <EvidenceConfidenceSection submission={data} />
 
           {/* REVIEWER DECISION & ACTION WORKBENCH */}
-          <section className="rounded-xl border-2 border-slate-900 bg-white p-3 shadow-sm space-y-2.5">
+          <section className="rounded-sm border border-[var(--line)] bg-white p-4 space-y-2">
             <div className="flex items-center gap-2">
-              <Scale className="h-4 w-4 text-slate-700" />
-              <h3 className="text-[13px] font-bold tracking-tight text-slate-900">Decision Workbench</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Decision workbench</h3>
               <span aria-live="polite" className={clsx("rounded-full border px-2 py-0.5 text-[11px] font-bold capitalize", isClosed ? "border-slate-300 bg-slate-100 text-slate-700" : "border-blue-200 bg-blue-50 text-blue-700", busy && "animate-pulse")}>
                 {busy && pendingAction ? `${pendingAction.replaceAll("_", " ")}…` : liveStatus.replaceAll("_", " ")}
               </span>
@@ -1001,10 +991,10 @@ export default function ReviewDetailPage() {
             </div>
 
             {/* Quick Action Button Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               <button
                 type="button"
-                className="flex items-center justify-center gap-1 rounded-md bg-emerald-600 px-2 py-2 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors shadow-xs disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1 rounded-sm bg-[var(--ink)] px-2 py-2 text-[11px] font-semibold text-white hover:opacity-90 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
                 disabled={busy || isClosed || !canAccept}
                 onClick={handleAccept}
                 title={canAccept ? "Accept claim assessment based on evidence and model" : "Blocked: integrity failure or unusable grade"}
@@ -1014,7 +1004,7 @@ export default function ReviewDetailPage() {
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1 rounded-md bg-slate-900 px-2 py-2 text-[11px] font-bold text-white hover:bg-black disabled:opacity-50 transition-colors shadow-xs disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1 rounded-sm border border-[var(--line)] bg-white px-2 py-2 text-[11px] font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
                 disabled={busy || isClosed}
                 onClick={handleCorrect}
                 title="Apply reviewer corrections and verify"
@@ -1024,42 +1014,42 @@ export default function ReviewDetailPage() {
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1 rounded-md border border-amber-400 bg-amber-50 px-2 py-2 text-[11px] font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1 rounded-sm border border-[var(--line)] bg-white px-2 py-2 text-[11px] font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
                 disabled={busy}
                 onClick={handleOpenRecapture}
                 title="Request farmer to recapture specific angles"
               >
-                <RotateCcw className="h-3.5 w-3.5 text-amber-700" />
+                <RotateCcw className="h-3.5 w-3.5" />
                 <span>Recapture (R)</span>
               </button>
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1 rounded-sm border border-[var(--line)] bg-white px-2 py-2 text-[11px] font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50 transition-colors disabled:cursor-not-allowed"
                 disabled={busy || isClosed}
                 onClick={handleInspection}
                 title="Dispatch physical field inspector"
               >
-                {pendingAction === "physical_inspection" ? busyLabel("physical_inspection") : (<><UserCheck className="h-3.5 w-3.5 text-slate-600" /><span>Inspect (P)</span></>)}
+                {pendingAction === "physical_inspection" ? busyLabel("physical_inspection") : (<><UserCheck className="h-3.5 w-3.5" /><span>Inspect (P)</span></>)}
               </button>
 
               <button
                 type="button"
-                className="flex items-center justify-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-2 text-[11px] font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50 transition-colors col-span-2 sm:col-span-1 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1 rounded-sm border border-[var(--line)] bg-white px-2 py-2 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50 transition-colors col-span-2 sm:col-span-1 disabled:cursor-not-allowed"
                 disabled={busy || isClosed}
                 onClick={handleReject}
                 title="Reject claim with reason"
               >
-                {pendingAction === "reject" ? busyLabel("reject") : (<><XCircle className="h-3.5 w-3.5 text-rose-600" /><span>Reject (X)</span></>)}
+                {pendingAction === "reject" ? busyLabel("reject") : (<><XCircle className="h-3.5 w-3.5" /><span>Reject (X)</span></>)}
               </button>
             </div>
 
             {/* Calibration & Override Form Fields — collapsed by default */}
-            <details className="rounded-lg border border-slate-200 bg-slate-50/70 text-xs">
-              <summary className="cursor-pointer list-none px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-600 hover:text-slate-900">
-                Adjustments + notes (for Correct / Reject)
+            <details className="rounded-sm border border-[var(--line)] bg-white text-xs">
+              <summary className="cursor-pointer list-none px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900">
+                Adjustments and notes (for Correct / Reject)
               </summary>
-              <div className="space-y-2 border-t border-slate-200 px-3 py-2.5">
+              <div className="space-y-2 border-t border-[var(--line)] px-4 py-2">
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <label className="block font-medium text-slate-700">
