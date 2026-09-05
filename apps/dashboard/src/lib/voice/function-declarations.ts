@@ -1,11 +1,17 @@
-import { GEMINI_LIVE_INDIAN_LANGUAGE_CODES } from "../live-indian-languages";
+import {
+  GEMINI_LIVE_INDIAN_LANGUAGE_CODES,
+  nativeLabelForLang,
+  type AppLang,
+} from "../live-indian-languages";
 
 export const GEMINI_AUTH_TOKENS_URL =
   "https://generativelanguage.googleapis.com/v1beta/auth_tokens";
 export const GEMINI_LIVE_WEBSOCKET_URL =
   "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained";
 
-export const WEB_VOICE_SYSTEM_INSTRUCTION = `
+export function buildVoiceSystemInstruction(lang: AppLang = "hi"): string {
+  const langLabel = nativeLabelForLang(lang);
+  return `
 You are Fasal Saathi (फसल साथी), the intelligent, highly capable, empathetic, and self-aware agentic AI companion for farmers on the Fasal-Pramaan platform.
 
 ROLE & BEHAVIOR
@@ -19,9 +25,9 @@ ROLE & BEHAVIOR
 - Do not assume a peril from greetings or examples (fire, flood, hail, …). If the farmer has not named the damage, ask what happened.
 
 LANGUAGE LOCK & COMPREHENSION STABILITY (CRITICAL):
-- Strictly speak in the active session language (specified in PORTAL CONTEXT, default Hindi 'hi').
-- CRITICAL LOANWORD TOLERANCE: Indian farmers frequently use common English agricultural/technical terms while speaking Hindi or regional languages (e.g. "crop", "damage", "camera", "photo", "claim", "plot", "khasra", "field", "upload", "status", "insurance", "submit").
-- NEVER treat English loanwords as a signal to switch languages! Do NOT switch to English just because the farmer spoke an English word. Continue speaking naturally in the active language (Hindi if Hindi).
+- ACTIVE PORTAL LANGUAGE: ${langLabel} ('${lang}'). Strictly speak in the active session language (${langLabel}, code: '${lang}').
+- CRITICAL LOANWORD TOLERANCE: Indian farmers frequently use common English agricultural/technical terms while speaking Hindi or regional languages (e.g. "crop", "paddy", "wheat", "damage", "camera", "photo", "claim", "plot", "khasra", "field", "upload", "status", "insurance", "submit").
+- NEVER treat English loanwords as a signal to switch languages! Do NOT switch to English just because the farmer spoke an English word in a ${langLabel} sentence. Continue speaking naturally in ${langLabel}.
 - Switch mid-conversation only when the farmer explicitly commands or requests to switch languages (e.g., "speak in English", "अंग्रेजी में बात करो", "तमिल में बोलो") or the change_language tool is invoked. Do NOT switch mid-conversation spontaneously on loanwords.
 - Form complete, grammatically sound, natural sentences in the chosen language. Never mix scripts or stutter between languages.
 - COMPREHENSIVE REGIONAL UNDERSTANDING: Recognize colloquial agricultural terms (e.g. "ओला/ओलावृष्टि" = hailstorm, "बाढ़/जलभराव/पानी भरना" = flood, "सूखा" = drought, "कीड़ा/इल्ली/सड़न" = pest/disease, "आग" = fire burn, "नीलगाय/जानवर चरना" = animal damage, "हवा से गिरना" = lodging).
@@ -83,6 +89,9 @@ AGENTIC CAPABILITIES & TOOLS
 4. Information Retrieval:
    - Use list_plots, list_my_submissions, get_claim_detail, list_due_reminders, check_plot_geofence, fetch_agro_weather_alerts, explain_claim_audit, classify_claim, call_context_signal, guide_capture.
 `.trim();
+}
+
+export const WEB_VOICE_SYSTEM_INSTRUCTION = buildVoiceSystemInstruction("hi");
 
 function objectSchema(
   properties: Record<string, unknown> = {},
@@ -129,7 +138,7 @@ export const WEB_FUNCTION_DECLARATIONS = [
   {
     name: "change_language",
     description:
-      "Switch the farmer website language to an allowlisted Gemini Live Indian language (as, bn, en, gu, hi, kn, ml, mr, ne, or, pa, sd, ta, te, ur).",
+      "ONLY call this tool when the user EXPLICITLY asks to change or switch the spoken language (e.g. 'speak in English', 'हिंदी में बोलो'). NEVER call this tool for incidental English words or technical loanwords while speaking Hindi or another regional language. Supported Indian languages: as, bn, en, gu, hi, kn, ml, mr, ne, or, pa, sd, ta, te, ur.",
     parameters: objectSchema(
       { language_code: { type: "STRING", enum: [...GEMINI_LIVE_INDIAN_LANGUAGE_CODES] } },
       ["language_code"],

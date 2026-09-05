@@ -8,7 +8,7 @@ import {
   newIntentId,
 } from "./claim-routing";
 import { CANONICAL_ANGLES, getFarmerT } from "./farmerI18n";
-import type { AppLang } from "./live-indian-languages";
+import { nativeLabelForLang, type AppLang } from "./live-indian-languages";
 
 export type SaathiSlot = {
   peril?: Peril;
@@ -160,37 +160,66 @@ export function resolveAgenticAction(
   const extracted = extractSlotsFromText(text, plots);
   const nextSlots = mergeSlots(currentSlots, extracted);
 
-  // 1. Language switch orders
-  if (/(हिंदी|hindi|switch to hindi|talk in hindi|hindi me)/i.test(t)) {
+  // 1. Language switch orders - ONLY trigger on explicit commands, NEVER on incidental words
+  if (
+    /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?hindi|(?:talk|speak|reply)\s+(?:in\s+)?hindi|(?:हिंदी|हिन्दी)\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|hindi\s+me\s+(?:baat\s+karo|bolo))/i.test(
+      t,
+    )
+  ) {
     return {
-      replyMessage: newMsg("saathi", "जी, अब मैं हिंदी में बात करूँगा। आपकी फसल में क्या समस्या है?", "जी, अब मैं हिंदी में बात करूँगा। आपकी फसल में क्या समस्या है?"),
+      replyMessage: newMsg(
+        "saathi",
+        "जी, अब मैं हिंदी में बात करूँगा। आपकी फसल में क्या समस्या है?",
+        "जी, अब मैं हिंदी में बात करूँगा। आपकी फसल में क्या समस्या है?",
+      ),
       action: { type: "switch_language", lang: "hi" },
       actionSummary: "Language switched to Hindi",
       actionSummaryHi: "भाषा हिंदी में बदली गई",
       slots: nextSlots,
     };
   }
-  if (/(english|switch to english|talk in english)/i.test(t)) {
+  if (
+    /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?english|(?:talk|speak|reply)\s+(?:in\s+)?english|(?:अंग्रेजी|अंग्रेज़ी)\s*(?:में\s*(?:बात\s*करो|बोलो)|बोलो)|english\s+me\s+(?:baat\s+karo|bolo))/i.test(
+      t,
+    )
+  ) {
     return {
-      replyMessage: newMsg("saathi", "Sure, I will assist you in English now. What issue did you face with your crop?"),
+      replyMessage: newMsg(
+        "saathi",
+        "Sure, I will assist you in English now. What issue did you face with your crop?",
+      ),
       action: { type: "switch_language", lang: "en" },
       actionSummary: "Language switched to English",
       actionSummaryHi: "भाषा अंग्रेज़ी में बदली गई",
       slots: nextSlots,
     };
   }
-  if (/(gujarati|ગુજરાતી|gujrati)/i.test(t)) {
+  if (
+    /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?gujarati|(?:talk|speak|reply)\s+(?:in\s+)?gujarati|ગુજરાતી(?:માં)?\s*(?:વાત\s*કરો|બોલો)|gujarati\s+me\s+(?:baat\s+karo|bolo))/i.test(
+      t,
+    )
+  ) {
     return {
-      replyMessage: newMsg("saathi", "હા, હું હવે ગુજરાતીમાં વાત કરીશ. તમારા પાકમાં શું સમસ્યા છે?"),
+      replyMessage: newMsg(
+        "saathi",
+        "હા, હું હવે ગુજરાતીમાં વાત કરીશ. તમારા પાકમાં શું સમસ્યા છે?",
+      ),
       action: { type: "switch_language", lang: "gu" },
       actionSummary: "Language switched to Gujarati",
       actionSummaryHi: "ભાષા ગુજરાતીમાં બદલી",
       slots: nextSlots,
     };
   }
-  if (/(tamil|தமிழ்)/i.test(t)) {
+  if (
+    /(?:(?:switch|change)\s+(?:to\s+|language\s+to\s+)?tamil|(?:talk|speak|reply)\s+(?:in\s+)?tamil|தமிழ்(?:இல்)?\s*(?:பேசு|பேசுங்கள்)|tamil\s+me\s+(?:baat\s+karo|bolo))/i.test(
+      t,
+    )
+  ) {
     return {
-      replyMessage: newMsg("saathi", "சரி, நான் இப்போது தமிழில் பேசுகிறேன். உங்கள் பயிரில் என்ன பிரச்சனை?"),
+      replyMessage: newMsg(
+        "saathi",
+        "சரி, நான் இப்போது தமிழில் பேசுகிறேன். உங்கள் பயிரில் என்ன பிரச்சனை?",
+      ),
       action: { type: "switch_language", lang: "ta" },
       actionSummary: "Language switched to Tamil",
       actionSummaryHi: "மொழி தமிழில் மாற்றப்பட்டது",
@@ -303,9 +332,15 @@ export function buildSystemPrompt(intent: ClaimIntent | null, lang: string = "en
     "CONVERSATION RULES:\n" +
     "- PRECISE & SHORT BY DEFAULT: Form complete, natural sentences, but answer ONLY what was asked directly without unprompted lectures. Keep default answers to 1-2 crisp sentences.\n" +
     "- EXPLAIN IN DETAIL WHEN ASKED: If the farmer asks for details or says 'samajh nahi aaya' ('didn't understand') or expresses confusion, acknowledge warmly and give a patient, thorough, step-by-step explanation.\n" +
-    "- SELF-AWARE & GROUNDED: Be self-aware of your role; guide evidence collection, but never invent payout/insurance approvals.";
+    "- SELF-AWARE & GROUNDED: Be self-aware of your role; guide evidence collection, but never invent payout/insurance approvals.\n" +
+    "- STRICT LANGUAGE LOCK & LOANWORD TOLERANCE: Maintain conversation strictly in the active language. Indian farmers frequently use common English agricultural terms (crop, paddy, wheat, damage, photo, camera, status, claim). Tolerate loanwords completely without spontaneously switching languages.";
+  const langLabel = nativeLabelForLang((lang as AppLang) || "hi");
   const langLine =
-    `ALWAYS reply ONLY in ${lang === "hi" ? "Hindi (Devanagari script, simple village-friendly Hindi)" : "simple English"}. Never mix scripts.`;
+    lang === "hi"
+      ? "ALWAYS reply strictly in Hindi (Devanagari script, simple village-friendly Hindi). Never mix scripts. Tolerate English loanwords (crop, photo, claim, damage) without switching."
+      : lang === "en"
+        ? "ALWAYS reply strictly in clear, simple English. Never mix scripts. Tolerate regional agricultural terms without switching."
+        : `ALWAYS reply strictly in ${langLabel} ('${lang}'). Never mix scripts. Tolerate loanwords without switching.`;
   if (!intent) {
     return (
       `${base}\n` +

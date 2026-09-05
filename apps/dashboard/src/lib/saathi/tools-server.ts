@@ -157,8 +157,8 @@ async function callContextSignal(args: Record<string, unknown>): Promise<SaathiT
 
 function guideCapture(args: Record<string, unknown>): SaathiToolResult {
   const angleId = String(args.angle || "").trim();
-  const lang = String(args.lang || "en").trim().toLowerCase();
-  const hi = lang.startsWith("hi");
+  const lang = String(args.lang || "hi").trim().toLowerCase();
+  const hi = !lang.startsWith("en");
   const canonical = CANONICAL_ANGLES.find((a) => a.id === angleId);
   if (canonical) {
     return {
@@ -206,7 +206,7 @@ async function classifyClaim(args: Record<string, unknown>): Promise<SaathiToolR
     }
     return { ok: false, error: "text is required for classify_claim" };
   }
-  const lang = String(args.lang || "en").trim().slice(0, 8) || "en";
+  const lang = String(args.lang || "hi").trim().slice(0, 8) || "hi";
   const contextNotes =
     typeof args.contextNotes === "string" && args.contextNotes.trim()
       ? args.contextNotes.trim().slice(0, 2000)

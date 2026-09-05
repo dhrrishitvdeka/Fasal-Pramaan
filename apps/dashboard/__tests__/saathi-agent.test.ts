@@ -111,17 +111,76 @@ describe("saathi agent", () => {
       }
     });
 
-    it("resolves language switching orders autonomously", () => {
+    it("does NOT switch language on incidental loanwords in Hindi or English", () => {
+      // Common farmer sentences with English technical/crop loanwords
+      const res1 = resolveAgenticAction(
+        "मेरा धान का crop damage हो गया है, photo लेनी है",
+        {},
+        emptyPlots,
+        "hi",
+      );
+      expect(res1.action?.type).not.toBe("switch_language");
+
+      const res2 = resolveAgenticAction(
+        "paddy crop damage insurance claim status",
+        {},
+        emptyPlots,
+        "hi",
+      );
+      expect(res2.action?.type).not.toBe("switch_language");
+
+      const res3 = resolveAgenticAction(
+        "khasra 402 photo upload karni hai",
+        {},
+        emptyPlots,
+        "hi",
+      );
+      expect(res3.action?.type).not.toBe("switch_language");
+
+      const res4 = resolveAgenticAction(
+        "my wheat crop has lodging damage",
+        {},
+        emptyPlots,
+        "en",
+      );
+      expect(res4.action?.type).not.toBe("switch_language");
+    });
+
+    it("resolves language switching orders only on explicit commands", () => {
       const resHi = resolveAgenticAction("हिंदी में बात करो", {}, emptyPlots, "en");
       expect(resHi.action?.type).toBe("switch_language");
       if (resHi.action?.type === "switch_language") {
         expect(resHi.action.lang).toBe("hi");
       }
 
+      const resHi2 = resolveAgenticAction("switch to hindi", {}, emptyPlots, "en");
+      expect(resHi2.action?.type).toBe("switch_language");
+      if (resHi2.action?.type === "switch_language") {
+        expect(resHi2.action.lang).toBe("hi");
+      }
+
+      const resEn = resolveAgenticAction("switch to english", {}, emptyPlots, "hi");
+      expect(resEn.action?.type).toBe("switch_language");
+      if (resEn.action?.type === "switch_language") {
+        expect(resEn.action.lang).toBe("en");
+      }
+
+      const resEn2 = resolveAgenticAction("अंग्रेजी में बात करो", {}, emptyPlots, "hi");
+      expect(resEn2.action?.type).toBe("switch_language");
+      if (resEn2.action?.type === "switch_language") {
+        expect(resEn2.action.lang).toBe("en");
+      }
+
       const resGu = resolveAgenticAction("ગુજરાતીમાં વાત કરો", {}, emptyPlots, "hi");
       expect(resGu.action?.type).toBe("switch_language");
       if (resGu.action?.type === "switch_language") {
         expect(resGu.action.lang).toBe("gu");
+      }
+
+      const resTa = resolveAgenticAction("speak in tamil", {}, emptyPlots, "hi");
+      expect(resTa.action?.type).toBe("switch_language");
+      if (resTa.action?.type === "switch_language") {
+        expect(resTa.action.lang).toBe("ta");
       }
     });
   });

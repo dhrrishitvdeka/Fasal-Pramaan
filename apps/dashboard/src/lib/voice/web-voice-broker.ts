@@ -735,8 +735,18 @@ export class WebVoiceBroker {
         message: "That language is not available. Use an Indian Gemini Live language.",
       };
     }
-    this.gateway.changeLanguage(parsed);
     const label = nativeLabelForLang(parsed);
+    if (this.gateway.language === parsed) {
+      return {
+        outcome: "succeeded",
+        message:
+          parsed === "hi"
+            ? "ऐप की भाषा पहले से ही हिन्दी है।"
+            : `The app language is already ${label}.`,
+        data: { language_code: parsed },
+      };
+    }
+    this.gateway.changeLanguage(parsed);
     return {
       outcome: "succeeded",
       message:
