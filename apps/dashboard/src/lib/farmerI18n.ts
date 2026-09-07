@@ -323,6 +323,8 @@ export const farmerTranslations = {
     perilFloodPhrase: "Flood water is logged in the field",
     perilPestPhrase: "Pest and disease on my crop",
     perilHailPhrase: "Hailstorm damaged the field",
+    perilDroughtPhrase: "Dry spell damaged my crop",
+    perilLodgingPhrase: "Wind lodged my crop",
     perilOtherPhrase: "I have general crop loss",
 
     // Dashboard & Cards
@@ -580,6 +582,8 @@ export const farmerTranslations = {
     perilFloodPhrase: "बाढ़ का पानी खेत में भर गया है",
     perilPestPhrase: "फसल पर कीट और रोग लगा है",
     perilHailPhrase: "ओले गिरने से फसल बर्बाद हुई",
+    perilDroughtPhrase: "सूखे से मेरी फसल खराब हुई",
+    perilLodgingPhrase: "हवा से फसल गिर गई है",
     perilOtherPhrase: "फसल का नुकसान हुआ है",
 
     // Dashboard & Cards

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 import { isReviewerRole, requireWebActor } from "@/lib/web-auth";
 import {
   claimFromRow,
@@ -19,6 +20,15 @@ import { sanitizeMojibake } from "@/lib/name-sanitizer";
 export async function GET(request: Request) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
+  // Polled frequently by dashboards; each call fans out to plots + claims +
+  // images + signed URLs, so cap per-user frequency.
+  const stateLimit = checkRateLimit(`farmer-state:${auth.actor.userId}`, 60, 60_000);
+  if (!stateLimit.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Try again shortly." },
+      { status: 429, headers: { "Retry-After": String(stateLimit.retryAfterSeconds) } },
+    );
+  }
   const supabase = createServerSupabase();
   if (!supabase) {
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });

@@ -25,7 +25,7 @@ export default function AlertsPage() {
   const { data = [], isLoading, error, refetch } = useQuery({
     queryKey: ["alerts"],
     queryFn: listAlerts,
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
     enabled: gate.status === "ok",
   });
 

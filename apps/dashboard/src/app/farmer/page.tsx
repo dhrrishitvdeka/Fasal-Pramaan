@@ -74,7 +74,10 @@ export default function FarmerHomePage() {
     }
   };
 
-  // Periodic background synchronization: keeps recapture & payout alerts fresh without manual refresh
+  // Periodic background synchronization: keeps recapture & payout alerts fresh
+  // without manual refresh. 60s cadence (was 10s): farmer state fans out to
+  // plots + claims + images + signed URLs per call, and focus/visibility
+  // events already trigger immediate syncs.
   React.useEffect(() => {
     const handleVisibilityChange = () => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
@@ -88,7 +91,7 @@ export default function FarmerHomePage() {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
         void refresh().catch(() => {});
       }
-    }, 10_000);
+    }, 60_000);
 
     return () => {
       window.removeEventListener("visibilitychange", handleVisibilityChange);

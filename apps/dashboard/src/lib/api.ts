@@ -520,7 +520,7 @@ export async function submitWebClaim(input: {
     dimensions?: { width: number; height: number } | null;
     capturedAt?: string | null;
   }>;
-}): Promise<{ claimId: string; gate?: unknown; context?: unknown }> {
+}): Promise<{ claimId: string; gate?: unknown; context?: unknown; plotUnlinked?: boolean }> {
   if (!isSupabaseConfigured()) {
     throw new Error("Supabase is not configured");
   }
@@ -535,9 +535,12 @@ export async function submitWebClaim(input: {
     }),
   );
   const payload = { ...input, images: processedImages };
+  // Bound the upload: without a timeout a stalled connection hangs the studio
+  // forever with no error path. Draft auto-save on failure lives in the caller.
   const res = await apiFetch(route.path, {
     method: "POST",
     body: JSON.stringify(payload),
+    signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(90000) : undefined,
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -545,7 +548,7 @@ export async function submitWebClaim(input: {
     const errDetail = errBody.details ? `${errBody.error || "Failed to persist claim"}: ${errBody.details}` : (errBody.error || "Failed to persist claim");
     throw new Error(errDetail);
   }
-  return body as { claimId: string };
+  return body as { claimId: string; plotUnlinked?: boolean };
 }
 
 export async function reanalyzeClaim(id: string): Promise<{
@@ -563,6 +566,13 @@ export async function reanalyzeClaim(id: string): Promise<{
     inferError?: string | null;
   };
   if (!res.ok) {
+    // Honor server backpressure: surface the wait instead of hammering retry.
+    if (res.status === 429) {
+      const wait = Number(res.headers.get("Retry-After") || "30");
+      throw new Error(
+        `Analysis busy — please wait ${Number.isFinite(wait) ? wait : 30}s and retry.`,
+      );
+    }
     throw new Error(body.error || "Re-analysis failed");
   }
   return { ok: true, grade: body.grade ?? null, crop: body.crop ?? null, inferError: body.inferError ?? null };

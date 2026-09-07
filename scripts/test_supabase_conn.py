@@ -5,12 +5,14 @@ Required environment variables:
   SUPABASE_PROJECT_REF
   SUPABASE_DB_REGION
 
-Never hardcode credentials in this file. This script never prints the password.
+Read-only probe: connects, runs SELECT version(), and exits. It never
+writes, never creates extensions, and never prints the password.
 """
 
 from __future__ import annotations
 
 import os
+import re
 import sys
 import urllib.parse
 
@@ -44,6 +46,12 @@ def main() -> int:
     password = os.environ["SUPABASE_DB_PASSWORD"]
     project_ref = os.environ["SUPABASE_PROJECT_REF"]
     region = os.environ["SUPABASE_DB_REGION"]
+    if not re.fullmatch(r"[a-z0-9-]{4,64}", project_ref):
+        print("Invalid SUPABASE_PROJECT_REF: must match [a-z0-9-]{4,64}.", file=sys.stderr)
+        return 1
+    if not re.fullmatch(r"[a-z]{2}-[a-z]+-\d+", region):
+        print("Invalid SUPABASE_DB_REGION: expected an AWS region like ap-south-1.", file=sys.stderr)
+        return 1
     encoded_password = urllib.parse.quote_plus(password)
 
     pooler_host = f"aws-0-{region}.pooler.supabase.com"
@@ -59,11 +67,6 @@ def main() -> int:
                 cur.execute("SELECT version();")
                 version = cur.fetchone()[0]
                 print(f"SUCCESS: connected. {version}")
-                cur.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
-                cur.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
-                cur.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto;")
-                conn.commit()
-                print("Extensions successfully enabled!")
                 print(f"CONFIRMED_REGION={region}")
         return 0
     except Exception as exc:

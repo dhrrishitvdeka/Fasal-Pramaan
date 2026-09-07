@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { applyWebReviewAction, getWebClaim, listReviewHistory, reanalyzeClaim, type Submission } from "@/lib/api";
 import type { ReviewActionPayload } from "@/lib/web-db";
 import { useParams, useRouter } from "next/navigation";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRequireRole } from "@/lib/use-require-role";
 import AccessGate from "@/components/AccessGate";
@@ -137,6 +137,10 @@ export default function ReviewDetailPage() {
     }
   };
 
+  // Cap pending-polls: if deferred inference died silently server-side,
+  // polling getClaim (full images + signed URLs) forever is a cost storm.
+  // After ~2 minutes the reviewer uses Re-run instead.
+  const pendingPollsRef = useRef(0);
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["submission", id],
     queryFn: async () => getWebClaim(id),
@@ -145,7 +149,12 @@ export default function ReviewDetailPage() {
       const current = query.state.data as Submission | undefined;
       if (!current) return false;
       // Keep polling while analysis is missing OR still running server-side.
-      return !current.latest_prediction || current.inference_status === "pending" ? 5_000 : false;
+      if (!current.latest_prediction || current.inference_status === "pending") {
+        pendingPollsRef.current += 1;
+        return pendingPollsRef.current > 24 ? false : 5_000;
+      }
+      pendingPollsRef.current = 0;
+      return false;
     },
   });
 
@@ -480,6 +489,16 @@ export default function ReviewDetailPage() {
 
   const handleCorrect = () => {
     const why = (reason || notes || "Reviewer verified with field corrections").trim();
+    // One-click verify with zero corrections is almost always a mis-tap:
+    // confirm before treating "Correct" as a plain accept.
+    const hasCorrections = Boolean(severity || affectedArea || crop || growthStage || grade || damage);
+    if (
+      !hasCorrections &&
+      typeof window !== "undefined" &&
+      !window.confirm("No corrections entered. Verify this claim as-is?")
+    ) {
+      return;
+    }
     action.mutate({
       action: "correct",
       override_reason: why,
@@ -555,6 +574,7 @@ export default function ReviewDetailPage() {
     setMessage(null);
     let usable = 0;
     let total = 0;
+    let fetchFailed = 0;
     try {
       for (const img of storedImages) {
         try {
@@ -573,12 +593,18 @@ export default function ReviewDetailPage() {
           const j = res.ok ? await res.json().catch(() => null) : null;
           if (j && typeof j === "object" && (j as { usable?: unknown }).usable === true) usable += 1;
         } catch {
-          total += 1;
+          // Download/CORS failures are infrastructure noise, not verdicts:
+          // exclude them from the usable ratio instead of counting as unusable.
+          fetchFailed += 1;
         }
       }
+      const summary =
+        fetchFailed > 0
+          ? `Gate re-run recorded: ${usable}/${total} usable (${fetchFailed} photo${fetchFailed === 1 ? "" : "s"} could not be downloaded — not counted).`
+          : `Gate re-run recorded: ${usable}/${total} usable.`;
       await applyWebReviewAction(id, {
         action: "annotate",
-        notes: `Gate re-run recorded: ${usable}/${total} usable`,
+        notes: summary,
       });
       qc.invalidateQueries({ queryKey: ["submission", id] });
       qc.invalidateQueries({ queryKey: ["review-queue"] });
@@ -586,7 +612,7 @@ export default function ReviewDetailPage() {
       qc.invalidateQueries({ queryKey: ["overview"] });
       qc.invalidateQueries({ queryKey: ["map"] });
       qc.invalidateQueries({ queryKey: ["audit"] });
-      setMessage(`Gate re-run recorded: ${usable}/${total} usable.`);
+      setMessage(summary);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Gate re-run failed");
     } finally {
@@ -625,6 +651,7 @@ export default function ReviewDetailPage() {
               onClick={handleCopyId}
               className="flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 hover:text-slate-700"
               title="Copy full Case ID"
+              aria-label="Copy full case ID"
             >
               {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
             </button>
@@ -731,7 +758,17 @@ export default function ReviewDetailPage() {
             {inspectableImages.length === 0 ? (
               <div className="py-6 text-center text-xs text-slate-400">
                 <Camera className="h-7 w-7 mx-auto mb-1.5 opacity-30 text-slate-400" />
-                <span>No photographic evidence attached</span>
+                <div>No photographic evidence attached</div>
+                {!isClosed && (
+                  <button
+                    type="button"
+                    onClick={handleOpenRecapture}
+                    className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded border border-amber-300 bg-amber-50 px-3 py-1.5 font-semibold text-amber-900 hover:bg-amber-100"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>Request recapture</span>
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">

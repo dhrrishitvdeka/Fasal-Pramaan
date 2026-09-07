@@ -17,6 +17,9 @@ import type { WebClaimRow } from "./web-db";
 
 const GATE_CACHE_TTL_MS = 10 * 60 * 1000;
 const gateCache = new Map<string, { result: GateResult; expiresAt: number }>();
+// In-flight dedup: concurrent same-key submissions share one Gemini call
+// instead of each missing the cache and fanning out N parallel requests.
+const gateInflight = new Map<string, Promise<GateResult>>();
 
 function bytesToDataUrl(bytes: Uint8Array, contentType?: string): string {
   const mime = (contentType || "image/jpeg").toLowerCase();
@@ -135,21 +138,36 @@ async function gateSingleImage(
     farmerObservation: input.farmerObservation,
   };
 
-  // Try Gemini first with full image + metadata context; reuse same prompt via shared geminiGate.
-  try {
-    const gemini = await geminiGate(dataUrl, input.angleType || "photo_1", expectedCrop, peril, meta);
-    if (gemini) {
-      cacheGateResult(cacheKey, gemini);
-      return gemini;
-    }
-  } catch {
-    // fall through to heuristic
+  // Share one in-flight Gemini call per cache key so concurrent same-image
+  // submissions don't fan out N parallel billed requests.
+  if (cacheKey) {
+    const pending = gateInflight.get(cacheKey);
+    if (pending) return pending;
   }
+  const run = (async (): Promise<GateResult> => {
+    // Try Gemini first with full image + metadata context; reuse same prompt via shared geminiGate.
+    try {
+      const gemini = await geminiGate(dataUrl, input.angleType || "photo_1", expectedCrop, peril, meta);
+      if (gemini) {
+        cacheGateResult(cacheKey, gemini);
+        return gemini;
+      }
+    } catch {
+      // fall through to heuristic
+    }
 
-  const heuristic = heuristicGate(dataUrl, expectedCrop, peril, meta);
-  const result: GateResult = { ...heuristic, fallback: true };
-  cacheGateResult(cacheKey, result);
-  return result;
+    const heuristic = heuristicGate(dataUrl, expectedCrop, peril, meta);
+    const result: GateResult = { ...heuristic, fallback: true };
+    cacheGateResult(cacheKey, result);
+    return result;
+  })();
+  if (!cacheKey) return run;
+  gateInflight.set(cacheKey, run);
+  try {
+    return await run;
+  } finally {
+    if (gateInflight.get(cacheKey) === run) gateInflight.delete(cacheKey);
+  }
 }
 
 export type PersistedGateOutcome = {
@@ -1199,6 +1217,13 @@ export function claimNeedsInferenceRetry(claim: WebClaimRow, nowMs: number = Dat
   return nowMs - startedMs >= INFERENCE_RETRY_AFTER_MS;
 }
 
+// Per-process inference lease: two reviewers (or two tabs) hitting Re-run on
+// the same claim must not launch parallel billed Gemini runs. The 5/min route
+// rate limit bounds multi-instance races; this kills the single-instance one,
+// including force=true which previously bypassed every guard.
+const INFERENCE_LEASE_MS = 5 * 60 * 1000;
+const inferenceLeases = new Map<string, number>();
+
 export async function retryPendingInference(
   store: ClaimStore,
   claimId: string,
@@ -1223,6 +1248,11 @@ export async function retryPendingInference(
   ) {
     return null;
   }
+  const leaseHeld = inferenceLeases.get(claimId);
+  if (leaseHeld && Date.now() - leaseHeld < INFERENCE_LEASE_MS) {
+    return { prediction: null, inferError: "Analysis already running — please wait." };
+  }
+  inferenceLeases.set(claimId, Date.now());
   try {
     await store.updateClaim(claimId, {
       inference_status: "pending",
@@ -1257,9 +1287,14 @@ export async function retryPendingInference(
   }
   if (!images.length) {
     await markInferenceFailed(store, claimId, "no_image_bytes");
+    inferenceLeases.delete(claimId);
     return { prediction: null, inferError: "no_image_bytes" };
   }
-  return inferAndAttachToClaim(store, claimId, images, claim.crop_type || undefined, infer, inferOptions);
+  try {
+    return await inferAndAttachToClaim(store, claimId, images, claim.crop_type || undefined, infer, inferOptions);
+  } finally {
+    inferenceLeases.delete(claimId);
+  }
 }
 
 export async function persistAndInfer(

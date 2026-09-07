@@ -19,7 +19,10 @@ export async function POST(request: Request) {
 
   const limit = checkRateLimit(`context-assemble:${auth.actor.userId}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
   if (!limit.ok) {
-    return NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
+    return NextResponse.json(
+      { error: "Too many requests. Try again shortly." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
   }
 
   let body: any = {};
@@ -36,7 +39,11 @@ export async function POST(request: Request) {
   const plotLon = toCoordinate(body.plotLon ?? body.plot_lon, -180, 180);
   const rawAccuracy = body.captureAccuracyM ?? body.capture_accuracy_m ?? body.accuracyM ?? body.accuracy_m;
   const captureAccuracyM = typeof rawAccuracy === "number" && Number.isFinite(rawAccuracy) ? rawAccuracy : undefined;
-  const plotProximityMeters = typeof body.plotProximityMeters === "number" ? body.plotProximityMeters : undefined;
+  const rawProximity = body.plotProximityMeters;
+  const plotProximityMeters =
+    typeof rawProximity === "number" && Number.isFinite(rawProximity) && rawProximity >= 0 && rawProximity <= 1000000
+      ? rawProximity
+      : undefined;
   const peril = normalizePeril(body.peril || body.claim_type || "normal");
   const rawSowingDate = typeof body.sowingDate === "string" ? body.sowingDate.trim() : "";
   const sowingDate = /^\d{4}-\d{2}-\d{2}$/.test(rawSowingDate) ? rawSowingDate : undefined;

@@ -40,11 +40,25 @@ function FarmerClaimDetailContent() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { lang, getClaimById, farmerProfile, isLoading, refresh } = useFarmerData();
+  const { lang, getClaimById, hydrateClaim, farmerProfile, isLoading, refresh } = useFarmerData();
   const t = getFarmerT(lang);
 
   const claimId = (params?.id as string) || "";
   const claim = getClaimById(claimId);
+  const [hydrateFailed, setHydrateFailed] = useState(false);
+
+  // Direct-link fallback: store-only lookup misses on refresh/new devices.
+  // Try the server once before rendering "not found".
+  useEffect(() => {
+    if (isLoading || claim || !claimId || hydrateFailed) return;
+    let cancelled = false;
+    void hydrateClaim(claimId).then((hydrated) => {
+      if (!cancelled && !hydrated) setHydrateFailed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, claim, claimId, hydrateFailed, hydrateClaim]);
   const justRecaptured = searchParams.get("recaptured") === "true";
   const justSubmitted = searchParams.get("submitted") === "true";
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -144,7 +158,7 @@ function FarmerClaimDetailContent() {
     };
   }, [selectedImage, selectedIndex, claim?.images]);
 
-  if (isLoading) {
+  if (isLoading || (!claim && !hydrateFailed)) {
     return <DetailSkeleton className="py-6" />;
   }
 

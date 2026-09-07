@@ -32,20 +32,15 @@ function readStoredLang(): Lang {
 }
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
-
-  useEffect(() => {
-    const stored = readStoredLang();
-    if (stored && stored !== lang) {
-      setLangState(stored);
-    }
-  }, []);
+  // Lazy init from storage: avoids a default-language first-paint flip when
+  // the user already picked a language in a previous session.
+  const [lang, setLangState] = useState<Lang>(readStoredLang);
 
   useEffect(() => {
     const handleSync = (e: Event) => {
       const custom = e as CustomEvent<string>;
       const next = parseAppLang(custom.detail || localStorage.getItem("fasal_lang") || localStorage.getItem("fp_farmer_lang_v1"));
-      if (next && next !== lang) {
+      if (next) {
         setLangState(next);
       }
     };
@@ -56,7 +51,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("fasal:lang-change", handleSync);
       window.removeEventListener("storage", handleSync);
     };
-  }, [lang]);
+  }, []);
 
   const setLang = (newLang: Lang) => {
     const next = parseAppLang(newLang);

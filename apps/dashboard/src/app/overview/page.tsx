@@ -84,14 +84,14 @@ export default function OverviewPage() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["overview"],
     queryFn: overviewStats,
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
     enabled: gate.status === "ok",
   });
 
   const { data: claims } = useQuery({
     queryKey: ["review-queue"],
     queryFn: listWebClaims,
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
     enabled: gate.status === "ok",
   });
 

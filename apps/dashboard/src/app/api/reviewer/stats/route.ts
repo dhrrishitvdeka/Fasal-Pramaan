@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 import { actorUnauthorized, isReviewerRole, requireWebActor } from "@/lib/web-auth";
 import {
   alertsFromClaims,
@@ -19,6 +20,14 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
   if (!isReviewerRole(auth.actor.role)) {
     return actorUnauthorized("Reviewer role required");
+  }
+  // Full-table scan + per-image signed URLs per call: throttle bulk export.
+  const statsLimit = checkRateLimit(`reviewer-stats:${auth.actor.userId}`, 30, 60_000);
+  if (!statsLimit.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Try again shortly." },
+      { status: 429, headers: { "Retry-After": String(statsLimit.retryAfterSeconds) } },
+    );
   }
   const supabase = createServerSupabase();
   if (!supabase) {

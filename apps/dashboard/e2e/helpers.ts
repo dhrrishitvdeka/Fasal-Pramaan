@@ -4,12 +4,19 @@ import { test } from "@playwright/test";
 
 export const E2E_CLAIM_ID = "e2e-claim-0001";
 
-/** All specs skip unless a staging Supabase URL is provided for the run. */
+/**
+ * All specs skip unless a staging Supabase URL is provided for the run —
+ * except in CI, where a missing secret fails loudly instead of reporting a
+ * false-green "passed with 0 tests" run.
+ */
 export function requiresStagingSupabase() {
-  test.skip(
-    !process.env.E2E_SUPABASE_URL,
-    "E2E_SUPABASE_URL is not set — skipping browser E2E against staging.",
-  );
+  const missing = !process.env.E2E_SUPABASE_URL;
+  if (missing && process.env.CI) {
+    throw new Error(
+      "E2E_SUPABASE_URL is not set in CI — configure the staging secret instead of skipping.",
+    );
+  }
+  test.skip(missing, "E2E_SUPABASE_URL is not set — skipping browser E2E against staging.");
 }
 
 export function json(route: Route, body: unknown, status = 200) {

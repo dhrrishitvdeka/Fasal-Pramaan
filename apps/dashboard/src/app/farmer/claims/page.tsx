@@ -55,20 +55,19 @@ function FarmerClaimsContent() {
     if (activeFilter !== "all" && claim.status !== activeFilter) {
       return false;
     }
-    // Search query filter
+    // Search query filter (null-safe: legacy claims may lack Hi fields)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchId = claim.id.toLowerCase().includes(q);
-      const matchCrop =
-        claim.cropType.toLowerCase().includes(q) ||
-        claim.cropTypeHi.toLowerCase().includes(q);
+      const text = (v: unknown) => String(v || "").toLowerCase();
+      const matchId = text(claim.id).includes(q);
+      const matchCrop = text(claim.cropType).includes(q) || text(claim.cropTypeHi).includes(q);
       const matchPlot =
-        claim.plotName.toLowerCase().includes(q) ||
-        claim.plotNameHi.toLowerCase().includes(q) ||
-        claim.khasraNumber.toLowerCase().includes(q);
+        text(claim.plotName).includes(q) ||
+        text(claim.plotNameHi).includes(q) ||
+        text(claim.khasraNumber).includes(q);
       const matchDisease =
-        claim.aiPrediction.diseaseDetected.toLowerCase().includes(q) ||
-        claim.aiPrediction.diseaseDetectedHi.toLowerCase().includes(q);
+        text(claim.aiPrediction?.diseaseDetected).includes(q) ||
+        text(claim.aiPrediction?.diseaseDetectedHi).includes(q);
       return matchId || matchCrop || matchPlot || matchDisease;
     }
     return true;

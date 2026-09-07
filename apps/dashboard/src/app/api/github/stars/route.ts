@@ -1,10 +1,22 @@
 import { NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 import { CANONICAL_GITHUB_REPO, resolveGithubRepo } from "@/lib/github-repo";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300; // 5 minutes cache
 
 export async function GET(request: Request) {
+  // Unauthenticated quota proxy: throttle per IP so callers can't burn the
+  // GITHUB_TOKEN rate budget (arbitrary ?repo= values are still allowed).
+  const forwarded = request.headers.get("x-forwarded-for");
+  const ip = forwarded?.split(",")[0]?.trim() || "unknown";
+  const limit = checkRateLimit(`github-stars:${ip}`, 20, 60_000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Try again shortly." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
   const { searchParams } = new URL(request.url);
   const repo = resolveGithubRepo(
     searchParams.get("repo") || process.env.NEXT_PUBLIC_GITHUB_REPO || CANONICAL_GITHUB_REPO

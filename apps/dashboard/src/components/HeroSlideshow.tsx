@@ -63,7 +63,7 @@ export default function HeroSlideshow({ alt }: { alt: string }) {
               fill
               sizes="(max-width: 639px) 52vw, (max-width: 768px) 78vw, 380px"
               priority={i === 0}
-              loading={i === 0 ? undefined : "eager"}
+              loading={i === 0 ? undefined : "lazy"}
               className={clsx(
                 "object-contain transition-opacity duration-1000 ease-in-out",
                 active ? "opacity-100" : "pointer-events-none opacity-0",
@@ -73,13 +73,12 @@ export default function HeroSlideshow({ alt }: { alt: string }) {
         })}
       </div>
       {!reducedMotion && (
-        <div className="mt-2 flex items-center justify-center gap-1.5" role="tablist" aria-label="Hero images">
+        <div className="mt-2 flex items-center justify-center gap-1.5" role="group" aria-label="Hero images">
           {SLIDES.map((slide, i) => (
             <button
               key={slide.src}
               type="button"
-              role="tab"
-              aria-selected={i === index}
+              aria-current={i === index}
               aria-label={`Show image ${i + 1} of ${SLIDES.length}`}
               onClick={() => setIndex(i)}
               className={clsx(

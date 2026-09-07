@@ -25,7 +25,8 @@ export function toCsv(rows: Record<string, unknown>[], columns?: string[]): stri
 
 export function downloadCsv(filename: string, csv: string): void {
   if (typeof window === "undefined") return;
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  // BOM so Excel renders Hindi and other non-Latin scripts correctly.
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

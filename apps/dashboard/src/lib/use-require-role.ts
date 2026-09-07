@@ -14,14 +14,33 @@ export type RequireRoleResult = {
  * Module-level cache so client-side navigations do not refetch roles.
  * Only positive (authenticated) results are cached — a null result is
  * re-checked on every mount so signing in on /login immediately unblocks
- * guarded pages within the same SPA session.
+ * guarded pages within the same SPA session. Entries expire after
+ * ROLE_CACHE_TTL_MS so a mid-session demotion can't linger indefinitely.
  */
+const ROLE_CACHE_TTL_MS = 5 * 60 * 1000;
 let cachedRoles: string[] | undefined;
+let cachedAt = 0;
 let inflight: Promise<string[] | null> | null = null;
 
 export function clearRoleCache(): void {
   cachedRoles = undefined;
+  cachedAt = 0;
   inflight = null;
+}
+
+function readCache(): string[] | undefined {
+  if (cachedRoles === undefined) return undefined;
+  if (Date.now() - cachedAt > ROLE_CACHE_TTL_MS) {
+    cachedRoles = undefined;
+    cachedAt = 0;
+    return undefined;
+  }
+  return cachedRoles;
+}
+
+function writeCache(roles: string[]): void {
+  cachedRoles = roles;
+  cachedAt = Date.now();
 }
 
 function fetchSessionRoles(): Promise<string[] | null> {
@@ -44,20 +63,22 @@ export function useRequireRole(allowed: string[]): RequireRoleResult {
   // pass inline array literals.
   const allowedKey = allowed.join("|");
 
-  const [result, setResult] = useState<RequireRoleResult>(() =>
-    cachedRoles === undefined
+  const [result, setResult] = useState<RequireRoleResult>(() => {
+    const cached = readCache();
+    return cached === undefined
       ? { status: "loading", roles: null }
-      : { status: deriveStatus(cachedRoles, allowedKey), roles: cachedRoles },
-  );
+      : { status: deriveStatus(cached, allowedKey), roles: cached };
+  });
 
   useEffect(() => {
-    if (cachedRoles !== undefined) {
-      setResult({ status: deriveStatus(cachedRoles, allowedKey), roles: cachedRoles });
+    const cached = readCache();
+    if (cached !== undefined) {
+      setResult({ status: deriveStatus(cached, allowedKey), roles: cached });
       return;
     }
     let cancelled = false;
     void fetchSessionRoles().then((roles) => {
-      if (roles) cachedRoles = roles;
+      if (roles) writeCache(roles);
       if (!cancelled) {
         setResult({ status: deriveStatus(roles, allowedKey), roles });
       }

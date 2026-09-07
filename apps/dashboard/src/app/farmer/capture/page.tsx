@@ -92,6 +92,8 @@ function CaptureStudioContent() {
   const recaptureClaimId = searchParams.get("recapture");
   const requestedAnglesParam = searchParams.get("angles");
   const plotIdParam = searchParams.get("plotId");
+  // Optional crop hint carried by Saathi Skip (no intent/peril in that case).
+  const cropParam = (searchParams.get("crop") || "").trim().slice(0, 80) || undefined;
   const milestoneId = searchParams.get("milestone");
   const intentIdParam = searchParams.get("intentId");
   const perilParam = searchParams.get("peril");
@@ -812,7 +814,7 @@ function CaptureStudioContent() {
           body: JSON.stringify({
             imageDataUrl: imageUrl,
             angleType: currentAngle.id,
-            expectedCrop: selectedPlot?.cropType || activeIntent?.crop || undefined,
+            expectedCrop: selectedPlot?.cropType || activeIntent?.crop || cropParam,
             peril: requestedPeril,
             sha256: digest,
             pHash,
@@ -963,10 +965,10 @@ function CaptureStudioContent() {
           const newClaim = await createClaim({
             submissionId: submissionIdRef.current,
             plotId: plot?.id || activeIntent?.plotId || "",
-            plotName: plot?.name || activeIntent?.crop || "Unregistered plot",
+            plotName: plot?.name || activeIntent?.crop || cropParam || "Unregistered plot",
             plotNameHi: plot?.nameHi || "",
             khasraNumber: plot?.khasraNumber || "",
-            cropType: plot?.cropType || activeIntent?.crop || "",
+            cropType: plot?.cropType || activeIntent?.crop || cropParam || "",
             cropTypeHi: plot?.cropTypeHi || "",
             cropVariety: plot?.cropVariety || "",
             status: "submitted",
@@ -1003,6 +1005,13 @@ function CaptureStudioContent() {
           return { id: newClaim.id };
         } catch (submitErr) {
           const errMsg = submitErr instanceof Error ? submitErr.message : String(submitErr);
+          // Auto-preserve everything into the local draft: a failed submit
+          // (offline, timeout, 500) must never strand captured evidence.
+          try {
+            handleSaveDraft();
+          } catch {
+            // draft save is best-effort; the error below is authoritative
+          }
           const code = mapApiErrorToNotificationCode(0, errMsg);
           notify(code, errMsg);
           throw submitErr;

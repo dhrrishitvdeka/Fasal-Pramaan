@@ -27,7 +27,7 @@ export async function runVoiceShutter(input: {
   if (input.peril !== "fire_burn" && isUnusableLighting(frame.lightingScore)) {
     return {
       ok: false,
-      message: "Frame is too dark. Point the camera at the crop, or use Upload.",
+      message: "Frame is too dark. Point the camera at the crop in daylight and retry.",
     };
   }
   await input.saveFrame(frame.dataUrl, { lightingScore: frame.lightingScore });

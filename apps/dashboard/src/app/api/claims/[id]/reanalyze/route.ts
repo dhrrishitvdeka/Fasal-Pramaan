@@ -46,6 +46,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return NextResponse.json({ error: "Claim not found" }, { status: 404 });
     }
     if (result.inferError && !result.prediction) {
+      // A held inference lease means another run is in flight: 409, not 502.
+      if (/already running/i.test(result.inferError)) {
+        return NextResponse.json(
+          { error: "Analysis already running — please wait.", inference_status: "pending" },
+          { status: 409 },
+        );
+      }
       // Log provider internals server-side; the client only needs the status.
       console.error(`reanalyze ${id} inference failed:`, result.inferError);
       return NextResponse.json(

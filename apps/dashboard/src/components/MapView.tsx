@@ -30,26 +30,33 @@ function FitBounds({ markers }: { markers: MapMarker[] }) {
   return null;
 }
 
-/** Monochrome severity scale suitable for print / official screens. */
+/**
+ * Colorblind-safe status/severity scale (Okabe–Ito inspired). Every state has
+ * a distinct hue AND the popup carries a text label, so color is never the
+ * only signal. In particular needs_recapture (amber) no longer collides with
+ * none/U (grey).
+ */
 function severityColor(severity?: string | null, status?: string) {
-  if (status === "needs_recapture") return "#94a3b8";
+  if (status === "needs_recapture") return "#e69f00";
+  if (status === "verified") return "#009e73";
+  if (status === "rejected") return "#cc79a7";
   switch ((severity || "").toLowerCase()) {
     case "high":
     case "severe":
     case "critical":
     case "c":
-      return "#0f172a";
+      return "#d55e00";
     case "medium":
     case "b":
-      return "#475569";
+      return "#e69f00";
     case "low":
     case "a":
-      return "#64748b";
+      return "#56b4e9";
     case "none":
     case "u":
-      return "#94a3b8";
+      return "#999999";
     default:
-      return "#64748b";
+      return "#0072b2";
   }
 }
 

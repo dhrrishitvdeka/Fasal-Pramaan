@@ -150,6 +150,7 @@ export async function POST(request: Request) {
   const store = createSupabaseClaimStore(supabase);
   // Reject claims referencing a plot the caller does not own (cross-tenant guard).
   let requestedPlotId = data.plotId?.trim() || null;
+  let plotUnlinked = false;
   if (requestedPlotId) {
     try {
       const plotRow = await supabase
@@ -161,10 +162,12 @@ export async function POST(request: Request) {
         console.warn("plot lookup warning:", plotRow.error.message);
         // Do not fail claim persistence if plot table had a lookup issue; safely unlink the plot reference
         requestedPlotId = null;
+        plotUnlinked = true;
       } else if (!plotRow.data) {
-        // Plot is not present in web_plots (e.g. unpersisted offline draft)
+        // Plot is not present in web_plots (e.g. unpersisted demo plot)
         // Keep the claim and photos safe by unlinking the foreign key reference
         requestedPlotId = null;
+        plotUnlinked = true;
       } else if (
         plotRow.data.created_by &&
         plotRow.data.created_by !== auth.actor.userId &&
@@ -271,7 +274,11 @@ export async function POST(request: Request) {
         ),
       );
     }
-    return NextResponse.json({ claimId: result.claimId, prediction: result.prediction ?? null });
+    return NextResponse.json({
+      claimId: result.claimId,
+      prediction: result.prediction ?? null,
+      ...(plotUnlinked ? { plotUnlinked: true as const } : {}),
+    });
   } catch (error) {
     console.error("POST /api/claims failed:", error);
     const message = error instanceof Error ? error.message : "Persist failed";

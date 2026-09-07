@@ -79,9 +79,12 @@ function ReviewQueuePage() {
   };
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["review-queue"],
+    // Key includes view params so back/forward navigations and shared links
+    // never render one filter's list under another filter's cache entry.
+    queryKey: ["review-queue", filterTab, searchQuery, sortBy, perilFilter],
     queryFn: async () => ({ items: await listWebClaims() }),
     enabled: gate.status === "ok",
+    staleTime: 30_000,
   });
 
   const rawItems = useMemo(() => data?.items || [], [data?.items]);
@@ -195,11 +198,20 @@ function ReviewQueuePage() {
   const [bulkResult, setBulkResult] = useState<string | null>(null);
 
   function canQueueAccept(s: Submission, ev: { integrity: { score: number } }) {
-    if (s.status === "verified" || s.status === "rejected") return false;
-    if (ev.integrity.score < 50) return false;
+    return queueAcceptBlockReason(s, ev) === null;
+  }
+
+  /** Human reason a row is excluded from bulk accept (shown as tooltip). */
+  function queueAcceptBlockReason(
+    s: Submission,
+    ev: { integrity: { score: number } },
+  ): string | null {
+    if (s.status === "verified" || s.status === "rejected")
+      return `Already ${s.status.replaceAll("_", " ")} — reopen via recapture first`;
+    if (ev.integrity.score < 50) return "Blocked: integrity score below 50";
     const g = s.gate_result as { gateFailed?: boolean; overridden?: boolean } | null | undefined;
-    if (g?.gateFailed && !g.overridden) return false;
-    return true;
+    if (g?.gateFailed && !g.overridden) return "Blocked: gate failed — override or recapture first";
+    return null;
   }
 
   const selectableIds = useMemo(
@@ -229,6 +241,7 @@ function ReviewQueuePage() {
     setBulkResult(null);
     setBulk({ done: 0, total: ids.length, failed: 0 });
     let failed = 0;
+    const failedIds: string[] = [];
     for (let i = 0; i < ids.length; i++) {
       try {
         await applyWebReviewAction(ids[i], {
@@ -237,6 +250,7 @@ function ReviewQueuePage() {
         });
       } catch {
         failed += 1;
+        failedIds.push(ids[i].length > 14 ? `${ids[i].slice(0, 14)}…` : ids[i]);
       }
       setBulk({ done: i + 1, total: ids.length, failed });
       if (i < ids.length - 1) {
@@ -257,7 +271,9 @@ function ReviewQueuePage() {
     setBulkResult(
       failed === 0
         ? `Accepted ${ids.length} case${ids.length === 1 ? "" : "s"}.`
-        : `Accepted ${ids.length - failed} of ${ids.length}; ${failed} failed (cases with blocked integrity cannot be accepted).`,
+        : `Accepted ${ids.length - failed} of ${ids.length}; failed: ${failedIds.slice(0, 5).join(", ")}${
+            failedIds.length > 5 ? ` (+${failedIds.length - 5} more)` : ""
+          } — open a failed case to see why (e.g. inference incomplete, gate failed).`,
     );
   };
 
@@ -380,10 +396,9 @@ function ReviewQueuePage() {
         <ErrorMessage
           title="Something went wrong loading the review queue"
           message={error instanceof Error ? error.message : "Unable to retrieve claims for review. Please verify reviewer credentials."}
-          onRetry={() => {
-            if (typeof window !== "undefined") window.location.reload();
-            else void refetch();
-          }}
+          // Refetch preserves the URL filter context; a full reload would keep
+          // it too via the URL, but refetch is instant and keeps selection.
+          onRetry={() => void refetch()}
           className="my-4"
         />
       )}
@@ -448,7 +463,7 @@ function ReviewQueuePage() {
                   checked={allVisibleSelected}
                   onChange={toggleAllRows}
                   disabled={bulkBusy || selectableIds.length === 0}
-                  className="h-5 w-5 cursor-pointer rounded border-[var(--line)] align-middle"
+                  className="h-6 w-6 cursor-pointer rounded border-[var(--line)] align-middle"
                 />
               </th>
               <th>Case</th>
@@ -477,6 +492,7 @@ function ReviewQueuePage() {
                     <input
                       type="checkbox"
                       aria-label={`Select case ${s.id.slice(0, 8)}`}
+                      title={queueAcceptBlockReason(s, ev) || `Select case ${s.id.slice(0, 8)}`}
                       checked={isSelected}
                       onChange={() => toggleRow(s.id)}
                       disabled={
@@ -484,7 +500,7 @@ function ReviewQueuePage() {
                         !canQueueAccept(s, ev) ||
                         (!isSelected && selectedIds.length >= MAX_BULK_SELECT)
                       }
-                      className="h-5 w-5 cursor-pointer rounded border-[var(--line)] align-middle"
+                      className="h-6 w-6 cursor-pointer rounded border-[var(--line)] align-middle"
                     />
                   </td>
                   <td className="min-w-[11rem] max-w-[15rem] align-top">
@@ -646,10 +662,19 @@ function ReviewQueuePage() {
             {BULK_GAP_MS / 1000}s. Cases whose integrity checks block acceptance will fail and be
             reported. This is audited and cannot be undone here.
           </p>
-          <ul className="max-h-40 space-y-0.5 overflow-y-auto border border-slate-200 bg-slate-50 p-2 font-mono text-[11px] text-slate-700">
-            {selectedIds.map((id) => (
-              <li key={id}>{id}</li>
-            ))}
+          <ul className="max-h-40 space-y-0.5 overflow-y-auto border border-slate-200 bg-slate-50 p-2 text-[11px] text-slate-700">
+            {selectedIds.map((id) => {
+              const hit = filteredItems.find((item) => item.submission.id === id)?.submission;
+              return (
+                <li key={id} className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-mono">{id.length > 18 ? `${id.slice(0, 18)}…` : id}</span>
+                  <span className="text-slate-500">
+                    {[hit?.crop_type, hit?.plot_name].filter(Boolean).join(" · ") || "—"}
+                  </span>
+                  <span className="capitalize text-slate-400">{hit?.status.replaceAll("_", " ") || ""}</span>
+                </li>
+              );
+            })}
           </ul>
           <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-2 sm:flex-row sm:justify-end">
             <button

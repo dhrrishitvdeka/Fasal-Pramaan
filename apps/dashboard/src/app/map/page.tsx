@@ -39,7 +39,7 @@ export default function MapPage() {
       }
       return mapMarkers(params);
     },
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
     enabled: gate.status === "ok",
   });
 

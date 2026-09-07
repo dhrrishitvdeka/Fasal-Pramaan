@@ -20,12 +20,16 @@ import {
   Wind,
   RotateCcw,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
 import { nativeLabelForLang } from "@/lib/live-indian-languages";
 import { saathiRouteLabel, useSaathiSession } from "@/lib/saathi/session-provider";
+import { getLocalizedAngleInfo } from "@/lib/help-i18n";
+import { normalizePeril, PERIL_OPTIONS } from "@/lib/claim-routing";
 import clsx from "clsx";
+
+const KNOWN_PERILS = new Set(PERIL_OPTIONS.map((o) => o.value));
 
 export default function SaathiIntakePage() {
   const { lang } = useFarmerData();
@@ -44,9 +48,9 @@ export default function SaathiIntakePage() {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const autoStartedRef = useRef(false);
   const perilSeededRef = useRef(false);
   const search = useSearchParams();
+  const router = useRouter();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -57,30 +61,29 @@ export default function SaathiIntakePage() {
     const raw = search.get("peril");
     if (!raw) return;
     perilSeededRef.current = true;
-    void sendText(raw.replace(/_/g, " "), "text");
+    // Validate deep-linked perils: unknown values are ignored instead of
+    // being fed to the model as free text.
+    const peril = normalizePeril(raw);
+    if (!KNOWN_PERILS.has(peril)) return;
+    void sendText(peril.replace(/_/g, " "), "text");
   }, [search, sendText]);
 
-  useEffect(() => {
-    if (autoStartedRef.current) return;
-    autoStartedRef.current = true;
-    if (typeof window === "undefined" || !("WebSocket" in window)) return;
-    if (liveStatus === "idle" || liveStatus === "error") void connectVoice();
-    // Share the layout-level session — do not start a second socket if already live.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Voice connects only on explicit user tap (toggleVoice button below):
+  // auto-connecting on mount fires a mic-permission prompt with no gesture,
+  // which browsers block and which startles users.
 
   const canProceed = Boolean(slots.peril);
   const route = saathiRouteLabel(slots);
 
   const quickPerils = [
-    { peril: "normal", label: "Normal damage", icon: Layers, phrase: "I have normal crop damage", color: "bg-emerald-700 hover:bg-emerald-800", labelColor: "text-emerald-800" },
+    { peril: "normal", label: "Normal damage", icon: Layers, phrase: t.perilOtherPhrase, color: "bg-emerald-700 hover:bg-emerald-800", labelColor: "text-emerald-800" },
     { peril: "fire_burn", label: "Fire / Burn", icon: Flame, phrase: t.perilFirePhrase, color: "bg-red-700 hover:bg-red-800", labelColor: "text-red-800" },
     { peril: "animal_damage", label: "Animal damage", icon: Compass, phrase: t.perilAnimalsPhrase, color: "bg-amber-700 hover:bg-amber-800", labelColor: "text-amber-800" },
     { peril: "flood", label: "Flood", icon: Waves, phrase: t.perilFloodPhrase, color: "bg-blue-700 hover:bg-blue-800", labelColor: "text-blue-800" },
-    { peril: "drought", label: "Drought", icon: SunMedium, phrase: "Dry spell damaged my crop", color: "bg-orange-700 hover:bg-orange-800", labelColor: "text-orange-800" },
+    { peril: "drought", label: "Drought", icon: SunMedium, phrase: t.perilDroughtPhrase, color: "bg-orange-700 hover:bg-orange-800", labelColor: "text-orange-800" },
     { peril: "pest_disease", label: "Pest / Disease", icon: Bug, phrase: t.perilPestPhrase, color: "bg-fuchsia-700 hover:bg-fuchsia-800", labelColor: "text-fuchsia-800" },
     { peril: "hailstorm", label: "Hailstorm", icon: CloudRain, phrase: t.perilHailPhrase, color: "bg-sky-700 hover:bg-sky-800", labelColor: "text-sky-800" },
-    { peril: "lodging", label: "Lodging", icon: Wind, phrase: "Wind lodged my crop", color: "bg-violet-700 hover:bg-violet-800", labelColor: "text-violet-800" },
+    { peril: "lodging", label: "Lodging", icon: Wind, phrase: t.perilLodgingPhrase, color: "bg-violet-700 hover:bg-violet-800", labelColor: "text-violet-800" },
   ];
 
   return (
@@ -330,9 +333,9 @@ export default function SaathiIntakePage() {
             {route.requiredAngles.map((a) => (
               <span
                 key={a}
-                className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1 font-mono text-xs font-medium text-emerald-900 shadow-2xs"
+                className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1 text-xs font-medium text-emerald-900 shadow-2xs"
               >
-                {a}
+                {getLocalizedAngleInfo(a, lang).shortName}
               </span>
             ))}
           </div>
@@ -361,8 +364,17 @@ export default function SaathiIntakePage() {
               type="button"
               className="fp-btn-secondary min-h-11 py-2.5 text-xs rounded-xl"
               onClick={() => {
-                if (canProceed) proceedToCapture();
-                else window.location.assign("/farmer/capture");
+                if (canProceed) {
+                  proceedToCapture();
+                  return;
+                }
+                // Even without a peril, carry known plot/crop context so the
+                // capture studio doesn't open on an "Unregistered plot".
+                const params = new URLSearchParams();
+                if (slots.plotId) params.set("plotId", slots.plotId);
+                if (slots.crop) params.set("crop", slots.crop);
+                const qs = params.toString();
+                router.push(qs ? `/farmer/capture?${qs}` : "/farmer/capture");
               }}
             >
               {lang === "hi" ? "स्किप" : "Skip"}

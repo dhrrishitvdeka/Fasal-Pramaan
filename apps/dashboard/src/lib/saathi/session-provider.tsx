@@ -165,8 +165,11 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     }
   }, []);
 
+  // Debounced: streaming partials update messages per token; stringifying up
+  // to 80 messages to sessionStorage on every fragment is pure overhead.
   useEffect(() => {
-    persistStored(messages, slots);
+    const timer = window.setTimeout(() => persistStored(messages, slots), 500);
+    return () => window.clearTimeout(timer);
   }, [messages, slots]);
 
   const broker = useMemo(
@@ -752,6 +755,10 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     setLastTool(null);
     setError(null);
     setIsAnalyzing(false);
+    // A reset starts a genuinely new conversation: drop the capture intent
+    // everywhere it lives, or the next capture inherits the old peril/route.
+    setActiveIntent(null);
+    webCaptureBridge.setIntent(null);
     const greeting = initialSaathiGreeting(langRef.current);
     setMessages([greeting]);
     try {
@@ -759,7 +766,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
     } catch {
       // ignore
     }
-  }, [disconnectVoice]);
+  }, [disconnectVoice, setActiveIntent]);
 
   const sendText = useCallback(
     async (raw: string, source: "text" | "voice" = "text") => {

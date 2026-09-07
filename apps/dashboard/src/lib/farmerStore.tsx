@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { FarmerLang } from "./farmerI18n";
 import { parseAppLang, persistAppLang } from "./live-indian-languages";
 import { getWebClaim, listWebClaims, submitWebClaim } from "./api";
@@ -212,6 +212,7 @@ interface FarmerContextType {
   addMilestones: (milestones: GrowthTimelineMilestone[]) => void;
   registerPlot: (input: PlotRegistrationInput) => Promise<{ plotId: string }>;
   getClaimById: (id: string) => FarmerClaim | undefined;
+  hydrateClaim: (id: string) => Promise<FarmerClaim | null>;
   createClaim: (
     claim: Omit<FarmerClaim, "id" | "createdAt" | "updatedAt" | "evidenceTrust" | "aiPrediction"> & {
       evidenceTrust?: ClaimEvidenceTrust;
@@ -363,29 +364,35 @@ function submissionToClaim(item: Awaited<ReturnType<typeof listWebClaims>>[numbe
   };
 }
 
-export function FarmerProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<FarmerLang>("hi");
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("fasal_lang") || localStorage.getItem(STORAGE_KEY_LANG);
-      const parsed = persistAppLang(stored, "hi");
-      if (typeof document !== "undefined") {
-        document.documentElement.lang = parsed;
-      }
-      if (parsed && parsed !== lang) {
-        setLangState(parsed);
-      }
-    } catch {
-      // ignore
+function readStoredFarmerLang(): FarmerLang {
+  if (typeof window === "undefined") return "hi";
+  try {
+    const stored = localStorage.getItem("fasal_lang") || localStorage.getItem(STORAGE_KEY_LANG);
+    const parsed = persistAppLang(stored, "hi");
+    if (parsed && typeof document !== "undefined") {
+      document.documentElement.lang = parsed;
     }
-  }, []);
+    return parsed || "hi";
+  } catch {
+    return "hi";
+  }
+}
+
+export function FarmerProvider({ children }: { children: React.ReactNode }) {
+  // Lazy init from storage: avoids an en/hi first-paint flip when the user
+  // already picked a language in a previous session.
+  const [lang, setLangState] = useState<FarmerLang>(readStoredFarmerLang);
 
   useEffect(() => {
     const handleSync = (e: Event) => {
       const custom = e as CustomEvent<string>;
-      const next = parseAppLang(custom.detail || localStorage.getItem("fasal_lang") || localStorage.getItem(STORAGE_KEY_LANG));
-      if (next && next !== lang) {
+      let next: FarmerLang | null = null;
+      try {
+        next = parseAppLang(custom.detail || localStorage.getItem("fasal_lang") || localStorage.getItem(STORAGE_KEY_LANG));
+      } catch {
+        next = null;
+      }
+      if (next) {
         if (typeof document !== "undefined") {
           document.documentElement.lang = next;
         }
@@ -399,7 +406,7 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("fasal:lang-change", handleSync);
       window.removeEventListener("storage", handleSync);
     };
-  }, [lang]);
+  }, []);
   const [plots, setPlots] = useState<FarmerPlot[]>([]);
   const [claims, setClaims] = useState<FarmerClaim[]>([]);
   const [milestones, setMilestones] = useState<GrowthTimelineMilestone[]>([]);
@@ -418,42 +425,63 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   const [newPayoutNotices, setNewPayoutNotices] = useState<PayoutNotice[]>([]);
   const [newRejectionNotices, setNewRejectionNotices] = useState<RejectionNotice[]>([]);
 
+  // Serialize refreshes: concurrent polls/mutations interleaving caused
+  // last-writer-wins stale overwrites of just-snoozed milestones and claims.
+  const refreshInFlight = useRef<Promise<void> | null>(null);
   const refresh = async () => {
-    try {
-      if (isSupabaseConfigured()) {
-        const res = await apiFetch("/api/farmer/state");
-        if (!res.ok) {
-          throw new Error(res.status === 401 ? "Sign in required" : "Failed to load farmer data");
+    if (refreshInFlight.current) {
+      await refreshInFlight.current.catch(() => {});
+      return;
+    }
+    const run = (async () => {
+      try {
+        if (isSupabaseConfigured()) {
+          const res = await apiFetch("/api/farmer/state");
+          if (!res.ok) {
+            throw new Error(res.status === 401 ? "Sign in required" : "Failed to load farmer data");
+          }
+          const body = (await res.json()) as {
+            plots?: FarmerPlot[];
+            claims?: FarmerClaim[];
+            milestones?: GrowthTimelineMilestone[];
+            profile?: typeof EMPTY_FARMER_PROFILE;
+          };
+          setPlots(body.plots || []);
+          setClaims(body.claims || []);
+          setMilestones(body.milestones || []);
+          const rawProf = body.profile || { ...EMPTY_FARMER_PROFILE };
+          setFarmerProfile({
+            ...EMPTY_FARMER_PROFILE,
+            ...rawProf,
+            name: sanitizeMojibake(rawProf.name, "Farmer"),
+            nameHi: sanitizeMojibake(rawProf.nameHi, ""),
+          });
+        } else {
+          // Local-only mode has no server truth: merge, don't replace, or a
+          // background poll wipes locally created claims within seconds.
+          const items = await listWebClaims().catch(() => []);
+          const incoming = items.map(submissionToClaim);
+          setClaims((prev) => {
+            const ids = new Set(incoming.map((c) => c.id));
+            return [...prev.filter((c) => !ids.has(c.id)), ...incoming];
+          });
         }
-        const body = (await res.json()) as {
-          plots?: FarmerPlot[];
-          claims?: FarmerClaim[];
-          milestones?: GrowthTimelineMilestone[];
-          profile?: typeof EMPTY_FARMER_PROFILE;
-        };
-        setPlots(body.plots || []);
-        setClaims(body.claims || []);
-        setMilestones(body.milestones || []);
-        const rawProf = body.profile || { ...EMPTY_FARMER_PROFILE };
-        setFarmerProfile({
-          ...EMPTY_FARMER_PROFILE,
-          ...rawProf,
-          name: sanitizeMojibake(rawProf.name, "Farmer"),
-          nameHi: sanitizeMojibake(rawProf.nameHi, ""),
-        });
-      } else {
-        const items = await listWebClaims().catch(() => []);
-        setClaims(items.map(submissionToClaim));
-      }
-      setError(null);
-    } catch (err) {
-      if (!isSupabaseConfigured()) {
         setError(null);
-      } else {
-        setError(err instanceof Error ? err.message : "Failed to load claims");
+      } catch (err) {
+        if (!isSupabaseConfigured()) {
+          setError(null);
+        } else {
+          setError(err instanceof Error ? err.message : "Failed to load claims");
+        }
+      } finally {
+        setLoading(false);
       }
+    })();
+    refreshInFlight.current = run;
+    try {
+      await run;
     } finally {
-      setLoading(false);
+      if (refreshInFlight.current === run) refreshInFlight.current = null;
     }
   };
 
@@ -650,6 +678,26 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
 
   const getClaimById = (id: string) => claims.find((c) => c.id.toLowerCase() === id.toLowerCase());
 
+  /**
+   * Direct-link fallback: when the store is empty (refresh, new device,
+   * logged-out session) fetch the single claim from the server and merge it
+   * in. Returns null when the claim doesn't exist or isn't visible to the user.
+   */
+  const hydrateClaim = async (id: string): Promise<FarmerClaim | null> => {
+    if (!isSupabaseConfigured()) return null;
+    try {
+      const persisted = await getWebClaim(id);
+      const claim = submissionToClaim(persisted);
+      setClaims((prev) => {
+        const next = prev.map((item) => (item.id === claim.id ? claim : item));
+        return next.some((item) => item.id === claim.id) ? next : [claim, ...prev];
+      });
+      return claim;
+    } catch {
+      return null;
+    }
+  };
+
   const createClaim = async (
     claimData: Omit<FarmerClaim, "id" | "createdAt" | "updatedAt" | "evidenceTrust" | "aiPrediction"> & {
       evidenceTrust?: ClaimEvidenceTrust;
@@ -709,10 +757,19 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
           capturedAt: img.timestamp || undefined,
         })),
       });
+      if (result.plotUnlinked) {
+        // Plot reference was dropped server-side (missing plot or transient
+        // lookup failure): surface it so the farmer can re-link the plot.
+        setError(
+          "Claim saved, but the plot link was lost. Please re-link your plot from Reminders.",
+        );
+      }
       try {
         const persisted = await getWebClaim(result.claimId);
         claim = submissionToClaim(persisted);
       } catch {
+        // Submit succeeded but hydration failed: never invent trust scores.
+        // Mark pending hydration and re-sync in the background instead.
         claim = {
           ...claimData,
           id: result.claimId,
@@ -720,16 +777,19 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
           updatedAt: new Date().toISOString(),
           status: "under_review",
           evidenceTrust: claimData.evidenceTrust || {
-            qualityScore: 85,
-            coverageScore: 100,
-            contextScore: 100,
-            integrityScore: 100,
-            overallConfidence: 90,
+            qualityScore: 0,
+            coverageScore: 0,
+            contextScore: 0,
+            integrityScore: 0,
+            overallConfidence: 0,
           },
           aiPrediction: claimData.aiPrediction || emptyPrediction(),
         };
+        void refresh().catch(() => {});
       }
     } else {
+      // Local-only mode (no Supabase): no AI ran, so report zeroed scores and
+      // an explicit "not analyzed" prediction instead of fabricated 90+ values.
       const claimId = `claim-${Date.now()}`;
       claim = {
         ...claimData,
@@ -738,20 +798,16 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         updatedAt: new Date().toISOString(),
         status: "under_review",
         evidenceTrust: claimData.evidenceTrust || {
-          qualityScore: 85,
-          coverageScore: 100,
-          contextScore: 100,
-          integrityScore: 100,
-          overallConfidence: 90,
+          qualityScore: 0,
+          coverageScore: 0,
+          contextScore: 0,
+          integrityScore: 0,
+          overallConfidence: 0,
         },
         aiPrediction: claimData.aiPrediction || {
           ...emptyPrediction(),
-          cropIdentified: claimData.cropType || "Wheat",
-          cropConfidence: 92,
-          diseaseDetected: "Healthy crop foliage",
-          severityPercentage: 0,
-          severityGrade: "Low",
-          modelConfidence: 95,
+          cropIdentified: claimData.cropType || "",
+          diseaseDetected: "Not analyzed (offline mode)",
         },
       };
     }
@@ -788,6 +844,18 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
       images: recapturedImages,
       status: "under_review",
       updatedAt: new Date().toISOString(),
+      // Local-only mode: keep existing scores if present, else honest zeroes.
+      evidenceTrust: existing?.evidenceTrust || {
+        qualityScore: 0,
+        coverageScore: 0,
+        contextScore: 0,
+        integrityScore: 0,
+        overallConfidence: 0,
+      },
+      aiPrediction: existing?.aiPrediction || {
+        ...emptyPrediction(),
+        diseaseDetected: "Not analyzed (offline mode)",
+      },
     };
     setClaims((prev) => {
       const next = prev.map((item) => (item.id === claim.id ? claim : item));
@@ -843,6 +911,7 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const snoozeMilestone = async (id: string, days: number) => {
+    const previous = milestones;
     const updated = milestones.map((m) => {
       if (m.id !== id) return m;
       const d = new Date(m.dueDate);
@@ -863,12 +932,15 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         });
         if (!res.ok) throw new Error("Failed to update reminder");
       } catch (err) {
+        // Roll back the optimistic update so the UI never sits ahead of the server.
+        setMilestones(previous);
         setError(err instanceof Error ? err.message : "Failed to update reminder");
       }
     }
   };
 
   const completeMilestone = async (id: string, imageUrl: string, notes?: string) => {
+    const previous = milestones;
     const updated = milestones.map((m) => {
       if (m.id !== id) return m;
       return {
@@ -896,6 +968,8 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         });
         if (!res.ok) throw new Error("Failed to complete reminder");
       } catch (err) {
+        // Roll back the optimistic update so the UI never sits ahead of the server.
+        setMilestones(previous);
         setError(err instanceof Error ? err.message : "Failed to complete reminder");
       }
     }
@@ -919,6 +993,7 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         addMilestones,
         registerPlot,
         getClaimById,
+        hydrateClaim,
         createClaim,
         updateClaimRecapture,
         saveClaimDraft,
