@@ -6,7 +6,7 @@ type HealthResponse = {
   ok: boolean;
   status: string;
   timestamp?: string;
-  checks?: { app?: boolean; supabase?: boolean; gemini?: boolean };
+  checks?: { app?: boolean; supabase?: boolean; serviceRole?: boolean; gemini?: boolean };
 };
 
 function CheckRow({ label, pass }: { label: string; pass: boolean | undefined }) {
@@ -56,6 +56,7 @@ export default function HealthPage() {
             <ul className="mt-2">
               <CheckRow label="Next.js app" pass={data.checks?.app} />
               <CheckRow label="Supabase (database + auth)" pass={data.checks?.supabase} />
+              <CheckRow label="Supabase service role (API writes)" pass={data.checks?.serviceRole} />
               <CheckRow label="Gemini (AI analysis)" pass={data.checks?.gemini} />
             </ul>
           </>

@@ -23,7 +23,14 @@ Gemini analysis is stored on the claim (`hf_label` / `model_id` columns keep the
 
 ## Storage
 
-Bucket `fasal-web-evidence`, private. Uploads go through `POST /api/claims` with server-generated keys and a server-recomputed SHA-256.
+Bucket `fasal-web-evidence`, private. Uploads go through `POST /api/claims` with server-generated keys and a server-recomputed SHA-256. There is no second evidence bucket.
+
+## Live SQL editor
+
+1. Read-only inventory: `scripts/audit_schema.sql`
+2. Lockdown + indexes + leftover cleanup: `scripts/optimize_schema.sql`
+
+The app uses exactly six tables (`web_plots`, `web_claims`, `web_claim_images`, `web_milestones`, `web_review_actions`, `web_profiles`). Plot coordinates are `lat`/`lon` doubles — PostGIS is not queried.
 
 ## What not to set
 

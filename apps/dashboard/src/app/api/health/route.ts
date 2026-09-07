@@ -11,8 +11,9 @@ export async function GET() {
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
       (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
   );
+  const hasServiceRole = Boolean((process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim());
   const hasGemini = Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
-  const degraded = !hasSupabase || !hasGemini;
+  const degraded = !hasSupabase || !hasServiceRole || !hasGemini;
   return NextResponse.json({
     ok: true,
     status: degraded ? "degraded" : "ok",
@@ -20,6 +21,7 @@ export async function GET() {
     checks: {
       app: true,
       supabase: hasSupabase,
+      serviceRole: hasServiceRole,
       gemini: hasGemini,
     },
   });

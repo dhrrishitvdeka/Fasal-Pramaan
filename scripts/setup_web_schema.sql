@@ -232,11 +232,22 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;
 -- Postgres does not auto-index FK targets, so create them explicitly.
 CREATE INDEX IF NOT EXISTS web_claims_created_by_idx ON public.web_claims (created_by);
 CREATE INDEX IF NOT EXISTS web_claims_plot_id_idx ON public.web_claims (plot_id);
+CREATE INDEX IF NOT EXISTS web_claims_status_created_idx ON public.web_claims (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS web_claims_inference_status_idx
+  ON public.web_claims (inference_status)
+  WHERE inference_status IS NOT NULL AND inference_status <> 'complete';
 CREATE INDEX IF NOT EXISTS web_plots_created_by_idx ON public.web_plots (created_by);
 CREATE INDEX IF NOT EXISTS web_claim_images_claim_id_idx ON public.web_claim_images (claim_id);
+CREATE INDEX IF NOT EXISTS web_claim_images_sha256_idx
+  ON public.web_claim_images (sha256)
+  WHERE sha256 IS NOT NULL;
 CREATE INDEX IF NOT EXISTS web_milestones_plot_id_idx ON public.web_milestones (plot_id);
 CREATE INDEX IF NOT EXISTS web_milestones_created_by_idx ON public.web_milestones (created_by);
+CREATE INDEX IF NOT EXISTS web_milestones_due_idx
+  ON public.web_milestones (due_date)
+  WHERE completed IS NOT TRUE;
 CREATE INDEX IF NOT EXISTS web_review_actions_claim_id_idx ON public.web_review_actions (claim_id);
+CREATE INDEX IF NOT EXISTS web_review_actions_created_idx ON public.web_review_actions (created_at DESC);
 CREATE INDEX IF NOT EXISTS web_profiles_email_idx ON public.web_profiles (email);
 
 -- Keep updated_at honest: bump on every UPDATE since app code rarely sets it.

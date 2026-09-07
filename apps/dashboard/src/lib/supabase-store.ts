@@ -191,10 +191,6 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
       } catch {
         // fallback to public url
       }
-      if (!url) {
-        const { data: pub } = client.storage.from("fasal-web-evidence").getPublicUrl(path);
-        url = pub?.publicUrl || "";
-      }
       return { url, storagePath: path };
     },
     async downloadImage(path) {
