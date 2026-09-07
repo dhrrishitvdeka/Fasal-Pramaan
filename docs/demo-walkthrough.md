@@ -1,10 +1,10 @@
-# MUN Exhibition Walkthrough & Showcase Guide
+# Operational Walkthrough & Adjudication Showcase Guide
 
-This guide provides a structured, presentation-ready script and walkthrough for demonstrating **Fasal-Pramaan** at Model United Nations (MUN) exhibitions, agricultural tech conferences, and policy stakeholder reviews.
+This guide provides a structured, presentation-ready operational walkthrough for validating **Fasal-Pramaan** during field audits, agricultural tech inspections, and policy stakeholder reviews.
 
 ---
 
-## Pre-Demonstration Setup
+## Verification & Staging Environment Setup
 
 1. **Start the Platform**: Run the webapp locally:
    ```bash
@@ -12,9 +12,9 @@ This guide provides a structured, presentation-ready script and walkthrough for 
    npm install && npm run dev
    ```
 2. **Open Portals** (single Next.js origin on `:3000`):
-   - **Farmer Portal**: `http://localhost:3000/farmer/saathi` (Supabase Auth user with farmer role)
-   - **Reviewer Portal**: `http://localhost:3000/review` (Supabase Auth user listed in `REVIEWER_EMAILS`)
-3. **Reset Operational Data** (Optional clean slate): In the Supabase SQL editor, clear demo submissions:
+   - **Farmer Portal**: `http://localhost:3000/farmer/saathi` (Supabase Auth user with farmer role, e.g. `farmer@fasalpramaan.com`)
+   - **Reviewer Portal**: `http://localhost:3000/review` (Supabase Auth user listed in `REVIEWER_EMAILS`, e.g. `reviewer@fasalpramaan.com`)
+3. **Reset Operational Data** (Optional clean slate): In the Supabase SQL editor, clear test submissions:
    ```sql
    DELETE FROM web_claim_images;
    DELETE FROM web_claims;
@@ -53,7 +53,7 @@ sequenceDiagram
   Dashboard->>Farmer Web: 8. Real-time DBT Sanctioned card appears on Farmer portal (₹ payout)
 ```
 
-1. **Farmer Action**: On the Farmer web (`:3000/farmer`), open **Farms** $\rightarrow$ **Add Farm** (*"Green Valley"*), **Add Plot** (*"Plot A1"*), and start **Paddy Cycle**. Tap **Capture Crop Evidence** (or start from `/farmer/saathi`). *(Tip: For indoor hackathon stage testing, add `?demo=true` to the URL to relax foliage color checks).* Capture the required angles and tap **Save & Submit**.
+1. **Farmer Action**: On the Farmer web (`:3000/farmer`), open **Farms** $\rightarrow$ **Add Farm** (*"Green Valley"*), **Add Plot** (*"Plot A1"*), and start **Paddy Cycle**. Tap **Capture Crop Evidence** (or start from `/farmer/saathi`). Capture the required angles and tap **Save & Submit**.
 2. **Reviewer Action**: In the Command Centre (`:3000/review`), open **Review Queue**. Notice that "Paddy" declared and "Rice" identified match cleanly via `crop-synonyms.ts` without triggering any `wrong_crop` gates. Click the case to show:
    - **Final Evidence Confidence**: `92.6 / 100` (Evidence Sufficient).
    - **Component Breakdown**: Quality `94.0`, Coverage `100.0`, Context `85.0`, Integrity `100.0`.
@@ -81,7 +81,7 @@ sequenceDiagram
   Reviewer->>Dashboard: 8. Reviews updated evidence -> Accepts Claim
 ```
 
-1. **Demonstrate the Gap**: Show the case in the Reviewer Dashboard with Evidence Confidence `72.4 / 100` and `Uncertainty: Coverage (High)`.
+1. **Verify the Gap**: Show the case in the Reviewer Dashboard with Evidence Confidence `72.4 / 100` and `Uncertainty: Coverage (High)`.
 2. **Reviewer Action**: Click **Request Recapture**. Point out that the system auto-selects `["closeup_damage"]` and provides bilingual farmer instructions.
 3. **Farmer Action**: Open the farmer portal. Notice the notification: *"Additional evidence required: Close-up damage photo"*. Tapping it opens guided capture in `specific_recapture` mode, requesting **only** the 1 missing photo.
 4. **Re-Evaluation**: Upload the photo. Refresh the Reviewer Dashboard to show the **Confidence Delta**:
@@ -105,7 +105,7 @@ sequenceDiagram
   Reviewer->>Dashboard: Inspects Duplicate Flag -> Clicks 'Reject Claim' with reason
 ```
 
-1. **Demonstrate Protection**: Show that even if an image is visually sharp ($S_{\text{Quality}} = 95.0$), an identical cryptographic SHA-256 hash collision reused across angles immediately drops $S_{\text{Integrity}}$ to $35.0$.
+1. **Verify Tamper Protection**: Show that even if an image is visually sharp ($S_{\text{Quality}} = 95.0$), an identical cryptographic SHA-256 hash collision reused across angles immediately drops $S_{\text{Integrity}}$ to $35.0$.
 2. **Strict Escalation**: Highlight that the automated recapture engine **refuses to issue an automated retake** for integrity breaches, requiring explicit human reviewer adjudication to protect the insurance pool.
 3. **Reviewer Action**: Reviewer clicks **Reject Claim** and logs the reason *"Fraudulent duplicate photo detected across angles"*.
 

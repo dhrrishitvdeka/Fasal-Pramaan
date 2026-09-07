@@ -16,6 +16,13 @@ import { checkRateLimit } from "@/lib/server/rate-limit";
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
+  const limit = checkRateLimit(`claim-reanalyze:${auth.actor.userId}`, 10, 60_000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many re-analysis requests. Please wait a moment." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
   const { id } = await context.params;
   const supabase = createServerSupabase();
   if (!supabase) {

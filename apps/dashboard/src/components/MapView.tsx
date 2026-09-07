@@ -7,11 +7,14 @@ import { OSM_TILE_ATTRIBUTION, OSM_TILE_URL } from "@/lib/map-tiles";
 import { useEffect } from "react";
 import Link from "next/link";
 
+import { MapPin } from "lucide-react";
+import { isValidCoordinate } from "@/lib/context/assemble";
+
 function FitBounds({ markers }: { markers: MapMarker[] }) {
   const map = useMap();
   useEffect(() => {
     const valid = markers.filter(
-      (m) => typeof m.lat === "number" && typeof m.lon === "number" && !isNaN(m.lat) && !isNaN(m.lon),
+      (m) => isValidCoordinate(m.lat, m.lon),
     );
     if (valid.length === 0) return;
     const lats = valid.map((m) => m.lat);
@@ -52,10 +55,22 @@ function severityColor(severity?: string | null, status?: string) {
 
 export default function MapView({ markers }: { markers: MapMarker[] }) {
   const validMarkers = markers.filter(
-    (m) => typeof m.lat === "number" && typeof m.lon === "number" && !isNaN(m.lat) && !isNaN(m.lon),
+    (m) => isValidCoordinate(m.lat, m.lon),
   );
-  const center: [number, number] =
-    validMarkers.length > 0 ? [validMarkers[0].lat, validMarkers[0].lon] : [23.26, 77.41];
+
+  if (validMarkers.length === 0) {
+    return (
+      <div className="flex h-[min(58vh,380px)] w-full flex-col items-center justify-center border border-slate-200 bg-slate-50 p-6 text-center md:h-[520px]">
+        <MapPin className="mb-2 h-10 w-10 text-slate-400" />
+        <h3 className="text-sm font-bold text-slate-800">No Geotagged Claims Available</h3>
+        <p className="mt-1 max-w-sm text-xs text-slate-500">
+          None of the claims currently have valid GPS coordinates recorded. Ensure location permissions are active during field capture.
+        </p>
+      </div>
+    );
+  }
+
+  const center: [number, number] = [validMarkers[0].lat, validMarkers[0].lon];
 
   return (
     <div className="h-[min(58vh,380px)] w-full overflow-hidden border border-slate-200 bg-white md:h-[520px]">

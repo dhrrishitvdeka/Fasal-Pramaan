@@ -74,7 +74,7 @@ sequenceDiagram
 
 ## 4. Operational Secrets & Deployment Policy
 
-1. **Zero Hardcoded Secrets**: All cryptographic keys, database passwords, and API tokens are injected strictly via environment variables. Never commit `SUPABASE_DB_PASSWORD`, `HF_TOKEN`, or publishable/service keys. `scripts/test_supabase_conn.py` reads env only.
-2. **Vercel server-only keys**: `SUPABASE_SERVICE_ROLE_KEY` and `HF_TOKEN` must never be named `NEXT_PUBLIC_*`. The evidence bucket `fasal-web-evidence` is private.
-3. **Local vs. Production Isolation**: Never enable demo credentials or mock inference fallbacks on a hosted deployment; keep demo data out of the production Supabase project.
+1. **Zero Hardcoded Secrets**: All cryptographic keys, database passwords, and API tokens are injected strictly via environment variables. Never commit `SUPABASE_DB_PASSWORD`, `GEMINI_API_KEY`, or publishable/service keys. `scripts/test_supabase_conn.py` reads env only.
+2. **Vercel server-only keys**: `SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` must never be named `NEXT_PUBLIC_*`. The evidence bucket `fasal-web-evidence` is private.
+3. **Local vs. Production Isolation**: Never enable test credentials or mock inference fallbacks on a hosted deployment; keep test data out of the production Supabase project.
 4. **Audit Trails**: All reviewer overrides, claim status mutations, gate adjudications, and recapture requests write immutable records to the `web_review_actions` table with actor UUID, action type, notes, and timestamp.

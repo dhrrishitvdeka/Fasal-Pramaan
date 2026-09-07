@@ -12,7 +12,7 @@ This guide walks you through setting up and running the Next.js webapp (`apps/da
 - **A Supabase account** (free tier works): you will create one project for auth, Postgres tables, and evidence storage.
 - **Git**: for cloning the repository.
 - **Optional API keys**:
-  - `GEMINI_API_KEY` — vision gate, post-submit field analysis, Saathi classify, and Live voice. Default vision model is `gemini-3.8-flash`. If Vercel still has `GEMINI_VISION_MODEL=gemini-2.0-flash`, change or delete it (that model is shut down).
+  - `GEMINI_API_KEY` — vision gate, post-submit field analysis, Saathi classify, and Live voice. Canonical vision model is `gemini-3.8-flash` (with `gemini-3.7-flash` and `gemini-3.6-flash` fallbacks); Live voice model is `gemini-3.1-flash-live-preview`.
   - `SENTINEL_TOKEN` / `IMD_API_KEY` — optional external context signals; without them signals return `pending` (IMD rainfall still works through the open-meteo proxy with no key).
 
 ---

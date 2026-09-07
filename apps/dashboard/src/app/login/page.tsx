@@ -53,60 +53,36 @@ function LoginFormView() {
 
   async function onSubmit(data: LoginForm) {
     setError(null);
-    try {
-      if (isSupabaseConfigured()) {
-        const supabase = getSupabaseClient();
-        if (!supabase) {
-          setError("Supabase is not configured.");
-          return;
-        }
-        const { error: authError } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password: data.password,
-        });
-        if (authError) {
-          setError(authError.message || "Sign-in failed.");
-          return;
-        }
-        const meRes = await apiFetch("/api/me");
-        const me = (await meRes.json().catch(() => ({}))) as { role?: string };
-        if (!meRes.ok) {
-          setError("Signed in, but the server could not resolve your role.");
-          return;
-        }
-        const next = safeNext(search.get("next"));
-        if (me.role === "farmer") {
-          router.push(next?.startsWith("/farmer") ? next : "/farmer");
-          return;
-        }
-        router.push(next && !next.startsWith("/farmer") ? next : "/overview");
-        return;
-      }
-
-      // Local / Offline demo mode authentication (when Supabase is not connected)
-      const email = data.email.trim().toLowerCase();
-      const isReviewer =
-        email.includes("reviewer") ||
-        email.includes("admin") ||
-        email === "reviewer@fasalpramaan.local";
-      const role = isReviewer ? "reviewer" : "farmer";
-      const roles = isReviewer ? ["reviewer", "administrator"] : ["farmer"];
-
-      setSessionTokens(`demo-jwt-${role}-${Date.now()}`, `demo-refresh-${Date.now()}`);
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("fp_demo_user", JSON.stringify({ email, role, roles }));
-      }
-
-      const next = safeNext(search.get("next"));
-      if (role === "farmer") {
-        router.push(next?.startsWith("/farmer") ? next : "/farmer");
-        return;
-      }
-      router.push(next && !next.startsWith("/farmer") ? next : "/overview");
+    if (!isSupabaseConfigured()) {
+      setError("Supabase authentication is required. Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.");
       return;
-    } catch {
-      setError("Sign-in failed. Check credentials and network connectivity.");
     }
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setError("Supabase client is not available.");
+      return;
+    }
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: data.email,
+      password: data.password,
+    });
+    if (authError) {
+      setError(authError.message || "Sign-in failed.");
+      return;
+    }
+    const meRes = await apiFetch("/api/me");
+    const me = (await meRes.json().catch(() => ({}))) as { role?: string };
+    if (!meRes.ok) {
+      setError("Signed in, but the server could not resolve your role.");
+      return;
+    }
+    const next = safeNext(search.get("next"));
+    if (me.role === "farmer") {
+      router.push(next?.startsWith("/farmer") ? next : "/farmer");
+      return;
+    }
+    router.push(next && !next.startsWith("/farmer") ? next : "/overview");
+    return;
   }
 
   return (
@@ -181,9 +157,9 @@ function LoginFormView() {
           </form>
 
           <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600 space-y-1">
-            <p className="font-semibold text-slate-800">Local demo accounts:</p>
-            <p>• <strong>Reviewer:</strong> reviewer@fasalpramaan.local / Demo@12345</p>
-            <p>• <strong>Farmer:</strong> farmer@fasalpramaan.local / Demo@12345</p>
+            <p className="font-semibold text-slate-800">Official Supabase accounts:</p>
+            <p>• <strong>Reviewer:</strong> reviewer@fasalpramaan.com / Reviewer@Pramaan2026!</p>
+            <p>• <strong>Farmer:</strong> farmer@fasalpramaan.com / Kisan@Pramaan2026!</p>
           </div>
 
           <div className="mt-4 flex gap-3 border-t border-slate-100 pt-3 text-[11px] text-slate-400">

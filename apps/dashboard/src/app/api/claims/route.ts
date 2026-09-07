@@ -18,7 +18,7 @@ import { claimSubmissionSchema } from "@/lib/schemas";
 export const maxDuration = 60;
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
-const MAX_BYTES = 15 * 1024 * 1024;
+const MAX_BYTES = 4 * 1024 * 1024;
 const MAX_IMAGES = 6;
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -34,7 +34,7 @@ function decodeDataUrl(value: string): { bytes: Uint8Array; contentType: string 
   }
   const bytes = Uint8Array.from(Buffer.from(match[2], "base64"));
   if (bytes.byteLength === 0 || bytes.byteLength > MAX_BYTES) {
-    throw new Error("Each image must be between 1 byte and 15 MB");
+    throw new Error("Each image must be between 1 byte and 4 MB");
   }
   return { contentType, bytes };
 }
@@ -148,7 +148,7 @@ export async function POST(request: Request) {
         // Do not fail claim persistence if plot table had a lookup issue; safely unlink the plot reference
         requestedPlotId = null;
       } else if (!plotRow.data) {
-        // Plot is not present in web_plots (e.g. local draft or unpersisted demo plot)
+        // Plot is not present in web_plots (e.g. unpersisted offline draft)
         // Keep the claim and photos safe by unlinking the foreign key reference
         requestedPlotId = null;
       } else if (

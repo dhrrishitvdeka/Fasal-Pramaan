@@ -91,7 +91,7 @@ flowchart TB
 ### 2. Peril-Aware Capture Studio & Edge CV
 - **Real-Time On-Device OpenCV:** Excess Green / GLI / Excess Red, Laplacian texture, skin rejection, and scanline/moiré screen detection at a few FPS in a Web Worker. No cloud model on the live viewfinder.
 - **Anti-Screen & Anti-Spoofing Filter:** Detects digital display scanlines, pixel subgrids, and Moiré interference patterns ($0^\circ/90^\circ$ gradient ratio $> 0.80$) to reject monitor re-captures and fake images before upload.
-- **Strict 75%+ Crop Quality Shutter Lock:** Disables the shutter button unless the live frame achieves $\ge 75\%$ crop match (relaxed to $\ge 40\%$ for charred fire burn scars, with `?demo=true` stage relaxation for indoor hackathon demos).
+- **Strict 75%+ Crop Quality Shutter Lock:** Disables the shutter button unless the live frame achieves $\ge 75\%$ crop match (relaxed to $\ge 40\%$ for charred fire burn scars).
 - **Multilingual Accessible Claim Banner (`ClaimNotificationBanner`):** Farmer-friendly guidance ("what happened" + "what to do next") across all 15 Indian languages with distinct visual states (Error, Warning, Success, Info), non-obstructive top docking, and 4-second debouncing.
 
 ### 3. 3-Stage Ground Truth Verification Pipeline
@@ -124,7 +124,7 @@ Comprehensive architectural, mathematical, API, and deployment documentation is 
 | [**REST & WebSocket API Reference**](./docs/api.md) | Complete endpoint schemas for `/api/claims`, `/api/vision/gate`, `/api/voice/session`, `/api/context/assemble`, etc. |
 | [**Production Deployment Guide**](./docs/deployment.md) | Vercel + Supabase + Gemini (Root Directory = `apps/dashboard`). |
 | [**Security & Governance**](./docs/governance-and-safety.md) | Cryptographic SHA-256 hashes, Row Level Security (RLS) policies, and ephemeral token lifecycle. |
-| [**Demonstration Walkthrough**](./docs/demo-walkthrough.md) | Step-by-step presentation script for exhibitions, hackathons, and policy stakeholder reviews. |
+| [**Demonstration Walkthrough**](./docs/demo-walkthrough.md) | Step-by-step presentation script for exhibitions, field audits, and policy stakeholder reviews. |
 | [**Environment Variables**](./docs/environment-variables.md) | Complete configuration matrix for production, preview, and local development. |
 
 ---

@@ -143,6 +143,7 @@ export interface AssembleInput {
   sowingDate?: string;
   captureLat?: number | null;
   captureLon?: number | null;
+  captureAccuracyM?: number | null;
   plotLat?: number | null;
   plotLon?: number | null;
   plotProximityMeters?: number;
@@ -166,12 +167,12 @@ function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number)
  * coordinate is missing/non-finite.
  */
 export function isValidCoordinate(
-  lat: number | null | undefined,
-  lon: number | null | undefined,
-): boolean {
+  lat: unknown,
+  lon: unknown,
+): lat is number {
   if (lat == null || lon == null) return false;
-  const nLat = Number(lat);
-  const nLon = Number(lon);
+  const nLat = typeof lat === "number" ? lat : Number(lat);
+  const nLon = typeof lon === "number" ? lon : Number(lon);
   if (!Number.isFinite(nLat) || !Number.isFinite(nLon)) return false;
   if (nLat < -90 || nLat > 90 || nLon < -180 || nLon > 180) return false;
   if (Math.abs(nLat) < 0.00001 && Math.abs(nLon) < 0.00001) return false;
@@ -844,15 +845,48 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
   }
 
   // 6. GPS
-  signals.push({
-    source: "gps",
-    status: lat != null && lon != null ? "available" : "unavailable",
-    labelEn: "GPS",
-    labelHi: "जीपीएस",
-    summaryEn: lat != null && lon != null ? `GPS ${lat.toFixed(5)}, ${lon.toFixed(5)}` : "No GPS fix on capture.",
-    summaryHi: lat != null && lon != null ? `जीपीएस ${lat.toFixed(5)}, ${lon.toFixed(5)}` : "कैप्चर पर जीपीएस नहीं।",
-    checkedAt: now,
-  });
+  const rawAccuracy = input.captureAccuracyM != null ? Number(input.captureAccuracyM) : null;
+  const accuracyM = Number.isFinite(rawAccuracy) && rawAccuracy != null ? rawAccuracy : null;
+  const isGpsInaccurate = accuracyM != null && accuracyM > 100;
+
+  if (lat != null && lon != null) {
+    if (isGpsInaccurate) {
+      signals.push({
+        source: "gps",
+        status: "unavailable",
+        labelEn: "GPS (Inaccurate)",
+        labelHi: "जीपीएस (अविश्वसनीय)",
+        summaryEn: `GPS fix inaccuracy (±${accuracyM}m) exceeds the 100m threshold — location verification degraded.`,
+        summaryHi: `जीपीएस अनिश्चितता (±${accuracyM}मी) 100मी सीमा से अधिक है — स्थान सत्यापन अमान्य।`,
+        confidence: 30,
+        meta: { lat, lon, accuracyM, inaccurate: true },
+        checkedAt: now,
+      });
+    } else {
+      signals.push({
+        source: "gps",
+        status: "available",
+        labelEn: "GPS",
+        labelHi: "जीपीएस",
+        summaryEn: `GPS ${lat.toFixed(5)}, ${lon.toFixed(5)}${accuracyM != null ? ` (±${accuracyM}m)` : ""}`,
+        summaryHi: `जीपीएस ${lat.toFixed(5)}, ${lon.toFixed(5)}${accuracyM != null ? ` (±${accuracyM}मी)` : ""}`,
+        confidence: 90,
+        meta: { lat, lon, accuracyM },
+        checkedAt: now,
+      });
+    }
+  } else {
+    signals.push({
+      source: "gps",
+      status: "unavailable",
+      labelEn: "GPS",
+      labelHi: "जीपीएस",
+      summaryEn: "No valid GPS fix on capture.",
+      summaryHi: "कैप्चर पर कोई मान्य जीपीएस नहीं।",
+      confidence: 0,
+      checkedAt: now,
+    });
+  }
 
   // 7. Plot containment — capture point vs registered plot center (haversine radius check)
   const plotProximityRaw = Number(input.plotProximityMeters);
@@ -864,17 +898,31 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
   const containment = plotContainment(lat, lon, input.plotLat, input.plotLon, plotProximity);
   if (hasPlotPoint && containment.distanceM != null) {
     const distTxt = Math.round(containment.distanceM).toString();
-    signals.push({
-      source: "plot_match",
-      status: "available",
-      labelEn: "Plot location match",
-      labelHi: "प्लॉट स्थान मिलान",
-      summaryEn: `Capture is ${distTxt} m from plot center (${containment.within ? "within" : "outside"} ${plotProximity}m radius).`,
-      summaryHi: `कैप्चर प्लॉट केंद्र से ${distTxt} मीटर दूर है (${containment.within ? `${plotProximity} मीटर त्रिज्या के भीतर` : `${plotProximity} मीटर त्रिज्या से बाहर`})।`,
-      confidence: containment.within ? 75 : 40,
-      meta: { distanceM: containment.distanceM, maxMeters: plotProximity, within: containment.within },
-      checkedAt: now,
-    });
+    if (isGpsInaccurate) {
+      signals.push({
+        source: "plot_match",
+        status: "pending",
+        labelEn: "Plot location match (Degraded)",
+        labelHi: "प्लॉट स्थान मिलान (कमज़ोर)",
+        summaryEn: `Capture GPS is inaccurate (±${accuracyM}m > 100m threshold). Distance to plot center ~${distTxt}m cannot be reliably verified.`,
+        summaryHi: `कैप्चर जीपीएस अविश्वसनीय है (±${accuracyM}मी > 100मी सीमा)। प्लॉट केंद्र से दूरी ~${distTxt}मी सत्यापित नहीं हो सकती।`,
+        confidence: 30,
+        meta: { distanceM: containment.distanceM, maxMeters: plotProximity, within: containment.within, inaccurateGps: true, accuracyM },
+        checkedAt: now,
+      });
+    } else {
+      signals.push({
+        source: "plot_match",
+        status: "available",
+        labelEn: "Plot location match",
+        labelHi: "प्लॉट स्थान मिलान",
+        summaryEn: `Capture is ${distTxt} m from plot center (${containment.within ? "within" : "outside"} ${plotProximity}m radius).`,
+        summaryHi: `कैप्चर प्लॉट केंद्र से ${distTxt} मीटर दूर है (${containment.within ? `${plotProximity} मीटर त्रिज्या के भीतर` : `${plotProximity} मीटर त्रिज्या से बाहर`})।`,
+        confidence: containment.within ? 75 : 40,
+        meta: { distanceM: containment.distanceM, maxMeters: plotProximity, within: containment.within },
+        checkedAt: now,
+      });
+    }
   } else if (!hasPlotPoint) {
     signals.push({
       source: "plot_match",

@@ -429,6 +429,57 @@ export const listWebClaims = listClaims;
 export const getWebClaim = getClaim;
 export const applyWebReviewAction = applyReviewAction;
 
+/**
+ * Downscale and compress high-resolution client photos before upload to ensure
+ * multi-photo payloads stay well within Vercel's 4.5 MB serverless request body budget.
+ */
+export async function compressImageDataUrl(
+  dataUrl: string,
+  maxDim = 1600,
+  quality = 0.82,
+): Promise<string> {
+  if (typeof window === "undefined" || typeof Image === "undefined") {
+    return dataUrl;
+  }
+  // If the image is already lightweight (< 500 KB base64), keep original
+  if (dataUrl.length < 500_000) {
+    return dataUrl;
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width <= maxDim && height <= maxDim && dataUrl.length < 800_000) {
+        resolve(dataUrl);
+        return;
+      }
+      if (width > height) {
+        if (width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 export async function submitWebClaim(input: {
   id?: string;
   plotId?: string;
@@ -474,9 +525,19 @@ export async function submitWebClaim(input: {
     throw new Error("Supabase is not configured");
   }
   const route = resolveClaimClientPath(true, "submit");
+  const processedImages = await Promise.all(
+    input.images.map(async (img) => {
+      if (img.imageDataUrl && img.imageDataUrl.startsWith("data:")) {
+        const compressed = await compressImageDataUrl(img.imageDataUrl);
+        return { ...img, imageDataUrl: compressed };
+      }
+      return img;
+    }),
+  );
+  const payload = { ...input, images: processedImages };
   const res = await apiFetch(route.path, {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify(payload),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -696,17 +757,6 @@ export async function currentSessionRoles(): Promise<string[] | null> {
     return Array.isArray(body.roles) ? body.roles : null;
   }
   if (hasRealApiSession()) {
-    if (typeof window !== "undefined") {
-      const demo = sessionStorage.getItem("fp_demo_user");
-      if (demo) {
-        try {
-          const parsed = JSON.parse(demo);
-          if (Array.isArray(parsed.roles)) return parsed.roles;
-        } catch {
-          // ignore JSON parse error
-        }
-      }
-    }
     const response = await api.get<{ roles: string[] }>("/auth/me").catch(() => null);
     return response?.data?.roles || ["farmer"];
   }

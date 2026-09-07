@@ -11,8 +11,8 @@ describe("fixed-window rate limiter", () => {
     vi.useRealTimers();
   });
 
-  it("bypasses rate limits by default for seamless demonstrations", () => {
-    const key = "route:demo-user";
+  it("bypasses rate limits when not in production and not explicitly enabled", () => {
+    const key = "route:test-user";
     for (let i = 0; i < 20; i++) {
       expect(checkRateLimit(key, 2)).toEqual({ ok: true });
     }

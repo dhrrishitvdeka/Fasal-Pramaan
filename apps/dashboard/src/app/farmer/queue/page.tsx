@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useFarmerData } from "@/lib/farmerStore";
 import { getFarmerT } from "@/lib/farmerI18n";
-import { Trash2 } from "lucide-react";
+import { Trash2, Inbox } from "lucide-react";
+import EmptyState from "@/components/EmptyState";
 
 export default function FarmerQueuePage() {
   const { lang, loadClaimDraft, clearClaimDraft } = useFarmerData();
@@ -21,7 +22,12 @@ export default function FarmerQueuePage() {
     <div className="space-y-4">
       <h1 className="text-lg font-bold text-slate-900 sm:text-2xl">{t.queueTitle}</h1>
       {!draft ? (
-        <p className="text-sm text-slate-600">{t.queueEmpty}</p>
+        <EmptyState
+          icon={Inbox}
+          title={t.queueTitle}
+          body={t.queueEmpty}
+          action={{ href: "/farmer/capture", label: t.quickActionNewClaim }}
+        />
       ) : (
         <div className="fp-panel space-y-3 p-3 sm:p-5">
           <div className="break-words text-sm font-bold">

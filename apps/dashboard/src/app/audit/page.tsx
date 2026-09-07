@@ -5,6 +5,7 @@ import { auditLogs } from "@/lib/api";
 import { useRequireRole } from "@/lib/use-require-role";
 import AccessGate from "@/components/AccessGate";
 import EmptyState from "@/components/EmptyState";
+import { TableSkeleton } from "@/components/LoadingAnimation";
 import { ShieldCheck } from "lucide-react";
 
 export default function AuditPage() {
@@ -27,7 +28,7 @@ export default function AuditPage() {
         <p className="fp-page-sub">Immutable record of significant actions</p>
       </div>
 
-      {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
+      {isLoading && <TableSkeleton rows={4} cols={4} className="mt-4" />}
 
       {!isLoading && rows.length === 0 && !error && (
         <EmptyState

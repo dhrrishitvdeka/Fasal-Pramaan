@@ -11,6 +11,17 @@ export type Peril =
   | "hailstorm"
   | "lodging";
 
+export const PERIL_TYPES: readonly Peril[] = [
+  "normal",
+  "fire_burn",
+  "animal_damage",
+  "flood",
+  "drought",
+  "pest_disease",
+  "hailstorm",
+  "lodging",
+] as const;
+
 export type ContextCheck =
   | "sentinel_fire"
   | "wildlife_proximity"

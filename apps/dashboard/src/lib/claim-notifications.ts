@@ -114,7 +114,7 @@ const EN_NOTIFICATIONS: NotificationDictionary = {
     type: "warning",
     title: "Database Not Configured",
     message: "Cloud database connection is not active — claim cannot be saved to cloud.",
-    actionHint: "Connect Supabase or proceed in local offline demonstration mode.",
+    actionHint: "Connect Supabase or check offline sync queue.",
   },
   gps_unavailable: {
     type: "warning",

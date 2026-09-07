@@ -22,6 +22,8 @@ import {
   Check,
   AlertTriangle,
   Lock,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { loadDraftImagesFromDb } from "@/lib/draft-db";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
@@ -174,6 +176,8 @@ function CaptureStudioContent() {
   const [observations, setObservations] = useState<string>("");
   const [isListening, setIsListening] = useState<boolean>(false);
   const [speechSupported, setSpeechSupported] = useState<boolean>(false);
+  const [voiceGuidanceActive, setVoiceGuidanceActive] = useState<boolean>(false);
+  const lastSpokenGuidanceRef = useRef<{ text: string; time: number }>({ text: "", time: 0 });
 
   // Submission / draft state & notification management
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -503,6 +507,36 @@ function CaptureStudioContent() {
     };
   }, [isCameraActive, currentAngle?.id]);
 
+  // Realtime spoken voice guidance & screen reader announcement text
+  const liveGuidanceText = cvResult?.isPersonDetected
+    ? (lang === "hi" ? "व्यक्ति का चेहरा या शरीर दिखा — केवल असली फसल दिखाएँ" : "Person detected — Aim camera at field crop")
+    : cvResult?.isScreenDetected
+    ? (lang === "hi" ? "स्क्रीन का फोटो अमान्य — खेत में असली फसल दिखाएँ" : "Screen replay detected — Point at real field")
+    : (lang === "hi" ? cvResult?.hintHi : cvResult?.hintEn) ||
+      (cvModelStatus === "ready"
+        ? (lang === "hi" ? "फसल पर स्थिर रखें" : "Align camera with crop")
+        : (lang === "hi" ? "कैमरा स्थिर रखें" : "Hold steady"));
+
+  useEffect(() => {
+    if (!voiceGuidanceActive || !isCameraActive || typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
+    const text = liveGuidanceText;
+    const now = Date.now();
+    if (text && (text !== lastSpokenGuidanceRef.current.text || now - lastSpokenGuidanceRef.current.time > 4000)) {
+      lastSpokenGuidanceRef.current = { text, time: now };
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = lang === "hi" ? "hi-IN" : "en-IN";
+        utterance.rate = 1.05;
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        // non-fatal if browser prevents speech without prior interaction
+      }
+    }
+  }, [liveGuidanceText, voiceGuidanceActive, isCameraActive, lang]);
+
   const [gpsRetry, setGpsRetry] = useState(0);
 
   useEffect(() => {
@@ -597,7 +631,7 @@ function CaptureStudioContent() {
 
   const capturePhotoFromCamera = async () => {
     const isDryOrCharredPeril = requestedPeril === "fire_burn" || requestedPeril === "drought";
-    const isRelaxed = isDryOrCharredPeril;
+    const isRelaxed = isDryOrCharredPeril || cvModelStatus === "unavailable";
 
     if (!cvResult && !isRelaxed) {
       const msg =
@@ -1115,7 +1149,7 @@ function CaptureStudioContent() {
   }, []);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       {/* Polished, accessible, multilingual claim notification banner */}
       <ClaimNotificationBanner
         notification={activeNotification}
@@ -1131,6 +1165,19 @@ function CaptureStudioContent() {
           {lang === "hi"
             ? "डेटाबेस कॉन्फ़िगर नहीं है — दावा सबमिट नहीं होगा। Supabase कनेक्ट करें।"
             : "Database is not configured — this claim will not be stored. Connect Supabase before submitting."}
+        </div>
+      )}
+      {cvModelStatus === "unavailable" && (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900"
+        >
+          <Info className="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+          <span>
+            {lang === "hi"
+              ? "ऑन-डिवाइस विज़न वर्कर लोड नहीं हुआ — मुख्य थ्रेड संगतता सक्रिय है। फसल गुणवत्ता जाँच जारी रहेगी।"
+              : "On-device vision worker unavailable — running in main-thread compatibility mode. Crop checks remain active."}
+          </span>
         </div>
       )}
       {gpsCoords.status === "unavailable" && (
@@ -1310,11 +1357,27 @@ function CaptureStudioContent() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left Column (7 cols): Camera Viewfinder & Controls */}
         <div className="lg:col-span-7 space-y-3">
-          {/* Live-camera-only indicator (upload + demo removed) */}
+          {/* Live-camera-only indicator */}
           <div className="flex items-center gap-2 border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--ink)]">
             <Camera className="h-3.5 w-3.5 shrink-0" />
             <span>{lang === "hi" ? "सीधा कैमरा — सत्यापित लाइव साक्ष्य" : "Live Camera — verified capture only"}</span>
           </div>
+
+          {/* Graceful Fallback Warning UI when on-device CV / WebWorker is unavailable */}
+          {cvModelStatus === "unavailable" && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 shadow-xs"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+              <span>
+                {lang === "hi"
+                  ? "ऑन-डिवाइस AI मार्गदर्शन ऑफलाइन है (बैकअप मोड सक्रिय)। आप सामान्य रूप से तस्वीरें ले सकते हैं।"
+                  : "On-device AI guidance is offline (fallback heuristics active). You can still take photos normally."}
+              </span>
+            </div>
+          )}
 
             {/* Live Camera Viewfinder (only mode) */}
             <div className="fp-viewfinder relative flex aspect-[4/3] h-[min(52vh,420px)] min-h-[240px] w-full items-center justify-center overflow-hidden border border-[var(--ink)] bg-black sm:aspect-[16/10] sm:h-auto">
@@ -1337,23 +1400,33 @@ function CaptureStudioContent() {
                 />
               ) : null}
               {!isCameraActive && !capturedImages[currentAngle.id] ? (
-                <div className="absolute inset-0 z-[3] flex flex-col items-center justify-center p-6 text-center text-slate-400">
-                  <Camera className="mx-auto mb-2 h-12 w-12 opacity-40" />
-                  <p className="text-sm font-medium">
-                    {cameraError || (lang === "hi" ? "कैमरा शुरू हो रहा है…" : "Starting camera…")}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                    {cameraError ? (
+                <div className="absolute inset-0 z-[3] flex flex-col items-center justify-center p-6 text-center text-slate-300 bg-black/90">
+                  {cameraError ? (
+                    <>
+                      <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-amber-400" aria-hidden="true" />
+                      <h3 className="text-sm font-bold text-white mb-1">
+                        {lang === "hi" ? "कैमरा उपलब्ध नहीं है" : "Camera Access Unavailable"}
+                      </h3>
+                      <p className="text-xs text-stone-300 max-w-sm mb-4 leading-relaxed">
+                        {cameraError}
+                      </p>
                       <button
                         type="button"
                         onClick={() => void startCamera()}
-                        className="fp-btn-secondary gap-1.5 text-xs"
+                        className="fp-btn-primary gap-1.5 text-xs px-4 py-2"
                       >
                         <RefreshCw className="h-3.5 w-3.5" />
                         <span>{lang === "hi" ? "कैमरा पुनः शुरू करें" : "Retry Camera"}</span>
                       </button>
-                    ) : null}
-                  </div>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="mx-auto mb-2 h-12 w-12 opacity-40 animate-pulse" />
+                      <p className="text-sm font-medium">
+                        {lang === "hi" ? "कैमरा शुरू हो रहा है…" : "Starting camera…"}
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : null}
 
@@ -1373,6 +1446,46 @@ function CaptureStudioContent() {
                 <div className="border-r border-b border-white/20" />
                 <div />
               </div>
+
+              {/* Audio voice guidance toggle */}
+              {isCameraActive && !capturedImages[currentAngle.id] && (
+                <div className="absolute top-3 left-3 z-[4] flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVoiceGuidanceActive((v) => !v)}
+                    aria-label={
+                      voiceGuidanceActive
+                        ? lang === "hi"
+                          ? "आवाज़ मार्गदर्शन बंद करें"
+                          : "Mute voice guidance"
+                        : lang === "hi"
+                          ? "आवाज़ मार्गदर्शन चालू करें"
+                          : "Enable voice guidance"
+                    }
+                    className={clsx(
+                      "flex min-h-8 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold backdrop-blur-md transition-all shadow-md",
+                      voiceGuidanceActive
+                        ? "border border-emerald-400 bg-emerald-950/80 text-emerald-200 ring-2 ring-emerald-500/50"
+                        : "border border-white/30 bg-black/60 text-white hover:bg-black/80"
+                    )}
+                  >
+                    {voiceGuidanceActive ? (
+                      <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
+                    ) : (
+                      <VolumeX className="h-3.5 w-3.5 text-stone-300" />
+                    )}
+                    <span className="text-[11px]">
+                      {voiceGuidanceActive
+                        ? lang === "hi"
+                          ? "बोलें चालू"
+                          : "Voice On"
+                        : lang === "hi"
+                          ? "आवाज़"
+                          : "Voice"}
+                    </span>
+                  </button>
+                </div>
+              )}
 
               {/* Seamless Realtime CV Reticle & Bounding Box */}
               {cvResult?.bbox && isCameraActive && !capturedImages[currentAngle.id] && (
@@ -1402,12 +1515,18 @@ function CaptureStudioContent() {
                 </div>
               )}
 
-              {/* Seamless Viewfinder Floating Glass HUD */}
+              {/* Seamless Viewfinder Floating Glass HUD with ARIA Live Announcements */}
               {isCameraActive && !capturedImages[currentAngle.id] && (
-                <div className="pointer-events-none absolute bottom-3 left-2 right-2 flex flex-col items-center gap-1.5 sm:bottom-4 sm:left-4 sm:right-4">
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  className="pointer-events-none absolute bottom-3 left-2 right-2 flex flex-col items-center gap-1.5 sm:bottom-4 sm:left-4 sm:right-4"
+                >
                   <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-white/20 bg-black/75 px-3.5 py-1.5 text-xs text-white shadow-lg backdrop-blur-md">
                     {/* Status Indicator Dot */}
                     <span
+                      aria-hidden="true"
                       className={clsx(
                         "h-2 w-2 rounded-full shrink-0",
                         cvResult?.isPersonDetected || cvResult?.isScreenDetected
@@ -1422,14 +1541,7 @@ function CaptureStudioContent() {
 
                     {/* Anti-Screen / Person Alert or Localized Guidance Text */}
                     <span className="font-semibold tracking-wide line-clamp-2 leading-snug">
-                      {cvResult?.isPersonDetected
-                        ? (lang === "hi" ? "व्यक्ति का चेहरा / शरीर दिखा — केवल असली फसल दिखाएँ" : "Person detected — Aim camera at field crop")
-                        : cvResult?.isScreenDetected
-                        ? (lang === "hi" ? "स्क्रीन / फोटो का फोटो अमान्य — खेत में असली फसल दिखाएँ" : "Screen replay detected — Point at real field")
-                        : (lang === "hi" ? cvResult?.hintHi : cvResult?.hintEn) ||
-                          (cvModelStatus === "ready"
-                            ? (lang === "hi" ? "फसल पर स्थिर रखें" : "Align camera with crop")
-                            : (lang === "hi" ? "कैमरा स्थिर रखें" : "Hold steady"))}
+                      {liveGuidanceText}
                     </span>
                   </div>
                 </div>
@@ -1452,7 +1564,7 @@ function CaptureStudioContent() {
 
           {/* Primary Viewport Action Buttons — thumb-zone sticky bar on phone,
               back to normal flow inside the lg+ two-column studio */}
-          <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 -mx-3 border-t border-[var(--line)] bg-[var(--surface)] px-3 py-2 shadow-[0_-4px_12px_rgba(28,25,21,0.08)] sm:-mx-4 sm:px-4 md:bottom-0 md:-mx-6 md:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:shadow-none">
+          <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 -mx-3 border-t border-[var(--line)] bg-[var(--surface)] px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(28,25,21,0.08)] sm:-mx-4 sm:px-4 md:bottom-0 md:-mx-6 md:px-6 md:pb-2 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:shadow-none">
             <div className="space-y-2">
               <>
                   <div className="grid grid-cols-[auto_1fr] items-center gap-2">

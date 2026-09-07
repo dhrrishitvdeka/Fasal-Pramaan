@@ -368,7 +368,7 @@ Source: `apps/dashboard/src/app/api/vision/gate/route.ts:13-23`
 | `expectedCrop` present | `{ usable:true, reason:"ok", crop_detected: expectedCrop, confidence:0.62 }` |
 | else | `{ usable:true, reason:"ok", crop_detected:"unknown", confidence:0.6 }` with `fallback:true` flag |
 
-This ensures offline/demo builds still gate obviously broken images while never blocking fire claims for low vegetation.
+This ensures offline and fallback environments still gate obviously broken images while never blocking fire claims for low vegetation.
 
 ### 8.4 Reason Taxonomy
 

@@ -15,7 +15,7 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
           throw new Error("Claim already exists");
         }
         if (/foreign key|fkey|23503/i.test(msg) || code === "23503") {
-          // If plot_id violates foreign key constraint (e.g. plot deleted or from demo state),
+          // If plot_id violates foreign key constraint (e.g. plot was deleted or unlinked),
           // fallback to plot_id: null so the farmer's crop evidence and claim are never lost.
           const { plot_id: _badPlot, ...fallback } = row as any;
           const { data, error } = await client
@@ -87,27 +87,8 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
             msg.match(/column "?([^"\s]+)"? of relation/i);
 
           if (colMatch && colMatch[1] && colMatch[1] in currentBody) {
+            console.warn(`[SupabaseStore] Column '${colMatch[1]}' missing in table, skipping for backward-compat retry.`);
             delete currentBody[colMatch[1]];
-            continue;
-          }
-
-          if (
-            code === "42703" ||
-            code === "PGRST204" ||
-            /growth_stage|predicted_growth_stage|corrected_growth_stage|sowing_date|peril|intent_id|gate_result|context_signals|adaptive_result|inference_|column.*does not exist|Could not find the '.*' column/i.test(msg)
-          ) {
-            delete currentBody.growth_stage;
-            delete currentBody.predicted_growth_stage;
-            delete currentBody.corrected_growth_stage;
-            delete currentBody.sowing_date;
-            delete currentBody.peril;
-            delete currentBody.intent_id;
-            delete currentBody.gate_result;
-            delete currentBody.context_signals;
-            delete currentBody.adaptive_result;
-            delete currentBody.inference_status;
-            delete currentBody.inference_error;
-            delete currentBody.inference_started_at;
             continue;
           }
 
@@ -181,7 +162,7 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
             try {
               const { data: signed } = await client.storage
                 .from("fasal-web-evidence")
-                .createSignedUrl(row.storage_path, 60 * 60 * 24 * 7);
+                .createSignedUrl(row.storage_path, 1800);
               if (signed?.signedUrl) {
                 return { ...row, image_url: signed.signedUrl };
               }

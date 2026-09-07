@@ -4,7 +4,7 @@ Copy `apps/dashboard/.env.example` to `apps/dashboard/.env.local`. On Vercel, se
 
 **Never** prefix server secrets with `NEXT_PUBLIC_`.
 
-## Required for a working demo
+## Required for Production Deployment
 
 | Variable | Public? | Notes |
 |---|---|---|
@@ -21,12 +21,13 @@ Without Gemini, capture still works with a weak heuristic gate and no written an
 | Variable | Notes |
 |---|---|
 | `SITE_LOCK_PASSWORD` | Shared gate for the public URL (`/unlock`) |
-| `GEMINI_VISION_MODEL` | Default **`gemini-3.8-flash`**. **Do not set `gemini-2.0-flash`** — that model is shut down |
+| `ENABLE_RATE_LIMIT` | Optional boolean (`true`/`false`). When `true`, enforces in-memory sliding-window rate limiting across `/api/claims`, `/api/vision/gate`, etc. |
+| `GEMINI_VISION_MODEL` | Default **`gemini-3.8-flash`**. Fallbacks: `gemini-3.7-flash` → `gemini-3.5-flash` → `gemini-2.5-flash` |
 | `GEMINI_LIVE_MODEL` | Default **`gemini-3.1-flash-live-preview`** |
 | `GEMINI_LIVE_VOICE` | Default `Kore` |
 | `GEMINI_LIVE_SESSION_MINUTES` | Default `15` |
 
-If you already set `GEMINI_VISION_MODEL=gemini-2.0-flash` on Vercel, **change it to `gemini-3.8-flash` or delete the variable** so the code default applies.
+Ensure `GEMINI_VISION_MODEL` is set to `gemini-3.8-flash` or left unset so the code default applies.
 
 ## Optional context signals
 
@@ -55,7 +56,7 @@ Confirm these **names** exist (values stay secret):
 1. Supabase trio: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 2. `GEMINI_API_KEY`
 3. `REVIEWER_EMAILS`
-4. `SITE_LOCK_PASSWORD` (for a public demo URL)
+4. `SITE_LOCK_PASSWORD` (shared access gate for staged environments)
 5. Optional: `SENTINEL_TOKEN` (CDSE Process API bearer), `GEMINI_VISION_MODEL=gemini-3.8-flash`
 
 SQL already applied: `scripts/setup_supabase.sql`, `setup_web_schema.sql`. Private bucket `fasal-web-evidence`.

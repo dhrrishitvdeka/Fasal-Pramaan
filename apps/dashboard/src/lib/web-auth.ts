@@ -66,12 +66,16 @@ export async function requireWebActor(
   if (!token) {
     return { ok: false, response: NextResponse.json({ error: "Sign in required" }, { status: 401 }) };
   }
-  // Intercept demo tokens (presentation & offline sessions)
+  // Intercept demo tokens ONLY in automated tests when explicitly enabled.
+  // In production and live environments, authentication strictly requires Supabase user JWTs.
+  const allowDemoTokens =
+    process.env.NODE_ENV === "test" && process.env.ALLOW_DEMO_TOKENS === "true";
   if (
-    token.startsWith("demo-") ||
-    token === "demo" ||
-    token === "test-token" ||
-    token.startsWith("demo-jwt-")
+    allowDemoTokens &&
+    (token.startsWith("demo-") ||
+      token === "demo" ||
+      token === "test-token" ||
+      token.startsWith("demo-jwt-"))
   ) {
     const isReviewer =
       token.includes("reviewer") ||

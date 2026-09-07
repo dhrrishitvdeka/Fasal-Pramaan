@@ -11,7 +11,7 @@ import type { ContextSignal } from "./context/types";
 import { adaptiveConfidence, type AdaptiveResult } from "./context/adaptive-engine";
 import { ROUTE_CONFIG, type Peril } from "./claim-routing";
 import { isCropMatch } from "./crop-synonyms";
-
+import type { WebClaimRow } from "./web-db";
 
 // ---------- Vision gate helpers (shared with /api/vision/gate) ----------
 
@@ -354,69 +354,7 @@ export type PersistClaimInput = {
   images: PersistedImageInput[];
 };
 
-export type WebClaimRow = {
-  id: string;
-  plot_id?: string | null;
-  plot_name?: string | null;
-  plot_name_hi?: string | null;
-  khasra_number?: string | null;
-  crop_type?: string | null;
-  crop_type_hi?: string | null;
-  crop_variety?: string | null;
-  sowing_date?: string | null;
-  status: string;
-  farmer_observations?: string | null;
-  missing_angles?: string[] | null;
-  recapture_reason?: string | null;
-  recapture_reason_hi?: string | null;
-  reviewer_notes?: string | null;
-  quality_score?: number | null;
-  coverage_score?: number | null;
-  context_score?: number | null;
-  integrity_score?: number | null;
-  overall_confidence?: number | null;
-  quality_notes?: string | null;
-  coverage_notes?: string | null;
-  context_notes?: string | null;
-  integrity_notes?: string | null;
-  crop_identified?: string | null;
-  crop_confidence?: number | null;
-  disease_detected?: string | null;
-  disease_detected_hi?: string | null;
-  severity_percentage?: number | null;
-  severity_grade?: string | null;
-  affected_area_hectares?: number | null;
-  estimated_loss_inr?: number | null;
-  model_confidence?: number | null;
-  model_id?: string | null;
-  hf_label?: string | null;
-  hf_score?: number | null;
-  payout_status?: string | null;
-  payout_amount_inr?: number | null;
-  capture_lat?: number | null;
-  capture_lon?: number | null;
-  capture_accuracy_m?: number | null;
-  gps_status?: string | null;
-  peril?: string | null;
-  intent_id?: string | null;
-  gate_result?: unknown;
-  context_signals?: unknown;
-  adaptive_result?: unknown;
-  created_by?: string | null;
-  created_at?: string;
-  updated_at?: string;
-  inference_status?: "pending" | "complete" | "failed" | null;
-  inference_error?: string | null;
-  inference_started_at?: string | null;
-  corrected_crop?: string | null;
-  corrected_grade?: string | null;
-  corrected_severity?: string | null;
-  corrected_damage_codes?: string[] | null;
-  corrected_affected_area_pct?: number | null;
-  corrected_growth_stage?: string | null;
-  growth_stage?: string | null;
-  predicted_growth_stage?: string | null;
-};
+export type { WebClaimRow };
 
 export type ReviewerActionInput = {
   action: string;
@@ -910,12 +848,12 @@ export async function persistFarmerSubmission(
   const claim: WebClaimRow = {
     id: claimId,
     plot_id: normalizePlotId(input.plotId),
-    plot_name: input.plotName,
-    plot_name_hi: input.plotNameHi,
-    khasra_number: input.khasraNumber,
-    crop_type: input.cropType,
-    crop_type_hi: input.cropTypeHi,
-    crop_variety: input.cropVariety,
+    plot_name: input.plotName ?? null,
+    plot_name_hi: input.plotNameHi ?? null,
+    khasra_number: input.khasraNumber ?? null,
+    crop_type: input.cropType ?? null,
+    crop_type_hi: input.cropTypeHi ?? null,
+    crop_variety: input.cropVariety ?? null,
     sowing_date: input.sowingDate ?? null,
     status: "under_review",
     farmer_observations: input.farmerObservations || "",
@@ -1276,6 +1214,15 @@ export async function retryPendingInference(
   if (inferOptions?.force && REVIEWER_LOCKED_STATUSES.has(claim.status)) {
     return { prediction: null, inferError: "Claim is finalized; recapture to reopen it" };
   }
+  // Concurrency guard: if inference is already pending within the last 2 minutes, avoid duplicate run
+  if (
+    !inferOptions?.force &&
+    claim.inference_status === "pending" &&
+    claim.inference_started_at &&
+    Date.now() - new Date(claim.inference_started_at).getTime() < 120_000
+  ) {
+    return null;
+  }
   try {
     await store.updateClaim(claimId, {
       inference_status: "pending",
@@ -1332,10 +1279,14 @@ export async function persistAndInfer(
     if (!input.contextSignals || input.contextSignals.length === 0) {
       const lat = input.captureLat ?? input.images.find((i) => i.lat != null)?.lat ?? null;
       const lon = input.captureLon ?? input.images.find((i) => i.lon != null)?.lon ?? null;
+      const captureAccuracyM = input.captureAccuracyM ?? input.images.find((i) => i.accuracyM != null)?.accuracyM ?? null;
       const { assembleContext } = await import("./context/assemble");
       const ctx = await assembleContext({
         lat,
         lon,
+        captureLat: lat,
+        captureLon: lon,
+        captureAccuracyM,
         peril: input.peril,
         sowingDate: input.sowingDate ?? undefined,
         plotLat: input.plotLat ?? null,

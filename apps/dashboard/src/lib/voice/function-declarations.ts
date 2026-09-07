@@ -49,7 +49,7 @@ MANDATORY PLOT RULE (BEFORE CAPTURE OR CLAIM):
 - Before beginning capture or filing a claim, check plot_count in PORTAL CONTEXT or call list_plots.
 - IF 0 PLOTS EXIST (plot_count === 0):
   * You CANNOT start capture! Do NOT call begin_guided_capture.
-  * Inform the farmer warmly: every claim requires a registered plot. Prompt them for plot details (plot name, crop type, area, village), or use sensible defaults if they ask for a test/demo plot, then immediately call register_plot.
+  * Inform the farmer warmly: every claim requires a registered plot. Prompt them for plot details (plot name, crop type, area, village), or use sensible defaults if they ask for quick registration, then immediately call register_plot.
   * NEVER ask the farmer for Khasra / Survey / Dag number — it auto-links from their mobile-verified land record. NEVER ask for Khata number — that field no longer exists.
   * Village is auto-filled from their farmer profile if not specified; field GPS is acquired at capture time.
   * Only after register_plot succeeds may you proceed to begin_guided_capture.
@@ -94,11 +94,11 @@ CLAIM STATUSES & AUDIT
 
 AGENTIC CAPABILITIES & TOOLS
 1. Plot Registration & Test/Demo Plot Protocol:
-   - When the user, farmer, or developer asks to register a plot — including test/demo plots (e.g., "I am a dev, register a test plot", "test plot बना दो", "register a plot", "एक खेत जोड़ दो"):
+   - When the user, farmer, or operator asks to register a plot — including test/demo plots (e.g., "register a plot", "test plot बना दो", "खेत जोड़ दो", "add a plot"):
      * DO NOT refuse, debate, or demand external legal documents.
      * You have full authorization to register it immediately using register_plot.
      * If some details are omitted, apply sensible defaults:
-       - Name: requested name (or "Test Plot" / "Farm Plot")
+       - Name: requested name (or "Main Field" / "Farm Plot")
        - Crop type: requested crop or "wheat" (गेहूं)
        - Area: requested area or 1.0 hectare (~79.05 Kattha)
        - Village: requested village or farmer profile village (or "Local Village")
@@ -130,10 +130,10 @@ export const WEB_FUNCTION_DECLARATIONS = [
   {
     name: "register_plot",
     description:
-      "Register a new agricultural plot with plot name, crop type, area in hectares, and village. The Khasra / Survey number auto-links from the mobile-verified land record (never ask the farmer for it); field GPS is verified live at capture time. Accepts test/demo plots with sensible defaults (crop: wheat, area: 1.0 ha, village: profile village) if omitted.",
+      "Register a new agricultural plot with plot name, crop type, area in hectares, and village. The Khasra / Survey number auto-links from the mobile-verified land record (never ask the farmer for it); field GPS is verified live at capture time. Accepts sensible defaults (crop: wheat, area: 1.0 ha, village: profile village) if omitted.",
     parameters: objectSchema(
       {
-        name: { type: "STRING", description: "Name of the plot (e.g. North Wheat Field, Canal Plot, Test Plot)" },
+        name: { type: "STRING", description: "Name of the plot (e.g. North Wheat Field, Canal Plot, Main Field)" },
         crop_type: {
           type: "STRING",
           enum: ["wheat", "paddy", "maize", "potato"],

@@ -54,9 +54,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Image too large" }, { status: 400 });
   }
 
-  const rawMetadata = body.metadata && typeof body.metadata === "object" ? body.metadata : undefined;
-  // Legacy client flag — never trusted. Stripped defensively (upload/demo removed).
-  const metadata = rawMetadata ? (({ isDemoMode, ...rest }: any) => rest)(rawMetadata) : undefined;
+  const metadata =
+    body.metadata && typeof body.metadata === "object" ? { ...body.metadata } : undefined;
 
   // Duplicate check across already captured slots (SHA-256 byte digest or perceptual hash)
   const incomingHash = String(body.sha256 || metadata?.sha256 || "").trim();

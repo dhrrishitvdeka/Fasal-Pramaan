@@ -30,6 +30,7 @@ import {
 import { buildDefaultMilestones } from "@/lib/growth-stages";
 import { milestoneFromRow } from "@/lib/web-db";
 import PlotRegistrationForm from "@/components/PlotRegistrationForm";
+import EmptyState from "@/components/EmptyState";
 import clsx from "clsx";
 
 export default function FarmerRemindersPage() {
@@ -146,7 +147,12 @@ export default function FarmerRemindersPage() {
 
       <div className="fp-panel p-3 sm:p-5">
         {sections.length === 0 ? (
-          <p className="text-sm text-slate-600">{t.noPlotsForTimeline}</p>
+          <EmptyState
+            icon={Calendar}
+            title={t.noPlotsForTimeline}
+            body={lang === "hi" ? "विकास अनुस्मारक सक्रिय करने के लिए नीचे अपना पहला खेत पंजीकृत करें।" : "Register your first plot below to activate automated growth milestone reminders."}
+            action={{ href: "#register-plot", label: lang === "hi" ? "खेत पंजीकृत करें" : "Register Plot" }}
+          />
         ) : (
           <>
             <div className="flex flex-col justify-between gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-center">

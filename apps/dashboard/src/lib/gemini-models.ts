@@ -1,10 +1,9 @@
 /**
- * Canonical Gemini model IDs for the hosted MVP.
- * Source: https://ai.google.dev/gemini-api/docs/models (2026-09-02).
+ * Canonical Gemini model IDs for production deployment.
+ * Source: https://ai.google.dev/gemini-api/docs/models.
  *
- * gemini-2.0-flash is shut down (2026-06-01). Do not use it.
- * Vision / classify: gemini-3.8-flash (stable GA Flash).
- * Live voice: gemini-3.1-flash-live-preview (Live API).
+ * Vision / classify: gemini-3.8-flash (canonical GA Flash; fallbacks: 3.7-flash, 3.6-flash).
+ * Live voice: gemini-3.1-flash-live-preview (Gemini Live API).
  */
 
 export const GEMINI_VISION_MODEL_DEFAULT = "gemini-3.8-flash";

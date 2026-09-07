@@ -25,8 +25,8 @@ Saathi Live is **audio-only** (`gemini-3.1-flash-live-preview`). Gemini vision /
 | [deployment.md](deployment.md) | Vercel Root Directory = `apps/dashboard` |
 | [supabase-integration.md](supabase-integration.md) | `web_*` tables and private evidence bucket |
 | [security.md](security.md) | Auth, RLS, secrets |
-| [known-limitations.md](known-limitations.md) | Honest demo limits |
-| [demo-walkthrough.md](demo-walkthrough.md) | Stage script |
+| [known-limitations.md](known-limitations.md) | Platform boundaries & operational constraints |
+| [demo-walkthrough.md](demo-walkthrough.md) | Operational walkthrough script |
 | [VOICE_ASSISTANT_DEMO.md](VOICE_ASSISTANT_DEMO.md) | Saathi Live (mic + speaker) |
 | [GETTING_STARTED.md](../GETTING_STARTED.md) | Local run |
 

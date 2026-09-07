@@ -34,6 +34,8 @@ export async function POST(request: Request) {
   const captureLon = toCoordinate(body.captureLon ?? body.capture_lon ?? lon, -180, 180);
   const plotLat = toCoordinate(body.plotLat ?? body.plot_lat, -90, 90);
   const plotLon = toCoordinate(body.plotLon ?? body.plot_lon, -180, 180);
+  const rawAccuracy = body.captureAccuracyM ?? body.capture_accuracy_m ?? body.accuracyM ?? body.accuracy_m;
+  const captureAccuracyM = typeof rawAccuracy === "number" && Number.isFinite(rawAccuracy) ? rawAccuracy : undefined;
   const plotProximityMeters = typeof body.plotProximityMeters === "number" ? body.plotProximityMeters : undefined;
   const peril = normalizePeril(body.peril || body.claim_type || "normal");
   const rawSowingDate = typeof body.sowingDate === "string" ? body.sowingDate.trim() : "";
@@ -47,6 +49,7 @@ export async function POST(request: Request) {
       sowingDate,
       captureLat,
       captureLon,
+      captureAccuracyM,
       plotLat,
       plotLon,
       plotProximityMeters,

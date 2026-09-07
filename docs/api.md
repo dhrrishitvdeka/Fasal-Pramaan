@@ -97,7 +97,7 @@ Persisted columns: `peril`, `intent_id` (`web_claims`). `claimToSubmission` expo
 
 1. `GET /farmer/saathi` → farmer says *"aag lag gayi"* → `extractSlotsFromText` → `classifyPerilHeuristic="fire_burn" (0.92)` → `mergeSlots` → `slotsToIntent` → `ClaimIntent {peril:"fire_burn", perilLabelEn:"Fire / Burn"}` → `sessionStorage fp_active_claim_intent_v1`.
 2. `router.push("/farmer/capture?peril=fire_burn&intentId=intent-xxx")` → studio selects `anglesForPeril("fire_burn") = [wide_field, closeup_damage]` (vs 5 for `normal`).
-3. `POST /api/claims {peril:"fire_burn", intentId:"intent-xxx", images: [...]}` → Supabase `web_claims` + bucket + HF inference.
+3. `POST /api/claims {peril:"fire_burn", intentId:"intent-xxx", images: [...]}` → Supabase `web_claims` + bucket + Gemini field analysis.
 
 ---
 
@@ -307,7 +307,7 @@ All protected routes share the in-memory fixed-window limiter (`src/lib/server/r
 
 | Route | Method | Limit | Notes |
 |---|---|---|---|
-| `/api/claims` | POST | **10 req/min/user** | Evidence upload + inference; lowest cap because each call fans out to storage, HF Space, and context assembly |
+| `/api/claims` | POST | **10 req/min/user** | Evidence upload + inference; lowest cap because each call fans out to storage, Gemini field analysis, and context assembly |
 | `/api/claims/{id}/action` | POST | **30 req/min/user** | Reviewer adjudication actions |
 | `/api/milestones/{id}` | PATCH | **30 req/min/user** | Milestone / evidence-reminder updates |
 | `/api/vision/gate` | POST | **20 req/min/user** | Gemini vision gate (+ heuristic fallback) |

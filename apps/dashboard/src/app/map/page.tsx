@@ -6,6 +6,7 @@ import { mapMarkers, MapMarker } from "@/lib/api";
 import { useState } from "react";
 import { useRequireRole } from "@/lib/use-require-role";
 import AccessGate from "@/components/AccessGate";
+import { LoadingSpinner } from "@/components/LoadingAnimation";
 
 const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 
@@ -120,7 +121,9 @@ export default function MapPage() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-slate-500">Loading map…</p>
+        <div className="flex h-[min(58vh,380px)] w-full flex-col items-center justify-center border border-slate-200 bg-slate-50 p-6 text-center md:h-[520px] animate-pulse">
+          <LoadingSpinner size="lg" label="Loading geospatial markers…" />
+        </div>
       ) : (
         <MapView markers={data} />
       )}

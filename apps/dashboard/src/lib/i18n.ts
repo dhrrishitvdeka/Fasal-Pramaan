@@ -33,7 +33,7 @@ const dict = {
     inspection: "Physical Inspection",
     overrideReason: "Override Reason (required)",
     disclaimer:
-      "AI predictions are assistive and non-production by default. Human review is required for insurance decisions under PMFBY guidelines.",
+      "AI assessments are assistive decision-support systems. Final claim verification requires human reviewer approval under PMFBY operating guidelines.",
     
     // Showcase & Landing Page
     heroHeadline: "Verifiable Crop Evidence. Explainable AI Assessment. Instant Human Triage.",
@@ -41,10 +41,10 @@ const dict = {
       "A next-generation PMFBY crop loss assessment ecosystem combining 3-photo structured evidence capture, cryptographic integrity verification, multi-modal Vision AI, and adaptive single-photo recapture protocols.",
     launchFarmer: "Launch Farmer Web Portal",
     launchReviewer: "Launch Reviewer Command Centre",
-    exploreScenarios: "Explore 6 Canonical Demo Scenarios",
+    exploreScenarios: "Explore 6 Canonical Damage Scenarios",
     architectureTitle: "Autonomous Evidence Verification Architecture",
     architectureSub: "From farmer smartphone to PMFBY insurance settlement without black-box opacity",
-    canonicalTitle: "6 Canonical MUN Interactive Scenarios",
+    canonicalTitle: "6 Canonical Field Scenarios",
     canonicalSub: "One-click interactive test scenarios representing real-world field situations and edge cases",
     inspectInReviewer: "Inspect in Reviewer Centre →",
     inspectInFarmer: "Experience as Farmer →",
@@ -125,7 +125,7 @@ const dict = {
     inspection: "भौतिक निरीक्षण",
     overrideReason: "ओवरराइड कारण (आवश्यक)",
     disclaimer:
-      "AI भविष्यवाणियाँ सहायक हैं और डिफ़ॉल्ट रूप से गैर-उत्पादन हैं। PMFBY दिशानिर्देशों के तहत बीमा निर्णयों के लिए मानवीय समीक्षा आवश्यक है।",
+      "AI आकलन सहायक निर्णय-प्रणाली हैं। PMFBY परिचालन दिशानिर्देशों के तहत अंतिम दावा अनुमोदन के लिए मानवीय समीक्षा आवश्यक है।",
 
     // Showcase & Landing Page
     heroHeadline: "सत्यापन योग्य फसल प्रमाण। पारदर्शी AI आकलन। त्वरित मानवीय समीक्षा।",
@@ -133,10 +133,10 @@ const dict = {
       "PMFBY फसल बीमा के लिए आधुनिक समाधान: 3-फ़ोटो संरचित साक्ष्य कैप्चर, क्रिप्टोग्राफिक सत्यनिष्ठा सुरक्षा, मल्टी-मॉडल विज़न AI और लक्षित एकल-फोटो पुनः कैप्चर प्रोटोकॉल।",
     launchFarmer: "किसान वेब पोर्टल खोलें",
     launchReviewer: "समीक्षक कमांड सेंटर खोलें",
-    exploreScenarios: "6 प्रामाणिक डेमो परिदृश्य देखें",
+    exploreScenarios: "6 प्रामाणिक क्षेत्रीय परिदृश्य देखें",
     architectureTitle: "स्वायत्त साक्ष्य सत्यापन आर्किटेक्चर",
     architectureSub: "किसान के स्मार्टफोन से PMFBY बीमा निपटान तक पूर्ण पारदर्शिता",
-    canonicalTitle: "6 प्रामाणिक MUN इंटरैक्टिव परिदृश्य",
+    canonicalTitle: "6 प्रामाणिक क्षेत्रीय परिदृश्य",
     canonicalSub: "वास्तविक क्षेत्रीय स्थितियों और मामलों का 1-क्लिक इंटरैक्टिव परीक्षण",
     inspectInReviewer: "समीक्षक केंद्र में जांचें →",
     inspectInFarmer: "किसान के रूप में अनुभव करें →",

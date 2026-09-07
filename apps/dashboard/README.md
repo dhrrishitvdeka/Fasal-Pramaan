@@ -19,8 +19,8 @@ The **Fasal-Pramaan webapp** is a Next.js application for crop-evidence capture,
 - **PMFBY Financial Settlement & DBT Payout**: Connects Gemini visual damage percentages with plot area and PMFBY benchmark Scale-of-Finance rates (Paddy: ₹65,000/Ha, Wheat: ₹60,000/Ha, Maize: ₹45,000/Ha, Mustard: ₹42,000/Ha, Gram: ₹40,000/Ha) to compute `affected_area_hectares` and `estimated_loss_inr`. Reviewer acceptance marks `payout_status = "approved"` and populates `payout_amount_inr`, instantly activating the live green **DBT Bank Sanctioned** payout card on the farmer portal.
 - **Indian Agricultural Crop Synonym Engine** (`src/lib/crop-synonyms.ts`): Resolves multi-dialect variations across Indian crops (Paddy $\leftrightarrow$ Rice $\leftrightarrow$ Dhan, Maize $\leftrightarrow$ Corn $\leftrightarrow$ Makka, Gram $\leftrightarrow$ Chickpea $\leftrightarrow$ Chana, etc.) across both the vision gate and reviewer queue search queries, preventing false-positive `wrong_crop` gate rejections.
 - **Interactive 4-Card Farmer Summary Dashboard & 15-Language Localization**: Actionable dashboard cards with deep-links for registered plots, filed claims, verified claims, and needs-action tasks, fully localized across 15 official Indian languages.
-- **Presentation Demo Mode**: Optional `?demo=true` parameter relaxes camera crop score and screen detection locks for indoor hackathon stage demonstrations.
-- **Hardened API surface**: all evidence routes require a Supabase JWT (`requireWebActor`); inputs are clamped server-side; rate limiting is disabled by default for hackathon demonstrations.
+- **Resilient Mobile Field UX & Compression**: Client-side image compression (`compressImage`) reduces upload footprints over rural cellular networks; camera studio includes safe-area inset adaptation (`env(safe-area-inset-bottom)`), audio speech synthesis guidance (`window.speechSynthesis`), and ARIA live regions for accessible field capture.
+- **Hardened API Surface & Rate Limiting**: All evidence and context routes require a verified Supabase JWT (`requireWebActor`); inputs are clamped server-side; production sliding-window rate limiting is configurable via `ENABLE_RATE_LIMIT=true` (`src/lib/server/rate-limit.ts`).
 
 ---
 
@@ -40,7 +40,7 @@ npm run dev                  # http://localhost:3000
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
 - `SITE_LOCK_PASSWORD` (server-only site gate; required on Vercel)
 - `GEMINI_API_KEY` (server-only; vision gate + field analysis + Saathi Live + classify)
-- `GEMINI_VISION_MODEL` (optional; default `gemini-3.8-flash` — do not use shut-down `gemini-2.0-flash`)
+- `GEMINI_VISION_MODEL` (optional; default `gemini-3.8-flash`; fallbacks: `gemini-3.7-flash`, `gemini-3.6-flash`)
 - `SENTINEL_TOKEN` (optional upgrade — with it, fire checks run the real Sentinel-2 burn-scar NDVI process API; without it a free Open-Meteo extreme-heat proxy answers instead) / `IMD_API_KEY` (reserved hook for paid IMD weather; free open-meteo rain/hail/gust works without it)
 - `REVIEWER_EMAILS` (comma-separated reviewer emails; everyone else is a farmer)
 

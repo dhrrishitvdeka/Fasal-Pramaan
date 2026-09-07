@@ -84,7 +84,7 @@ export default function SaathiIntakePage() {
   ];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4 py-2">
+    <div className="mx-auto max-w-2xl space-y-4 py-2 pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       <div className="fp-panel rounded-2xl p-4 sm:p-5 border border-stone-200/90 bg-[#fffdf9] shadow-2xs">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -371,7 +371,7 @@ export default function SaathiIntakePage() {
         </div>
       )}
 
-      <div className="flex justify-center pt-2">
+      <div className="flex justify-center pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <Link href="/farmer" className="text-xs text-slate-500 hover:text-slate-900 underline underline-offset-2">
           ← {lang === "hi" ? "किसान डैशबोर्ड पर लौटें" : "Back to Farmer Dashboard"}
         </Link>

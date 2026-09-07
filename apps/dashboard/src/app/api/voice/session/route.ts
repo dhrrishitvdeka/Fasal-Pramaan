@@ -4,10 +4,18 @@ import { SITE_LOCK_COOKIE, isSiteLockActive, isValidSiteLockToken } from "@/lib/
 import { assertNoSecretLeak, mintVoiceSession } from "@/lib/voice/gemini-session";
 import { requireWebActor } from "@/lib/web-auth";
 import { parseAppLang } from "@/lib/live-indian-languages";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 
 export async function POST(request: Request) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
+  const limit = checkRateLimit(`voice-session:${auth.actor.userId}`, 15, 60_000);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many voice session requests. Please try again shortly." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
   const jar = await cookies();
   const unlocked = await isValidSiteLockToken(jar.get(SITE_LOCK_COOKIE)?.value);
   const jsonBody = (await request.json().catch(() => ({}))) as { lang?: unknown };

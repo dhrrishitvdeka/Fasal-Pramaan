@@ -17,6 +17,14 @@ const MAX_STACK = 2000;
 const MAX_URL = 2048;
 const MAX_USER_AGENT = 512;
 
+function sanitizeTelemetryText(input?: string): string | undefined {
+  if (!input) return undefined;
+  return input
+    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "[EMAIL_MASKED]")
+    .replace(/\b(?:\+91|91)?[6-9]\d{9}\b/g, "[PHONE_MASKED]")
+    .replace(/\b(?:Bearer\s+)?[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[JWT_MASKED]");
+}
+
 export async function POST(request: Request) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
@@ -46,9 +54,9 @@ export async function POST(request: Request) {
   }
 
   const payload = {
-    message,
-    stack: body.stack ? String(body.stack).slice(0, MAX_STACK) : undefined,
-    url: body.url ? String(body.url).slice(0, MAX_URL) : undefined,
+    message: sanitizeTelemetryText(message),
+    stack: sanitizeTelemetryText(body.stack ? String(body.stack).slice(0, MAX_STACK) : undefined),
+    url: sanitizeTelemetryText(body.url ? String(body.url).slice(0, MAX_URL) : undefined),
     userAgent: body.userAgent ? String(body.userAgent).slice(0, MAX_USER_AGENT) : undefined,
     source: body.source ? String(body.source).slice(0, 32) : undefined,
     reportedBy: auth.actor.userId,
