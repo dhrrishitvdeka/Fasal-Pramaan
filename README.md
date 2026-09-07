@@ -6,7 +6,6 @@
   </a>
   <img src="https://img.shields.io/badge/Next.js%2016-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
   <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
-
   <img src="https://img.shields.io/badge/Google%20Gemini-8E75B2?style=for-the-badge&logo=google&logoColor=white" alt="Google Gemini" />
   <img src="https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Vercel" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
@@ -14,130 +13,301 @@
 
 <p align="center">
   <b>Capture. Verify. Protect.</b><br/>
-  An open-source, multimodal AI platform for agricultural crop damage assessment and transparent PMFBY insurance claims adjudication.
+  An open-source multimodal platform for agricultural crop damage assessment, geospatial ground-truth validation, and transparent PMFBY insurance claims adjudication.
 </p>
 
 ---
 
-## Problem & Mission
+## Overview
 
-Rural agricultural insurance programs like **PMFBY (Pradhan Mantri Fasal Bima Yojana)** face a critical trust deficit:
-- **Paper & Bureaucratic Friction:** Smallholder farmers struggle with complex digital portals, language barriers, and non-intuitive cadastral lookups.
-- **Subjective & Delayed Assessments:** Traditional loss appraisals rely on manual spot visits that take weeks or months to process.
-- **Fraud & Verification Gaps:** Risk of digital screen spoofing, stock imagery, or non-field photos undermines insurance solvency.
+Agricultural insurance programs such as the **Pradhan Mantri Fasal Bima Yojana (PMFBY)** protect hundreds of millions of smallholder farmers against weather calamities, pest outbreaks, and natural disasters. However, existing claim adjudication processes face structural challenges:
 
-**Fasal-Pramaan** bridges this divide by combining **on-device computer vision**, a **multimodal live conversational AI co-pilot (Fasal Saathi)**, **spaceborne satellite cross-checks (Copernicus Sentinel-2 & ISRO Bhuvan)**, and a **deterministic 3-stage trust evaluation engine** with a human-in-the-loop reviewer command centre.
+- **Friction for Farmers:** Complex paperwork, digital literacy barriers, and portal interfaces that lack native language support make filing claims difficult.
+- **Prolonged Adjudication Cycles:** Physical spot visits by field adjusters can take weeks or months to schedule and complete.
+- **Verification Gaps & Fraud Exposure:** Digital submissions can be susceptible to stock photos, repeated images, or photographs taken off digital screens.
+- **Opaque Decisions:** Farmers rarely receive clear explanations for claim denials or partial settlements, leading to distrust.
+
+**Fasal-Pramaan** addresses these challenges by introducing a transparent, technology-driven workflow:
+1. **Conversational Voice Assistant:** Farmers can register plots and submit claims using spoken dialogue across 15 Indian languages.
+2. **On-Device Edge Vision:** The camera viewfinder inspects image clarity, framing, and screen moire patterns directly inside the browser before an upload occurs.
+3. **Geospatial & Satellite Cross-Checks:** Claims are automatically correlated against satellite vegetation indices (Copernicus Sentinel-2), cadastral maps (ISRO Bhuvan), and localized meteorological records (Open-Meteo).
+4. **Human-in-the-Loop Reviewer Workspace:** Insurance officers review claims with split-screen satellite comparison, explainable 4-pillar trust scoring, and direct DBT sanctioning.
 
 ---
 
-## System Architecture
+## End-to-End System Workflow
 
 ```mermaid
-flowchart TB
-  %% Client / Browser Tier
-  subgraph T_CLIENT["Farmer PWA & Experience Tier (/farmer)"]
-    direction TB
-    F_SAATHI["<b>Fasal Saathi Voice Co-Pilot</b><br/>• Full-Duplex 16kHz AudioWorklet Voice<br/>• Audio-only Live (no camera frames)<br/>• 15 Indian Languages Support"]
-    F_CAPTURE["<b>Peril-Aware Guided Capture Studio</b><br/>• On-device OpenCV shutter lock<br/>• Anti-screen / moiré filter<br/>• 75%+ crop quality lock"]
-    F_SAATHI <== "Audio-only Live + capture tools" ==> F_CAPTURE
-  end
+flowchart TD
+    subgraph S1["1. Farmer Interface (/farmer)"]
+        A["Farmer Speaks / Interacts<br/>(15 Indian Languages)"] --> B["Fasal Saathi Voice Co-Pilot<br/>(Gemini 3.1 Flash Live Audio)"]
+        B --> C["Camera Studio & Edge CV<br/>(OpenCV WebAssembly)"]
+        C --> D["On-Device Validation<br/>• Moiré / Screen Detection<br/>• Quality & Framing Check<br/>• GPS Geofence Verification"]
+    end
 
-  %% Gateway & Routing Tier
-  subgraph T_GATEWAY["Edge Gateway & API Pipeline (apps/dashboard)"]
-    direction TB
-    API_ROUTES["<b>Next.js Edge API Handlers</b><br/><code>/api/claims</code> • <code>/api/vision/gate</code> • <code>/api/voice/session</code> • <code>/api/context/assemble</code>"]
-    CORE_PIPELINE["<b>3-Stage Deterministic Trust Pipeline</b><br/>• Cryptographic SHA-256 Tamper Lock • Peril Routing Engine • Adaptive Recapture Engine"]
-    API_ROUTES --- CORE_PIPELINE
-  end
+    subgraph S2["2. Validation & Intelligence Gateway (apps/dashboard)"]
+        D -->|"Compressed Payload (<4.5 MB)"| E["API Gateway (/api/claims)"]
+        E --> F["Gemini 3.8 Flash Vision Gate<br/>(Crop identity, authenticity, damage severity)"]
+        E --> G["Geospatial & Earth Observation Engine<br/>• Copernicus Sentinel-2 NDVI<br/>• ISRO Bhuvan WMS Cadastral Map<br/>• Open-Meteo Weather Radar"]
+        F & G --> H["Deterministic Trust Engine<br/>• 4-Pillar Score: Quality, Coverage, Context, Integrity<br/>• SHA-256 Tamper Ledger"]
+    end
 
-  %% Multi-Model AI & External Signals Tier
-  subgraph T_SERVICES["Multi-Model AI & Ground-Truth Infrastructure"]
-    direction LR
-    S_GEMINI["<b>Google Gemini</b><br/>• Live voice (audio only)<br/>• Vision gate + field analysis"]
-    S_SIGNALS["<b>Earth Observation & Weather</b><br/>• Copernicus Sentinel-2 NDVI (fire)<br/>• ISRO Bhuvan WMS probe<br/>• Open-Meteo rain / hail / gust"]
-  end
+    subgraph S3["3. Reviewer Command Centre (/review)"]
+        H --> I["Reviewer Decision Workbench<br/>• Split-screen Field vs. Satellite Imagery<br/>• Cadastral Plot Boundary Overlay<br/>• Explainable Score Breakdown"]
+        I --> J{"Reviewer Decision"}
+        J -->|"Approve"| K["DBT Payout Sanctioned<br/>(Scale-of-Finance Calculation)"]
+        J -->|"Recapture"| L["Targeted Recapture Request<br/>(Specific angle re-requested)"]
+        J -->|"Reject"| M["Detailed Explanation Issued<br/>(Clear audit trail provided)"]
+    end
 
-  %% Reviewer Tier
-  subgraph T_REVIEWER["PMFBY Reviewer Command Centre (/review)"]
-    R_QUEUE["<b>Decision Workbench & Triage</b><br/>• Explainable 4-Pillar Trust Breakdown (Q, C, X, I)<br/>• Satellite vs Field Photo Split-Screen<br/>• 1-Click Targeted Recapture & Audit Trail"]
-  end
-
-  %% Persistence
-  subgraph T_STORAGE["Secure Storage & Ledger"]
-    S_SUPABASE[("<b>Supabase Postgres & Storage</b><br/>• RLS Security Policies<br/>• Private evidence bucket<br/>• Immutable Audit Action Log")]
-  end
-
-  %% Flow Connections
-  T_CLIENT ==>|"Duplex WebSocket / HTTPS"| API_ROUTES
-  T_REVIEWER ==>|"Role-Gated REST"| API_ROUTES
-  CORE_PIPELINE ==> S_GEMINI
-  CORE_PIPELINE ==> S_SIGNALS
-  API_ROUTES ==> T_STORAGE
+    K & L & M -->|"Status & Notification Sync"| A
 ```
 
 ---
 
-## Core Innovations
+## Geospatial and Mapping Capabilities
 
-### 1. Fasal Saathi (फसल साथी) v3.0 — Spoken Multimodal Co-Pilot
-- **Hands-Free AudioWorklet Pipeline:** Samples audio off the main thread via `AudioWorkletNode`, downsamples to 16 kHz PCM16 mono, and features acoustic half-duplex echo gating with instant barge-in support.
-- **Audio-only Live voice:** Saathi talks over Gemini Live. The camera stays on-device; OpenCV guides framing. Gemini sees stills only when the farmer submits.
-- **Anti-Self-Interruption Navigation:** Decouples silent route changes from Gemini Live WebSocket context synchronization, eliminating speech cutoffs, re-triggered greetings, and barge-in loops when moving across app screens.
-- **Proactive Opening Spoken Greeting:** Automatically welcomes the farmer aloud immediately upon connect (*"नमस्ते किसान भाई! मैं फसल साथी हूँ..."*).
-- **Hierarchical Multi-Agent Tools:** Spoken plot registration (`register_plot` with automatic milestone seeding), GPS parcel geofencing (`check_plot_geofence`), 72-hour agro-weather radar (`fetch_agro_weather_alerts`), and plain-language AI audit explanations (`explain_claim_audit`).
-- **Grounded Cross-Screen Camera Actions:** Spoken camera orders (*"फोटो खींचो"* / *"Take photo"*) anywhere on the platform automatically verify plot registration and launch the capture studio.
-- **15 Indian Languages:** Dynamic native translation across Hindi, Bengali, Tamil, Telugu, Marathi, Gujarati, Punjabi, Kannada, Malayalam, Odia, Assamese, and more.
+Fasal-Pramaan embeds spatial awareness into every stage of a claim's lifecycle, ensuring that claims correspond to actual physical locations and verifiable environmental conditions.
 
-### 2. Peril-Aware Capture Studio & Edge CV
-- **Real-Time On-Device OpenCV:** Excess Green / GLI / Excess Red, Laplacian texture, skin rejection, and scanline/moiré screen detection at a few FPS in a Web Worker. No cloud model on the live viewfinder.
-- **Anti-Screen & Anti-Spoofing Filter:** Detects digital display scanlines, pixel subgrids, and Moiré interference patterns ($0^\circ/90^\circ$ gradient ratio $> 0.80$) to reject monitor re-captures and fake images before upload.
-- **Strict 75%+ Crop Quality Shutter Lock:** Disables the shutter button unless the live frame achieves $\ge 75\%$ crop match (relaxed to $\ge 40\%$ for charred fire burn scars).
-- **Multilingual Accessible Claim Banner (`ClaimNotificationBanner`):** Farmer-friendly guidance ("what happened" + "what to do next") across all 15 Indian languages with distinct visual states (Error, Warning, Success, Info), non-obstructive top docking, and 4-second debouncing.
+```mermaid
+flowchart LR
+    subgraph GeoInputs["Spatial Data Sources"]
+        G1["Device GPS Coordinates<br/>(Latitude, Longitude, Accuracy)"]
+        G2["Cadastral Land Parcel Records<br/>(Survey Number, Village, Hectares)"]
+        G3["ISRO Bhuvan WMS Services<br/>(Indian Cadastral & LULC Layers)"]
+        G4["Copernicus Sentinel-2<br/>(Multi-spectral 10m Imagery, NDVI)"]
+        G5["Open-Meteo Historical API<br/>(Rainfall, Wind Gusts, Hail Probability)"]
+    end
 
-### 3. 3-Stage Ground Truth Verification Pipeline
-1. **Stage 1 — Gemini 3.8 Flash Vision Gate & Crop Synonym Engine:** Evaluates submitted stills for authenticity and peril congruence, rejecting AI-generated images and screen displays. Incorporates multi-dialect Indian crop synonym mapping (`crop-synonyms.ts`) so Paddy $\leftrightarrow$ Rice, Maize $\leftrightarrow$ Corn, etc. match without false `wrong_crop` gate rejections.
-2. **Stage 2 — Gemini field analysis:** On the submitted stills, Gemini writes crop identity, visible damage, severity, authenticity (screen / AI / indoor), and a reviewer-readable rationale. Assistive only.
-3. **Stage 3 — Earth Observation Cross-Check:** Fire claims can run Sentinel-2 NDVI burn-scar when a Copernicus token is set; weather is Open-Meteo (rain / hail / gust); Bhuvan is a WMS reachability probe.
+    subgraph GeoProcessing["Geospatial Analysis Pipeline"]
+        P1["GPS Accuracy Filter<br/>(Rejects inaccurate or spoofed coordinates)"]
+        P2["Boundary Polygon Geofencing<br/>(Verifies user presence within plot)"]
+        P3["Spectral Anomaly Detection<br/>(Burn scar, flood inundation, drought index)"]
+        P4["Temporal Weather Correlator<br/>(Confirms peril event within 72-hour window)"]
+    end
 
-### 4. PMFBY Reviewer Command Centre
-- **Explainable 4-Pillar Trust Score:** Bounded mathematical formula ($C_{\text{final}} = 0.4 S_Q + 0.3 S_C + 0.2 S_X + 0.1 S_I$) evaluating Quality, Coverage, Context, and Integrity.
-- **Satellite Cross-Check Split-Screen:** Direct comparison between the farmer's `wide_field` photo, ISRO Bhuvan cadastral boundaries, and Copernicus Browser imagery.
-- **1-Click Targeted Adaptive Recapture:** Reviewers can request a re-take of only the 1 defective angle without invalidating the rest of the claim.
-- **Unblocked Gate Override:** Reviewers can override false-positive gate flags and directly verify claims even on initial Grade U flags.
+    subgraph GeoOutputs["Map Visualizations"]
+        V1["Farmer Plot Map<br/>(Interactive polygon and current position)"]
+        V2["Reviewer Split-Screen Map<br/>(Field photo side-by-side with satellite tile)"]
+        V3["Regional Jurisdictional Map<br/>(Taluk / District risk heatmaps)"]
+    end
 
-### 5. Automated PMFBY Financial Settlement & DBT Payout
-- **Scale-of-Finance Loss Modeling:** Automatically computes `affected_area_hectares` and `estimated_loss_inr` using PMFBY benchmark Scale-of-Finance rates (Paddy: ₹65,000/Ha, Wheat: ₹60,000/Ha, Maize: ₹45,000/Ha, etc.) against plot acreage and visual severity.
-- **Closed-Loop DBT Sanctioning:** Reviewer acceptance transitions the claim to `payout_status: "approved"`, instantly activating the green **DBT Bank Sanctioned** payout card on the farmer portal with the exact sanctioned INR amount.
+    G1 & G2 --> P1 --> P2 --> V1
+    G3 & G4 --> P3 --> V2
+    G5 --> P4 --> V3
+```
+
+### 1. GPS Parcel Geofencing
+- During photo capture, device GPS coordinates are validated against registered parcel polygon coordinates.
+- Submissions taken more than 100 meters away from plot boundaries or with GPS accuracy degradation (>100m) trigger automated warnings to prevent off-site reporting.
+- Coordinates undergo boundary validation to reject placeholder coordinates (such as `0,0`) and out-of-bounds inputs.
+
+### 2. Interactive Map View (`/map`)
+- Built using Leaflet and OpenStreetMap, with options for satellite layer overlays.
+- Displays registered farmland parcels, crop boundaries, area calculations in hectares, and historical peril activity markers.
+
+### 3. Satellite Ground-Truth Comparison
+- **ISRO Bhuvan WMS:** Connects to Indian space research mapping services for cadastral and land-use context.
+- **Copernicus Sentinel-2:** In fire, flood, or drought claims, the system fetches near-real-time Normalized Difference Vegetation Index (NDVI) tiles to confirm large-scale crop biomass reduction.
+
+### 4. Localized Weather Correlation
+- Integrates with Open-Meteo weather models to pull precipitation, hail likelihood, and maximum wind gusts during the reported loss timeframe.
+- If a farmer files a flood or storm claim, the system automatically checks whether localized rainfall exceeded threshold levels during the event window.
 
 ---
 
-## Documentation Sitemap
+## User Experiences
 
-Comprehensive architectural, mathematical, API, and deployment documentation is available in the [`docs/`](./docs) directory:
+### 1. The Farmer Portal (`/farmer`)
 
-| Guide | Description |
+Designed for accessibility on basic mobile browsers and rural network connections:
+
+| Capability | Technical Implementation | Purpose |
+| :--- | :--- | :--- |
+| **Fasal Saathi Voice Assistant** | AudioWorklet, 16 kHz PCM streaming, Gemini 3.1 Flash Live | Enables hands-free claim filing, parcel lookup, and status checks in 15 native Indian languages. |
+| **Peril-Aware Camera Studio** | OpenCV WebAssembly in a Web Worker | Provides real-time guidance (framing, lighting, blur detection) without consuming cloud bandwidth. |
+| **Anti-Screen / Anti-Spoofing Filter** | 2D gradient ratio analysis for Moiré patterns | Rejects attempts to submit photos of computer monitors or printed photographs. |
+| **Offline Queue & Resilient Upload** | IndexedDB storage with automatic retry | Caches captured photos locally if cellular connection drops; uploads automatically upon reconnection. |
+| **Client-Side Image Optimization** | HTML5 Canvas bicubic downscaling (max 1600px, 0.82 JPEG) | Compresses multi-photo submissions to under 2 MB, staying safely within serverless limits. |
+
+### 2. The Reviewer Command Centre (`/review`)
+
+Designed for PMFBY insurance adjusters and agricultural officers:
+
+| Capability | Technical Implementation | Purpose |
+| :--- | :--- | :--- |
+| **Split-Screen Evidence Desk** | Responsive CSS Grid with synchronized zoom | Allows side-by-side visual comparison between field photos and satellite Earth observation imagery. |
+| **Explainable 4-Pillar Trust Score** | $C_{\text{final}} = 0.4 S_Q + 0.3 S_C + 0.2 S_X + 0.1 S_I$ | Breaks down confidence across Image Quality ($S_Q$), Crop Coverage ($S_C$), Context & Weather ($S_X$), and Integrity ($S_I$). |
+| **Targeted Recapture Requests** | Granular state machine tracking per photo angle | Lets reviewers request a retake of a single deficient photo without forcing the farmer to restart the entire claim. |
+| **Direct Bank Sanction (DBT)** | PMFBY Scale-of-Finance loss calculation engine | Computes recommended compensation based on affected acreage, crop type, and verified damage percentage. |
+
+---
+
+## Technology Stack
+
+```mermaid
+flowchart TB
+    subgraph Frontend["Frontend Application (apps/dashboard)"]
+        direction LR
+        FE_NEXT["Next.js 16 (App Router, Turbopack)"]
+        FE_REACT["React 19 & Tailwind CSS"]
+        FE_MAP["Leaflet & OpenStreetMap"]
+        FE_WORKER["OpenCV WebAssembly Worker"]
+    end
+
+    subgraph Backend["API & Edge Runtime"]
+        direction LR
+        BE_ROUTE["Next.js API Routes"]
+        BE_LIMIT["In-Memory Rate Limiting"]
+        BE_PIPE["3-Stage Claim Evaluation Engine"]
+    end
+
+    subgraph Intelligence["AI & External Data Providers"]
+        direction LR
+        AI_VIS["Google Gemini 3.8 Flash (Vision & Reasoning)"]
+        AI_VOICE["Google Gemini 3.1 Flash Live (Spoken Dialogue)"]
+        EXT_SAT["Copernicus Sentinel-2 & ISRO Bhuvan WMS"]
+        EXT_METEO["Open-Meteo Weather Services"]
+    end
+
+    subgraph Storage["Database & Infrastructure"]
+        direction LR
+        DB_POSTGRES["Supabase PostgreSQL (RLS, Audit Ledger)"]
+        DB_STORAGE["Supabase Object Storage (Private Buckets)"]
+        DB_AUTH["Supabase Identity & Authentication"]
+    end
+
+    Frontend --> Backend
+    Backend --> Intelligence
+    Backend --> Storage
+```
+
+| Layer | Technologies Used |
 | :--- | :--- |
-| [**System Architecture**](./docs/architecture.md) | Full system topology, 8-step claim sequence, deterministic state machine, and spatial jurisdiction hierarchy. |
-| [**Fasal Saathi Voice Co-Pilot**](./docs/VOICE_ASSISTANT_DEMO.md) | AudioWorklet protocol, audio-only Live, prompt structure, and spoken command reference. |
-| [**Evidence Trust Engine**](./docs/evidence-evaluation.md) | Mathematical formulation ($C_{\text{final}}$), 4-pillar sub-scores, hard rejection rules, and anti-screen algorithms. |
-| [**Adaptive Recapture Engine**](./docs/adaptive-recapture.md) | Per-peril confidence thresholds ($T$), automated recapture state machine, and reviewer triage logic. |
-| [**REST & WebSocket API Reference**](./docs/api.md) | Complete endpoint schemas for `/api/claims`, `/api/vision/gate`, `/api/voice/session`, `/api/context/assemble`, etc. |
-| [**Production Deployment Guide**](./docs/deployment.md) | Vercel + Supabase + Gemini (Root Directory = `apps/dashboard`). |
-| [**Security & Governance**](./docs/governance-and-safety.md) | Cryptographic SHA-256 hashes, Row Level Security (RLS) policies, and ephemeral token lifecycle. |
-| [**Demonstration Walkthrough**](./docs/demo-walkthrough.md) | Step-by-step presentation script for exhibitions, field audits, and policy stakeholder reviews. |
-| [**Environment Variables**](./docs/environment-variables.md) | Complete configuration matrix for production, preview, and local development. |
+| **Application Framework** | Next.js 16 (App Router, Turbopack), React 19, TypeScript 5.8 |
+| **Styling & Components** | Tailwind CSS, Radix UI primitives |
+| **AI Models** | Google Gemini 3.8 Flash (Vision, Damage Grading), Gemini 3.1 Flash Live (Bidirectional Audio) |
+| **Client-Side Computer Vision** | OpenCV.js (WebAssembly), Custom Moiré Pattern Detection, GLI Vegetative Index |
+| **Mapping & Geospatial** | Leaflet, OpenStreetMap tiles, ISRO Bhuvan WMS services, GeoJSON parcel geometry |
+| **External Signals** | Copernicus Sentinel-2 NDVI data, Open-Meteo Historical Weather API |
+| **Database & Identity** | Supabase (PostgreSQL 15+, Row Level Security, S3-compatible Object Storage, GoTrue Auth) |
+| **Hosting & Deployment** | Vercel (Edge Functions, Serverless APIs), Supabase Cloud |
 
 ---
 
-## Core Contributors
+## Repository Structure
 
-<p align="center">
-  <a href="https://github.com/dhrrishitvdeka"><img src="https://github.com/dhrrishitvdeka.png?size=160" width="88" height="88" alt="" style="border-radius:50%; object-fit:cover;" /></a>&nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/parasdwivedi26"><img src="https://github.com/parasdwivedi26.png?size=160" width="88" height="88" alt="" style="border-radius:50%; object-fit:cover;" /></a>&nbsp;&nbsp;&nbsp;
-</p>
+```text
+Fasal-Pramaan/
+├── README.md                      # Primary project overview and documentation
+├── GETTING_STARTED.md             # Detailed developer onboarding guide
+├── docs/                          # Comprehensive engineering specifications
+│   ├── api.md                     # REST and WebSocket endpoint specifications
+│   ├── architecture.md            # System topology and sequence diagrams
+│   ├── deployment.md              # Production deployment instructions
+│   ├── evidence-evaluation.md     # Trust score mathematical formulations
+│   ├── security.md                # Security controls and data privacy policies
+│   └── ...
+└── apps/
+    └── dashboard/                 # Next.js 16 core web application
+        ├── src/
+        │   ├── app/               # App Router pages and API route handlers
+        │   │   ├── api/           # Endpoints: claims, vision gate, voice session
+        │   │   ├── farmer/        # Farmer dashboard, capture studio, and Saathi
+        │   │   ├── review/        # Reviewer triage queue and decision workbench
+        │   │   ├── map/           # Geospatial parcel and satellite visualizer
+        │   │   └── login/         # Supabase-authenticated entry portal
+        │   ├── components/        # Reusable UI components (MapView, Camera, Banners)
+        │   ├── lib/               # Business logic, pipeline stages, Supabase store
+        │   └── types/             # Strict TypeScript domain models
+        ├── __tests__/             # Vitest test suites (37 test files, 309 tests)
+        └── package.json           # Dependencies and build scripts
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+- **Node.js**: v20.x or higher
+- **npm**: v10.x or higher
+- **Supabase Account**: A Supabase project with database migrations applied
+- **Google Gemini API Key**: Access to Gemini 3 family models
+
+### Local Development Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/dhrrishitvdeka/Fasal-Pramaan.git
+   cd Fasal-Pramaan/apps/dashboard
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables:**
+   Create a `.env.local` file in `apps/dashboard/`:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Fill in your required credentials:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+   GEMINI_API_KEY=your-gemini-api-key
+   ```
+
+4. **Start the local development server:**
+   ```bash
+   npm run dev
+   ```
+   Open `http://localhost:3000` in your browser.
+
+### Test Credentials (Default Demo Users)
+
+| Role | Email | Password | Intended Portal |
+| :--- | :--- | :--- | :--- |
+| **Farmer** | `farmer@fasalpramaan.com` | `Kisan@Pramaan2026!` | `/farmer` |
+| **Reviewer** | `reviewer@fasalpramaan.com` | `Reviewer@Pramaan2026!` | `/review` |
+
+---
+
+## Verification and Quality Standards
+
+The project maintains automated quality gates across all releases:
+
+```bash
+# Run unit and integration tests (37 suites, 309 tests)
+npm test
+
+# Run strict TypeScript type verification
+npm run typecheck
+
+# Run ESLint static code analysis
+npm run lint
+
+# Build production application bundle with Next.js Turbopack
+npm run build
+```
+
+---
+
+## Documentation Index
+
+For technical deep dives and formal documentation, refer to the [`docs/`](./docs) directory:
+
+- [System Architecture Specification](./docs/architecture.md): Topology, claim state machines, and lifecycle transitions.
+- [REST & WebSocket API Reference](./docs/api.md): Parameter schemas, response models, and status codes.
+- [Evidence Trust Engine](./docs/evidence-evaluation.md): Complete mathematical breakdown of the 4-pillar trust model.
+- [Production Deployment Guide](./docs/deployment.md): Instructions for configuring Vercel and Supabase.
+- [Security & Governance Policy](./docs/security.md): Cryptographic hashing, Row Level Security, and PII protection.
+- [Demonstration Walkthrough Script](./docs/demo-walkthrough.md): Scripted guide for demonstrations and stakeholder presentations.
 
 ---
 
 ## License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+This project is open source and licensed under the [MIT License](LICENSE).
