@@ -6,7 +6,23 @@ type HealthResponse = {
   ok: boolean;
   status: string;
   timestamp?: string;
+  checks?: { app?: boolean; supabase?: boolean; gemini?: boolean };
 };
+
+function CheckRow({ label, pass }: { label: string; pass: boolean | undefined }) {
+  return (
+    <li className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm last:border-0">
+      <span className="text-slate-700">{label}</span>
+      <span
+        className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+          pass ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"
+        }`}
+      >
+        {pass ? "Configured" : "Not set"}
+      </span>
+    </li>
+  );
+}
 
 export default function HealthPage() {
   const { data, isLoading, error, refetch, isFetching } = useQuery<HealthResponse>({
@@ -33,17 +49,21 @@ export default function HealthPage() {
           </p>
         )}
         {data && (
-          <p className="mt-2 text-sm text-slate-800">
-            App {data.ok ? "is up" : "reported a failure"} ({data.status}).
-          </p>
+          <>
+            <p className="mt-2 text-sm text-slate-800">
+              App {data.ok ? "is up" : "reported a failure"} ({data.status}).
+            </p>
+            <ul className="mt-2">
+              <CheckRow label="Next.js app" pass={data.checks?.app} />
+              <CheckRow label="Supabase (database + auth)" pass={data.checks?.supabase} />
+              <CheckRow label="Gemini (AI analysis)" pass={data.checks?.gemini} />
+            </ul>
+          </>
         )}
         <button type="button" className="fp-btn-secondary mt-3 text-xs" onClick={() => void refetch()}>
           {isFetching ? "Refreshing…" : "Refresh"}
         </button>
       </div>
-      <pre className="overflow-auto rounded border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-700">
-        {JSON.stringify(data || { ok: false }, null, 2)}
-      </pre>
     </div>
   );
 }

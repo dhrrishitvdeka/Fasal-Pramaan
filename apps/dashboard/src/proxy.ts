@@ -5,7 +5,7 @@ import {
   isValidSiteLockToken,
 } from "@/lib/site-lock";
 
-export async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (pathname === "/unlock" || pathname === "/api/unlock") {
     return NextResponse.next();

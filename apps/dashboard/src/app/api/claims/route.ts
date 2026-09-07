@@ -57,10 +57,10 @@ export async function GET(request: Request) {
   const visible = isReviewerRole(auth.actor.role)
     ? claims
     : claims.filter((claim) => claim.created_by === auth.actor.userId);
-  const items = [];
-  for (const claim of visible) {
-    items.push(claimToSubmission(claim, await store.listImages(claim.id)));
-  }
+  // Per-claim image fetches are independent: run concurrently.
+  const items = await Promise.all(
+    visible.map(async (claim) => claimToSubmission(claim, await store.listImages(claim.id))),
+  );
   return NextResponse.json({ items });
 }
 

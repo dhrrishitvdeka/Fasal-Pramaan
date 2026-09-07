@@ -27,21 +27,19 @@ test.describe("smoke", () => {
   test("health page renders status blocks", async ({ page }) => {
     // The shell gates reviewer pages on a session; grant one for this page.
     await mockMe(page, "reviewer");
+    // Mock matches the real /api/health contract (booleans only).
     await page.route("**/api/health", (route) =>
       json(route, {
         ok: true,
-        status: "ok",
-        mode: "hosted",
-        checks: {
-          next: { ok: true },
-          supabase: { ok: true },
-          gemini: { configured: false },
-        },
+        status: "degraded",
+        timestamp: new Date().toISOString(),
+        checks: { app: true, supabase: true, gemini: false },
       }),
     );
     await page.goto("/health");
     await expect(page.getByText("System health")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("Dependency checks")).toBeVisible();
-    await expect(page.locator("pre").first()).toContainText("ok");
+    await expect(page.getByText("Gemini (AI analysis)")).toBeVisible();
+    await expect(page.getByText("Not set")).toBeVisible();
   });
 });

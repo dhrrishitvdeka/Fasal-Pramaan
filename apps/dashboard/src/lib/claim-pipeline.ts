@@ -590,6 +590,7 @@ function imageIsPresent(image: PersistedImageInput): boolean {
   return Boolean(image.bytes && image.bytes.byteLength > 0);
 }
 
+/** HF-legacy shim: tested contract (see claim-pipeline.test.ts); Gemini path is primary. */
 export function workflowGrade(value?: string | null): "A" | "B" | "C" | "U" | null {
   return value === "A" || value === "B" || value === "C" || value === "U" ? value : null;
 }
@@ -2136,6 +2137,11 @@ export async function applyReviewerAction(
   return updated;
 }
 
+/**
+ * TEST-ONLY in-memory ClaimStore. Production routes exclusively use
+ * createSupabaseClaimStore; this exists so unit tests can exercise the
+ * pipeline without a database. Do not import from app or route code.
+ */
 export function createMemoryClaimStore(): ClaimStore & {
   claims: Map<string, WebClaimRow>;
   plots: Map<string, { id?: string; area_hectares?: number | null; crop_type?: string | null }>;

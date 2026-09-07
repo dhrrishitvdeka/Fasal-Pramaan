@@ -261,15 +261,15 @@ export default function OverviewPage() {
             <Download className="h-3.5 w-3.5 text-slate-500" />
             <span>Export CSV</span>
           </button>
-          <span className="hidden text-xs text-slate-400 sm:inline">Auto-refreshes every 15s</span>
+          <span className="hidden text-xs text-slate-400 sm:inline">Auto-refreshes every 30s</span>
         </div>
       </div>
 
-      {/* Filter Chips / View Switcher */}
+      {/* Filter Chips / View Switcher (toggle buttons, not tabs: no tabpanel semantics) */}
       <div
         className="fp-chip-row border-b border-slate-200 pb-2 text-xs"
-        role="tablist"
-        aria-label="Overview & Analytics tabs"
+        role="group"
+        aria-label="Overview & Analytics sections"
       >
         {[
           { id: "all" as const, label: "All Telemetry & Charts", icon: Layers },
@@ -283,8 +283,7 @@ export default function OverviewPage() {
             <button
               key={tab.id}
               type="button"
-              role="tab"
-              aria-selected={isActive}
+              aria-pressed={isActive}
               onClick={() => switchSection(tab.id)}
               className={clsx(
                 "inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors border sm:min-h-9",

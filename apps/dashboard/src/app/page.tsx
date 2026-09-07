@@ -81,6 +81,28 @@ export default function HomePage() {
     fetchRecent();
   }, []);
 
+  const summarizeClaim = (claim: Submission) => {
+    const peril = normalizePeril(claim.peril);
+    const conf =
+      claim.evidence_evaluation?.confidence?.final ??
+      claim.latest_evaluation?.confidence?.final ??
+      (claim.latest_prediction?.overall_confidence != null
+        ? Math.round(claim.latest_prediction.overall_confidence * 100)
+        : 0);
+    const isPending =
+      claim.status === "under_review" ||
+      claim.status === "pending_review" ||
+      claim.status === "submitted" ||
+      claim.status === "needs_recapture" ||
+      claim.status === "recaptured";
+    return {
+      perilTitle: t.perilLabels[peril]?.title || claim.peril || "—",
+      crop: claim.latest_prediction?.predicted_crop || "—",
+      conf,
+      isPending,
+    };
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-3 pb-6 pt-3 sm:px-6 sm:pb-12 sm:pt-8 md:pb-16 md:pt-10">
       {/* Hero Header */}
@@ -208,76 +230,93 @@ export default function HomePage() {
             </Link>
           </div>
         ) : (
-          <div className="mt-6 overflow-x-auto border border-[var(--line)] bg-[var(--surface)]">
-            <table className="fp-table">
-              <thead>
-                <tr>
-                  <th>{t.thId}</th>
-                  <th>{t.thPeril}</th>
-                  <th>{t.thCrop}</th>
-                  <th>{t.thStatus}</th>
-                  <th>{t.thConfidence}</th>
-                  <th className="text-right">{t.thAction}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {claims.map((claim) => {
-                  const peril = normalizePeril(claim.peril);
-                  const pInfo = t.perilLabels[peril];
-                  const conf =
-                    claim.evidence_evaluation?.confidence?.final ??
-                    claim.latest_evaluation?.confidence?.final ??
-                    (claim.latest_prediction?.overall_confidence != null
-                      ? Math.round(claim.latest_prediction.overall_confidence * 100)
-                      : 0);
-                  const isPending =
-                    claim.status === "under_review" ||
-                    claim.status === "pending_review" ||
-                    claim.status === "submitted" ||
-                    claim.status === "needs_recapture" ||
-                    claim.status === "recaptured";
-                  return (
-                    <tr key={claim.id}>
-                      <td className="font-mono text-xs font-semibold">{claim.id.slice(0, 12)}</td>
-                      <td>
-                        <span className="rounded-sm bg-[var(--canvas)] px-2 py-0.5 text-xs font-medium text-[var(--ink)]">
-                          {pInfo?.title || claim.peril || "—"}
-                        </span>
-                      </td>
-                      <td>{claim.latest_prediction?.predicted_crop || "—"}</td>
-                      <td>
-                        <span
-                          className={`inline-flex items-center gap-1 text-xs font-medium capitalize ${
-                            isPending
-                              ? "text-amber-700 dark:text-amber-500"
-                              : claim.status === "accepted"
-                              ? "text-emerald-700 dark:text-emerald-500"
-                              : "text-[var(--ink-muted)]"
-                          }`}
-                        >
-                          {claim.status.replaceAll("_", " ")}
-                        </span>
-                      </td>
-                      <td className="font-mono text-xs">
-                        {conf > 0 ? (
-                          <span className={conf >= 75 ? "font-bold text-emerald-700" : "text-[var(--ink-muted)]"}>
-                            {conf}%
+          <>
+            {/* Phone: stacked cards (no horizontal table scroll) */}
+            <div className="mt-6 space-y-2 md:hidden">
+              {claims.map((claim) => {
+                const s = summarizeClaim(claim);
+                return (
+                  <Link
+                    key={claim.id}
+                    href={`/review/${claim.id}`}
+                    className="fp-panel block p-3 transition-colors hover:border-[var(--ink)]"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-mono text-xs font-semibold text-slate-800">
+                          {claim.id.slice(0, 12)}
+                        </div>
+                        <div className="mt-0.5 truncate text-xs capitalize text-slate-600">
+                          {s.perilTitle} · {s.crop} · {claim.status.replaceAll("_", " ")}
+                        </div>
+                      </div>
+                      <span className="shrink-0 font-mono text-xs text-[var(--ink-muted)]">
+                        {s.conf > 0 ? `${s.conf}%` : "—"}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            {/* md+: full table */}
+            <div className="mt-6 hidden overflow-x-auto border border-[var(--line)] bg-[var(--surface)] md:block">
+              <table className="fp-table">
+                <thead>
+                  <tr>
+                    <th>{t.thId}</th>
+                    <th>{t.thPeril}</th>
+                    <th>{t.thCrop}</th>
+                    <th>{t.thStatus}</th>
+                    <th>{t.thConfidence}</th>
+                    <th className="text-right">{t.thAction}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {claims.map((claim) => {
+                    const s = summarizeClaim(claim);
+                    return (
+                      <tr key={claim.id}>
+                        <td className="font-mono text-xs font-semibold">{claim.id.slice(0, 12)}</td>
+                        <td>
+                          <span className="rounded-sm bg-[var(--canvas)] px-2 py-0.5 text-xs font-medium text-[var(--ink)]">
+                            {s.perilTitle}
                           </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="text-right">
-                        <Link href={`/review/${claim.id}`} className="fp-link font-medium">
-                          {t.btnReview}
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td>{s.crop}</td>
+                        <td>
+                          <span
+                            className={`inline-flex items-center gap-1 text-xs font-medium capitalize ${
+                              s.isPending
+                                ? "text-amber-700 dark:text-amber-500"
+                                : claim.status === "accepted"
+                                ? "text-emerald-700 dark:text-emerald-500"
+                                : "text-[var(--ink-muted)]"
+                            }`}
+                          >
+                            {claim.status.replaceAll("_", " ")}
+                          </span>
+                        </td>
+                        <td className="font-mono text-xs">
+                          {s.conf > 0 ? (
+                            <span className={s.conf >= 75 ? "font-bold text-emerald-700" : "text-[var(--ink-muted)]"}>
+                              {s.conf}%
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="text-right">
+                          <Link href={`/review/${claim.id}`} className="fp-link font-medium">
+                            {t.btnReview}
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
     </div>

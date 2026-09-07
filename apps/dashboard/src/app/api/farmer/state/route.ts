@@ -79,19 +79,25 @@ export async function GET(request: Request) {
     imageRows.push(...((imagesRes.data || []) as WebClaimImageRow[]));
   }
 
+  // Signed-URL minting is network-bound: resolve concurrently instead of
+  // one round trip per image (was the dominant latency on this endpoint).
   const grouped = new Map<string, Awaited<ReturnType<typeof imageFromRow>>[]>();
-  for (const row of imageRows) {
-    const resolved = await resolveImageUrl(row.image_url, row.storage_path, supabase);
+  const resolvedRows = await Promise.all(
+    imageRows.map(async (row) => ({
+      row,
+      resolved: await resolveImageUrl(row.image_url, row.storage_path, supabase),
+    })),
+  );
+  for (const { row, resolved } of resolvedRows) {
     const list = grouped.get(row.claim_id) || [];
     list.push(imageFromRow({ ...row, image_url: resolved }));
     grouped.set(row.claim_id, list);
   }
 
   const profile = profileRes.data as WebProfileRow | null;
-  const isReviewer =
-    isReviewerRole(auth.actor.role) ||
-    Boolean(auth.actor.email?.toLowerCase().includes("reviewer")) ||
-    Boolean(auth.actor.email?.toLowerCase().includes("admin"));
+  // Server role only: an email-substring heuristic here would mislabel farmers
+  // whose addresses merely contain "reviewer"/"admin".
+  const isReviewer = isReviewerRole(auth.actor.role);
   const rawName = sanitizeMojibake(
     profile?.name ||
       profile?.full_name ||

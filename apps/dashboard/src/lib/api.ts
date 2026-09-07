@@ -1,4 +1,3 @@
-import axios from "axios";
 import { apiFetch } from "./auth-headers";
 import { resolveClaimClientPath } from "./claim-routes";
 import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
@@ -6,126 +5,15 @@ import { emptyOverview, type PerilAnalytics, type ReviewActionPayload } from "./
 import { clearRoleCache } from "./use-require-role";
 import { isCropMatch } from "./crop-synonyms";
 
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "/backend";
-
-export const api = axios.create({
-  baseURL: `${API_BASE}/api/v1`,
-  headers: { "Content-Type": "application/json" },
-});
-
-const ACCESS_KEY = "fp_access_token";
-const REFRESH_KEY = "fp_refresh_token";
-
-let accessToken: string | null = null;
-let refreshToken: string | null = null;
-let refreshInFlight: Promise<string> | null = null;
-
-function readStored(key: string): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return sessionStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStored(key: string, value: string | null) {
-  if (typeof window === "undefined") return;
-  try {
-    if (value) sessionStorage.setItem(key, value);
-    else sessionStorage.removeItem(key);
-  } catch {
-    // ignore
-  }
-}
-
-export function setAuthToken(token: string | null) {
-  accessToken = token;
-  writeStored(ACCESS_KEY, token);
-  if (token) {
-    api.defaults.headers.common.Authorization = `Bearer ${token}`;
-  } else {
-    delete api.defaults.headers.common.Authorization;
-    refreshToken = null;
-    writeStored(REFRESH_KEY, null);
-    clearRoleCache();
-  }
-}
-
-export function setSessionTokens(access: string, refresh: string) {
-  refreshToken = refresh;
-  writeStored(REFRESH_KEY, refresh);
-  setAuthToken(access);
-}
-
-export function loadStoredToken() {
-  if (!accessToken) {
-    const stored = readStored(ACCESS_KEY);
-    const storedRefresh = readStored(REFRESH_KEY);
-    if (stored) {
-      accessToken = stored;
-      refreshToken = storedRefresh;
-      api.defaults.headers.common.Authorization = `Bearer ${stored}`;
-    }
-  }
-  return accessToken;
-}
-
-export function hasRealApiSession(): boolean {
-  loadStoredToken();
-  return Boolean(accessToken);
-}
-
 export async function logoutSession() {
-  const token = refreshToken || readStored(REFRESH_KEY);
-  try {
-    if (token && accessToken) {
-      await api.post("/auth/logout", { refresh_token: token });
-    }
-  } catch {
-    // ignore network errors on logout
-  }
   try {
     const supabase = getSupabaseClient();
     if (supabase) await supabase.auth.signOut();
   } catch {
     // ignore
   }
-  setAuthToken(null);
+  clearRoleCache();
 }
-
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const original = error.config as (typeof error.config & { _retried?: boolean }) | undefined;
-    if (
-      error.response?.status === 401 &&
-      refreshToken &&
-      original &&
-      !original._retried
-    ) {
-      original._retried = true;
-      try {
-        refreshInFlight ??= axios
-          .post(`${API_BASE}/api/v1/auth/refresh`, { refresh_token: refreshToken })
-          .then((response) => {
-            setSessionTokens(response.data.access_token, response.data.refresh_token);
-            return response.data.access_token as string;
-          })
-          .finally(() => {
-            refreshInFlight = null;
-          });
-        const token = await refreshInFlight;
-        original.headers = { ...original.headers, Authorization: `Bearer ${token}` };
-        return api.request(original);
-      } catch {
-        setAuthToken(null);
-      }
-    }
-    return Promise.reject(error);
-  }
-);
 
 export type Overview = {
   total_submissions: number;
@@ -386,10 +274,6 @@ export async function listClaims(): Promise<Submission[]> {
     const body = (await res.json()) as { items?: Submission[] };
     return Array.isArray(body.items) ? body.items : [];
   }
-  if (hasRealApiSession()) {
-    const res = await api.get<{ items: Submission[] }>(route.path);
-    return res.data.items || [];
-  }
   return [];
 }
 
@@ -399,9 +283,6 @@ export async function getClaim(id: string): Promise<Submission> {
     const res = await apiFetch(route.path);
     if (!res.ok) throw new Error("Claim not found");
     return (await res.json()) as Submission;
-  }
-  if (hasRealApiSession()) {
-    return (await api.get<Submission>(route.path)).data;
   }
   throw new Error("Claim not found");
 }
@@ -418,9 +299,6 @@ export async function applyReviewAction(id: string, payload: ReviewActionPayload
       throw new Error(body.error || "Review action failed");
     }
     return res.json();
-  }
-  if (hasRealApiSession()) {
-    return (await api.post(route.path, payload)).data;
   }
   throw new Error("Sign in required to record a review action");
 }
@@ -584,9 +462,6 @@ export async function listReviewHistory(id: string) {
     if (!res.ok) return [];
     return res.json();
   }
-  if (hasRealApiSession()) {
-    return (await api.get(`/review/${id}/history`)).data;
-  }
   return [];
 }
 
@@ -620,9 +495,6 @@ export async function overviewStats(): Promise<Overview> {
     const stats = await reviewerStats();
     if (!stats?.overview) return emptyOverview();
     return { ...stats.overview, analytics_by_peril: stats.analytics?.byPeril };
-  }
-  if (hasRealApiSession()) {
-    return (await api.get<Overview>("/dashboard/overview")).data;
   }
   return emptyOverview();
 }
@@ -677,9 +549,6 @@ export async function mapMarkers(params?: Record<string, string>): Promise<MapMa
     if (params?.date_to) markers = markers.filter((m) => (m.created_at || "") <= params.date_to);
     return markers;
   }
-  if (hasRealApiSession()) {
-    return (await api.get<MapMarker[]>("/dashboard/map/markers", { params })).data;
-  }
   return [];
 }
 
@@ -697,21 +566,6 @@ export async function auditLogs() {
       notes: row.notes || row.reason || undefined,
     }));
   }
-  if (hasRealApiSession()) {
-    return (
-      await api.get<
-        Array<{
-          id: string;
-          action: string;
-          entity_type: string;
-          entity_id?: string;
-          actor_id?: string;
-          created_at?: string;
-          notes?: string;
-        }>
-      >("/admin/audit-logs")
-    ).data;
-  }
   return [];
 }
 
@@ -719,9 +573,6 @@ export async function listAlerts(): Promise<AlertItem[]> {
   if (isSupabaseConfigured()) {
     const stats = await reviewerStats();
     return stats?.alerts || [];
-  }
-  if (hasRealApiSession()) {
-    return (await api.get<AlertItem[]>("/dashboard/alerts")).data;
   }
   return [];
 }
@@ -731,9 +582,6 @@ export async function analyticsByCategory() {
     const stats = await reviewerStats();
     return stats?.analytics.byCategory || [];
   }
-  if (hasRealApiSession()) {
-    return (await api.get("/dashboard/analytics/damage-by-category")).data;
-  }
   return [];
 }
 
@@ -742,9 +590,6 @@ export async function analyticsBySeverity() {
     const stats = await reviewerStats();
     return stats?.analytics.bySeverity || [];
   }
-  if (hasRealApiSession()) {
-    return (await api.get("/dashboard/analytics/severity-distribution")).data;
-  }
   return [];
 }
 
@@ -752,9 +597,6 @@ export async function analyticsByCrop() {
   if (isSupabaseConfigured()) {
     const stats = await reviewerStats();
     return stats?.analytics.byCrop || [];
-  }
-  if (hasRealApiSession()) {
-    return (await api.get("/dashboard/analytics/by-crop")).data;
   }
   return [];
 }
@@ -765,10 +607,6 @@ export async function currentSessionRoles(): Promise<string[] | null> {
     if (!res.ok) return null;
     const body = (await res.json()) as { roles?: string[] };
     return Array.isArray(body.roles) ? body.roles : null;
-  }
-  if (hasRealApiSession()) {
-    const response = await api.get<{ roles: string[] }>("/auth/me").catch(() => null);
-    return response?.data?.roles || ["farmer"];
   }
   return null;
 }

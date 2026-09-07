@@ -56,9 +56,16 @@ export async function GET(request: Request) {
       imageRows.push(...((imagesRes.data || []) as WebClaimImageRow[]));
     }
   }
+  // Signed-URL minting is network-bound: resolve concurrently instead of
+  // one round trip per image (was the dominant latency on this endpoint).
   const grouped = new Map<string, ReturnType<typeof imageFromRow>[]>();
-  for (const row of imageRows) {
-    const resolved = await resolveImageUrl(row.image_url, row.storage_path, supabase);
+  const resolvedRows = await Promise.all(
+    imageRows.map(async (row) => ({
+      row,
+      resolved: await resolveImageUrl(row.image_url, row.storage_path, supabase),
+    })),
+  );
+  for (const { row, resolved } of resolvedRows) {
     const list = grouped.get(row.claim_id) || [];
     list.push(imageFromRow({ ...row, image_url: resolved }));
     grouped.set(row.claim_id, list);

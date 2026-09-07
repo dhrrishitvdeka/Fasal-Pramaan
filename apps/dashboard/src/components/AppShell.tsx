@@ -15,7 +15,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { currentSessionRoles, loadStoredToken, logoutSession } from "@/lib/api";
+import { currentSessionRoles, logoutSession } from "@/lib/api";
 import { canAccessReviewerPortal, reviewerLoginHref } from "@/lib/review-access";
 import { useLanguage } from "@/lib/LanguageContext";
 import type { DictKey, Lang } from "@/lib/i18n";
@@ -215,7 +215,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      loadStoredToken();
       try {
         const sessionRoles = await currentSessionRoles();
         if (!cancelled) {
