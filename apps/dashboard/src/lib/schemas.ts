@@ -126,16 +126,17 @@ export type ClaimImageInput = z.infer<typeof claimImageSchema>;
 // ---------------------------------------------------------------------------
 export const reviewActionSchema = z.object({
   action: z.enum(REVIEW_ACTION_IDS),
-  notes: z.string().optional(),
-  reason: z.string().optional(),
-  override_reason: z.string().optional(),
-  required_angles: z.array(z.string()).optional(),
-  corrected_crop: z.string().optional(),
-  corrected_grade: z.string().optional(),
-  corrected_severity: z.string().optional(),
-  corrected_damage_codes: z.array(z.string()).optional(),
-  corrected_affected_area_pct: z.number().finite().optional(),
-  corrected_growth_stage: z.string().optional(),
+  notes: z.string().max(2000).optional(),
+  reason: z.string().max(2000).optional(),
+  reason_hi: z.string().max(2000).optional(),
+  override_reason: z.string().max(2000).optional(),
+  required_angles: z.array(z.string().max(64)).max(10).optional(),
+  corrected_crop: z.string().max(120).optional(),
+  corrected_grade: z.string().max(32).optional(),
+  corrected_severity: z.string().max(32).optional(),
+  corrected_damage_codes: z.array(z.string().max(64)).max(20).optional(),
+  corrected_affected_area_pct: z.number().finite().min(0).max(100).optional(),
+  corrected_growth_stage: z.string().max(120).optional(),
 });
 
 export type ReviewActionBody = z.infer<typeof reviewActionSchema>;
@@ -208,7 +209,16 @@ export const milestoneSchema = z.object({
   completed: z.boolean().optional(),
   /** Stored only when the client explicitly sends it (null clears it). */
   completedDate: z.union([isoDate, z.null()]).optional(),
-  evidenceImageUrl: z.string().max(2048).optional(),
+  // Evidence must be an https link or a local data/blob image URL — never
+  // javascript:, file:, or internal-network URLs rendered into <img>/<a>.
+  evidenceImageUrl: z
+    .string()
+    .max(2048)
+    .refine(
+      (v) => v.startsWith("https://") || v.startsWith("data:image/") || v.startsWith("blob:"),
+      "evidenceImageUrl must be an https, data:image, or blob URL",
+    )
+    .optional(),
   notes: z.string().max(2000).optional(),
   isOverdue: z.boolean().optional(),
 });

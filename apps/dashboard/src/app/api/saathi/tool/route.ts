@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/server/rate-limit";
 import { requireWebActor } from "@/lib/web-auth";
 import { executeSaathiTool, type SaathiToolResult } from "@/lib/saathi/tools-server";
 import { CANONICAL_ANGLES, LEGACY_CANONICAL_ANGLES } from "@/lib/farmerI18n";
@@ -132,6 +133,15 @@ function sanitizeArgs(name: string, raw: unknown): Record<string, unknown> | nul
 export async function POST(request: Request) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
+
+  // This endpoint fans out to Gemini + agro context services per call.
+  const toolLimit = checkRateLimit(`saathi-tool:${auth.actor.userId}`, 30, 60_000);
+  if (!toolLimit.ok) {
+    return NextResponse.json(
+      { ok: false, error: "Too many Saathi requests. Please try again shortly." },
+      { status: 429, headers: { "Retry-After": String(toolLimit.retryAfterSeconds) } },
+    );
+  }
 
   const declaredLength = Number(request.headers.get("content-length") || "0");
   if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_CHARS) {

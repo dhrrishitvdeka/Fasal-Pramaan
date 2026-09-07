@@ -26,5 +26,16 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     console.error("review actions query failed:", error.message);
     return NextResponse.json({ error: "Request failed" }, { status: 500 });
   }
-  return NextResponse.json(data || []);
+  const rows = (data || []) as Array<Record<string, unknown>>;
+  // Farmers see the decision trail on their own claims, but reviewer identity
+  // stays internal: replace actor emails with a role label for non-reviewers.
+  if (!isReviewerRole(auth.actor.role)) {
+    return NextResponse.json(
+      rows.map((row) => ({
+        ...row,
+        actor: typeof row.actor === "string" && row.actor.includes("@") ? "Reviewing officer" : row.actor,
+      })),
+    );
+  }
+  return NextResponse.json(rows);
 }

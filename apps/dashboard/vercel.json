@@ -6,6 +6,11 @@
   "functions": {
     "app/api/claims/route.ts": { "maxDuration": 60 },
     "app/api/claims/[id]/route.ts": { "maxDuration": 60 },
-    "app/api/claims/[id]/reanalyze/route.ts": { "maxDuration": 60 }
+    "app/api/claims/[id]/reanalyze/route.ts": { "maxDuration": 60 },
+    "app/api/claims/[id]/action/route.ts": { "maxDuration": 60 },
+    "app/api/vision/gate/route.ts": { "maxDuration": 60 },
+    "app/api/voice/session/route.ts": { "maxDuration": 60 },
+    "app/api/saathi/tool/route.ts": { "maxDuration": 60 },
+    "app/api/context/assemble/route.ts": { "maxDuration": 60 }
   }
 }

@@ -696,7 +696,8 @@ export default function ReviewDetailPage() {
         <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-100/80 px-3 py-2 text-xs text-slate-700">
           <ShieldAlert className="h-3.5 w-3.5 text-slate-500 shrink-0" />
           <span>
-            Finalized as <strong>{liveStatus}</strong> — immutable. Issue a recapture if fresh evidence is needed.
+            Finalized as <strong>{liveStatus}</strong> — decisions are locked. Issuing a recapture reopens
+            the case and voids any settled payout until re-verified.
           </span>
         </div>
       )}

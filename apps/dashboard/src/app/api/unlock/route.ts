@@ -33,11 +33,20 @@ async function timingSafeEqualStrings(a: string, b: string): Promise<boolean> {
   return mismatch === 0;
 }
 
+/** Best-effort client IP for per-actor throttling (Vercel/CDN aware). */
+function clientIp(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  const first = forwarded?.split(",")[0]?.trim();
+  return first || request.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
 export async function POST(request: Request) {
   if (!isSiteLockActive()) {
     return NextResponse.json({ ok: true, locked: false });
   }
-  const unlockLimit = checkRateLimit("unlock", 10, 60_000);
+  // Per-IP bucket, always enforced: a global key lets one attacker lock out
+  // every legitimate user (or brute-force unbothered when disabled in dev).
+  const unlockLimit = checkRateLimit(`unlock:${clientIp(request)}`, 10, 60_000, true);
   if (!unlockLimit.ok) {
     return NextResponse.json(
       { error: "Too many attempts. Please try again shortly." },

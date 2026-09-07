@@ -81,11 +81,27 @@ function forward(error: TelemetryError) {
   })();
 }
 
+/** Client-side scrub (mirrors server sanitizeTelemetryText): the in-memory
+ * ring and console output must never hold raw emails, phone numbers, or JWTs.
+ * Query strings and hashes are stripped from URLs (may carry IDs/tokens). */
+export function scrubTelemetryText(input: string): string {
+  return input
+    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "[EMAIL_MASKED]")
+    .replace(/\b(?:\+91|91)?[6-9]\d{9}\b/g, "[PHONE_MASKED]")
+    .replace(/\b(?:Bearer\s+)?[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[JWT_MASKED]");
+}
+
+function scrubUrl(href: string): string {
+  if (!href) return "";
+  const queryIndex = href.search(/[?#]/);
+  return queryIndex === -1 ? href : href.slice(0, queryIndex);
+}
+
 function handle(kind: "onerror" | "unhandledrejection", message: string, stack?: string) {
   const error: TelemetryError = {
-    message: String(message).slice(0, 500),
-    stack: stack ? String(stack).slice(0, 2000) : undefined,
-    url: typeof window !== "undefined" ? window.location.href : "",
+    message: scrubTelemetryText(String(message)).slice(0, 500),
+    stack: stack ? scrubTelemetryText(String(stack)).slice(0, 2000) : undefined,
+    url: typeof window !== "undefined" ? scrubUrl(window.location.href) : "",
     userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
     timestamp: new Date().toISOString(),
     source: kind,

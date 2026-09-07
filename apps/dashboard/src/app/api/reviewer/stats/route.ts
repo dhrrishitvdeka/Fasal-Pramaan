@@ -55,20 +55,26 @@ export async function GET(request: Request) {
     grouped.set(row.claim_id, list);
   }
   const mapped = claims.map((row) => claimFromRow(row, grouped.get(row.id) || []));
-  const { data: actions, error: actionError } = await supabase
-    .from("web_review_actions")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (actionError) {
-    console.error("reviewer actions query failed:", actionError.message);
-    return NextResponse.json({ error: "Request failed" }, { status: 500 });
+  // The review-action trail is an admin audit log: reviewers get aggregates,
+  // administrators additionally get the actor-attributed action history.
+  let actions: WebReviewActionRow[] = [];
+  if (auth.actor.role === "administrator") {
+    const { data, error: actionError } = await supabase
+      .from("web_review_actions")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (actionError) {
+      console.error("reviewer actions query failed:", actionError.message);
+      return NextResponse.json({ error: "Request failed" }, { status: 500 });
+    }
+    actions = (data || []) as WebReviewActionRow[];
   }
   return NextResponse.json({
     overview: overviewFromClaims(mapped),
     markers: markersFromClaims(mapped),
     alerts: alertsFromClaims(mapped),
     analytics: analyticsFromClaims(mapped),
-    actions: (actions || []) as WebReviewActionRow[],
+    actions,
   });
 }

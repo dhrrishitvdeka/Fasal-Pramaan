@@ -6,6 +6,8 @@ import {
   type PersistedImageInput,
 } from "../src/lib/claim-pipeline";
 import { inferCropDisease } from "../src/lib/gemini-analyze";
+import { reviewActionSchema } from "../src/lib/schemas";
+import { scrubTelemetryText } from "../src/lib/telemetry";
 
 function jpegLikeBytes(): Uint8Array {
   const bytes = new Uint8Array(8192);
@@ -71,6 +73,32 @@ async function persistSeed(store = createMemoryClaimStore()) {
   );
   return { store, claimId: result.claimId };
 }
+
+describe("review action input validation", () => {
+  it("rejects unbounded notes and out-of-range severity percentages", () => {
+    expect(reviewActionSchema.safeParse({ action: "accept", notes: "ok" }).success).toBe(true);
+    expect(reviewActionSchema.safeParse({ action: "accept", notes: "x".repeat(2001) }).success).toBe(false);
+    expect(
+      reviewActionSchema.safeParse({ action: "correct", corrected_affected_area_pct: 42 }).success,
+    ).toBe(true);
+    expect(
+      reviewActionSchema.safeParse({ action: "correct", corrected_affected_area_pct: 99999 }).success,
+    ).toBe(false);
+    expect(reviewActionSchema.safeParse({ action: "nuke" }).success).toBe(false);
+  });
+});
+
+describe("telemetry scrubbing", () => {
+  it("masks emails, phones, and JWTs before buffering", () => {
+    expect(scrubTelemetryText("failed for lead@example.com")).toBe("failed for [EMAIL_MASKED]");
+    expect(scrubTelemetryText("call +919876543210 now")).toBe("call +[PHONE_MASKED] now");
+    expect(scrubTelemetryText("call 9876543210 now")).toBe("call [PHONE_MASKED] now");
+    expect(scrubTelemetryText("Bearer eyJhbGciOiJIUzI1NiJ9.cGF5bG9hZA.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c")).toBe(
+      "[JWT_MASKED]",
+    );
+    expect(scrubTelemetryText("plain network timeout")).toBe("plain network timeout");
+  });
+});
 
 describe("reviewer payout guards", () => {
   it("blocks accept while AI inference is still pending", async () => {

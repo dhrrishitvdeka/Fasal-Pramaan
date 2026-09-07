@@ -455,19 +455,69 @@ async function explainClaimAudit(
   };
 }
 
+const TOOL_CROP_KEYS = [
+  "wheat",
+  "paddy",
+  "maize",
+  "mustard",
+  "potato",
+  "sugarcane",
+  "cotton",
+  "soybean",
+  "gram",
+  "groundnut",
+  "onion",
+  "pulses",
+] as const;
+
+const TOOL_CROP_ALIASES: Record<string, string> = {
+  rice: "paddy",
+  dhan: "paddy",
+  corn: "maize",
+  makka: "maize",
+  chickpea: "gram",
+  chana: "gram",
+  sarson: "mustard",
+  aloo: "potato",
+  ganna: "sugarcane",
+  kapas: "cotton",
+  moongfalli: "groundnut",
+  peanut: "groundnut",
+  pyaaz: "onion",
+  dal: "pulses",
+  gehun: "wheat",
+};
+
+/** Canonicalize a model-supplied crop name; null when unsupported. */
+function normalizeToolCrop(raw: string): string | null {
+  const key = raw.trim().toLowerCase();
+  if ((TOOL_CROP_KEYS as readonly string[]).includes(key)) return key;
+  return TOOL_CROP_ALIASES[key] || null;
+}
+
 async function registerPlotServer(
   args: Record<string, unknown>,
   context: SaathiToolContext,
 ): Promise<SaathiToolResult> {
   const client = createServerSupabase();
   if (!client) return { ok: false, error: "Supabase is not configured" };
-  const name = String(args.name || args.plot_name || "Farm Plot").trim();
-  const cropType = String(args.crop_type || args.crop || "wheat").trim().toLowerCase();
+  const name = String(args.name || args.plot_name || "Farm Plot").trim().slice(0, 80);
+  if (!name) return { ok: false, error: "A plot name is required." };
+  const cropType = normalizeToolCrop(String(args.crop_type || args.crop || "wheat"));
+  if (!cropType) {
+    return {
+      ok: false,
+      error: `Unsupported crop. Supported crops: ${TOOL_CROP_KEYS.join(", ")}.`,
+    };
+  }
   // Khasra auto-links from the mobile-verified land record; never ask the farmer for it.
-  const khasra = args.khasra_number ? String(args.khasra_number).trim() : autoLinkedKhasra();
+  const khasra = args.khasra_number ? String(args.khasra_number).trim().slice(0, 64) : autoLinkedKhasra();
   const area = args.area_hectares ? Number(args.area_hectares) : 1.0;
-  const village = args.village ? String(args.village).trim() : "";
-  const plotId = `plot_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  if (!Number.isFinite(area) || area <= 0 || area > 100000) {
+    return { ok: false, error: "Plot area must be between 0 and 100000 hectares." };
+  }
+  const village = args.village ? String(args.village).trim().slice(0, 120) : "";
+  const plotId = `plot_${crypto.randomUUID()}`;
   const row = {
     id: plotId,
     name,

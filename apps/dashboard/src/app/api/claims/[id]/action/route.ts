@@ -4,16 +4,9 @@ import { createServerSupabase } from "@/lib/supabase";
 import { createSupabaseClaimStore } from "@/lib/supabase-store";
 import { actorUnauthorized, isReviewerRole, requireWebActor } from "@/lib/web-auth";
 import { checkRateLimit } from "@/lib/server/rate-limit";
+import { REVIEW_ACTION_IDS, reviewActionSchema } from "@/lib/schemas";
 
-const ALLOWED_ACTIONS = new Set([
-  "accept",
-  "correct",
-  "request_recapture",
-  "physical_inspection",
-  "reject",
-  "override_gate",
-  "annotate",
-]);
+const ALLOWED_ACTIONS = new Set<string>(REVIEW_ACTION_IDS);
 const RATE_LIMIT_MAX = 30;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 
@@ -35,8 +28,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!supabase) {
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
   }
-  const payload = await request.json().catch(() => ({}));
-  const action = String(payload.action || "");
+  const rawPayload: unknown = await request.json().catch(() => ({}));
+  const parsed = reviewActionSchema.safeParse(rawPayload);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message || "Invalid review action" },
+      { status: 400 },
+    );
+  }
+  const payload = parsed.data;
+  const action = payload.action;
   if (!ALLOWED_ACTIONS.has(action)) {
     return NextResponse.json({ error: "Unsupported review action" }, { status: 400 });
   }
@@ -45,24 +46,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       action,
       notes: payload.notes,
       reason: payload.reason || payload.override_reason,
-      reason_hi: payload.reason_hi ? String(payload.reason_hi) : undefined,
-      required_angles: Array.isArray(payload.required_angles) ? payload.required_angles.map(String) : undefined,
+      reason_hi: payload.reason_hi,
+      required_angles: payload.required_angles,
       actor: auth.actor.email || auth.actor.userId,
-      corrected_crop: payload.corrected_crop == null ? undefined : String(payload.corrected_crop),
-      corrected_grade: payload.corrected_grade == null ? undefined : String(payload.corrected_grade),
-      corrected_severity: payload.corrected_severity == null ? undefined : String(payload.corrected_severity),
-      corrected_damage_codes: Array.isArray(payload.corrected_damage_codes)
-        ? payload.corrected_damage_codes.map(String)
-        : undefined,
-      corrected_affected_area_pct: (() => {
-        if (payload.corrected_affected_area_pct == null || payload.corrected_affected_area_pct === "") {
-          return undefined;
-        }
-        const pct = Number(payload.corrected_affected_area_pct);
-        return Number.isFinite(pct) ? pct : undefined;
-      })(),
-      corrected_growth_stage:
-        payload.corrected_growth_stage == null ? undefined : String(payload.corrected_growth_stage),
+      corrected_crop: payload.corrected_crop,
+      corrected_grade: payload.corrected_grade,
+      corrected_severity: payload.corrected_severity,
+      corrected_damage_codes: payload.corrected_damage_codes,
+      corrected_affected_area_pct: payload.corrected_affected_area_pct,
+      corrected_growth_stage: payload.corrected_growth_stage,
     });
     return NextResponse.json(updated);
   } catch (error) {

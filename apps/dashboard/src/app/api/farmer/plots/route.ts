@@ -4,6 +4,7 @@ import { createServerSupabase } from "@/lib/supabase";
 import { requireWebActor } from "@/lib/web-auth";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { katthaToHectares, toKattha } from "@/lib/land-units";
+import { plotSchema } from "@/lib/schemas";
 
 const CROPS: Record<string, { en: string; hi: string }> = {
   wheat: { en: "Wheat", hi: "गेहूँ" },
@@ -33,54 +34,58 @@ export async function POST(request: Request) {
   const supabase = createServerSupabase();
   if (!supabase) return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
 
-  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const name = String(body.name || "").trim();
-  if (!name || name.length > 80) {
-    return NextResponse.json({ error: "A plot name is required." }, { status: 400 });
+  const rawBody: unknown = await request.json().catch(() => ({}));
+  const parsed = plotSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message || "Invalid plot details" },
+      { status: 400 },
+    );
   }
-  const cropKey = String(body.cropType || "wheat").trim().toLowerCase();
-  const crop = CROPS[cropKey] || { en: String(body.cropType || "Wheat"), hi: String(body.cropTypeHi || "") };
-  const sowingDate = String(body.sowingDate || "").trim() || new Date().toISOString().slice(0, 10);
+  const body = parsed.data;
+  const name = body.name;
+  const crop = CROPS[body.cropType] || CROPS.wheat;
+  const sowingDate = body.sowingDate || new Date().toISOString().slice(0, 10);
   const plotId = `plot_${crypto.randomUUID()}`;
 
   // Area calculation: prefer areaKattha if supplied or convert unit
   let areaHa = 0;
-  if (body.areaKattha !== undefined && body.areaKattha !== null && body.areaKattha !== "") {
-    areaHa = katthaToHectares(Number(body.areaKattha));
-  } else if (body.areaHectares !== undefined && body.areaHectares !== null && body.areaHectares !== "") {
-    areaHa = Number(body.areaHectares);
-  } else if (body.areaValue && body.areaUnit) {
-    const k = toKattha(Number(body.areaValue), body.areaUnit as any);
+  if (body.areaKattha != null) {
+    areaHa = katthaToHectares(body.areaKattha);
+  } else if (body.areaHectares != null) {
+    areaHa = body.areaHectares;
+  } else if (body.areaValue != null && body.areaUnit) {
+    const k = toKattha(body.areaValue, body.areaUnit);
     areaHa = katthaToHectares(k);
   }
-
-  const lat = Number(body.lat);
-  const lon = Number(body.lon);
+  if (!Number.isFinite(areaHa) || areaHa < 0 || areaHa > 100000) {
+    return NextResponse.json({ error: "Plot area is out of range." }, { status: 400 });
+  }
 
   const row = {
     id: plotId,
     name,
-    name_hi: String(body.nameHi || name),
-    khasra_number: String(body.khasraNumber || "").trim(),
-    khata_number: String(body.khataNumber || "").trim(),
-    hissa_number: String(body.hissaNumber || "").trim(),
-    tehsil: String(body.tehsil || "").trim(),
-    ownership_type: String(body.ownershipType || "owner").trim(),
-    season: String(body.season || "").trim(),
-    area_hectares: Number.isFinite(areaHa) && areaHa > 0 ? Number(areaHa.toFixed(4)) : 0,
+    name_hi: body.nameHi || name,
+    khasra_number: body.khasraNumber || "",
+    khata_number: body.khataNumber || "",
+    hissa_number: body.hissaNumber || "",
+    tehsil: body.tehsil || "",
+    ownership_type: body.ownershipType || "owner",
+    season: body.season || "",
+    area_hectares: areaHa > 0 ? Number(areaHa.toFixed(4)) : 0,
     crop_type: crop.en,
     crop_type_hi: crop.hi || crop.en,
-    crop_variety: String(body.cropVariety || "").trim(),
+    crop_variety: body.cropVariety || "",
     current_stage: "Sowing",
     current_stage_hi: "बुवाई",
     sowing_date: sowingDate,
-    soil_type: String(body.soilType || "").trim(),
-    irrigation_type: String(body.irrigationType || "").trim(),
-    village: String(body.village || "").trim(),
-    district: String(body.district || "").trim(),
-    state: String(body.state || "").trim(),
-    lat: Number.isFinite(lat) ? lat : null,
-    lon: Number.isFinite(lon) ? lon : null,
+    soil_type: body.soilType || "",
+    irrigation_type: body.irrigationType || "",
+    village: body.village || "",
+    district: body.district || "",
+    state: body.state || "",
+    lat: body.lat ?? null,
+    lon: body.lon ?? null,
     created_by: auth.actor.userId,
   };
 

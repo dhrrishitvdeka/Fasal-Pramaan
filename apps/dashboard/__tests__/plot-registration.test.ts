@@ -102,6 +102,15 @@ describe("Plot Registration & Cadastral Synchronization", () => {
     expect(parsed.success).toBe(false);
   });
 
+  it("rejects unknown crops, out-of-range GPS, and absurd areas", () => {
+    expect(plotSchema.safeParse({ name: "X", cropType: "cannabis" }).success).toBe(false);
+    expect(plotSchema.safeParse({ name: "X", cropType: "WHEAT" }).success).toBe(true);
+    expect(plotSchema.safeParse({ name: "X", lat: 999, lon: 0 }).success).toBe(false);
+    expect(plotSchema.safeParse({ name: "X", lat: -91, lon: 0 }).success).toBe(false);
+    expect(plotSchema.safeParse({ name: "X", areaHectares: -3 }).success).toBe(false);
+    expect(plotSchema.safeParse({ name: "X", areaHectares: 50 }).success).toBe(true);
+  });
+
   it("converts area across Kattha, Bigha, Acre, and Hectare accurately", () => {
     // 10 Kattha = 0.5 Bigha = ~0.1265 Hectare = 0.3125 Acre
     const kattha = 10;
