@@ -6,9 +6,9 @@ export type AcceptablePrediction = {
 } | null | undefined;
 
 /**
- * Reviewer Accept is allowed when integrity is intact and the screening grade
- * is not Unusable. A missing prediction (HF Space still warming / timed out)
- * does not block Accept — the model is assistive, not a settlement gate.
+ * Mirrors `applyReviewerAction("accept")`: integrity must hold, grade U is
+ * never one-click acceptable (Correct must set A/B/C first), and a missing
+ * prediction is only acceptable after an explicit gate override.
  */
 export function predictionIsAcceptable(
   pred: AcceptablePrediction,
@@ -16,8 +16,8 @@ export function predictionIsAcceptable(
   gateOverridden = false,
 ): boolean {
   if (integrityFailed) return false;
-  if (!pred) return true;
-  if (pred.predicted_grade === "U") return Boolean(gateOverridden);
+  if (!pred) return Boolean(gateOverridden);
+  if (pred.predicted_grade === "U") return false;
   if (
     pred.predicted_grade === "A" ||
     pred.predicted_grade === "B" ||

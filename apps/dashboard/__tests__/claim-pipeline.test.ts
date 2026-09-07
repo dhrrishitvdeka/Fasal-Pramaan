@@ -220,6 +220,25 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     ).rejects.toThrow(/class or grade/i);
   });
 
+  it("does not upgrade grade U to a payable grade just because the crop name matches", async () => {
+    const parsed = await inferCropDisease({
+      imageBytes: jpegLikeBytes(),
+      expectedCrop: "Wheat",
+      fetchImpl: geminiFetchImpl({
+        ...geminiSuccess,
+        predicted_grade: "U",
+        grade_label: "unusable_or_not_authentic",
+        score: 0,
+        overall_confidence: 0,
+        human_review_recommendation: "recapture",
+        reasoning: "Frame is too dark to grade severity.",
+      }),
+    });
+    expect(parsed.predictedCrop).toBe("unknown");
+    expect(parsed.predictedGrade).toBe("U");
+    expect(predictionIsAcceptable({ predicted_grade: parsed.predictedGrade }, false)).toBe(false);
+  });
+
   async function persistSeed(store = createMemoryClaimStore()) {
     const closeup = jpegLikeBytes();
     const result = await persistAndInfer(
@@ -608,10 +627,11 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect(predictionIsAcceptable({ predicted_grade: "C" }, false)).toBe(true);
   });
 
-  it("allows Accept when the Space prediction is still missing", () => {
-    expect(predictionIsAcceptable(null, false)).toBe(true);
-    expect(predictionIsAcceptable(undefined, false)).toBe(true);
+  it("blocks Accept when the prediction is still missing unless the gate is overridden", () => {
+    expect(predictionIsAcceptable(null, false)).toBe(false);
+    expect(predictionIsAcceptable(undefined, false)).toBe(false);
     expect(predictionIsAcceptable(null, true)).toBe(false);
+    expect(predictionIsAcceptable(null, false, true)).toBe(true);
   });
 
   it("does not let late inference overwrite a reviewer's verified grade", async () => {
@@ -747,8 +767,8 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
     expect((outcome.gateResult as { duplicateAngles: string[] }).duplicateAngles).toEqual(["photo_2"]);
   });
 
-  it("allows acceptance on Grade U claims when gate is overridden", () => {
-    expect(predictionIsAcceptable({ predicted_grade: "U" }, false, true)).toBe(true);
+  it("never allows one-click Accept on Grade U, even after a gate override", () => {
+    expect(predictionIsAcceptable({ predicted_grade: "U" }, false, true)).toBe(false);
     expect(predictionIsAcceptable({ predicted_grade: "U" }, true, true)).toBe(false);
     expect(predictionIsAcceptable({ predicted_grade: "U" }, false, false)).toBe(false);
   });

@@ -1924,6 +1924,37 @@ export async function applyReviewerAction(
     }
   }
 
+  if (payload.action === "correct") {
+    // Correct is the other door onto verified + approved payout. It must not
+    // launder a missing/U grade or a failed gate into a sanctioned claim.
+    const correctionReason = String(payload.reason || payload.notes || payload.override_reason || "").trim();
+    if (!correctionReason) {
+      throw new Error("A reason or note is required to correct and verify a claim.");
+    }
+    const effectiveGrade = String(
+      payload.corrected_grade || existing.corrected_grade || existing.severity_grade || "",
+    )
+      .trim()
+      .toUpperCase();
+    if (effectiveGrade !== "A" && effectiveGrade !== "B" && effectiveGrade !== "C") {
+      throw new Error(
+        "Cannot verify claim: set an explicit payable grade (A, B, or C). Grade U cannot be sanctioned.",
+      );
+    }
+    if (existing.integrity_score != null && existing.integrity_score < 50) {
+      throw new Error(
+        "Cannot verify claim: integrity score is below 50. Request physical inspection or recapture.",
+      );
+    }
+    const correctGate = (existing as any).gate_result as { overridden?: boolean } | null | undefined;
+    const inferenceStatus = (existing as { inference_status?: string | null }).inference_status;
+    if (inferenceStatus !== "complete" && !payload.corrected_grade && !correctGate?.overridden) {
+      throw new Error(
+        "Cannot verify claim: AI analysis is not complete yet. Wait for inference, set an explicit grade, or override the gate with a reason first.",
+      );
+    }
+  }
+
   if (
     (payload.action === "reject" || payload.action === "request_recapture") &&
     !String(payload.reason || payload.notes || "").trim()

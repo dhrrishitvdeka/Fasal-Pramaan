@@ -482,9 +482,9 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
           (w) => w !== "crop_mismatch" && w !== "wrong_crop",
         );
       }
-      if (parsed.predictedGrade === "U" && parsed.authenticity?.authentic !== false) {
-        parsed.predictedGrade = "B";
-      }
+      // Crop identity matching the declaration does not make an unusable
+      // read payable. Grade U stays U; the reviewer must set an explicit
+      // grade via Correct before Accept can proceed.
     }
   }
   return { ...parsed, modelId: usedModel };

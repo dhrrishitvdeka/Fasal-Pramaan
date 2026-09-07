@@ -147,6 +147,31 @@ describe("reviewer payout guards", () => {
     ).rejects.toThrow(/reason/i);
   });
 
+  it("blocks correct-without-grade from verifying a grade U claim", async () => {
+    const { store, claimId } = await persistSeed();
+    const row = store.claims.get(claimId) as any;
+    row.severity_grade = "U";
+    await expect(
+      applyReviewerAction(store, claimId, { action: "correct", notes: "looks fine" }),
+    ).rejects.toThrow(/payable grade/i);
+    expect(store.claims.get(claimId)?.status).not.toBe("verified");
+    expect(store.claims.get(claimId)?.payout_status).not.toBe("approved");
+  });
+
+  it("lets correct settle only after an explicit payable grade", async () => {
+    const { store, claimId } = await persistSeed();
+    const row = store.claims.get(claimId) as any;
+    row.severity_grade = "U";
+    const acted = await applyReviewerAction(store, claimId, {
+      action: "correct",
+      notes: "Field visit confirmed moderate damage",
+      corrected_grade: "B",
+    });
+    expect(acted.status).toBe("verified");
+    expect(store.claims.get(claimId)?.severity_grade).toBe("B");
+    expect(store.claims.get(claimId)?.payout_status).toBe("approved");
+  });
+
   it("voids the settled payout when a terminal claim is reopened", async () => {
     const { store, claimId } = await persistSeed();
     await applyReviewerAction(store, claimId, { action: "accept", notes: "ok" });
