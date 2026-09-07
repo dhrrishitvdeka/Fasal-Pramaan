@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+export const maxDuration = 60;
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { requireWebActor } from "@/lib/web-auth";
 import { executeSaathiTool, type SaathiToolResult } from "@/lib/saathi/tools-server";

@@ -190,6 +190,20 @@ DROP POLICY IF EXISTS web_profiles_anon_all ON public.web_profiles;
 
 -- No policies for anon or authenticated. Browser keys cannot read or write.
 -- Hosted Next.js routes use the service role after verifying a user JWT.
+-- FORCE RLS so table owners cannot bypass it from the PostgREST roles.
+ALTER TABLE public.web_plots FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.web_claims FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.web_claim_images FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.web_milestones FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.web_review_actions FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.web_profiles FORCE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.web_plots FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.web_claims FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.web_claim_images FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.web_milestones FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.web_review_actions FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.web_profiles FROM PUBLIC, anon, authenticated;
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (

@@ -88,12 +88,12 @@ export async function GET(request: Request) {
       updatedAt: new Date().toISOString(),
     });
   } catch (err) {
+    console.error("github stars fetch failed:", err instanceof Error ? err.message : err);
     return NextResponse.json({
       stars: null,
       repo,
       url: `https://github.com/${repo}`,
       source: "unavailable",
-      error: err instanceof Error ? err.message : "Fetch error",
     });
   }
 }

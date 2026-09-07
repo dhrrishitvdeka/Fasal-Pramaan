@@ -48,6 +48,13 @@ function clampNumber(value: unknown, min: number, max: number): number | undefin
 export async function GET(request: Request) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
+  const listLimit = checkRateLimit(`claims-list:${auth.actor.userId}`, 30, RATE_LIMIT_WINDOW_MS);
+  if (!listLimit.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Try again shortly." },
+      { status: 429, headers: { "Retry-After": String(listLimit.retryAfterSeconds) } },
+    );
+  }
   const supabase = createServerSupabase();
   if (!supabase) {
     return NextResponse.json({ items: [] });

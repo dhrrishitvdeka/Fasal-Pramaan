@@ -162,7 +162,7 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
             try {
               const { data: signed } = await client.storage
                 .from("fasal-web-evidence")
-                .createSignedUrl(row.storage_path, 1800);
+                .createSignedUrl(row.storage_path, 15 * 60);
               if (signed?.signedUrl) {
                 return { ...row, image_url: signed.signedUrl };
               }
@@ -184,7 +184,7 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
       try {
         const { data: signed, error: signError } = await client.storage
           .from("fasal-web-evidence")
-          .createSignedUrl(path, 60 * 60 * 24 * 7);
+          .createSignedUrl(path, 15 * 60);
         if (!signError && signed?.signedUrl) {
           url = signed.signedUrl;
         }

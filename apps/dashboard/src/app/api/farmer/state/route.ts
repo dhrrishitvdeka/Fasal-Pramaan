@@ -34,14 +34,22 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
   }
 
-  let plotsQuery = supabase.from("web_plots").select("*").order("created_at", { ascending: true });
-  let claimsQuery = supabase.from("web_claims").select("*").order("created_at", { ascending: false });
-  let milestonesQuery = supabase.from("web_milestones").select("*").order("day_number", { ascending: true });
-  if (!isReviewerRole(auth.actor.role)) {
-    plotsQuery = plotsQuery.eq("created_by", auth.actor.userId);
-    claimsQuery = claimsQuery.eq("created_by", auth.actor.userId);
-    milestonesQuery = milestonesQuery.eq("created_by", auth.actor.userId);
-  }
+  const plotsQuery = supabase
+    .from("web_plots")
+    .select("*")
+    .eq("created_by", auth.actor.userId)
+    .order("created_at", { ascending: true });
+  const claimsQuery = supabase
+    .from("web_claims")
+    .select("*")
+    .eq("created_by", auth.actor.userId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const milestonesQuery = supabase
+    .from("web_milestones")
+    .select("*")
+    .eq("created_by", auth.actor.userId)
+    .order("day_number", { ascending: true });
 
   const [plotsRes, claimsRes, milestonesRes, profileRes] = await Promise.all([
     plotsQuery,

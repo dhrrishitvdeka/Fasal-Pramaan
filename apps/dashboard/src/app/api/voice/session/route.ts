@@ -1,4 +1,6 @@
 import { cookies } from "next/headers";
+
+export const maxDuration = 60;
 import { NextResponse } from "next/server";
 import { SITE_LOCK_COOKIE, isSiteLockActive, isValidSiteLockToken } from "@/lib/site-lock";
 import { assertNoSecretLeak, mintVoiceSession } from "@/lib/voice/gemini-session";

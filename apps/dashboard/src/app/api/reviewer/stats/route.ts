@@ -36,7 +36,8 @@ export async function GET(request: Request) {
   const { data: claimRows, error } = await supabase
     .from("web_claims")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(500);
   if (error) {
     console.error("reviewer claims query failed:", error.message);
     return NextResponse.json({ error: "Request failed" }, { status: 500 });

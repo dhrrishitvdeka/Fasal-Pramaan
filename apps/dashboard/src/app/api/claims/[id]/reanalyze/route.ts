@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+export const maxDuration = 60;
 import { retryPendingInference } from "@/lib/claim-pipeline";
 import { inferCropDisease } from "@/lib/gemini-analyze";
 import { createServerSupabase } from "@/lib/supabase";
@@ -35,8 +37,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!existingClaim) {
     return NextResponse.json({ error: "Claim not found" }, { status: 404 });
   }
-  if (!isReviewerRole(auth.actor.role) && existingClaim.created_by !== auth.actor.userId) {
-    return actorUnauthorized("Access denied");
+  if (!isReviewerRole(auth.actor.role)) {
+    return actorUnauthorized("Reviewer role required");
   }
   try {
     const result = await retryPendingInference(store, id, inferCropDisease, {

@@ -18,6 +18,8 @@ import type {
 } from "./api";
 
 export const EVIDENCE_BUCKET = "fasal-web-evidence";
+/** Short-lived evidence URLs. Reviewer bulk dumps must not mint week-long links. */
+export const SIGNED_URL_TTL_SEC = 15 * 60;
 
 export interface WebPlotRow {
   id: string;
@@ -408,7 +410,7 @@ export async function resolveImageUrl(
   if (storagePath && supabase) {
     const { data, error } = await supabase.storage
       .from(EVIDENCE_BUCKET)
-      .createSignedUrl(storagePath, 60 * 60 * 24 * 7);
+      .createSignedUrl(storagePath, SIGNED_URL_TTL_SEC);
     if (!error && data?.signedUrl) return data.signedUrl;
   }
   return imageUrl || "";

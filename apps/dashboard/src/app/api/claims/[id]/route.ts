@@ -1,4 +1,6 @@
 import { after, NextResponse } from "next/server";
+
+export const maxDuration = 60;
 import { claimNeedsInferenceRetry, claimToSubmission, retryPendingInference } from "@/lib/claim-pipeline";
 import { inferCropDisease } from "@/lib/gemini-analyze";
 import { createServerSupabase } from "@/lib/supabase";
