@@ -7,7 +7,7 @@
 --      fully open to the anon key on 2026-09-07).
 --   2. Add the indexes the app actually queries (status, created_at, inference).
 --   3. Add status/payout/inference CHECKs used by the Next.js routes.
---   4. Keep the private evidence bucket; delete leftover "test" prefixes.
+--   4. Keep the private evidence bucket (object deletes go through Storage UI/API).
 --   5. ANALYZE hot tables.
 --
 -- What this does NOT do:
@@ -269,10 +269,10 @@ ON storage.objects FOR SELECT
 TO service_role
 USING (bucket_id = 'fasal-web-evidence');
 
--- Leftover explorer placeholder from empty-bucket listing ("test")
-DELETE FROM storage.objects
-WHERE bucket_id = 'fasal-web-evidence'
-  AND (name = 'test' OR name LIKE 'test/%');
+-- Do not DELETE FROM storage.objects here: Supabase raises
+-- storage.protect_delete() ("Use the Storage API instead").
+-- Any leftover "test" prefix is an empty-bucket explorer placeholder;
+-- remove it from Dashboard → Storage → fasal-web-evidence if it appears.
 
 -- 6. Comments so the SQL editor catalog is self-explanatory
 COMMENT ON TABLE public.web_plots IS 'Farmer land parcels. Written by /api/farmer/plots and Saathi register_plot.';
