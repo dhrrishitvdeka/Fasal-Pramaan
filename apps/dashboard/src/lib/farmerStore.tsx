@@ -179,7 +179,6 @@ export interface FarmerClaim {
   // compat aliases for DB column names
   gate_result?: unknown;
   context_signals?: unknown;
-  isDemoMode?: boolean;
 }
 
 export interface GrowthTimelineMilestone {
@@ -659,7 +658,6 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
       plotLat?: number | null;
       plotLon?: number | null;
       sowingDate?: string | null;
-      isDemoMode?: boolean;
     },
   ): Promise<FarmerClaim> => {
     const peril = claimData.peril || activeIntent?.peril || "normal";
@@ -685,7 +683,6 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
         plotLon: claimData.plotLon ?? undefined,
         sowingDate: claimData.sowingDate || undefined,
         growthStage: claimData.growthStage || undefined,
-        isDemoMode: claimData.isDemoMode,
         images: claimData.images.map((img) => ({
           angleType: img.angleType,
           imageDataUrl: img.imageUrl,

@@ -119,7 +119,6 @@ async function gateSingleImage(
     capturedAt: input.capturedAt,
     facing: input.facing,
     dimensions: input.dimensions,
-    isDemoMode: input.isDemoMode ?? (input as any).is_demo_mode ?? undefined,
     cvAnalysis: {
       cropScore: input.cropScore,
       greenPct: input.greenPct,
@@ -328,7 +327,6 @@ export type PersistedImageInput = {
   facing?: string | null;
   dimensions?: { width: number; height: number } | null;
   farmerObservation?: string | null;
-  isDemoMode?: boolean | null;
 };
 
 export type PersistClaimInput = {
@@ -353,7 +351,6 @@ export type PersistClaimInput = {
   growthStage?: string | null;
   createdBy?: string | null;
   contextSignals?: ContextSignal[];
-  isDemoMode?: boolean | null;
   images: PersistedImageInput[];
 };
 

@@ -449,7 +449,6 @@ export async function submitWebClaim(input: {
   plotLon?: number | null;
   sowingDate?: string | null;
   growthStage?: string | null;
-  isDemoMode?: boolean;
   images: Array<{
     angleType: string;
     imageDataUrl: string;

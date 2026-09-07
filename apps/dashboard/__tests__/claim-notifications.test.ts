@@ -23,7 +23,6 @@ describe("claim-notifications", () => {
       "missing_angles",
       "draft_saved",
       "draft_save_failed",
-      "photo_upload_failed",
       "camera_switched",
       "retake_cleared",
       "claim_submitted",

@@ -12,7 +12,6 @@ export type NotificationCode =
   | "missing_angles"
   | "draft_saved"
   | "draft_save_failed"
-  | "photo_upload_failed"
   | "camera_switched"
   | "retake_cleared"
   | "claim_submitted"
@@ -93,12 +92,6 @@ const EN_NOTIFICATIONS: NotificationDictionary = {
     title: "Could Not Save Draft",
     message: "Browser storage is full or restricted on this device.",
     actionHint: "Clear some browser storage or proceed directly with submission.",
-  },
-  photo_upload_failed: {
-    type: "error",
-    title: "Photo Upload Failed",
-    message: "Could not process or upload the selected photo file.",
-    actionHint: "Please try selecting or capturing the photo again.",
   },
   camera_switched: {
     type: "info",
@@ -191,12 +184,6 @@ const HI_NOTIFICATIONS: NotificationDictionary = {
     title: "ड्राफ्ट सहेजा नहीं जा सका",
     message: "डिवाइस का स्टोरेज भर जाने के कारण ड्राफ्ट सहेजा नहीं गया।",
     actionHint: "ब्राउज़र स्टोरेज खाली करें या सीधे दावा जमा करें।",
-  },
-  photo_upload_failed: {
-    type: "error",
-    title: "फोटो अपलोड विफल",
-    message: "तस्वीर अपलोड नहीं हो सकी। नेटवर्क या फ़ाइल में रुकावट है।",
-    actionHint: "कृपया कैमरे से दोबारा फोटो खींचने का प्रयास करें।",
   },
   camera_switched: {
     type: "info",

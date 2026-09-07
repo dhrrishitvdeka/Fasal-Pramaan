@@ -6,13 +6,12 @@ import {
   mockMe,
   requiresStagingSupabase,
   submissionFixture,
-  whitePngBuffer,
 } from "./helpers";
 
 test.describe("farmer capture flow", () => {
   requiresStagingSupabase();
 
-  test("saathi intake -> peril chip -> capture via file-upload fallback -> claim detail", async ({
+  test("saathi intake -> peril chip -> camera-only capture studio", async ({
     page,
   }) => {
     // Slow end-to-end walk through several pages.
@@ -54,7 +53,7 @@ test.describe("farmer capture flow", () => {
       json(route, { usable: true, crop_detected: "wheat", warnings: [] }),
     );
 
-    // Claim persistence: create returns the fixture id; detail fetch serves the submission.
+    // Claim persistence stub (camera-only: no headless capture, so no POST expected).
     let createdClaims = 0;
     await page.route("**/api/claims", async (route) => {
       const request = route.request();
@@ -83,34 +82,19 @@ test.describe("farmer capture flow", () => {
     await page.getByRole("button", { name: /Open Camera Studio/ }).click();
     await expect(page).toHaveURL(/\/farmer\/capture\?.*peril=fire_burn/);
 
-    // --- Camera permission fails headless -> gallery/file-upload fallback ---
-    const fileInput = page.locator('input[type="file"]');
-    await expect(fileInput).toBeAttached({ timeout: 15_000 });
-    const png = whitePngBuffer();
-    // fire_burn route: wide_field, mid_canopy, closeup_damage — three angles,
-    // auto-advancing after each successful upload.
-    for (let i = 0; i < 3; i += 1) {
-      await fileInput.setInputFiles({
-        name: `e2e-crop-${i}.png`,
-        mimeType: "image/png",
-        buffer: png,
-      });
-      await expect(page.getByText(/captured successfully/i).first()).toBeVisible({
-        timeout: 15_000,
-      });
-    }
+    // --- Camera-only studio: no gallery/file-upload fallback ---
+    // Upload path was removed (fraud + authenticity): studio must not expose
+    // any file picker, demo toggle, or upload affordance headless or otherwise.
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+    await expect(
+      page.getByText(/Live Camera — verified capture only/),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: /Upload|Demo/ })).toHaveCount(0);
 
-    // All angles ready -> submit becomes enabled.
+    // With 0/3 live captures, submit stays blocked and explains what remains.
     const submit = page.getByRole("button", { name: /Submit Verified Claim/ });
-    await expect(submit).toBeEnabled({ timeout: 15_000 });
-    await submit.click();
-
-    // Redirect to the freshly created claim detail.
-    await expect(page).toHaveURL(
-      new RegExp(`/farmer/claims/${E2E_CLAIM_ID}\\?submitted=true`),
-      { timeout: 20_000 },
-    );
-    await expect(page.getByText("Claim Record Not Found")).toHaveCount(0);
-    expect(createdClaims).toBe(1);
+    await expect(submit).toBeDisabled({ timeout: 15_000 });
+    await expect(page.getByText(/Capture .* more photo/i).first()).toBeVisible();
+    expect(createdClaims).toBe(0);
   });
 });

@@ -39,7 +39,6 @@ export type ImageEvidenceMetadata = {
   plotLon?: number | null;
   plotDistanceM?: number | null;
   farmerObservation?: string | null;
-  isDemoMode?: boolean | null;
 };
 
 export type GateResult = {
@@ -172,8 +171,7 @@ export function heuristicGate(
   if (
     cv?.hintCode === "crop_not_detected" &&
     !hasFreshCropSignal &&
-    peril !== "fire_burn" &&
-    !metadata?.isDemoMode
+    peril !== "fire_burn"
   ) {
     return {
       usable: false,
@@ -184,7 +182,7 @@ export function heuristicGate(
       fallback: true,
     };
   }
-  if (cropScore != null && cropScore < 75 && peril !== "fire_burn" && !metadata?.isDemoMode) {
+  if (cropScore != null && cropScore < 75 && peril !== "fire_burn") {
     return {
       usable: false,
       reason: "crop_not_detected",
@@ -197,7 +195,7 @@ export function heuristicGate(
   }
 
   const greenPct = cv?.greenPct;
-  if (greenPct != null && greenPct < 8 && peril !== "fire_burn" && !metadata?.isDemoMode) {
+  if (greenPct != null && greenPct < 8 && peril !== "fire_burn") {
     return {
       usable: false,
       reason: "not_crop",
@@ -222,10 +220,10 @@ export function heuristicGate(
     };
   }
 
-  // Without CV measurements, fail closed — expectedCrop must not auto-pass (unless demo mode).
+  // Without CV measurements, fail closed — expectedCrop must not auto-pass.
   const hasQualitySignal =
     cropScore != null || luma != null || blur != null || greenPct != null || cv?.hintCode != null;
-  if (!hasQualitySignal && !metadata?.isDemoMode) {
+  if (!hasQualitySignal) {
     return {
       usable: false,
       reason: "heuristic_unverified",
@@ -299,21 +297,15 @@ Capture Metadata Context:
 `
     : "";
 
-  const demoInstruction = metadata?.isDemoMode
-    ? "PRESENTATION / DEMO MODE ACTIVE: This photograph is captured during a live indoor stage demonstration. Relax rigid outdoor farm field requirements; do not reject with 'not_crop' or 'no_field' solely due to indoor room context if sample plants or agricultural materials are presented."
-    : "";
-
-
   const prompt = `You are the chief agricultural verification officer for the PMFBY crop insurance program.
 Conduct an authoritative multimodal and contextual audit of this field evidence photograph.
 
 ${cropInstruction}
 ${perilInstruction}
-${demoInstruction}
 ${metaContextLines}
 
 Evaluate:
-1. Visual Authenticity (fail closed): Reject photographs OF a phone, laptop, monitor, TV, or any second screen (bezels, status bar, moiré, pixel grid, UI chrome) with reason='screen_replay'. Reject AI-generated, stock, meme, or printed paper with reason='ai_generated'. Reject indoor rooms, selfies, and non-field objects with reason='not_crop' or 'no_field' (unless in Demo Mode). Ornamental hedge, garden shrub, lawn, houseplant, or decorative foliage that is not a farm crop stand → reason='not_crop' (or 'wrong_crop' if a crop was declared), usable=false.
+1. Visual Authenticity (fail closed): Reject photographs OF a phone, laptop, monitor, TV, or any second screen (bezels, status bar, moiré, pixel grid, UI chrome) with reason='screen_replay'. Reject AI-generated, stock, meme, or printed paper with reason='ai_generated'. Reject indoor rooms, selfies, and non-field objects with reason='not_crop' or 'no_field'. Ornamental hedge, garden shrub, lawn, houseplant, or decorative foliage that is not a farm crop stand → reason='not_crop' (or 'wrong_crop' if a crop was declared), usable=false.
 2. Exposure & Focus: Reject if completely pitch dark or washed out (reason='too_dark' or 'too_blurry').
 3. Crop Evidence Verification: Accept any clear photograph showing the crop stand, agricultural field, or crop damage/symptoms (${angleType}). Do NOT enforce rigid camera angle constraints. Flag retake ONLY if photo quality is unusable (pitch dark, blurry, fake, screen replay, non-crop, or exact duplicate angle).
 4. Peril Consistency: Confirm if visual loss indicators match declared peril '${peril || "normal"}'.

@@ -12,8 +12,6 @@ import {
   MicOff,
   MapPin,
   ShieldCheck,
-  ChevronRight,
-  ChevronLeft,
   Save,
   Send,
   Trash2,
@@ -24,7 +22,6 @@ import {
   Check,
   AlertTriangle,
   Lock,
-  Upload,
 } from "lucide-react";
 import { loadDraftImagesFromDb } from "@/lib/draft-db";
 import { useFarmerData, ClaimImageEvidence } from "@/lib/farmerStore";
@@ -40,7 +37,6 @@ import {
   measureLightingScore,
   qualityPassedFromSignals,
   sha256FromDataUrl,
-  sha256Hex,
 } from "@/lib/evidence";
 import {
   applyVideoPlaybackFlags,
@@ -97,8 +93,6 @@ function CaptureStudioContent() {
   const milestoneId = searchParams.get("milestone");
   const intentIdParam = searchParams.get("intentId");
   const perilParam = searchParams.get("peril");
-  const demoParam = searchParams.get("demo") === "true" || searchParams.get("mode") === "demo";
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(demoParam);
   const milestone = milestones.find((item) => item.id === milestoneId);
 
   // Determine active angles to capture — peril-aware, recapture-aware, intent-aware
@@ -202,7 +196,6 @@ function CaptureStudioContent() {
         "missing_angles",
         "draft_saved",
         "draft_save_failed",
-        "photo_upload_failed",
         "camera_switched",
         "retake_cleared",
         "claim_submitted",
@@ -298,11 +291,7 @@ function CaptureStudioContent() {
     [notify],
   );
 
-  // Capture mode: Live Camera vs Field Photo Upload
-  const [captureMode, setCaptureMode] = useState<"camera" | "upload">("camera");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [isUploading, setIsUploading] = useState<boolean>(false);
-
+  // Live-camera-only capture (file upload removed by design: fraud + authenticity)
   // Load existing draft if not in recapture or milestone mode
   useEffect(() => {
     if (!isTargetedRecapture && !milestoneId) {
@@ -608,7 +597,7 @@ function CaptureStudioContent() {
 
   const capturePhotoFromCamera = async () => {
     const isDryOrCharredPeril = requestedPeril === "fire_burn" || requestedPeril === "drought";
-    const isRelaxed = isDryOrCharredPeril || isDemoMode;
+    const isRelaxed = isDryOrCharredPeril;
 
     if (!cvResult && !isRelaxed) {
       const msg =
@@ -619,14 +608,14 @@ function CaptureStudioContent() {
       return { ok: false as const, message: msg };
     }
 
-    // Anti-Screen Fraud Rejection (bypassed in demo mode)
-    if (cvResult?.isScreenDetected && !isDemoMode) {
+    // Anti-Screen Fraud Rejection (always enforced)
+    if (cvResult?.isScreenDetected) {
       const msg = lang === "hi" ? "स्क्रीन / डिस्प्ले पहचानी गई — कृपया असली खेत व फसल की फोटो लें।" : "Screen / display detected — photograph real outdoor crop.";
       showToast(msg);
       return { ok: false as const, message: msg };
     }
 
-    // Strict 75%+ Crop Quality Lock (relaxed in demo/presentation mode)
+    // Strict 75%+ Crop Quality Lock (relaxed only for dry/charred perils)
     if (cvResult && cvResult.cropScore < 75 && !isRelaxed) {
       const msg = lang === "hi"
         ? `फसल पहचान केवल ${cvResult.cropScore}% है — फोटो लेने के लिए 75%+ होना आवश्यक है। कैमरे को फसल के पास लाएँ।`
@@ -755,7 +744,6 @@ function CaptureStudioContent() {
           dimensions,
           pHash,
           isDuplicate: isExactDup,
-          isDemoMode,
           cvAnalysis: cvResult
             ? {
                 cropScore: cvResult.cropScore,
@@ -822,7 +810,7 @@ function CaptureStudioContent() {
         }
         // also run local CV on still for second opinion (crop-only)
         const cv = await import("@/lib/vision/realtime-cv").then((m) => m.analyzeDataUrl(imageUrl, currentAngle.id));
-        if (cv && !cv.cropDetected && requestedPeril !== "fire_burn" && !isDemoMode) {
+        if (cv && !cv.cropDetected && requestedPeril !== "fire_burn") {
           showToast(lang === "hi" ? cv.hintHi : cv.hintEn);
         }
       } catch {
@@ -844,282 +832,6 @@ function CaptureStudioContent() {
     });
   };
 
-  /**
-   * Temporary Nocturnal / Test Mode: Process and store an uploaded crop image
-   * Bypasses the dark-room camera shutter lock so full pipeline and model
-   * predictions can be verified end-to-end at night.
-   */
-  const saveUploadedEvidenceImage = async (
-    targetAngleId: string,
-    imageUrl: string,
-    fileDimensions?: { width: number; height: number }
-  ) => {
-    const digest = await sha256FromDataUrl(imageUrl);
-    const useGps = gpsCoords.status === "accurate" || gpsCoords.status === "searching";
-    const dimensions = fileDimensions || { width: 1280, height: 720 };
-    const nowIso = new Date().toISOString();
-
-    // Run on-device agronomic CV on the uploaded frame still
-    let cv: import("@/lib/vision/realtime-cv").CvFrameResult | null = null;
-    try {
-      const mod = await import("@/lib/vision/realtime-cv");
-      cv = await mod.analyzeDataUrl(imageUrl, targetAngleId);
-    } catch {
-      cv = null;
-    }
-
-    // Measure lighting on the uploaded still using an offscreen canvas
-    let measuredLighting: number | undefined = undefined;
-    try {
-      const testCanvas = document.createElement("canvas");
-      testCanvas.width = 64;
-      testCanvas.height = 64;
-      const testCtx = testCanvas.getContext("2d");
-      if (testCtx) {
-        const testImg = new Image();
-        testImg.src = imageUrl;
-        testCtx.drawImage(testImg, 0, 0, 64, 64);
-        measuredLighting = measureLightingScore(testCtx.getImageData(0, 0, 64, 64));
-      }
-    } catch {
-      measuredLighting = undefined;
-    }
-
-    const lightingScore =
-      measuredLighting != null && !isUnusableLighting(measuredLighting)
-        ? measuredLighting
-        : 75; // safe normal lighting for test upload
-
-    const newEvidence: ClaimImageEvidence = {
-      angleType: targetAngleId,
-      imageUrl,
-      timestamp: nowIso,
-      lat: useGps && gpsCoords.lat != null ? gpsCoords.lat : selectedPlot?.lat ?? null,
-      lon: useGps && gpsCoords.lon != null ? gpsCoords.lon : selectedPlot?.lon ?? null,
-      accuracyM:
-        useGps && gpsCoords.accuracyM != null
-          ? gpsCoords.accuracyM
-          : selectedPlot?.lat != null
-          ? 5.0
-          : null,
-      sha256: digest,
-      qualityPassed: true, // uploaded file for test mode
-      lightingScore,
-      blurScore: cv?.blurScore ?? 50,
-      greenPct: cv?.greenPct ?? 80,
-      luma: cv?.luma ?? 60,
-      cropScore: cv?.cropScore ?? 85,
-      hintCode: cv?.hintCode ?? "ok",
-      isScreenDetected: cv?.isScreenDetected ?? false,
-      isPersonDetected: cv?.isPersonDetected ?? false,
-      facing: "environment",
-      dimensions,
-      farmerObservation: observations || undefined,
-    };
-
-    setCapturedImages((prev) => ({
-      ...prev,
-      [targetAngleId]: newEvidence,
-    }));
-
-    const angleInfo = getLocalizedAngleInfo(targetAngleId, lang);
-    showToast(
-      lang === "hi"
-        ? `${angleInfo.name} अपलोड हो गया!`
-        : `${angleInfo.name} uploaded successfully!`
-    );
-
-    // Call Stage 1 Vision Gate in background with comprehensive metadata
-    void (async () => {
-      try {
-        const metadata = {
-          lat: newEvidence.lat,
-          lon: newEvidence.lon,
-          accuracyM: newEvidence.accuracyM,
-          capturedAt: nowIso,
-          facing: "environment",
-          dimensions,
-          cvAnalysis: cv
-            ? {
-                cropScore: cv.cropScore,
-                greenPct: cv.greenPct,
-                isScreenDetected: cv.isScreenDetected,
-                phenologyType: cv.phenologyType,
-                luma: cv.luma,
-                blurScore: cv.blurScore,
-                hintCode: cv.hintCode,
-                modelLabel: cv.modelLabel,
-                modelProb: cv.modelProb,
-              }
-            : {
-                cropScore: 85,
-                greenPct: 80,
-                isScreenDetected: false,
-                phenologyType: "vegetative",
-                luma: 60,
-                blurScore: 50,
-                hintCode: "ok",
-              },
-          sha256: digest,
-          farmerObservation: observations || undefined,
-        };
-
-        const res = await apiFetch("/api/vision/gate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imageDataUrl: imageUrl,
-            angleType: targetAngleId,
-            expectedCrop: selectedPlot?.cropType || activeIntent?.crop || undefined,
-            peril: requestedPeril,
-            metadata,
-          }),
-        });
-        const gate = (await res.json().catch(() => null)) as {
-          usable?: boolean;
-          reason?: string;
-          crop_detected?: string | null;
-          warnings?: string[];
-        } | null;
-        if (gate && gate.usable === false) {
-          const reason = String(gate.reason || "unusable");
-          const warn =
-            reason === "wrong_crop"
-              ? lang === "hi"
-                ? `फसल मेल नहीं खाती (${gate.crop_detected || "अज्ञात"}) — सही फसल की फोटो लें।`
-                : `Crop mismatch (${gate.crop_detected || "unknown"}) — retake with correct crop in frame.`
-              : reason === "ai_generated"
-                ? lang === "hi"
-                  ? "AI-निर्मित/नकली लग रही है — मूल फोटो लें।"
-                  : "Looks AI-generated — please capture original photo."
-                : lang === "hi"
-                  ? `फोटो उपयोगी नहीं (${reason}) — दोबारा लें।`
-                  : `Photo not usable (${reason}) — please retake.`;
-          showToast(warn);
-          setCapturedImages((prev) => {
-            const cur = prev[targetAngleId];
-            if (!cur || cur.imageUrl !== imageUrl) return prev;
-            return { ...prev, [targetAngleId]: { ...cur, qualityPassed: false } };
-          });
-        } else if (gate?.usable && gate.crop_detected) {
-          showToast(
-            lang === "hi"
-              ? `✓ फसल पहचानी गई: ${gate.crop_detected} (${angleInfo.shortName})`
-              : `✓ Crop verified: ${gate.crop_detected} (${angleInfo.shortName})`
-          );
-        }
-      } catch {
-        // ignore gate errors — not blocking
-      }
-    })();
-  };
-
-  /**
-   * File selection handler supporting both single-photo assignment
-   * and multi-photo batch upload across remaining angles.
-   */
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    setIsUploading(true);
-
-    try {
-      const fileList = Array.from(files);
-      const ALLOWED_MIME = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
-      const validFiles = fileList.filter((f) => ALLOWED_MIME.has(f.type.toLowerCase()));
-
-      if (validFiles.length === 0) {
-        showToast(
-          lang === "hi"
-            ? "केवल JPEG, PNG या WebP प्रारूप समर्थित हैं।"
-            : "Only JPEG, PNG, or WebP images are supported."
-        );
-        return;
-      }
-
-      if (validFiles.length === 1) {
-        const file = validFiles[0];
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(new Error("File read error"));
-          reader.readAsDataURL(file);
-        });
-
-        const dims = await new Promise<{ width: number; height: number }>((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve({ width: img.naturalWidth || 1280, height: img.naturalHeight || 720 });
-          img.onerror = () => resolve({ width: 1280, height: 720 });
-          img.src = dataUrl;
-        });
-
-        await saveUploadedEvidenceImage(currentAngle.id, dataUrl, dims);
-
-        if (currentAngleIndex < activeAngleDefs.length - 1) {
-          setCurrentAngleIndex(currentAngleIndex + 1);
-        }
-      } else {
-        // Multi-file batch upload: map across uncaptured or all angles
-        const missing = activeAngleDefs.filter((a) => !capturedImages[a.id]);
-        const targetAngles =
-          missing.length >= validFiles.length
-            ? missing.map((a) => a.id)
-            : activeAngleDefs.map((a) => a.id);
-
-        const count = Math.min(validFiles.length, targetAngles.length);
-        for (let i = 0; i < count; i++) {
-          const file = validFiles[i];
-          const targetAngleId = targetAngles[i];
-          const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => reject(new Error("File read error"));
-            reader.readAsDataURL(file);
-          });
-          const dims = await new Promise<{ width: number; height: number }>((resolve) => {
-            const img = new Image();
-            img.onload = () => resolve({ width: img.naturalWidth || 1280, height: img.naturalHeight || 720 });
-            img.onerror = () => resolve({ width: 1280, height: 720 });
-            img.src = dataUrl;
-          });
-          await saveUploadedEvidenceImage(targetAngleId, dataUrl, dims);
-        }
-
-        showToast(
-          lang === "hi"
-            ? `${count} फसल तस्वीरें सफलतापूर्वक अपलोड हो गईं!`
-            : `${count} crop photos uploaded successfully in batch!`
-        );
-      }
-    } catch (err) {
-      console.error("Upload failed:", err);
-      notify("photo_upload_failed");
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const triggerSingleUpload = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.multiple = false;
-      fileInputRef.current.click();
-    }
-  };
-
-  const triggerBatchUpload = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.multiple = true;
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleDroppedFiles = async (fileList: FileList) => {
-    const fakeEvent = {
-      target: { files: fileList },
-    } as unknown as React.ChangeEvent<HTMLInputElement>;
-    await handleFileUpload(fakeEvent);
-  };
 
   // Check completion
   const requiredAngleIds = isTargetedRecapture
@@ -1223,7 +935,6 @@ function CaptureStudioContent() {
             plotLon: plot?.lon ?? null,
             sowingDate: plot?.sowingDate || activeIntent?.sowingDate || null,
             growthStage: plot?.currentStage || activeIntent?.growthStage || undefined,
-            isDemoMode: Boolean(isDemoMode),
             evidenceTrust: {
               qualityScore: 0,
               coverageScore: 0,
@@ -1439,17 +1150,6 @@ function CaptureStudioContent() {
         </div>
       )}
 
-      {/* Hidden File Input for Evidence Image Upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        multiple
-        className="hidden"
-        aria-hidden="true"
-        onChange={handleFileUpload}
-      />
-
       {/* Header Banner */}
       <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 sm:flex-row sm:items-center sm:justify-between sm:pb-4">
         <div className="min-w-0">
@@ -1606,219 +1306,17 @@ function CaptureStudioContent() {
           cancelHref="/farmer/reminders"
         />
       ) : (
-      /* Main Studio Viewport: Left Live Camera Viewfinder or Upload Workbench / Right Step Guidance */
+      /* Main Studio Viewport: Live Camera Viewfinder (camera-only) / Right Step Guidance */
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left Column (7 cols): Camera Viewfinder / Evidence Upload Workbench & Controls */}
+        {/* Left Column (7 cols): Camera Viewfinder & Controls */}
         <div className="lg:col-span-7 space-y-3">
-          {/* Dual-Mode Selector: Live Camera vs Field Photo Upload + Demo Toggle */}
-          <div className="flex items-stretch border border-[var(--line)] bg-[var(--surface)] p-1 text-xs font-semibold gap-1 rounded-sm">
-            <button
-              type="button"
-              onClick={() => {
-                setCaptureMode("camera");
-                if (!isCameraActive) void startCamera();
-              }}
-              className={`min-h-9 min-w-0 flex-1 flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[2px] px-2 py-2 text-[11px] sm:text-xs transition-all ${
-                captureMode === "camera"
-                  ? "bg-[var(--ink)] text-[var(--surface)] font-bold shadow-xs"
-                  : "text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-[var(--accent-soft)]"
-              }`}
-            >
-              <Camera className="h-3.5 w-3.5 shrink-0" />
-              <span className="sm:hidden">{lang === "hi" ? "कैमरा" : "Camera"}</span>
-              <span className="hidden sm:inline">{lang === "hi" ? "सीधा कैमरा" : "Live Camera"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCaptureMode("upload");
-                stopCamera();
-              }}
-              className={`min-h-9 min-w-0 flex-1 flex items-center justify-center gap-1.5 whitespace-nowrap rounded-[2px] px-2 py-2 text-[11px] sm:text-xs transition-all ${
-                captureMode === "upload"
-                  ? "bg-[var(--ink)] text-[var(--surface)] font-bold shadow-xs"
-                  : "text-[var(--ink-muted)] hover:text-[var(--ink)] hover:bg-[var(--accent-soft)]"
-              }`}
-            >
-              <Upload className="h-3.5 w-3.5 shrink-0" />
-              <span className="sm:hidden">{lang === "hi" ? "अपलोड" : "Upload"}</span>
-              <span className="hidden sm:inline">{lang === "hi" ? "खेत फ़ोटो अपलोड" : "Upload Photos"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const next = !isDemoMode;
-                setIsDemoMode(next);
-                showToast(
-                  next
-                    ? (lang === "hi" ? "डेमो मोड चालू — 75% फसल लॉक शिथिल" : "Demo Mode enabled — 75% crop lock relaxed")
-                    : (lang === "hi" ? "डेमो मोड बंद — 75% फसल लॉक सक्रिय" : "Demo Mode disabled — standard 75% lock active")
-                );
-              }}
-              className={clsx(
-                "min-h-9 whitespace-nowrap rounded-[2px] px-2.5 py-2 text-[11px] sm:text-xs font-bold transition-all border shrink-0",
-                isDemoMode
-                  ? "border-amber-500 bg-amber-100 text-amber-900 shadow-xs"
-                  : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-              )}
-              title={lang === "hi" ? "इनडोर / प्रेजेंटेशन डेमो मोड (75% फसल लॉक शिथिल)" : "Indoor presentation demo mode (relaxes 75% crop lock)"}
-            >
-              {isDemoMode ? "⚡ Demo ON" : "Demo"}
-            </button>
+          {/* Live-camera-only indicator (upload + demo removed) */}
+          <div className="flex items-center gap-2 border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--ink)]">
+            <Camera className="h-3.5 w-3.5 shrink-0" />
+            <span>{lang === "hi" ? "सीधा कैमरा — सत्यापित लाइव साक्ष्य" : "Live Camera — verified capture only"}</span>
           </div>
 
-          {captureMode === "upload" ? (
-            /* Upload Mode Workbench */
-            <div className="fp-panel p-4 sm:p-5 flex flex-col justify-between min-h-[380px]">
-              <div>
-                {/* Angle Header in Workbench */}
-                <div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
-                  <div>
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--ink-muted)]">
-                      {lang === "hi" ? "सक्रिय कोण" : "Active Angle"} · {currentAngleIndex + 1}/{activeAngleDefs.length}
-                    </span>
-                    <h2 className="text-sm sm:text-base font-bold text-[var(--ink)]">
-                      {getLocalizedAngleInfo(currentAngle.id, lang).name}
-                    </h2>
-                  </div>
-                  {capturedImages[currentAngle.id] ? (
-                    <span className="inline-flex items-center gap-1 border border-[var(--ink)] bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-bold text-[var(--ink)]">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-800" />
-                      {lang === "hi" ? "अपलोड सत्यापित" : "Uploaded"}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 border border-[var(--line)] bg-[var(--surface)] px-2 py-0.5 text-[11px] font-medium text-[var(--ink-muted)]">
-                      {lang === "hi" ? "प्रतीक्षारत" : "Pending"}
-                    </span>
-                  )}
-                </div>
-
-                {/* Upload or Preview Box */}
-                {capturedImages[currentAngle.id] ? (
-                  <div className="mt-4 space-y-3">
-                    <div className="relative aspect-[16/10] w-full overflow-hidden border border-[var(--line)] bg-slate-900">
-                      <img
-                        src={safeDisplayUrl(capturedImages[currentAngle.id].imageUrl)}
-                        alt={currentAngle.name}
-                        className="h-full w-full object-cover"
-                      />
-                      <div className="absolute bottom-0 inset-x-0 bg-black/80 p-2 text-white text-[11px] font-mono flex items-center justify-between">
-                        <span className="truncate max-w-[200px] sm:max-w-[300px]">
-                          SHA-256: {capturedImages[currentAngle.id].sha256?.slice(0, 16)}...
-                        </span>
-                        <span>
-                          {capturedImages[currentAngle.id].dimensions?.width} × {capturedImages[currentAngle.id].dimensions?.height}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Metadata & Quality Chips */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                      <div className="border border-[var(--line)] bg-[var(--surface)] p-2">
-                        <span className="text-[10px] text-[var(--ink-muted)] block">{lang === "hi" ? "प्रकाश स्तर" : "Lighting"}</span>
-                        <span className="font-bold text-[var(--ink)] font-mono">
-                          {capturedImages[currentAngle.id].lightingScore != null ? `${capturedImages[currentAngle.id].lightingScore}%` : "Good"}
-                        </span>
-                      </div>
-                      <div className="border border-[var(--line)] bg-[var(--surface)] p-2">
-                        <span className="text-[10px] text-[var(--ink-muted)] block">{lang === "hi" ? "फसल गुणवत्ता" : "Foliage Quality"}</span>
-                        <span className="font-bold text-[var(--ink)] font-mono">
-                          {capturedImages[currentAngle.id].cropScore != null ? `${capturedImages[currentAngle.id].cropScore}%` : "Verified"}
-                        </span>
-                      </div>
-                      <div className="col-span-2 sm:col-span-1 border border-[var(--line)] bg-[var(--surface)] p-2">
-                        <span className="text-[10px] text-[var(--ink-muted)] block">{lang === "hi" ? "स्थान स्थिति" : "Geolocation"}</span>
-                        <span className="font-bold text-[var(--ink)] truncate block">
-                          {capturedImages[currentAngle.id].lat != null ? `${capturedImages[currentAngle.id].lat?.toFixed(4)}, ${capturedImages[currentAngle.id].lon?.toFixed(4)}` : "Plot Linked"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => triggerSingleUpload()}
-                        disabled={isUploading}
-                        className="fp-btn-secondary text-xs py-1.5 flex-1 gap-1.5"
-                      >
-                        <RefreshCw className="h-3 w-3" />
-                        <span>{lang === "hi" ? "फोटो बदलें" : "Replace Photo"}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteCapturedAngle(currentAngle.id)}
-                        className="fp-btn-danger text-xs py-1.5 px-3"
-                      >
-                        {lang === "hi" ? "हटाएँ" : "Clear"}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => triggerSingleUpload()}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (e.dataTransfer.files?.length) {
-                        void handleDroppedFiles(e.dataTransfer.files);
-                      }
-                    }}
-                    className="mt-4 flex flex-col items-center justify-center border-2 border-dashed border-[var(--line)] bg-[var(--canvas)]/40 p-8 text-center cursor-pointer hover:border-[var(--ink)] transition-colors"
-                  >
-                    <div className="flex h-12 w-12 items-center justify-center border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] mb-3">
-                      <Upload className="h-6 w-6" />
-                    </div>
-                    <p className="text-sm font-bold text-[var(--ink)]">
-                      {lang === "hi" ? "इस कोण के लिए फोटो चुनें" : `Select photo for ${getLocalizedAngleInfo(currentAngle.id, lang).shortName}`}
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--ink-muted)] max-w-xs">
-                      {lang === "hi"
-                        ? "डिवाइस से फोटो चुनें या यहाँ खींचकर छोड़ें (JPG, PNG, WebP)"
-                        : "Click to browse or drag and drop image file (JPG, PNG, WebP)"}
-                    </p>
-                    <button
-                      type="button"
-                      disabled={isUploading}
-                      className="fp-btn-primary mt-4 text-xs px-4 py-2 gap-1.5"
-                    >
-                      <Upload className="h-3.5 w-3.5" />
-                      <span>
-                        {isUploading
-                          ? (lang === "hi" ? "अपलोड हो रहा है..." : "Processing...")
-                          : (lang === "hi" ? "फ़ोटो फ़ाइल चुनें" : "Choose File")}
-                      </span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Multi-photo batch upload card at bottom of workbench */}
-              <div className="mt-5 border-t border-[var(--line)] pt-3">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <div className="text-xs">
-                    <span className="font-bold text-[var(--ink)] block">
-                      {lang === "hi" ? "त्वरित बैच अपलोड" : "Batch Multi-Photo Upload"}
-                    </span>
-                    <span className="text-[11px] text-[var(--ink-muted)]">
-                      {lang === "hi"
-                        ? "गैलरी से सभी 3 साक्ष्य तस्वीरें एक साथ चुनें"
-                        : "Select all 3 crop evidence photos from your device at once"}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => triggerBatchUpload()}
-                    disabled={isUploading}
-                    className="fp-btn-secondary text-xs px-3 py-1.5 gap-1.5 shrink-0"
-                  >
-                    <Layers className="h-3.5 w-3.5" />
-                    <span>{lang === "hi" ? "सभी 3 फ़ोटो चुनें" : "Select 3 Photos"}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Live Camera Viewfinder */
+            {/* Live Camera Viewfinder (only mode) */}
             <div className="fp-viewfinder relative flex aspect-[4/3] h-[min(52vh,420px)] min-h-[240px] w-full items-center justify-center overflow-hidden border border-[var(--ink)] bg-black sm:aspect-[16/10] sm:h-auto">
               <video
                 ref={(el) => {
@@ -1845,21 +1343,6 @@ function CaptureStudioContent() {
                     {cameraError || (lang === "hi" ? "कैमरा शुरू हो रहा है…" : "Starting camera…")}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCaptureMode("upload");
-                        stopCamera();
-                      }}
-                      className="fp-btn-primary gap-1.5 text-xs"
-                    >
-                      <Upload className="h-3.5 w-3.5" />
-                      <span>
-                        {lang === "hi"
-                          ? "फ़ोटो अपलोड मोड पर जाएँ"
-                          : "Switch to Upload Mode"}
-                      </span>
-                    </button>
                     {cameraError ? (
                       <button
                         type="button"
@@ -1923,18 +1406,13 @@ function CaptureStudioContent() {
               {isCameraActive && !capturedImages[currentAngle.id] && (
                 <div className="pointer-events-none absolute bottom-3 left-2 right-2 flex flex-col items-center gap-1.5 sm:bottom-4 sm:left-4 sm:right-4">
                   <div className="flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-white/20 bg-black/75 px-3.5 py-1.5 text-xs text-white shadow-lg backdrop-blur-md">
-                    {isDemoMode && (
-                      <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-950 uppercase tracking-wide shrink-0">
-                        Demo Mode
-                      </span>
-                    )}
                     {/* Status Indicator Dot */}
                     <span
                       className={clsx(
                         "h-2 w-2 rounded-full shrink-0",
                         cvResult?.isPersonDetected || cvResult?.isScreenDetected
-                          ? (isDemoMode ? "bg-amber-400" : "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,1)] animate-ping")
-                          : ((cvResult?.cropScore ?? 0) >= 75 || isDemoMode)
+                          ? "bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,1)] animate-ping"
+                          : (cvResult?.cropScore ?? 0) >= 75
                           ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"
                           : cvResult?.hintCode === "too_dark"
                           ? "bg-rose-500"
@@ -1944,12 +1422,10 @@ function CaptureStudioContent() {
 
                     {/* Anti-Screen / Person Alert or Localized Guidance Text */}
                     <span className="font-semibold tracking-wide line-clamp-2 leading-snug">
-                      {cvResult?.isPersonDetected && !isDemoMode
+                      {cvResult?.isPersonDetected
                         ? (lang === "hi" ? "व्यक्ति का चेहरा / शरीर दिखा — केवल असली फसल दिखाएँ" : "Person detected — Aim camera at field crop")
-                        : cvResult?.isScreenDetected && !isDemoMode
+                        : cvResult?.isScreenDetected
                         ? (lang === "hi" ? "स्क्रीन / फोटो का फोटो अमान्य — खेत में असली फसल दिखाएँ" : "Screen replay detected — Point at real field")
-                        : isDemoMode
-                        ? (lang === "hi" ? "डेमो मोड — फसल लॉक शिथिल (फोटो लें)" : "Demo Mode — Crop lock relaxed")
                         : (lang === "hi" ? cvResult?.hintHi : cvResult?.hintEn) ||
                           (cvModelStatus === "ready"
                             ? (lang === "hi" ? "फसल पर स्थिर रखें" : "Align camera with crop")
@@ -1973,15 +1449,13 @@ function CaptureStudioContent() {
                 </div>
               )}
             </div>
-          )}
 
           {/* Primary Viewport Action Buttons — thumb-zone sticky bar on phone,
               back to normal flow inside the lg+ two-column studio */}
           <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-20 -mx-3 border-t border-[var(--line)] bg-[var(--surface)] px-3 py-2 shadow-[0_-4px_12px_rgba(28,25,21,0.08)] sm:-mx-4 sm:px-4 md:bottom-0 md:-mx-6 md:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:shadow-none">
             <div className="space-y-2">
-              {captureMode === "camera" ? (
-                <>
-                  <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+              <>
+                  <div className="grid grid-cols-[auto_1fr] items-center gap-2">
                     {/* Flip camera */}
                     <button
                       type="button"
@@ -1998,13 +1472,13 @@ function CaptureStudioContent() {
                     {/* Main Shutter / Capture Button with 75%+ Crop Lock */}
                     {(() => {
                       const isDryOrCharred = requestedPeril === "fire_burn" || requestedPeril === "drought";
-                      const isRelaxed = isDryOrCharred || isDemoMode;
+                      const isRelaxed = isDryOrCharred;
                       const isLocked =
                         isCameraActive &&
                         !capturedImages[currentAngle.id] &&
                         ((cvResult == null && !isRelaxed) ||
-                          (!isDemoMode && cvResult?.isPersonDetected === true) ||
-                          (!isDemoMode && cvResult?.isScreenDetected === true) ||
+                          cvResult?.isPersonDetected === true ||
+                          cvResult?.isScreenDetected === true ||
                           (cvResult != null && cvResult.cropScore < 75 && !isRelaxed) ||
                           (cvResult?.shouldBlockShutter === true && !isRelaxed));
 
@@ -2048,20 +1522,6 @@ function CaptureStudioContent() {
                       );
                     })()}
 
-                    {/* Switch to Upload Mode Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCaptureMode("upload");
-                        stopCamera();
-                      }}
-                      aria-label="Switch to upload mode"
-                      className="inline-flex min-h-11 items-center gap-1.5 border border-[var(--line)] bg-[var(--surface)] px-2.5 py-2 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--accent-soft)] sm:px-3"
-                      title={lang === "hi" ? "फ़ोटो अपलोड मोड" : "Upload Mode"}
-                    >
-                      <Upload className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{lang === "hi" ? "अपलोड" : "Upload"}</span>
-                    </button>
                   </div>
 
                   {/* Realtime Live Camera Notice */}
@@ -2072,84 +1532,6 @@ function CaptureStudioContent() {
                     </div>
                   </div>
                 </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (currentAngleIndex > 0) setCurrentAngleIndex(currentAngleIndex - 1);
-                      }}
-                      disabled={currentAngleIndex === 0}
-                      className="fp-btn-secondary min-h-11 px-3 text-xs gap-1 disabled:opacity-30"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      <span className="hidden sm:inline">{lang === "hi" ? "पिछला कोण" : "Previous Angle"}</span>
-                    </button>
-
-                    {capturedImages[currentAngle.id] ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (currentAngleIndex < activeAngleDefs.length - 1) {
-                            setCurrentAngleIndex(currentAngleIndex + 1);
-                          }
-                        }}
-                        disabled={currentAngleIndex === activeAngleDefs.length - 1}
-                        className="fp-btn-primary min-h-11 flex-1 px-4 text-xs gap-1.5 disabled:opacity-40"
-                      >
-                        <span>{lang === "hi" ? "अगला कोण ➔" : "Next Angle ➔"}</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => triggerSingleUpload()}
-                        disabled={isUploading}
-                        className="fp-btn-primary min-h-11 flex-1 px-4 text-xs gap-2"
-                      >
-                        <Upload className="h-4 w-4" />
-                        <span>
-                          {isUploading
-                            ? (lang === "hi" ? "अपलोड हो रहा है..." : "Processing...")
-                            : (lang === "hi" ? `इस कोण (${getLocalizedAngleInfo(currentAngle.id, lang).shortName}) के लिए फ़ोटो चुनें` : `Choose Photo for ${getLocalizedAngleInfo(currentAngle.id, lang).shortName}`)}
-                        </span>
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (currentAngleIndex < activeAngleDefs.length - 1) {
-                          setCurrentAngleIndex(currentAngleIndex + 1);
-                        }
-                      }}
-                      disabled={currentAngleIndex === activeAngleDefs.length - 1}
-                      className="fp-btn-secondary min-h-11 px-3 text-xs gap-1 disabled:opacity-30"
-                    >
-                      <span className="hidden sm:inline">{lang === "hi" ? "अगला कोण" : "Next Angle"}</span>
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  {/* Upload mode hint link */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[11px] text-[var(--ink-muted)]">
-                    <div className="inline-flex items-center gap-1">
-                      <Upload className="h-3.5 w-3.5 text-[var(--ink)]" />
-                      <span>{lang === "hi" ? "खेत फ़ोटो अपलोड मोड" : "Field Photo Upload Mode"}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCaptureMode("camera");
-                        if (!isCameraActive) void startCamera();
-                      }}
-                      className="underline hover:text-[var(--ink)] font-medium"
-                    >
-                      {lang === "hi" ? "सीधे कैमरे पर वापस जाएँ →" : "Switch back to live camera →"}
-                    </button>
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </div>
