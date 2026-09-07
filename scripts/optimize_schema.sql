@@ -18,6 +18,72 @@
 
 BEGIN;
 
+-- 0. Bring an older live table up to the columns the app writes today.
+--    The hosted project was created before inference_status / growth_stage /
+--    gate_result existed; CREATE INDEX on a missing column aborts the script.
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS created_by text;
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS name_hi text;
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS khata_number text;
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS hissa_number text;
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS tehsil text;
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS ownership_type text;
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS season text;
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS area_kattha double precision;
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS crop_type_hi text;
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS current_stage_hi text;
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS soil_type_hi text;
+ALTER TABLE public.web_plots ADD COLUMN IF NOT EXISTS irrigation_type_hi text;
+
+ALTER TABLE public.web_milestones ADD COLUMN IF NOT EXISTS created_by text;
+ALTER TABLE public.web_milestones ADD COLUMN IF NOT EXISTS crop_name_hi text;
+ALTER TABLE public.web_milestones ADD COLUMN IF NOT EXISTS stage_name_hi text;
+ALTER TABLE public.web_milestones ADD COLUMN IF NOT EXISTS evidence_image_url text;
+ALTER TABLE public.web_milestones ADD COLUMN IF NOT EXISTS is_overdue boolean DEFAULT false;
+
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS plot_name_hi text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS crop_type_hi text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS recapture_reason_hi text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS disease_detected_hi text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS sowing_date date;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS peril text DEFAULT 'normal';
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS intent_id text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS gate_result jsonb;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS context_signals jsonb;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS adaptive_result jsonb;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS inference_status text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS inference_error text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS inference_started_at timestamptz;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS growth_stage text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS predicted_growth_stage text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_crop text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_grade text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_severity text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_damage_codes text[];
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_affected_area_pct double precision;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS corrected_growth_stage text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS payout_status text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS payout_amount_inr double precision;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS hf_label text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS hf_score double precision;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS model_id text;
+ALTER TABLE public.web_claims ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+ALTER TABLE public.web_claim_images ADD COLUMN IF NOT EXISTS gate_result jsonb;
+ALTER TABLE public.web_claim_images ADD COLUMN IF NOT EXISTS sha256 text;
+ALTER TABLE public.web_claim_images ADD COLUMN IF NOT EXISTS storage_path text;
+ALTER TABLE public.web_claim_images ADD COLUMN IF NOT EXISTS blur_score double precision;
+ALTER TABLE public.web_claim_images ADD COLUMN IF NOT EXISTS lighting_score double precision;
+ALTER TABLE public.web_claim_images ADD COLUMN IF NOT EXISTS quality_passed boolean;
+
+ALTER TABLE public.web_review_actions ADD COLUMN IF NOT EXISTS reason text;
+ALTER TABLE public.web_review_actions ADD COLUMN IF NOT EXISTS required_angles text[] DEFAULT '{}';
+
+ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS full_name_hi text;
+ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS kisan_id text;
+ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS village text;
+ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS district text;
+ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS state text;
+
 -- 1. RLS lockdown -----------------------------------------------------------
 DO $$
 DECLARE
