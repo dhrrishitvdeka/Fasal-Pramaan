@@ -55,13 +55,10 @@ export function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-export function isFireRelaxAngle(angleId?: string): boolean {
-  return (
-    angleId === "fire_burn" ||
-    angleId === "wide_field" ||
-    angleId === "photo_1" ||
-    (angleId != null && angleId.includes("fire"))
-  );
+export function isFireRelaxAngle(angleId?: string, peril?: string): boolean {
+  if (peril === "fire_burn") return true;
+  if (!angleId) return false;
+  return angleId === "fire_burn" || /fire|burn/i.test(angleId);
 }
 
 export function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
@@ -232,12 +229,13 @@ function hintFor(
     isPersonDetected: boolean;
   },
   angleId?: string,
+  peril?: string,
 ): { code: CvHintCode; en: string; hi: string; block: boolean } {
   const { cropScore, totalCanopyPct, vegetativePct, luma, blur, glareRatio, syntheticRatio, isScreenDetected, isPersonDetected } =
     scores;
 
   const isCloseup = angleId === "closeup_damage";
-  const isFireRelax = isFireRelaxAngle(angleId);
+  const isFireRelax = isFireRelaxAngle(angleId, peril);
 
   if (isPersonDetected) {
     return {
@@ -249,15 +247,12 @@ function hintFor(
   }
 
   if (isScreenDetected) {
-    const isOutdoorCanopy = (totalCanopyPct >= 35 && vegetativePct >= 20) || cropScore >= 60;
-    if (!isOutdoorCanopy) {
-      return {
-        code: "screen_detected",
-        en: "Screen / display detected — photograph real outdoor crop",
-        hi: "स्क्रीन / डिस्प्ले पहचानी गई — असली खेत व फसल की फोटो लें",
-        block: true,
-      };
-    }
+    return {
+      code: "screen_detected",
+      en: "Screen / display detected — photograph real outdoor crop",
+      hi: "स्क्रीन / डिस्प्ले पहचानी गई — असली खेत व फसल की फोटो लें",
+      block: true,
+    };
   }
 
   const darkFloor = isFireRelax ? FIRE_DARK_LUMA_MIN : DARK_LUMA_MIN;
@@ -481,6 +476,7 @@ export function analyzeFrame(
   height: number,
   angleId?: string,
   modelVerdict?: ModelVerdict | null,
+  peril?: string,
 ): CvFrameResult {
   let sumLuma = 0;
   let vegetativeCount = 0;
@@ -503,7 +499,7 @@ export function analyzeFrame(
   let canopyLaplacianSum = 0;
   let canopyLaplacianCount = 0;
 
-  const isFireRelax = isFireRelaxAngle(angleId);
+  const isFireRelax = isFireRelaxAngle(angleId, peril);
   const pixelCount = width * height;
   const len = Math.min(data.length, pixelCount * 4);
 
@@ -636,6 +632,7 @@ export function analyzeFrame(
       isPersonDetected,
     },
     angleId,
+    peril,
   );
 
   const minThreshold = isFireRelax ? 40 : CROP_LOCK_SCORE;

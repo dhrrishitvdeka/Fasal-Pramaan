@@ -246,21 +246,8 @@ export function heuristicGate(
     };
   }
 
-  // fire_burn can have low green — don't require strict crop check, but mark heuristic fallback
-  if (peril === "fire_burn") {
-    return {
-      usable: true,
-      reason: "ok",
-      crop_detected: expectedCrop || "unknown",
-      peril_match: true,
-      metadata_verified: Boolean(metadata?.lat != null && metadata?.lon != null),
-      warnings: ["fire_burn_heuristic_fallback"],
-      confidence: expectedCrop ? 0.65 : 0.6,
-      fallback: true,
-    };
-  }
-
   // Without CV measurements, fail closed — expectedCrop must not auto-pass.
+  // fire_burn skips the crop/green locks above but still needs a quality signal.
   const hasQualitySignal =
     cropScore != null || luma != null || blur != null || greenPct != null || cv?.hintCode != null;
   if (!hasQualitySignal) {

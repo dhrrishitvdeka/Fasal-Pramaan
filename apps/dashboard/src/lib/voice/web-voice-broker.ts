@@ -204,6 +204,13 @@ export class WebVoiceBroker {
     this.gateway.currentPath = path;
   }
 
+  /** Keep the same broker instance across farmer-state refreshes. */
+  hydrate(
+    patch: Partial<Pick<WebVoiceGateway, "plots" | "claims" | "reminders" | "farmerProfile" | "currentPath" | "language">>,
+  ): void {
+    Object.assign(this.gateway, patch);
+  }
+
   async execute(
     name: string,
     args: Record<string, unknown>,

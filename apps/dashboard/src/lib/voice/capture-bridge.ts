@@ -62,16 +62,30 @@ class WebCaptureBridge {
   }
 
   getIntent(): ClaimIntent | null {
-    if (this.storedIntent) return this.storedIntent;
-    if (typeof window !== "undefined") {
+    const INTENT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+    const read = (): ClaimIntent | null => {
+      if (this.storedIntent) return this.storedIntent;
+      if (typeof window === "undefined") return null;
       try {
         const raw = sessionStorage.getItem(INTENT_STORAGE_KEY);
-        if (raw) this.storedIntent = JSON.parse(raw) as ClaimIntent;
+        if (!raw) return null;
+        return JSON.parse(raw) as ClaimIntent;
       } catch {
-        // ignore
+        return null;
       }
+    };
+    const parsed = read();
+    if (!parsed?.id || !parsed?.peril) {
+      this.storedIntent = null;
+      return null;
     }
-    return this.storedIntent;
+    const created = Date.parse(parsed.createdAt || "");
+    if (Number.isFinite(created) && Date.now() - created > INTENT_MAX_AGE_MS) {
+      this.setIntent(null);
+      return null;
+    }
+    this.storedIntent = parsed;
+    return parsed;
   }
 
   /** Live CV frame result from capture studio — feeds Saathi parallel guidance. */

@@ -168,9 +168,13 @@ export function parseGeminiAnalysis(payload: unknown, modelId = geminiVisionMode
   const printedPhoto = asBool(authenticityRaw.printed_photo ?? authenticityRaw.printedPhoto);
   const indoorScene = asBool(authenticityRaw.indoor_scene ?? authenticityRaw.indoorScene);
   const authenticExplicit = authenticityRaw.authentic;
-  const authentic =
-    authenticExplicit == null
-      ? !(screenReplay || aiGenerated || printedPhoto || indoorScene)
+  const authenticityPresent = Boolean(record.authenticity && typeof record.authenticity === "object");
+  // Missing authenticity object + no flags: leave the grade parser to reject
+  // empty payloads. An authenticity object with no `authentic` field is fail-closed.
+  const authentic = !authenticityPresent
+    ? !(screenReplay || aiGenerated || printedPhoto || indoorScene)
+    : authenticExplicit == null
+      ? false
       : asBool(authenticExplicit);
 
   const authenticity: GeminiAuthenticity = {
@@ -203,7 +207,7 @@ export function parseGeminiAnalysis(payload: unknown, modelId = geminiVisionMode
         .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
         .map((item) => ({
           angleType: asString(item.angle_type || item.angleType, "unknown"),
-          usable: item.usable !== false,
+          usable: item.usable === true,
           crop: item.crop == null ? null : asString(item.crop),
           damageVisible: asBool(item.damage_visible ?? item.damageVisible),
           findings: asString(item.findings, ""),

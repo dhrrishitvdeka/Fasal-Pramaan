@@ -140,6 +140,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
   const slotsRef = useRef(slots);
   const pathnameRef = useRef(pathname);
   const registerPlotRef = useRef(registerPlot);
+  const farmerProfileRef = useRef(farmerProfile);
   const mountedRef = useRef(true);
   const connectVoiceRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const hasGreetedRef = useRef(false);
@@ -153,6 +154,7 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
   slotsRef.current = slots;
   pathnameRef.current = pathname;
   registerPlotRef.current = registerPlot;
+  farmerProfileRef.current = farmerProfile;
 
   useEffect(() => {
     const s = loadStored();
@@ -175,53 +177,13 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
   const broker = useMemo(
     () =>
       new WebVoiceBroker({
-        plots: plots.map((plot) => ({
-          id: plot.id,
-          name: plot.name,
-          nameHi: plot.nameHi,
-          cropType: plot.cropType,
-          cropTypeHi: plot.cropTypeHi,
-          khasraNumber: plot.khasraNumber,
-          areaHectares: plot.areaHectares,
-          currentStage: plot.currentStage,
-          village: plot.village,
-          district: plot.district,
-          state: plot.state,
-        })),
-        claims: claims.map((claim) => ({
-          id: claim.id,
-          status: claim.status,
-          plotName: claim.plotName,
-          cropType: claim.cropType,
-          missingAngles: claim.missingAngles,
-          recaptureReason: claim.recaptureReason,
-          imageCount: claim.images?.length ?? 0,
-          createdAt: claim.createdAt,
-          reviewerNotes: claim.reviewerNotes,
-        })),
-        reminders: milestones.map((item) => ({
-          id: item.id,
-          stageName: item.stageName,
-          stageNameHi: item.stageNameHi,
-          dueDate: item.dueDate,
-          completed: item.completed,
-          isOverdue: item.isOverdue,
-          plotId: item.plotId,
-          cropName: item.cropName,
-        })),
-        farmerProfile: {
-          name: farmerProfile.name,
-          nameHi: farmerProfile.nameHi,
-          kisanId: farmerProfile.kisanId,
-          phone: farmerProfile.phone,
-          village: farmerProfile.village,
-          district: farmerProfile.district,
-          state: farmerProfile.state,
-        },
+        plots: [],
+        claims: [],
+        reminders: [],
+        farmerProfile: {},
         currentPath: pathname,
         language: lang,
         navigate: (path) => {
-          // Keep the live session — the provider lives in the farmer layout.
           agentNavigatingRef.current = true;
           router.push(path);
         },
@@ -249,35 +211,75 @@ export function SaathiSessionProvider({ children }: { children: React.ReactNode 
           } catch {
             // GPS optional
           }
+          const profile = farmerProfileRef.current;
           return await registerPlotRef.current({
             name: input.name,
             cropType: input.cropType,
             khasraNumber: input.khasraNumber,
             areaHectares: input.areaHectares,
-            village: input.village || farmerProfile.village || "Local Village",
-            district: farmerProfile.district || "",
-            state: farmerProfile.state || "",
+            village: input.village || profile?.village || "Local Village",
+            district: profile?.district || "",
+            state: profile?.state || "",
             lat,
             lon,
           });
         },
         capture: webCaptureBridge,
       }),
-    [
-      plots,
-      claims,
-      milestones,
-      farmerProfile,
-      pathname,
-      lang,
-      router,
-      setLang,
-      snoozeMilestone,
-      completeMilestone,
-    ],
+    [router, setLang, snoozeMilestone, completeMilestone],
   );
   const brokerRef = useRef(broker);
   brokerRef.current = broker;
+
+  useEffect(() => {
+    broker.hydrate({
+      plots: plots.map((plot) => ({
+        id: plot.id,
+        name: plot.name,
+        nameHi: plot.nameHi,
+        cropType: plot.cropType,
+        cropTypeHi: plot.cropTypeHi,
+        khasraNumber: plot.khasraNumber,
+        areaHectares: plot.areaHectares,
+        currentStage: plot.currentStage,
+        village: plot.village,
+        district: plot.district,
+        state: plot.state,
+      })),
+      claims: claims.map((claim) => ({
+        id: claim.id,
+        status: claim.status,
+        plotName: claim.plotName,
+        cropType: claim.cropType,
+        missingAngles: claim.missingAngles,
+        recaptureReason: claim.recaptureReason,
+        imageCount: claim.images?.length ?? 0,
+        createdAt: claim.createdAt,
+        reviewerNotes: claim.reviewerNotes,
+      })),
+      reminders: milestones.map((item) => ({
+        id: item.id,
+        stageName: item.stageName,
+        stageNameHi: item.stageNameHi,
+        dueDate: item.dueDate,
+        completed: item.completed,
+        isOverdue: item.isOverdue,
+        plotId: item.plotId,
+        cropName: item.cropName,
+      })),
+      farmerProfile: {
+        name: farmerProfile.name,
+        nameHi: farmerProfile.nameHi,
+        kisanId: farmerProfile.kisanId,
+        phone: farmerProfile.phone,
+        village: farmerProfile.village,
+        district: farmerProfile.district,
+        state: farmerProfile.state,
+      },
+      currentPath: pathname,
+      language: lang,
+    });
+  }, [broker, plots, claims, milestones, farmerProfile, pathname, lang]);
 
   const snapshotRef = useRef({ pathname, lang, plots, claims, milestones });
   snapshotRef.current = { pathname, lang, plots, claims, milestones };

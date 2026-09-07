@@ -23,6 +23,14 @@ import {
   Plus,
 } from "lucide-react";
 import { useFarmerData, ClaimStatus } from "@/lib/farmerStore";
+
+function claimMatchesFarmerTab(status: string, tab: string): boolean {
+  if (tab === "all") return true;
+  if (tab === "under_review") {
+    return status === "under_review" || status === "submitted" || status === "physical_inspection";
+  }
+  return status === tab;
+}
 import { getFarmerT } from "@/lib/farmerI18n";
 import { safeDisplayUrl } from "@/lib/media";
 import { CardSkeleton } from "@/components/LoadingAnimation";
@@ -35,8 +43,16 @@ function FarmerClaimsContent() {
   const searchParams = useSearchParams();
   const initialStatus = searchParams?.get("status");
 
-  const [activeFilter, setActiveFilter] = useState<"all" | "under_review" | "needs_recapture" | "verified" | "draft">(() => {
-    if (initialStatus === "verified" || initialStatus === "needs_recapture" || initialStatus === "under_review" || initialStatus === "draft") {
+  const [activeFilter, setActiveFilter] = useState<
+    "all" | "under_review" | "needs_recapture" | "verified" | "rejected" | "draft"
+  >(() => {
+    if (
+      initialStatus === "verified" ||
+      initialStatus === "needs_recapture" ||
+      initialStatus === "under_review" ||
+      initialStatus === "rejected" ||
+      initialStatus === "draft"
+    ) {
       return initialStatus;
     }
     return "all";
@@ -45,14 +61,20 @@ function FarmerClaimsContent() {
 
   useEffect(() => {
     const statusParam = searchParams?.get("status");
-    if (statusParam === "verified" || statusParam === "needs_recapture" || statusParam === "under_review" || statusParam === "draft") {
+    if (
+      statusParam === "verified" ||
+      statusParam === "needs_recapture" ||
+      statusParam === "under_review" ||
+      statusParam === "rejected" ||
+      statusParam === "draft"
+    ) {
       setActiveFilter(statusParam);
     }
   }, [searchParams]);
 
   const filteredClaims = claims.filter((claim) => {
     // Status filter
-    if (activeFilter !== "all" && claim.status !== activeFilter) {
+    if (activeFilter !== "all" && !claimMatchesFarmerTab(claim.status, activeFilter)) {
       return false;
     }
     // Search query filter (null-safe: legacy claims may lack Hi fields)
@@ -78,7 +100,7 @@ function FarmerClaimsContent() {
     {
       key: "under_review" as const,
       label: t.filterReview,
-      count: claims.filter((c) => c.status === "under_review" || c.status === "submitted").length,
+      count: claims.filter((c) => claimMatchesFarmerTab(c.status, "under_review")).length,
     },
     {
       key: "needs_recapture" as const,
@@ -90,6 +112,11 @@ function FarmerClaimsContent() {
       key: "verified" as const,
       label: t.filterVerified,
       count: claims.filter((c) => c.status === "verified").length,
+    },
+    {
+      key: "rejected" as const,
+      label: lang === "hi" ? "अस्वीकृत" : "Rejected",
+      count: claims.filter((c) => c.status === "rejected").length,
     },
     {
       key: "draft" as const,
