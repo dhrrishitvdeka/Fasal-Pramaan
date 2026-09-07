@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { refreshAuthCookies } from "@/lib/auth-cookies";
 import {
   SITE_LOCK_COOKIE,
   isSiteLockActive,
@@ -10,17 +11,21 @@ export default async function proxy(request: NextRequest) {
   if (pathname === "/unlock" || pathname === "/api/unlock") {
     return NextResponse.next();
   }
-  // Liveness probes and API clients must never get an HTML redirect:
-  // Docker HEALTHCHECK hits /api/health and would restart-loop under lock.
   if (pathname === "/api/health") {
     return NextResponse.next();
   }
+
+  let response = NextResponse.next({ request });
+  if (pathname !== "/api/auth/callback") {
+    response = await refreshAuthCookies(request, response);
+  }
+
   if (!isSiteLockActive()) {
-    return NextResponse.next();
+    return response;
   }
   const token = request.cookies.get(SITE_LOCK_COOKIE)?.value;
   if (await isValidSiteLockToken(token)) {
-    return NextResponse.next();
+    return response;
   }
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Site locked" }, { status: 401 });

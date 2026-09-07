@@ -14,6 +14,10 @@ describe("login form schema", () => {
     const r = loginSchema.safeParse({ email: "not-an-email", password: "Demo@12345" });
     expect(r.success).toBe(false);
   });
+
+  it("rejects passwords shorter than 8 characters", () => {
+    expect(loginSchema.safeParse({ email: "farmer@example.com", password: "short" }).success).toBe(false);
+  });
 });
 
 describe("claim submission schema", () => {

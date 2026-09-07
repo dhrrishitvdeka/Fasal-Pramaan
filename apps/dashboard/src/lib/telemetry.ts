@@ -57,15 +57,12 @@ function forward(error: TelemetryError) {
   // are purged in auth-headers and must not be read here).
   void (async () => {
     try {
-      const { supabaseAccessToken } = await import("./auth-headers");
-      const token = await supabaseAccessToken();
-      if (!token) return;
       await fetch("/api/telemetry/error", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "same-origin",
         body: JSON.stringify({
           message: error.message,
           stack: error.stack,

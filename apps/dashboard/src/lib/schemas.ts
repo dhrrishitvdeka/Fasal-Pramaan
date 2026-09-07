@@ -3,10 +3,22 @@ import { CANONICAL_ANGLES } from "@/lib/farmerI18n";
 
 export const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8).max(128),
 });
 
 export type LoginForm = z.infer<typeof loginSchema>;
+
+export const signupSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(128),
+  fullName: z.string().trim().min(1).max(80).optional(),
+});
+
+export type SignupForm = z.infer<typeof signupSchema>;
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
 
 /**
  * Shared building blocks. Zod validates structure/types/bounds only; the

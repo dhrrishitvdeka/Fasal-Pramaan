@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Lock, ShieldAlert } from "lucide-react";
-import { getSupabaseClient } from "@/lib/supabase";
+import { apiFetch } from "@/lib/auth-headers";
 import type { RoleGateStatus } from "@/lib/use-require-role";
 
 function GateCard({ children }: { children: React.ReactNode }) {
@@ -53,12 +53,13 @@ function DeniedGate() {
 
   useEffect(() => {
     let cancelled = false;
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-    supabase.auth
-      .getUser()
-      .then(({ data }) => {
-        if (!cancelled) setEmail(data.user?.email ?? null);
+    void apiFetch("/api/me")
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return (await res.json()) as { email?: string | null };
+      })
+      .then((me) => {
+        if (!cancelled) setEmail(me?.email ?? null);
       })
       .catch(() => {
         // ignore — hint stays generic

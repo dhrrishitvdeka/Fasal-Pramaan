@@ -1,12 +1,8 @@
-import { getSupabaseClient } from "@/lib/supabase";
-
 const LEGACY_TOKEN_KEYS = ["fp_access_token", "fp_refresh_token", "fp_demo_user"];
 
 /**
  * One-time purge of legacy pre-Supabase token keys. Those belonged to a
- * retired external backend and must never authenticate Supabase-backed API
- * calls: a stale value here would be sent as Bearer and fail closed as 401
- * even with a valid Supabase session, or worse, confuse token-source audits.
+ * retired external backend and must never authenticate API calls.
  */
 function purgeLegacyTokenKeys(): void {
   if (typeof window === "undefined") return;
@@ -22,25 +18,14 @@ function purgeLegacyTokenKeys(): void {
 
 let purged = false;
 
-export async function supabaseAccessToken(): Promise<string | null> {
+export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
   if (!purged) {
     purged = true;
     purgeLegacyTokenKeys();
   }
-  const supabase = getSupabaseClient();
-  if (supabase) {
-    const { data } = await supabase.auth.getSession();
-    if (data.session?.access_token) return data.session.access_token;
-  }
-  return null;
-}
-
-export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  const token = await supabaseAccessToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !headers.has("Content-Type") && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
-  return fetch(input, { ...init, headers });
+  return fetch(input, { ...init, headers, credentials: "same-origin" });
 }

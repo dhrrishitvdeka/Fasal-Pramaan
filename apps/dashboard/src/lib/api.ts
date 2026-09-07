@@ -1,14 +1,13 @@
 import { apiFetch } from "./auth-headers";
 import { resolveClaimClientPath } from "./claim-routes";
-import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
+import { isSupabaseConfigured } from "./supabase";
 import { emptyOverview, type PerilAnalytics, type ReviewActionPayload } from "./web-db";
 import { clearRoleCache } from "./use-require-role";
 import { isCropMatch } from "./crop-synonyms";
 
 export async function logoutSession() {
   try {
-    const supabase = getSupabaseClient();
-    if (supabase) await supabase.auth.signOut();
+    await apiFetch("/api/auth/logout", { method: "POST" });
   } catch {
     // ignore
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { createServerSupabase } from "./supabase";
+import { createClient, type User } from "@supabase/supabase-js";
+import { createAuthClientFromRequest } from "./auth-cookies";
+import { createServerSupabase, supabaseAnonKey, supabaseUrl } from "./supabase";
 
 export type WebRole = "farmer" | "reviewer" | "administrator";
 
@@ -63,52 +64,27 @@ export function bearerToken(request: Request): string | null {
   return match?.[1]?.trim() || null;
 }
 
-export async function requireWebActor(
-  request: Request,
-): Promise<{ ok: true; actor: WebActor } | { ok: false; response: NextResponse }> {
+async function userFromBearer(request: Request): Promise<User | null> {
   const token = bearerToken(request);
-  if (!token) {
-    return { ok: false, response: NextResponse.json({ error: "Sign in required" }, { status: 401 }) };
-  }
-  // Intercept demo tokens ONLY in automated tests when explicitly enabled.
-  // In production and live environments, authentication strictly requires Supabase user JWTs.
-  const allowDemoTokens =
-    process.env.NODE_ENV === "test" && process.env.ALLOW_DEMO_TOKENS === "true";
-  if (
-    allowDemoTokens &&
-    (token.startsWith("demo-") ||
-      token === "demo" ||
-      token === "test-token" ||
-      token.startsWith("demo-jwt-"))
-  ) {
-    const isReviewer =
-      token.includes("reviewer") ||
-      token.includes("admin") ||
-      request.headers.get("x-demo-role") === "reviewer";
-    return {
-      ok: true,
-      actor: {
-        userId: isReviewer ? "demo-reviewer-id" : "demo-farmer-id",
-        email: isReviewer ? "reviewer@fasalpramaan.local" : "demo@fasalpramaan.local",
-        role: isReviewer ? "reviewer" : "farmer",
-      },
-    };
-  }
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: "Supabase is not configured" }, { status: 503 }),
-    };
-  }
+  if (!token) return null;
+  const url = supabaseUrl();
+  const anon = supabaseAnonKey();
+  if (!url || !anon) return null;
   const authClient = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data, error } = await authClient.auth.getUser(token);
-  if (error || !data.user) {
-    return { ok: false, response: NextResponse.json({ error: "Invalid session" }, { status: 401 }) };
-  }
-  const user = data.user;
+  if (error || !data.user) return null;
+  return data.user;
+}
+
+async function userFromCookies(request: Request): Promise<User | null> {
+  const authClient = createAuthClientFromRequest(request);
+  if (!authClient) return null;
+  const { data, error } = await authClient.auth.getUser();
+  if (error || !data.user) return null;
+  return data.user;
+}
+
+export async function actorFromUser(user: User): Promise<WebActor> {
   const server = createServerSupabase();
   let profileRole: string | null = null;
   let hasProfile = false;
@@ -135,13 +111,56 @@ export async function requireWebActor(
     );
   }
   return {
-    ok: true,
-    actor: {
-      userId: user.id,
-      email: user.email || null,
-      role,
-    },
+    userId: user.id,
+    email: user.email || null,
+    role,
   };
+}
+
+export async function requireWebActor(
+  request: Request,
+): Promise<{ ok: true; actor: WebActor } | { ok: false; response: NextResponse }> {
+  const token = bearerToken(request);
+  // Intercept demo tokens ONLY in automated tests when explicitly enabled.
+  // In production and live environments, authentication strictly requires Supabase user JWTs.
+  const allowDemoTokens =
+    process.env.NODE_ENV === "test" && process.env.ALLOW_DEMO_TOKENS === "true";
+  if (
+    allowDemoTokens &&
+    token &&
+    (token.startsWith("demo-") ||
+      token === "demo" ||
+      token === "test-token" ||
+      token.startsWith("demo-jwt-"))
+  ) {
+    const isReviewer =
+      token.includes("reviewer") ||
+      token.includes("admin") ||
+      request.headers.get("x-demo-role") === "reviewer";
+    return {
+      ok: true,
+      actor: {
+        userId: isReviewer ? "demo-reviewer-id" : "demo-farmer-id",
+        email: isReviewer ? "reviewer@fasalpramaan.local" : "demo@fasalpramaan.local",
+        role: isReviewer ? "reviewer" : "farmer",
+      },
+    };
+  }
+
+  const url = supabaseUrl();
+  const anon = supabaseAnonKey();
+  if (!url || !anon) {
+    return {
+      ok: false,
+      response: NextResponse.json({ error: "Supabase is not configured" }, { status: 503 }),
+    };
+  }
+
+  const user = (await userFromCookies(request)) || (await userFromBearer(request));
+  if (!user) {
+    return { ok: false, response: NextResponse.json({ error: "Sign in required" }, { status: 401 }) };
+  }
+  return { ok: true, actor: await actorFromUser(user) };
 }
 
 export function actorUnauthorized(message = "Forbidden"): NextResponse {
