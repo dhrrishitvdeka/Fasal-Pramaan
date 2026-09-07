@@ -1,16 +1,36 @@
 import { getSupabaseClient } from "@/lib/supabase";
 
+const LEGACY_TOKEN_KEYS = ["fp_access_token", "fp_refresh_token", "fp_demo_user"];
+
+/**
+ * One-time purge of legacy pre-Supabase token keys. Those belonged to a
+ * retired external backend and must never authenticate Supabase-backed API
+ * calls: a stale value here would be sent as Bearer and fail closed as 401
+ * even with a valid Supabase session, or worse, confuse token-source audits.
+ */
+function purgeLegacyTokenKeys(): void {
+  if (typeof window === "undefined") return;
+  try {
+    for (const key of LEGACY_TOKEN_KEYS) {
+      window.sessionStorage.removeItem(key);
+      window.localStorage.removeItem(key);
+    }
+  } catch {
+    // storage unavailable — nothing to purge
+  }
+}
+
+let purged = false;
+
 export async function supabaseAccessToken(): Promise<string | null> {
+  if (!purged) {
+    purged = true;
+    purgeLegacyTokenKeys();
+  }
   const supabase = getSupabaseClient();
   if (supabase) {
     const { data } = await supabase.auth.getSession();
     if (data.session?.access_token) return data.session.access_token;
-  }
-  if (typeof window !== "undefined") {
-    try {
-      const stored = sessionStorage.getItem("fp_access_token");
-      if (stored) return stored;
-    } catch {}
   }
   return null;
 }

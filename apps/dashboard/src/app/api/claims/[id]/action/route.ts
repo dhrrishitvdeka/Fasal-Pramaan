@@ -75,6 +75,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           : message.startsWith("Cannot accept claim") || message.startsWith("Cannot ")
             ? 400
             : 500;
+    // Known domain errors are safe user-facing copy; anything else may carry
+    // DB/storage internals — log it and return a generic message.
+    if (status === 500) {
+      console.error("POST /api/claims/[id]/action failed:", error);
+      return NextResponse.json({ error: "Action failed" }, { status });
+    }
     return NextResponse.json(
       { error: message },
       { status },

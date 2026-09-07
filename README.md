@@ -266,12 +266,15 @@ Fasal-Pramaan/
    ```
    Open `http://localhost:3000` in your browser.
 
-### Test Credentials (Default Demo Users)
+### Test Credentials (Local Demo Users)
 
-| Role | Email | Password | Intended Portal |
-| :--- | :--- | :--- | :--- |
-| **Farmer** | `farmer@fasalpramaan.com` | `Kisan@Pramaan2026!` | `/farmer` |
-| **Reviewer** | `reviewer@fasalpramaan.com` | `Reviewer@Pramaan2026!` | `/review` |
+> Passwords are never published. Create local Supabase Auth users for testing
+> and ask your administrator for credentials. Example emails:
+
+| Role | Email | Intended Portal |
+| :--- | :--- | :--- |
+| **Farmer** | `farmer@example.com` | `/farmer` |
+| **Reviewer** | `reviewer@example.com` (must be listed in `REVIEWER_EMAILS`) | `/review` |
 
 ---
 

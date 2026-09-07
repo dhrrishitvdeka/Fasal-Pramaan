@@ -178,7 +178,7 @@ describe("farmer-notifications", () => {
     expect(notices.map((n) => n.claimId)).toEqual(["p-newer", "p-old"]);
   });
 
-  it("diffNewPayoutApprovals resolves amount from payoutAmountInr or fallback aiPrediction", () => {
+  it("diffNewPayoutApprovals only fires on approved payouts with positive amounts", () => {
     const [notice1] = diffNewPayoutApprovals([
       payoutClaim({
         id: "p1",
@@ -193,14 +193,25 @@ describe("farmer-notifications", () => {
     expect(notice1.plotNameHi).toBe("खेत 1");
     expect(notice1.cropTypeHi).toBe("गेहूं");
 
-    const [notice2] = diffNewPayoutApprovals([
-      payoutClaim({
-        id: "p2",
-        payoutAmountInr: null,
-        aiPrediction: { estimatedLossInr: 32000 },
-      }),
-    ]);
-    expect(notice2.payoutAmountInr).toBe(32000);
+    // Verified without an approved payout: no notice (never celebrate ₹0).
+    expect(
+      diffNewPayoutApprovals([
+        payoutClaim({ id: "p2", status: "verified", payoutStatus: "pending_review", payoutAmountInr: 0 }),
+      ]),
+    ).toEqual([]);
+
+    // AI estimate is not a payout: no notice even with a positive estimate.
+    expect(
+      diffNewPayoutApprovals([
+        payoutClaim({
+          id: "p3",
+          status: "verified",
+          payoutStatus: "pending_review",
+          payoutAmountInr: null,
+          aiPrediction: { estimatedLossInr: 32000 },
+        }),
+      ]),
+    ).toEqual([]);
   });
 
   it("dismissed payout claims disappear after markPayoutSeen", () => {

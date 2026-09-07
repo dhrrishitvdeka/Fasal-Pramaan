@@ -55,6 +55,22 @@ export const REVIEW_ACTION_IDS = [
 // ---------------------------------------------------------------------------
 // POST /api/claims
 // ---------------------------------------------------------------------------
+// Client CV measurements are untrusted hints (spoofable): bound them tightly so
+// absurd values are rejected at the edge instead of flowing into the gate.
+const cvScore = z.number().finite().min(0).max(100).nullish();
+const KNOWN_HINT_CODES = [
+  "ok",
+  "crop_not_detected",
+  "too_dark",
+  "too_bright",
+  "too_close",
+  "too_far",
+  "hold_steady",
+  "center_crop",
+  "screen_detected",
+  "person_detected",
+] as const;
+
 export const claimImageSchema = z.object({
   imageDataUrl: z.string(),
   angleType: z.string().optional().default("closeup_damage"),
@@ -62,17 +78,19 @@ export const claimImageSchema = z.object({
   lat: optionalBounded(-90, 90),
   lon: optionalBounded(-180, 180),
   accuracyM: optionalBounded(0, 100000),
-  lightingScore: z.number().finite().nullish(),
+  lightingScore: cvScore,
   qualityPassed: z.boolean().nullish(),
-  blurScore: z.number().finite().nullish(),
-  greenPct: z.number().finite().nullish(),
-  luma: z.number().finite().nullish(),
-  cropScore: z.number().finite().nullish(),
-  hintCode: z.string().max(64).nullish(),
+  blurScore: cvScore,
+  greenPct: cvScore,
+  luma: z.number().finite().min(0).max(255).nullish(),
+  cropScore: cvScore,
+  hintCode: z.enum(KNOWN_HINT_CODES).nullish(),
   isScreenDetected: z.boolean().nullish(),
   isPersonDetected: z.boolean().nullish(),
-  facing: z.string().nullish(),
-  dimensions: z.object({ width: z.number().finite(), height: z.number().finite() }).nullish(),
+  facing: z.enum(["environment", "user"]).nullish(),
+  dimensions: z
+    .object({ width: z.number().int().positive().max(16384), height: z.number().int().positive().max(16384) })
+    .nullish(),
   capturedAt: z.string().nullish(),
 });
 

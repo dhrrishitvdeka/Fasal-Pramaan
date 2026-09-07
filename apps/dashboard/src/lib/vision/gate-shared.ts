@@ -98,9 +98,10 @@ export function heuristicGate(
   }
 
   const cv = metadata?.cvAnalysis;
-  const isClearCropFoliage = (cv?.cropScore != null && cv.cropScore >= 60) || (cv?.greenPct != null && cv.greenPct >= 35);
 
-  if (cv?.hintCode === "person_detected" || (cv?.hintCode === "screen_detected" && !isClearCropFoliage)) {
+  // A screen-replay flag always fails: a photo of a screen showing crops must
+  // never pass on the strength of client-supplied foliage scores (spoofable).
+  if (cv?.hintCode === "person_detected" || cv?.hintCode === "screen_detected") {
     return {
       usable: false,
       reason: cv.hintCode === "screen_detected" ? "screen_replay_detected" : cv.hintCode,
@@ -123,7 +124,7 @@ export function heuristicGate(
     };
   }
 
-  if (cv?.isScreenDetected === true && !isClearCropFoliage) {
+  if (cv?.isScreenDetected === true) {
     return {
       usable: false,
       reason: "screen_replay_detected",
@@ -165,6 +166,24 @@ export function heuristicGate(
 
   const cropScore = cv?.cropScore;
   const greenPctEarly = cv?.greenPct;
+  // Contradictory client signals (e.g. "crop_not_detected" alongside a high
+  // crop score) indicate tampered or malfunctioning measurements: fail closed
+  // instead of letting one spoofed number override the other.
+  if (
+    cv?.hintCode === "crop_not_detected" &&
+    (cropScore != null || greenPctEarly != null) &&
+    peril !== "fire_burn"
+  ) {
+    return {
+      usable: false,
+      reason: "heuristic_unverified",
+      crop_detected: expectedCrop || null,
+      visual_reason: "On-device measurements contradict each other; capture again",
+      warnings: ["heuristic_unverified", "contradictory_signals"],
+      confidence: 0.15,
+      fallback: true,
+    };
+  }
   // Fresh on-device measurements override a stale `crop_not_detected` hint:
   // only honor the hint when there is no fresh cropScore/greenPct to contradict it.
   const hasFreshCropSignal = cropScore != null || greenPctEarly != null;
@@ -414,15 +433,21 @@ Angle: ${angleType}, Peril: ${peril || "normal"}`;
       }
     }
 
+    // Fail closed on omitted LLM fields: an absent verdict is not a passing one.
+    const authenticityScore =
+      typeof parsed.authenticity_score === "number"
+        ? Math.min(1, Math.max(0, parsed.authenticity_score))
+        : 0.4;
+    const modelConfidence =
+      typeof parsed.confidence === "number" ? Math.min(1, Math.max(0, parsed.confidence)) : 0.3;
     return {
       usable,
       reason,
       crop_detected: parsed.crop_detected ?? null,
-      peril_match: Boolean(parsed.peril_match ?? true),
-      metadata_verified: Boolean(parsed.metadata_verified ?? true),
-      authenticity_score:
-        typeof parsed.authenticity_score === "number" ? parsed.authenticity_score : usable ? 0.95 : 0.4,
-      confidence: typeof parsed.confidence === "number" ? parsed.confidence : usable ? 0.85 : 0.3,
+      peril_match: parsed.peril_match === true,
+      metadata_verified: parsed.metadata_verified === true,
+      authenticity_score: authenticityScore,
+      confidence: modelConfidence,
       visual_reason: parsed.visual_reason,
       warnings,
       recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations.map(String) : [],

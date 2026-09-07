@@ -116,6 +116,14 @@ function CaptureStudioContent() {
     : baseAngleDefs;
   const activeRoute = routeForPeril(requestedPeril);
 
+  // Stable idempotency key for this capture session: retries and double-taps
+  // reuse it so the server dedupes instead of creating twin claims.
+  const submissionIdRef = useRef(
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `claim-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+  );
+
   // Selected plot
   const [selectedPlotId, setSelectedPlotId] = useState<string>(
     plotIdParam || milestone?.plotId || plots[0]?.id || "",
@@ -953,6 +961,7 @@ function CaptureStudioContent() {
             return { id: updated.id };
           }
           const newClaim = await createClaim({
+            submissionId: submissionIdRef.current,
             plotId: plot?.id || activeIntent?.plotId || "",
             plotName: plot?.name || activeIntent?.crop || "Unregistered plot",
             plotNameHi: plot?.nameHi || "",

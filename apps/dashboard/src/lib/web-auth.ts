@@ -26,23 +26,27 @@ function asRoleList(value: unknown): string[] {
 
 export function resolveWebRole(input: {
   email?: string | null;
+  emailConfirmed?: boolean;
   appRoles?: unknown;
   profileRole?: string | null;
 }): WebRole {
-  const listed = [
-    ...asRoleList(input.appRoles),
-    String(input.profileRole || "")
-      .trim()
-      .toLowerCase(),
-  ];
-  if (listed.some((role) => role === "administrator" || role === "admin")) {
+  // Only server-set app_metadata can grant administrator: web_profiles is
+  // potentially client-writable, so a profile "administrator" value must never
+  // self-promote (it caps at reviewer).
+  const appRoles = asRoleList(input.appRoles);
+  if (appRoles.some((role) => role === "administrator" || role === "admin")) {
     return "administrator";
   }
-  if (listed.some((role) => role === "reviewer")) {
+  const profileRole = String(input.profileRole || "")
+    .trim()
+    .toLowerCase();
+  if (appRoles.includes("reviewer") || profileRole === "reviewer" || profileRole === "admin" || profileRole === "administrator") {
     return "reviewer";
   }
+  // The email allowlist only counts for verified addresses: otherwise anyone
+  // could register a listed email on an unverified account and inherit review.
   const email = (input.email || "").trim().toLowerCase();
-  if (email && reviewerEmailAllowlist().has(email)) {
+  if (email && input.emailConfirmed && reviewerEmailAllowlist().has(email)) {
     return "reviewer";
   }
   return "farmer";
@@ -115,6 +119,7 @@ export async function requireWebActor(
   }
   const role = resolveWebRole({
     email: user.email,
+    emailConfirmed: Boolean(user.email_confirmed_at),
     appRoles: user.app_metadata?.roles,
     profileRole,
   });

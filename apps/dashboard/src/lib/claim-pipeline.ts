@@ -1494,7 +1494,16 @@ export async function recaptureAndInfer(
     capture_lon: input.captureLon ?? existing.capture_lon,
     capture_accuracy_m: input.captureAccuracyM ?? existing.capture_accuracy_m,
     gps_status: input.gpsStatus ?? existing.gps_status,
-    payout_status: existing.payout_status || "pending_review",
+    // A reopened terminal case re-enters review: never inherit a settled
+    // (approved/rejected) payout — it was voided to needs_action on reopen.
+    payout_status:
+      existing.payout_status === "approved" || existing.payout_status === "rejected"
+        ? "pending_review"
+        : existing.payout_status || "pending_review",
+    payout_amount_inr:
+      existing.payout_status === "approved" || existing.payout_status === "rejected"
+        ? null
+        : existing.payout_amount_inr,
     inference_status: "pending",
     inference_started_at: now,
     inference_error: null,
@@ -1862,9 +1871,19 @@ export async function applyReviewerAction(
         "Cannot accept claim: integrity score is below 50. Request physical inspection or recapture.",
       );
     }
-    if (existing.severity_grade === "U" && !gateResult?.overridden) {
+    // Grade U is never acceptable as-is — not even with a gate override.
+    // The reviewer must set an explicit grade via `correct` first.
+    if (existing.severity_grade === "U") {
       throw new Error(
-        "Cannot accept claim: model analysis is unusable (grade U). Correct the grade or request recapture first.",
+        "Cannot accept claim: model analysis is unusable (grade U). Set an explicit grade with Correct, or request recapture first.",
+      );
+    }
+    // Never pay out on an incomplete AI read: heuristic-only evidence must go
+    // through override_gate (with reason) or wait for inference to complete.
+    const inferenceStatus = (existing as { inference_status?: string | null }).inference_status;
+    if (inferenceStatus !== "complete" && !gateResult?.overridden) {
+      throw new Error(
+        "Cannot accept claim: AI analysis is not complete yet. Wait for inference, re-run analysis, or override the gate with a reason first.",
       );
     }
   }
@@ -1906,10 +1925,6 @@ export async function applyReviewerAction(
           : existing.missing_angles,
     updated_at: new Date().toISOString(),
   };
-
-  if (payload.action === "accept" && existing.severity_grade === "U") {
-    patch.severity_grade = "B";
-  }
 
   if (payload.action === "correct") {
     if (payload.corrected_crop) {
@@ -1985,15 +2000,31 @@ export async function applyReviewerAction(
   } else if (payload.action === "reject") {
     patch.payout_status = "rejected";
     patch.payout_amount_inr = 0;
+  } else if (payload.action === "request_recapture") {
+    // Reopening a terminal case must void the settled payout first: keeping an
+    // "approved" payout on a claim that returns to under_review corrupts the
+    // ledger (approved + later rejected on the same row).
+    if (existing.status === "verified" || existing.status === "rejected") {
+      patch.payout_status = "needs_action";
+      patch.payout_amount_inr = null;
+    }
   }
 
   if (payload.action === "override_gate") {
-    // Reviewer explicitly marks gate-blocked evidence as usable — keep status unchanged,
-    // stamp the override into gate_result and clear the blocking quality note.
-    const existingGate = ((existing as any).gate_result ?? {}) as Record<string, unknown>;
+    // Overriding launders blocked evidence into payable state — it requires a
+    // written reason, and it must NOT silently upgrade grade U: the reviewer
+    // has to set an explicit grade via `correct` before `accept` can proceed
+    // (the accept guard blocks U unless overridden, and override no longer
+    // clears it).
     const sanitizedReason = String(payload.reason || payload.notes || "")
       .trim()
       .slice(0, 500);
+    if (!sanitizedReason) {
+      throw new Error("A reason or note is required to override the gate.");
+    }
+    // Reviewer explicitly marks gate-blocked evidence as usable — keep status unchanged,
+    // stamp the override into gate_result and clear the blocking quality note.
+    const existingGate = ((existing as any).gate_result ?? {}) as Record<string, unknown>;
     (patch as any).gate_result = {
       ...(existingGate && typeof existingGate === "object" && !Array.isArray(existingGate)
         ? existingGate
@@ -2001,11 +2032,8 @@ export async function applyReviewerAction(
       overridden: true,
       overriddenBy: payload.actor || "reviewer",
       overriddenAt: new Date().toISOString(),
-      ...(sanitizedReason ? { overrideReason: sanitizedReason } : {}),
+      overrideReason: sanitizedReason,
     };
-    if (existing.severity_grade === "U") {
-      patch.severity_grade = "B";
-    }
     patch.quality_notes = existing.quality_notes
       ? `${existing.quality_notes} (gate overridden)`
       : "(gate overridden)";

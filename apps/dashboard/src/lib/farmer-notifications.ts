@@ -149,26 +149,24 @@ export interface PayoutNoticeSource {
 export function diffNewPayoutApprovals(claims: PayoutNoticeSource[]): PayoutNotice[] {
   const seen = new Set(loadSeenPayoutNotices());
   return claims
+    // A payout notice fires ONLY on an approved payout with a positive
+    // amount. "Verified" alone means the claim passed review — not that money
+    // moved — and a ₹0 banner destroys farmer trust.
     .filter(
       (claim) =>
-        (claim.payoutStatus === "approved" || claim.status === "verified") &&
-        claim.payoutStatus !== "rejected" &&
+        claim.payoutStatus === "approved" &&
+        typeof claim.payoutAmountInr === "number" &&
+        claim.payoutAmountInr > 0 &&
         !seen.has(claim.id),
     )
     .map((claim) => {
-      const amount =
-        typeof claim.payoutAmountInr === "number" && claim.payoutAmountInr > 0
-          ? claim.payoutAmountInr
-          : typeof claim.aiPrediction?.estimatedLossInr === "number" && claim.aiPrediction.estimatedLossInr > 0
-            ? claim.aiPrediction.estimatedLossInr
-            : 0;
       return {
         claimId: claim.id,
         plotName: claim.plotName || "Plot",
         plotNameHi: claim.plotNameHi || undefined,
         cropType: claim.cropType || "Crop",
         cropTypeHi: claim.cropTypeHi || undefined,
-        payoutAmountInr: amount,
+        payoutAmountInr: claim.payoutAmountInr as number,
         at: claim.updatedAt || claim.createdAt || "",
       };
     })

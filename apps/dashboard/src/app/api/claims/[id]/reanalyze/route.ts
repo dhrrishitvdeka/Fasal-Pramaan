@@ -16,7 +16,9 @@ import { checkRateLimit } from "@/lib/server/rate-limit";
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireWebActor(request);
   if (!auth.ok) return auth.response;
-  const limit = checkRateLimit(`claim-reanalyze:${auth.actor.userId}`, 10, 60_000);
+  // Owners and reviewers share this endpoint, so keep the quota tight:
+  // each call is a synchronous multi-model Gemini run.
+  const limit = checkRateLimit(`claim-reanalyze:${auth.actor.userId}`, 5, 60_000);
   if (!limit.ok) {
     return NextResponse.json(
       { error: "Too many re-analysis requests. Please wait a moment." },
@@ -44,8 +46,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return NextResponse.json({ error: "Claim not found" }, { status: 404 });
     }
     if (result.inferError && !result.prediction) {
+      // Log provider internals server-side; the client only needs the status.
+      console.error(`reanalyze ${id} inference failed:`, result.inferError);
       return NextResponse.json(
-        { error: result.inferError, inference_status: "failed" },
+        { error: "Analysis failed", inference_status: "failed" },
         { status: 502 },
       );
     }
@@ -57,7 +61,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       inferError: result.inferError ?? null,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Re-analysis failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error(`reanalyze ${id} failed:`, error);
+    return NextResponse.json({ error: "Re-analysis failed" }, { status: 500 });
   }
 }

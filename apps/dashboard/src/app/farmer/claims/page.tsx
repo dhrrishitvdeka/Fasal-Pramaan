@@ -325,15 +325,14 @@ function FarmerClaimsContent() {
                       </div>
                     )}
 
-                    {/* Verified Payout Banner */}
+                    {/* Approved Payout Banner (sanctioned amounts only — estimates are not payouts) */}
                     {(() => {
+                      const isApproved = (claim as { payoutStatus?: string }).payoutStatus === "approved";
                       const amount =
                         typeof claim.payoutAmountInr === "number" && claim.payoutAmountInr > 0
                           ? claim.payoutAmountInr
-                          : typeof claim.aiPrediction?.estimatedLossInr === "number" && claim.aiPrediction.estimatedLossInr > 0
-                            ? claim.aiPrediction.estimatedLossInr
-                            : 0;
-                      if (!isVerified || amount <= 0) return null;
+                          : 0;
+                      if (!isVerified || !isApproved || amount <= 0) return null;
                       return (
                         <div className="mt-2 overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50/70">
                           <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">

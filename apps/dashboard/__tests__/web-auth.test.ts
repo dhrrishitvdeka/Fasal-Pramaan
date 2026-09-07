@@ -10,7 +10,10 @@ describe("hosted web roles", () => {
 
   it("honours app metadata and profile role", () => {
     expect(resolveWebRole({ appRoles: ["reviewer"] })).toBe("reviewer");
-    expect(resolveWebRole({ profileRole: "administrator" })).toBe("administrator");
+    expect(resolveWebRole({ appRoles: ["administrator"] })).toBe("administrator");
+    // A client-writable profile role can never self-promote to administrator.
+    expect(resolveWebRole({ profileRole: "administrator" })).toBe("reviewer");
+    expect(resolveWebRole({ profileRole: "reviewer" })).toBe("reviewer");
     expect(isReviewerRole("reviewer")).toBe(true);
     expect(isReviewerRole("farmer")).toBe(false);
   });
@@ -21,11 +24,14 @@ describe("hosted web roles", () => {
     expect(resolveWebRole({ email: "attacker@example.com" })).toBe("farmer");
   });
 
-  it("treats REVIEWER_EMAILS as a reviewer allowlist", () => {
+  it("treats REVIEWER_EMAILS as a reviewer allowlist for verified emails only", () => {
     const previous = process.env.REVIEWER_EMAILS;
     process.env.REVIEWER_EMAILS = "lead@example.com, other@example.com";
-    expect(resolveWebRole({ email: "lead@example.com" })).toBe("reviewer");
-    expect(resolveWebRole({ email: "farmer@example.com" })).toBe("farmer");
+    expect(resolveWebRole({ email: "lead@example.com", emailConfirmed: true })).toBe("reviewer");
+    // Unverified address on the allowlist stays farmer (prevents signup squat).
+    expect(resolveWebRole({ email: "lead@example.com", emailConfirmed: false })).toBe("farmer");
+    expect(resolveWebRole({ email: "lead@example.com" })).toBe("farmer");
+    expect(resolveWebRole({ email: "farmer@example.com", emailConfirmed: true })).toBe("farmer");
     process.env.REVIEWER_EMAILS = previous;
   });
 

@@ -45,43 +45,40 @@ function record(error: TelemetryError) {
   // Keep the newest at the end of the buffer; consumers read it directly.
 }
 
-function sessionToken(): string | null {
-  try {
-    if (typeof window === "undefined") return null;
-    return window.sessionStorage.getItem("fp_access_token");
-  } catch {
-    return null;
-  }
-}
-
 let lastForwardAt = 0;
 const FORWARD_MIN_MS = 5000;
 
 function forward(error: TelemetryError) {
-  const token = sessionToken();
-  if (!token || typeof navigator === "undefined" || !navigator.onLine) return;
+  if (typeof navigator === "undefined" || !navigator.onLine) return;
   const now = Date.now();
   if (now - lastForwardAt < FORWARD_MIN_MS) return;
   lastForwardAt = now;
-  try {
-    void fetch("/api/telemetry/error", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        message: error.message,
-        stack: error.stack,
-        url: error.url,
-        userAgent: error.userAgent,
-        source: error.source,
-      }),
-      keepalive: true,
-    });
-  } catch {
-    // Telemetry must never throw into the app; drop silently.
-  }
+  // Supabase session is the single token source (legacy sessionStorage keys
+  // are purged in auth-headers and must not be read here).
+  void (async () => {
+    try {
+      const { supabaseAccessToken } = await import("./auth-headers");
+      const token = await supabaseAccessToken();
+      if (!token) return;
+      await fetch("/api/telemetry/error", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message: error.message,
+          stack: error.stack,
+          url: error.url,
+          userAgent: error.userAgent,
+          source: error.source,
+        }),
+        keepalive: true,
+      });
+    } catch {
+      // Telemetry must never throw into the app; drop silently.
+    }
+  })();
 }
 
 function handle(kind: "onerror" | "unhandledrejection", message: string, stack?: string) {

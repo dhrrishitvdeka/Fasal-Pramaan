@@ -133,6 +133,20 @@ export async function POST(request: Request) {
   if (!images.length) {
     return NextResponse.json({ error: "Send at least one new image as a data URL" }, { status: 400 });
   }
+  // Server-side duplicate detection on recomputed digests: client-supplied
+  // hashes/pHashes are untrusted, but identical bytes across angles in one
+  // submission are always either fraud or user error — reject, don't persist.
+  const seenShas = new Set<string>();
+  for (const img of images) {
+    const digest = typeof img.sha256 === "string" ? img.sha256 : "";
+    if (digest && seenShas.has(digest)) {
+      return NextResponse.json(
+        { error: "Duplicate images detected. Capture each angle separately." },
+        { status: 400 },
+      );
+    }
+    if (digest) seenShas.add(digest);
+  }
   const store = createSupabaseClaimStore(supabase);
   // Reject claims referencing a plot the caller does not own (cross-tenant guard).
   let requestedPlotId = data.plotId?.trim() || null;
@@ -167,9 +181,10 @@ export async function POST(request: Request) {
   try {
     if (claimId) {
       const existing = await store.getClaim(claimId);
-      if (!existing) {
-        return NextResponse.json({ error: "Claim not found" }, { status: 404 });
-      }
+      // No existing row: the id is an idempotency key for a fresh submission
+      // (double-tap/retry reuses the client-generated UUID). Fall through to
+      // the insert path below instead of 404ing the retry.
+      if (existing) {
       if (!isReviewerRole(auth.actor.role) && existing.created_by !== auth.actor.userId) {
         return NextResponse.json({ error: "Claim not found" }, { status: 404 });
       }
@@ -210,8 +225,10 @@ export async function POST(request: Request) {
         );
       }
       return NextResponse.json({ claimId: result.claimId, prediction: result.prediction ?? null });
+      }
     }
     const input: PersistClaimInput = {
+      id: claimId,
       plotId: requestedPlotId || undefined,
       plotName: data.plotName,
       plotNameHi: data.plotNameHi,
@@ -262,11 +279,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Claim not found" }, { status: 404 });
     }
     if (message === "Claim already exists") {
+      // Idempotent retry: the first attempt won the insert race. Return the
+      // existing claim (ownership-checked) instead of a conflict.
+      if (claimId) {
+        try {
+          const existing = await store.getClaim(claimId);
+          if (
+            existing &&
+            (isReviewerRole(auth.actor.role) || existing.created_by === auth.actor.userId)
+          ) {
+            return NextResponse.json({ claimId, duplicate: true });
+          }
+        } catch {
+          // fall through to 409 below
+        }
+      }
       return NextResponse.json({ error: "Claim already exists" }, { status: 409 });
     }
     if (/Cannot recapture|status changed/i.test(message)) {
       return NextResponse.json({ error: message }, { status: 409 });
     }
-    return NextResponse.json({ error: "Persist failed", details: message }, { status: 500 });
+    // Never leak DB/storage internals to the client (details logged above).
+    return NextResponse.json({ error: "Persist failed" }, { status: 500 });
   }
 }

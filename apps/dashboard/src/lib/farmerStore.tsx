@@ -221,6 +221,7 @@ interface FarmerContextType {
       plotLat?: number | null;
       plotLon?: number | null;
       sowingDate?: string | null;
+      submissionId?: string;
     }
   ) => Promise<FarmerClaim>;
   updateClaimRecapture: (
@@ -658,6 +659,9 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
       plotLat?: number | null;
       plotLon?: number | null;
       sowingDate?: string | null;
+      // Stable client-generated idempotency key: retries of the same logical
+      // claim reuse it so double-taps can't create twin rows.
+      submissionId?: string;
     },
   ): Promise<FarmerClaim> => {
     const peril = claimData.peril || activeIntent?.peril || "normal";
@@ -666,6 +670,7 @@ export function FarmerProvider({ children }: { children: React.ReactNode }) {
 
     if (isSupabaseConfigured()) {
       const result = await submitWebClaim({
+        id: claimData.submissionId || undefined,
         plotId: claimData.plotId,
         plotName: claimData.plotName,
         plotNameHi: claimData.plotNameHi,

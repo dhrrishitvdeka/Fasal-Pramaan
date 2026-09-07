@@ -2,7 +2,6 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { api, logoutSession, setSessionTokens } from "@/lib/api";
 import { apiFetch } from "@/lib/auth-headers";
 import { LoginForm, loginSchema } from "@/lib/schemas";
 import { canAccessReviewerPortal } from "@/lib/review-access";
@@ -156,11 +155,14 @@ function LoginFormView() {
             </button>
           </form>
 
-          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600 space-y-1">
-            <p className="font-semibold text-slate-800">Official Supabase accounts:</p>
-            <p>• <strong>Reviewer:</strong> reviewer@fasalpramaan.com / Reviewer@Pramaan2026!</p>
-            <p>• <strong>Farmer:</strong> farmer@fasalpramaan.com / Kisan@Pramaan2026!</p>
-          </div>
+          {process.env.NEXT_PUBLIC_DEMO_CREDENTIALS === "true" && (
+            <div className="mt-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-[11px] leading-relaxed text-amber-900 space-y-1">
+              <p className="font-semibold">Demo accounts (non-production only):</p>
+              <p>• <strong>Reviewer:</strong> reviewer@example.com</p>
+              <p>• <strong>Farmer:</strong> farmer@example.com</p>
+              <p>Ask your administrator for the passwords.</p>
+            </div>
+          )}
 
           <div className="mt-4 flex gap-3 border-t border-slate-100 pt-3 text-[11px] text-slate-400">
             <Link href="/privacy" className="underline-offset-2 hover:text-slate-600 hover:underline">

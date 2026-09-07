@@ -487,7 +487,7 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
       }
     }
   }
-  return { ...parsed, modelId: model };
+  return { ...parsed, modelId: usedModel };
 }
 
 export function resolveHfModelId(): string {
