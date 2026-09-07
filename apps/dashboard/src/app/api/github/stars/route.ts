@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
-    "User-Agent": "FasalPramaan-App/2.7.0",
+    "User-Agent": "FasalPramaan-App/2.8.1",
   };
 
   if (process.env.GITHUB_TOKEN) {

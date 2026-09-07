@@ -332,7 +332,7 @@ Honest configuration summary powering the rebuilt `/admin` page. **Auth:** Beare
   "gemini": true,
   "sentinel": true,
   "imdKey": false,
-  "version": "2.7.0"
+  "version": "2.8.1"
 }
 ```
 
@@ -340,7 +340,7 @@ Honest configuration summary powering the rebuilt `/admin` page. **Auth:** Beare
 - `gemini` — `GEMINI_API_KEY` set (gate + analysis + Live + classify).
 - `sentinel` — `SENTINEL_TOKEN`/`COPERNICUS_TOKEN` string is set (does not prove Process API works).
 - `imdKey` — reserved; weather is still Open-Meteo.
-- `version` — `2.7.0`.
+- `version` — `2.8.1`.
 
 ### 9.2 Client Error Telemetry — `POST /api/telemetry/error` (`apps/dashboard/src/app/api/telemetry/error/route.ts`)
 

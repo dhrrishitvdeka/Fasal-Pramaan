@@ -2,7 +2,16 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.8.1] — 2026-09-05
+## [2.8.1] — 2026-09-07
+
+### Production Readiness, Gemini 3 Models, Supabase Auth & Security Hardening
+- **Pure Supabase Authentication**: Eliminated demo/mock authentication bypasses across the entire stack. Standardized on Supabase Auth for both Farmer and Reviewer portals with official credentials and database profile mapping.
+- **Canonical Gemini 3 Family Models**: Upgraded vision and classification to `gemini-3.8-flash` and live audio to `gemini-3.1-flash-live-preview`, backed by resilient Gemini 3 fallbacks (`gemini-3.7-flash`, `gemini-3.6-flash`).
+- **Client-Side Image Compression & Payload Budget**: Added bicubic canvas downscaling and JPEG re-encoding in `api.ts` (max 1600px, 0.82 quality), ensuring full 6-image claim submissions remain under 2 MB (comfortably below Vercel's 4.5 MB request limit).
+- **Default Rate Limiting & Concurrency Control**: Activated in-memory fixed-window rate limiting by default on all compute-intensive endpoints (`/api/claims/[id]/reanalyze`, `/api/voice/session`), and added an in-flight concurrency lock to prevent redundant background inference calls.
+- **Geospatial & GPS Validation**: Enforced strict coordinate validation (`isValidCoordinate`), removing hardcoded fallback coordinates and gating low-accuracy GPS readings (>100m).
+- **Camera & UI/UX Resilience**: Resolved OpenCV WebAssembly worker initialization deadlocks with graceful bilingual fallback guidance, and added mobile safe-area insets.
+- **Comprehensive Quality Gates**: 37 test suites and 309 tests passing, 0 TypeScript errors, 0 ESLint warnings, Turbopack production build verified.
 
 ### Added — Multilingual Farmer-Friendly Claim Notifications
 - **16-Scenario Typed Notification System (`claim-notifications.ts`, `ClaimNotificationBanner.tsx`)**: Full typed dictionary of notification codes (`invalid_session`, `submission_failed`, `duplicate_images`, `unusable_lighting`, `blurry_image`, `no_plot_selected`, `missing_angles`, `draft_saved`, `draft_save_failed`, `photo_upload_failed`, `camera_switched`, `retake_cleared`, `claim_submitted`, `supabase_not_configured`, `gps_unavailable`, `voice_unavailable`) covering error, warning, success, and info states.
