@@ -45,7 +45,7 @@ These two settings live only in the hosted Supabase project. Re-check them after
 1. **Authentication → Providers → Email → Confirm email: ON.**  
    `resolveWebRole` treats `REVIEWER_EMAILS` as reviewer only when `email_confirmed_at` is set. If confirmation is off, every new signup is auto-confirmed and an allowlisted address can self-promote. Prefer also disabling public signup (Authentication → Providers → Email → “Allow new users”) so accounts are invite-only.
 2. **`web_profiles` has no anon/authenticated INSERT or UPDATE policy.**  
-   `scripts/setup_web_schema.sql` enables RLS and drops `web_profiles_anon_all`. Confirm the live project still matches: run `scripts/verify_rls.sql` in the SQL editor. Expected: RLS on, zero policies, zero grants to `anon` / `authenticated` / `public` on `web_*` tables.
+   `scripts/setup_web_schema.sql` enables RLS and drops `web_profiles_anon_all`. Confirm the live project still matches: run `scripts/audit_schema.sql` in the SQL editor. Expected: RLS on, zero policies, zero grants to `anon` / `authenticated` / `public` on `web_*` tables.
 3. **If the live project is already open (anon can read/write `web_profiles`), run `scripts/optimize_schema.sql` immediately.** That script includes the RLS lockdown, the query indexes, status CHECKs, and leftover storage cleanup. Preview with the read-only `scripts/audit_schema.sql` first.
 
 ## Smoke check after deploy
