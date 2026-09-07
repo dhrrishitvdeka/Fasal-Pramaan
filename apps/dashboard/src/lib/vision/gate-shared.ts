@@ -56,6 +56,27 @@ export type GateResult = {
   fallback?: boolean;
 };
 
+function clampFinite(value: unknown, min: number, max: number): number | null {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(min, Math.min(max, n));
+}
+
+/** Client CV numbers are untrusted hints. Bound them before any pass/fail math. */
+export function sanitizeClientCv(
+  cv: ImageEvidenceMetadata["cvAnalysis"] | null | undefined,
+): ImageEvidenceMetadata["cvAnalysis"] | null {
+  if (!cv || typeof cv !== "object") return cv ?? null;
+  return {
+    ...cv,
+    cropScore: cv.cropScore == null ? cv.cropScore : clampFinite(cv.cropScore, 0, 100),
+    greenPct: cv.greenPct == null ? cv.greenPct : clampFinite(cv.greenPct, 0, 100),
+    blurScore: cv.blurScore == null ? cv.blurScore : clampFinite(cv.blurScore, 0, 100),
+    luma: cv.luma == null ? cv.luma : clampFinite(cv.luma, 0, 100),
+    modelProb: cv.modelProb == null ? cv.modelProb : clampFinite(cv.modelProb, 0, 1),
+  };
+}
+
 export function heuristicGate(
   dataUrl: string,
   expectedCrop?: string,
@@ -97,7 +118,7 @@ export function heuristicGate(
     };
   }
 
-  const cv = metadata?.cvAnalysis;
+  const cv = sanitizeClientCv(metadata?.cvAnalysis);
 
   // A screen-replay flag always fails: a photo of a screen showing crops must
   // never pass on the strength of client-supplied foliage scores (spoofable).

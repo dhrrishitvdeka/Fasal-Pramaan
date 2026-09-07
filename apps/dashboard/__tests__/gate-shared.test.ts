@@ -68,6 +68,19 @@ describe("vision authenticity gate (heuristic, no network)", () => {
     expect(res.reason).toBe("crop_not_detected");
   });
 
+  it("clamps absurd client CV numbers before pass/fail math", () => {
+    const inflated = heuristicGate(bigJpegDataUrl(), "Wheat", "normal", {
+      cvAnalysis: { luma: 900, greenPct: 400, blurScore: 999, cropScore: 1e9 },
+    });
+    expect(inflated.usable).toBe(true);
+
+    const negative = heuristicGate(bigJpegDataUrl(), "Wheat", "normal", {
+      cvAnalysis: { luma: 50, greenPct: 40, blurScore: 40, cropScore: -80 },
+    });
+    expect(negative.usable).toBe(false);
+    expect(negative.reason).toBe("crop_not_detected");
+  });
+
   it("passes expected-crop frames when CV quality signals are present", () => {
     const res = heuristicGate(bigJpegDataUrl(), "Wheat", "normal", {
       cvAnalysis: { luma: 50, greenPct: 40, blurScore: 40, cropScore: 80 },
