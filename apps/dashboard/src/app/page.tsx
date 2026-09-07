@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useState } from "react";
+import HeroSlideshow from "@/components/HeroSlideshow";
 import { listClaims, type Submission } from "@/lib/api";
 import { LANDING_ACTIONS } from "@/lib/landing-actions";
 import {
@@ -125,16 +125,10 @@ export default function HomePage() {
         </div>
           </div>
 
-          {/* Hero illustration — transparent PNG, blends with the page background */}
+          {/* Hero slideshow — 6 field cutouts, 3s crossfade loop */}
           <div className="order-1 min-w-0 md:order-2 md:col-span-5">
-            <Image
-              src="/farmer-sowing.png"
+            <HeroSlideshow
               alt={lang === "hi" ? "बीज बोता हुआ किसान" : "Farmer sowing seeds by hand"}
-              width={1217}
-              height={1293}
-              priority
-              sizes="(max-width: 639px) 52vw, (max-width: 768px) 78vw, 380px"
-              className="mx-auto h-auto w-[52vw] max-w-[190px] sm:w-full sm:max-w-[300px] md:max-w-[380px]"
             />
           </div>
         </div>
