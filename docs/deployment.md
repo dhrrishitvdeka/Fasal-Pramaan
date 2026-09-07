@@ -38,6 +38,15 @@ Run in the SQL editor, in order:
 
 Create/keep the private bucket `fasal-web-evidence` (JPEG/PNG/WebP, 15 MB). Read access requires server-signed temporary URLs; public bucket listing and unauthenticated downloads are prohibited.
 
+### Dashboard checks that the repo cannot perform
+
+These two settings live only in the hosted Supabase project. Re-check them after every project clone or restore.
+
+1. **Authentication → Providers → Email → Confirm email: ON.**  
+   `resolveWebRole` treats `REVIEWER_EMAILS` as reviewer only when `email_confirmed_at` is set. If confirmation is off, every new signup is auto-confirmed and an allowlisted address can self-promote. Prefer also disabling public signup (Authentication → Providers → Email → “Allow new users”) so accounts are invite-only.
+2. **`web_profiles` has no anon/authenticated INSERT or UPDATE policy.**  
+   `scripts/setup_web_schema.sql` enables RLS and drops `web_profiles_anon_all`. Confirm the live project still matches: run `scripts/verify_rls.sql` in the SQL editor. Expected: RLS on, zero policies, zero grants to `anon` / `authenticated` / `public` on `web_*` tables.
+
 ## Smoke check after deploy
 
 - `/unlock` if `SITE_LOCK_PASSWORD` is set
