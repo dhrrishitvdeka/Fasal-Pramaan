@@ -48,7 +48,7 @@ Fill in at minimum:
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Your Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes | Browser-safe publishable key |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Server-only; never expose to the client |
-
+| `APP_ORIGIN` | yes on Vercel | Canonical public URL for auth emails (`https://your-app.vercel.app`) |
 | `SITE_LOCK_PASSWORD` | no | Leave empty locally; set on Vercel to password-lock the site |
 | `GEMINI_API_KEY` | recommended | Vision gate, field analysis, Saathi Live voice |
 | `GEMINI_LIVE_MODEL` / `GEMINI_LIVE_VOICE` / `GEMINI_LIVE_SESSION_MINUTES` | optional | Saathi Live tuning (defaults provided) |

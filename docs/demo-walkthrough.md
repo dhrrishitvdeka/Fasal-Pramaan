@@ -12,8 +12,8 @@ This guide provides a structured, presentation-ready operational walkthrough for
    npm install && npm run dev
    ```
 2. **Open Portals** (single Next.js origin on `:3000`):
-   - **Farmer Portal**: `http://localhost:3000/farmer/saathi` (Supabase Auth user with farmer role, e.g. `farmer@fasalpramaan.com`)
-   - **Reviewer Portal**: `http://localhost:3000/review` (Supabase Auth user listed in `REVIEWER_EMAILS`, e.g. `reviewer@fasalpramaan.com`)
+   - **Farmer Portal**: `http://localhost:3000/farmer/saathi` (a Supabase Auth user you created; not listed in `REVIEWER_EMAILS`)
+   - **Reviewer Portal**: `http://localhost:3000/review` (a Supabase Auth user whose email is listed in `REVIEWER_EMAILS`)
 3. **Reset Operational Data** (Optional clean slate): In the Supabase SQL editor, clear test submissions:
    ```sql
    DELETE FROM web_claim_images;

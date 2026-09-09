@@ -8,12 +8,11 @@ describe("hosted web roles", () => {
     expect(resolveWebRole({ email: "farmer@example.com" })).toBe("farmer");
   });
 
-  it("honours app metadata and profile role", () => {
+  it("honours app metadata and ignores a stale profile role", () => {
     expect(resolveWebRole({ appRoles: ["reviewer"] })).toBe("reviewer");
     expect(resolveWebRole({ appRoles: ["administrator"] })).toBe("administrator");
-    // A client-writable profile role can never self-promote to administrator.
-    expect(resolveWebRole({ profileRole: "administrator" })).toBe("reviewer");
-    expect(resolveWebRole({ profileRole: "reviewer" })).toBe("reviewer");
+    expect(resolveWebRole({ profileRole: "administrator" })).toBe("farmer");
+    expect(resolveWebRole({ profileRole: "reviewer" })).toBe("farmer");
     expect(isReviewerRole("reviewer")).toBe(true);
     expect(isReviewerRole("farmer")).toBe(false);
   });

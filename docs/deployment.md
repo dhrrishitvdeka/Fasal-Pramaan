@@ -2,7 +2,7 @@
 
 ## Topology
 
-Vercel (Next.js 16 App Router, Root Directory **`apps/dashboard`**) → Supabase (Auth, Postgres `web_*`, private storage) → Google Gemini (`gemini-3.8-flash` vision + `gemini-3.1-flash-live-preview` Live voice). Optional Copernicus Process API for fire burn scars. Weather is Open-Meteo (no key).
+Vercel (Next.js 16 App Router, Root Directory **`apps/dashboard`**) → Supabase (Auth, Postgres `web_*`, private storage) → Google Gemini (`gemini-3.8-flash` vision + `gemini-3.1-flash-live-preview` Live voice). Optional Copernicus Process API for fire burn scars, flood water extent, and drought NDVI. Weather is Open-Meteo (no key).
 
 There is **no Hugging Face Space** to deploy.
 
@@ -11,9 +11,10 @@ There is **no Hugging Face Space** to deploy.
 1. Root Directory = `apps/dashboard`.
 2. Set env vars from [environment-variables.md](environment-variables.md).
 3. Ensure `GEMINI_VISION_MODEL` is `gemini-3.8-flash` (canonical default, with 3.7/3.5/2.5 fallbacks) and `GEMINI_LIVE_MODEL` is `gemini-3.1-flash-live-preview`.
-4. Enable production rate limiting: set `ENABLE_RATE_LIMIT=true` to protect public API surfaces.
-5. Long AI routes need `maxDuration: 60` (Pro plan; Hobby caps ~10s). Function keys in `apps/dashboard/vercel.json` are `app/api/...` paths.
-6. Redeploy after saving env.
+4. Production already enables in-memory rate limits. Set `ENABLE_RATE_LIMIT=true` only to force them in local dev. Login/unlock stay throttled even if `DISABLE_RATE_LIMIT=true`.
+5. Long AI routes need `maxDuration: 60` (Pro plan; Hobby caps ~10s). Function keys in `apps/dashboard/vercel.json` are `src/app/api/...` paths. Routes also export `maxDuration = 60`.
+6. Set `APP_ORIGIN` (or `NEXT_PUBLIC_SITE_URL`) to the public HTTPS origin. Auth confirmation and password-reset emails use this value, not the request Host header.
+7. Redeploy after saving env.
 
 ## Docker
 
@@ -51,9 +52,9 @@ These two settings live only in the hosted Supabase project. Re-check them after
 ## Smoke check after deploy
 
 - `/unlock` if `SITE_LOCK_PASSWORD` is set
-- Sign in as farmer (e.g. `farmer@fasalpramaan.com`) → Saathi → capture → submit
-- Sign in as an email in `REVIEWER_EMAILS` (e.g. `reviewer@fasalpramaan.com`) → `/review` → open the claim → Gemini write-up visible
-- `/api/health` returns `{ "ok": true, "status": "ok" }` only (no secrets)
+- Sign in as a farmer Auth user you created → Saathi → capture → submit
+- Sign in as an address listed in `REVIEWER_EMAILS` → `/review` → open the claim → Gemini write-up visible
+- `/api/health` returns `{ "ok": true, "status": "ok" }` only (no dependency booleans). Administrators see config flags on `/api/system/status`.
 
 ## Optional Sentinel
 

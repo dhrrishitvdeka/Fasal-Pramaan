@@ -11,9 +11,8 @@
 --   5. ANALYZE hot tables.
 --
 -- What this does NOT do:
---   - Drop PostGIS / uuid-ossp / pgcrypto (harmless; not referenced by app SQL).
---   - Drop hf_label / hf_score (Gemini still writes those column names).
---   - Drop area_kattha (cheap; unused write path, still mapped on read).
+--   - Drop PostGIS / uuid-ossp / pgcrypto (harmless; plots store lat/lon doubles).
+--   - Rename hf_label / hf_score (Gemini still writes those column names).
 -- ============================================================================
 
 BEGIN;
@@ -78,7 +77,10 @@ ALTER TABLE public.web_claim_images ADD COLUMN IF NOT EXISTS quality_passed bool
 ALTER TABLE public.web_review_actions ADD COLUMN IF NOT EXISTS reason text;
 ALTER TABLE public.web_review_actions ADD COLUMN IF NOT EXISTS required_angles text[] DEFAULT '{}';
 
+ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS full_name text;
 ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS full_name_hi text;
+ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS email text;
+ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS phone text;
 ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS kisan_id text;
 ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS village text;
 ALTER TABLE public.web_profiles ADD COLUMN IF NOT EXISTS district text;
@@ -140,6 +142,7 @@ CREATE INDEX IF NOT EXISTS web_milestones_plot_id_idx ON public.web_milestones (
 CREATE INDEX IF NOT EXISTS web_milestones_created_by_idx ON public.web_milestones (created_by);
 CREATE INDEX IF NOT EXISTS web_review_actions_claim_id_idx ON public.web_review_actions (claim_id);
 CREATE INDEX IF NOT EXISTS web_profiles_email_idx ON public.web_profiles (email);
+CREATE INDEX IF NOT EXISTS web_claims_peril_idx ON public.web_claims (peril);
 
 -- 3. Domain CHECKs (only when every existing row already complies) ---------
 DO $$
@@ -213,6 +216,28 @@ BEGIN
   END IF;
 END $$;
 
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.web_claims
+    WHERE peril IS NOT NULL AND peril NOT IN (
+      'normal', 'fire_burn', 'animal_damage', 'flood', 'drought',
+      'pest_disease', 'hailstorm', 'lodging'
+    )
+  ) THEN
+    RAISE NOTICE 'Skipped web_claims_peril_chk: existing rows use other peril values';
+  ELSE
+    ALTER TABLE public.web_claims DROP CONSTRAINT IF EXISTS web_claims_peril_chk;
+    ALTER TABLE public.web_claims ADD CONSTRAINT web_claims_peril_chk
+      CHECK (
+        peril IS NULL OR peril IN (
+          'normal', 'fire_burn', 'animal_damage', 'flood', 'drought',
+          'pest_disease', 'hailstorm', 'lodging'
+        )
+      );
+  END IF;
+END $$;
+
 -- 4. updated_at trigger (claims only — the only table the app updates in a loop)
 CREATE OR REPLACE FUNCTION public.web_bump_updated_at()
 RETURNS trigger AS $$
@@ -248,16 +273,14 @@ ON CONFLICT (id) DO UPDATE SET
   file_size_limit = 15728640,
   allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp'];
 
-DO $$
-DECLARE r record;
-BEGIN
-  FOR r IN
-    SELECT policyname FROM pg_policies
-    WHERE schemaname = 'storage' AND tablename = 'objects'
-  LOOP
-    EXECUTE format('DROP POLICY IF EXISTS %I ON storage.objects', r.policyname);
-  END LOOP;
-END $$;
+DROP POLICY IF EXISTS "Service Role Upload Access" ON storage.objects;
+DROP POLICY IF EXISTS "Service Role Select Access" ON storage.objects;
+DROP POLICY IF EXISTS "Public Read Access for Evidence" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated User Upload Access" ON storage.objects;
+DROP POLICY IF EXISTS web_evidence_insert ON storage.objects;
+DROP POLICY IF EXISTS web_evidence_select ON storage.objects;
+DROP POLICY IF EXISTS web_evidence_update ON storage.objects;
+DROP POLICY IF EXISTS web_evidence_delete ON storage.objects;
 
 CREATE POLICY "Service Role Upload Access"
 ON storage.objects FOR INSERT
@@ -271,8 +294,7 @@ USING (bucket_id = 'fasal-web-evidence');
 
 -- Do not DELETE FROM storage.objects here: Supabase raises
 -- storage.protect_delete() ("Use the Storage API instead").
--- Any leftover "test" prefix is an empty-bucket explorer placeholder;
--- remove it from Dashboard → Storage → fasal-web-evidence if it appears.
+-- Remove leftover objects from Dashboard → Storage → fasal-web-evidence.
 
 -- 6. Comments so the SQL editor catalog is self-explanatory
 COMMENT ON TABLE public.web_plots IS 'Farmer land parcels. Written by /api/farmer/plots and Saathi register_plot.';

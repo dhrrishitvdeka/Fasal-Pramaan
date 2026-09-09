@@ -2,6 +2,32 @@
 
 All notable changes to **Fasal-Pramaan** will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.2] — 2026-09-09
+
+### Docs & schema
+- README no longer lists demo emails or passwords. Create Auth users in your own Supabase project.
+- `setup_web_schema.sql` recreates private-bucket storage policies after dropping them (signed URL + upload path).
+- `optimize_schema.sql` adds a peril CHECK, a `web_claims(peril)` index, and only drops named evidence-bucket policies (does not wipe other Storage buckets).
+
+### Security
+- Auth email redirects now use `APP_ORIGIN` / `NEXT_PUBLIC_SITE_URL` / `VERCEL_URL` instead of `X-Forwarded-Host` (password-reset poisoning).
+- Reviewer role no longer sticks on a stale `web_profiles.role` after allowlist revocation.
+- `/api/health` is liveness-only; config booleans stay on administrator `/api/system/status`.
+- GitHub stars proxy is pinned to the canonical repo. Unlock cookies use the production `Secure` flag. Uploaded stills are sniffed by magic bytes.
+- Login no longer distinguishes unconfirmed accounts. Reanalyze returns 404 for non-reviewers. Saathi tools no longer leak PostgREST errors.
+- Forced rate limits on login/signup/forgot/unlock ignore `DISABLE_RATE_LIMIT`. Next.js bumped to 16.3.4 (RCE advisories).
+
+### Peril detection
+- Flood and drought now request Sentinel corroboration (`sentinel_water` NDWI, `sentinel_ndvi` canopy stress) in addition to fire burn-scar NDVI.
+- Adaptive engine holds satellite perils at medium until the raster is available, and caps hail/lodging/flood/drought when weather contradicts the claim.
+- Gemini field analysis prompt lists peril-specific visual cues. `normalizePeril` accepts `inundation` and other aliases.
+
+### UI / production
+- Forgot-password form no longer requires a password field. Landing claim links go to the farmer or reviewer portal by role.
+- Map legend matches marker colours. Review queue search is labelled. SMS/WhatsApp reminder toggles default off.
+- `vercel.json` function paths use `src/app/api/...`. Docker HEALTHCHECK uses Node `fetch`. PWA no longer caches `/farmer` HTML. HSTS + `robots.ts` added.
+- `proxy.ts` redirects unauthenticated browsers away from farmer/reviewer pages.
+
 ## [2.8.1] — 2026-09-07
 
 ### Production Readiness, Gemini 3 Models, Supabase Auth & Security Hardening

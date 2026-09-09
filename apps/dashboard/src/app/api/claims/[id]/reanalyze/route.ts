@@ -5,7 +5,7 @@ import { retryPendingInference } from "@/lib/claim-pipeline";
 import { inferCropDisease } from "@/lib/gemini-analyze";
 import { createServerSupabase } from "@/lib/supabase";
 import { createSupabaseClaimStore } from "@/lib/supabase-store";
-import { actorUnauthorized, isReviewerRole, requireWebActor } from "@/lib/web-auth";
+import { isReviewerRole, requireWebActor } from "@/lib/web-auth";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 
 /**
@@ -32,13 +32,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!supabase) {
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 503 });
   }
+  if (!isReviewerRole(auth.actor.role)) {
+    return NextResponse.json({ error: "Claim not found" }, { status: 404 });
+  }
   const store = createSupabaseClaimStore(supabase);
   const existingClaim = await store.getClaim(id);
   if (!existingClaim) {
     return NextResponse.json({ error: "Claim not found" }, { status: 404 });
-  }
-  if (!isReviewerRole(auth.actor.role)) {
-    return actorUnauthorized("Reviewer role required");
   }
   try {
     const result = await retryPendingInference(store, id, inferCropDisease, {

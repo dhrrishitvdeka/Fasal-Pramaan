@@ -72,6 +72,32 @@ describe("adaptive engine", () => {
     expect(res.reasons.join(" ")).toMatch(/duplicate/i);
   });
 
+  it("holds flood at medium when satellite water-extent is unavailable", () => {
+    const res = adaptiveConfidence({
+      ...base,
+      overall: 90,
+      peril: "flood",
+      signals: [sig("sentinel", "unavailable"), sig("imd", "available", { rainfall_7d_mm: 80 })],
+      missingAngles: [],
+    });
+    expect(res.level).toBe("medium");
+    expect(res.nextStep).toBe("proceed");
+    expect(res.reasons.join(" ")).toMatch(/satellite/i);
+  });
+
+  it("caps hailstorm at medium when weather codes show no hail", () => {
+    const res = adaptiveConfidence({
+      ...base,
+      overall: 90,
+      peril: "hailstorm",
+      signals: [sig("imd", "available", { rainfall_7d_mm: 12, hailDays7d: 0 })],
+      missingAngles: [],
+    });
+    expect(res.level).toBe("medium");
+    expect(res.nextStep).toBe("proceed");
+    expect(res.reasons.join(" ")).toMatch(/hail/i);
+  });
+
   it("holds fire_burn at medium/proceed when photos are complete but Sentinel burn-scar is unavailable", () => {
     const res = adaptiveConfidence({
       ...base,

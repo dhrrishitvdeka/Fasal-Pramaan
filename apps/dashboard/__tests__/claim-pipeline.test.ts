@@ -474,9 +474,18 @@ describe("claim persist + Fasal-Pramaan Space + reviewer queue", () => {
       hosted: true,
       path: "/api/claims/claim-1/action",
     });
-    expect(resolveClaimClientPath(true, "submit").path).not.toMatch(/backend/);
-    expect(resolveClaimClientPath(false, "list").hosted).toBe(false);
-    expect(resolveClaimClientPath(false, "action", "x").path).toBe("/review/x/action");
+    expect(resolveClaimClientPath(true, "submit").path).not.toMatch(/backend|submissions|review\/queue/);
+    expect(resolveClaimClientPath(false, "list")).toEqual({ hosted: true, path: "/api/claims" });
+    expect(resolveClaimClientPath(false, "submit").path).toBe("/api/claims");
+    expect(resolveClaimClientPath(false, "get", "x").path).toBe("/api/claims/x");
+    expect(resolveClaimClientPath(false, "action", "x").path).toBe("/api/claims/x/action");
+    for (const configured of [true, false]) {
+      const paths = ["list", "submit", "get", "action"].map(
+        (kind) => resolveClaimClientPath(configured, kind as "list" | "submit" | "get" | "action", "id-1").path,
+      );
+      expect(paths.join(" ")).not.toMatch(/\/submissions|\/review\/queue|\/backend/);
+      expect(paths.every((p) => p.startsWith("/api/claims"))).toBe(true);
+    }
   });
 
   it("does not send black frames to the Space and stores grade U without a crop", async () => {

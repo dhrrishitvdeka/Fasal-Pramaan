@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { claimSubmissionSchema, loginSchema } from "../src/lib/schemas";
+import { claimSubmissionSchema, forgotPasswordSchema, loginSchema } from "../src/lib/schemas";
 
 describe("login form schema", () => {
   it("accepts valid credentials", () => {
@@ -17,6 +17,11 @@ describe("login form schema", () => {
 
   it("rejects passwords shorter than 8 characters", () => {
     expect(loginSchema.safeParse({ email: "farmer@example.com", password: "short" }).success).toBe(false);
+  });
+
+  it("accepts a forgot-password payload with only an email", () => {
+    expect(forgotPasswordSchema.safeParse({ email: "farmer@example.com" }).success).toBe(true);
+    expect(forgotPasswordSchema.safeParse({ email: "farmer@example.com", password: "" }).success).toBe(true);
   });
 });
 

@@ -114,11 +114,12 @@ export function createSupabaseClaimStore(client: SupabaseClient): ClaimStore {
         return null;
       }
     },
-    async listClaims() {
-      const { data, error } = await client
-        .from("web_claims")
-        .select("*")
-        .order("created_at", { ascending: false });
+    async listClaims(filter) {
+      let query = client.from("web_claims").select("*").order("created_at", { ascending: false });
+      if (filter?.createdBy) {
+        query = query.eq("created_by", filter.createdBy);
+      }
+      const { data, error } = await query.limit(500);
       if (error) throw new Error(error.message);
       return (data || []) as WebClaimRow[];
     },

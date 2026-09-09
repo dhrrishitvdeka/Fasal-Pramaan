@@ -19,7 +19,7 @@ Created by `scripts/setup_web_schema.sql` (including peril columns and complete 
 
 - `web_plots`, `web_claims`, `web_claim_images`, `web_milestones`, `web_review_actions`, `web_profiles`
 
-Gemini analysis is stored on the claim (`hf_label` / `model_id` columns keep their names for compatibility; `gate_result.geminiAnalysis` holds the written rationale).
+Gemini analysis is stored on the claim (`hf_label` / `model_id` column names are historical; Gemini still writes them. `gate_result.geminiAnalysis` holds the written rationale).
 
 ## Storage
 
@@ -34,4 +34,4 @@ The app uses exactly six tables (`web_plots`, `web_claims`, `web_claim_images`, 
 
 ## What not to set
 
-`HF_TOKEN`, `HF_SPACE_URL`, `NEXT_PUBLIC_API_BASE_URL`.
+`HF_TOKEN`, `HF_SPACE_URL`, `NEXT_PUBLIC_API_BASE_URL` — not read by the hosted app.

@@ -58,15 +58,47 @@ export function adaptiveConfidence(opts: {
     return { level: "low", nextStep: "escalate_to_human", threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: [] };
   }
 
-  // fire_burn needs satellite or at least weak threshold
-  if (peril === "fire_burn" && !sentinelOk) {
-    reasons.push("Fire claim needs satellite burn-scar confirmation — keeping as medium until Sentinel available");
-    reasonsHi.push("आग के दावे को सैटेलाइट पुष्टि चाहिए — मध्यम पर रखा");
+  if (cfg.needsSatellite && !sentinelOk) {
+    const satReason =
+      peril === "flood"
+        ? "Flood claim needs satellite water-extent confirmation — keeping as medium until Sentinel is available"
+        : peril === "drought"
+          ? "Drought claim needs satellite vegetation-index confirmation — keeping as medium until Sentinel is available"
+          : "Fire claim needs satellite burn-scar confirmation — keeping as medium until Sentinel available";
+    const satReasonHi =
+      peril === "flood"
+        ? "बाढ़ दावे को सैटेलाइट जल-क्षेत्र पुष्टि चाहिए — मध्यम पर रखा"
+        : peril === "drought"
+          ? "सूखा दावे को सैटेलाइट वनस्पति पुष्टि चाहिए — मध्यम पर रखा"
+          : "आग के दावे को सैटेलाइट पुष्टि चाहिए — मध्यम पर रखा";
+    reasons.push(satReason);
+    reasonsHi.push(satReasonHi);
     if (opts.overall >= threshold) {
       const nextStep = capturedMissing.length > 0 ? "request_missing" : "proceed";
       return { level: "medium", nextStep, threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: capturedMissing };
     }
     return { level: "low", nextStep: "escalate_to_human", threshold, overall: opts.overall, reasons, reasonsHi, missingAngles: capturedMissing };
+  }
+
+  const imd = signals.find((s) => s.source === "imd");
+  const rainMm = Number(imd?.meta?.rainfall_7d_mm);
+  const hailDays = Number(imd?.meta?.hailDays7d);
+  const gustKph = Number(imd?.meta?.windGustMaxKph);
+  if (peril === "flood" && Number.isFinite(rainMm) && rainMm < 20) {
+    reasons.push("Flood claim has little 7-day rainfall corroboration — officer review recommended");
+    reasonsHi.push("बाढ़ दावे को 7-दिन वर्षा समर्थन कम है — अधिकारी समीक्षा उचित");
+  }
+  if (peril === "drought" && Number.isFinite(rainMm) && rainMm > 40) {
+    reasons.push("Drought claim coincides with substantial recent rainfall — officer review recommended");
+    reasonsHi.push("सूखा दावे के साथ हाल की पर्याप्त वर्षा — अधिकारी समीक्षा उचित");
+  }
+  if (peril === "hailstorm" && Number.isFinite(hailDays) && hailDays === 0) {
+    reasons.push("No hail weather codes in the past week — keep as medium until an officer confirms impact");
+    reasonsHi.push("पिछले सप्ताह ओला कोड नहीं — मध्यम पर रखें");
+  }
+  if (peril === "lodging" && Number.isFinite(gustKph) && gustKph < 40) {
+    reasons.push("Wind gusts below lodging threshold — officer review recommended");
+    reasonsHi.push("हवा झोंके गिराव सीमा से कम — अधिकारी समीक्षा उचित");
   }
 
   if (peril === "animal_damage" && gps?.status !== "available") {
@@ -79,11 +111,17 @@ export function adaptiveConfidence(opts: {
     }
   }
 
+  const weatherConflict =
+    (peril === "flood" && Number.isFinite(rainMm) && rainMm < 20) ||
+    (peril === "drought" && Number.isFinite(rainMm) && rainMm > 40) ||
+    (peril === "hailstorm" && Number.isFinite(hailDays) && hailDays === 0) ||
+    (peril === "lodging" && Number.isFinite(gustKph) && gustKph < 40);
+
   if (opts.overall >= threshold && opts.coverage >= 60 && opts.quality >= 40) {
-    level = "high";
-    nextStep = "proceed";
-    reasons.push("Evidence meets peril threshold");
-    reasonsHi.push("साक्ष्य आपदा सीमा पर खरा");
+    level = weatherConflict ? "medium" : "high";
+    nextStep = capturedMissing.length > 0 ? "request_missing" : "proceed";
+    reasons.push(weatherConflict ? "Field photos pass, but weather/satellite context is mixed" : "Evidence meets peril threshold");
+    reasonsHi.push(weatherConflict ? "फोटो पर्याप्त, मौसम/सैटेलाइट संदर्भ मिश्रित" : "साक्ष्य आपदा सीमा पर खरा");
   } else if (opts.overall >= threshold - 20 && opts.coverage >= 40) {
     level = "medium";
     // B2: never request_missing with zero missing angles — there is nothing to ask for.

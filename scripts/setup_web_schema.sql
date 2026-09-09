@@ -222,6 +222,19 @@ DROP POLICY IF EXISTS web_evidence_insert ON storage.objects;
 DROP POLICY IF EXISTS web_evidence_select ON storage.objects;
 DROP POLICY IF EXISTS web_evidence_update ON storage.objects;
 DROP POLICY IF EXISTS web_evidence_delete ON storage.objects;
+DROP POLICY IF EXISTS "Service Role Upload Access" ON storage.objects;
+DROP POLICY IF EXISTS "Service Role Select Access" ON storage.objects;
+
+-- Hosted Next.js routes use the service-role client for private-bucket I/O.
+CREATE POLICY "Service Role Upload Access"
+ON storage.objects FOR INSERT
+TO service_role
+WITH CHECK (bucket_id = 'fasal-web-evidence');
+
+CREATE POLICY "Service Role Select Access"
+ON storage.objects FOR SELECT
+TO service_role
+USING (bucket_id = 'fasal-web-evidence');
 
 -- Service-role grants: hosted Next.js routes bypass RLS as service_role, but
 -- restricted Supabase projects still require explicit table grants.
@@ -249,6 +262,7 @@ CREATE INDEX IF NOT EXISTS web_milestones_due_idx
 CREATE INDEX IF NOT EXISTS web_review_actions_claim_id_idx ON public.web_review_actions (claim_id);
 CREATE INDEX IF NOT EXISTS web_review_actions_created_idx ON public.web_review_actions (created_at DESC);
 CREATE INDEX IF NOT EXISTS web_profiles_email_idx ON public.web_profiles (email);
+CREATE INDEX IF NOT EXISTS web_claims_peril_idx ON public.web_claims (peril);
 
 -- Keep updated_at honest: bump on every UPDATE since app code rarely sets it.
 CREATE OR REPLACE FUNCTION public.web_bump_updated_at()

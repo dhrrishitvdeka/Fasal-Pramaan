@@ -265,41 +265,32 @@ export type AlertItem = {
 };
 
 export async function listClaims(): Promise<Submission[]> {
-  const route = resolveClaimClientPath(isSupabaseConfigured(), "list");
-  if (route.hosted) {
-    const res = await apiFetch(route.path);
-    if (res.status === 401 || res.status === 403) return [];
-    if (!res.ok) throw new Error("Could not load claims");
-    const body = (await res.json()) as { items?: Submission[] };
-    return Array.isArray(body.items) ? body.items : [];
-  }
-  return [];
+  const route = resolveClaimClientPath(true, "list");
+  const res = await apiFetch(route.path);
+  if (res.status === 401 || res.status === 403) return [];
+  if (!res.ok) throw new Error("Could not load claims");
+  const body = (await res.json()) as { items?: Submission[] };
+  return Array.isArray(body.items) ? body.items : [];
 }
 
 export async function getClaim(id: string): Promise<Submission> {
-  const route = resolveClaimClientPath(isSupabaseConfigured(), "get", id);
-  if (route.hosted) {
-    const res = await apiFetch(route.path);
-    if (!res.ok) throw new Error("Claim not found");
-    return (await res.json()) as Submission;
-  }
-  throw new Error("Claim not found");
+  const route = resolveClaimClientPath(true, "get", id);
+  const res = await apiFetch(route.path);
+  if (!res.ok) throw new Error("Claim not found");
+  return (await res.json()) as Submission;
 }
 
 export async function applyReviewAction(id: string, payload: ReviewActionPayload) {
-  const route = resolveClaimClientPath(isSupabaseConfigured(), "action", id);
-  if (route.hosted) {
-    const res = await apiFetch(route.path, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(body.error || "Review action failed");
-    }
-    return res.json();
+  const route = resolveClaimClientPath(true, "action", id);
+  const res = await apiFetch(route.path, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error || "Review action failed");
   }
-  throw new Error("Sign in required to record a review action");
+  return res.json();
 }
 
 export const listWebClaims = listClaims;
@@ -572,30 +563,6 @@ export async function listAlerts(): Promise<AlertItem[]> {
   if (isSupabaseConfigured()) {
     const stats = await reviewerStats();
     return stats?.alerts || [];
-  }
-  return [];
-}
-
-export async function analyticsByCategory() {
-  if (isSupabaseConfigured()) {
-    const stats = await reviewerStats();
-    return stats?.analytics.byCategory || [];
-  }
-  return [];
-}
-
-export async function analyticsBySeverity() {
-  if (isSupabaseConfigured()) {
-    const stats = await reviewerStats();
-    return stats?.analytics.bySeverity || [];
-  }
-  return [];
-}
-
-export async function analyticsByCrop() {
-  if (isSupabaseConfigured()) {
-    const stats = await reviewerStats();
-    return stats?.analytics.byCrop || [];
   }
   return [];
 }

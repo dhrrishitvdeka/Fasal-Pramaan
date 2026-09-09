@@ -126,10 +126,12 @@ export type FarmerAlertPrefs = { sms: boolean; whatsapp: boolean };
 
 export const FARMER_ALERT_PREFS_KEY = "fp_farmer_alert_prefs_v1";
 
+export const DEFAULT_FARMER_ALERT_PREFS: FarmerAlertPrefs = { sms: false, whatsapp: false };
+
 export function parseFarmerAlertPrefs(raw: unknown): FarmerAlertPrefs {
   const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   return {
-    sms: value.sms !== false,
-    whatsapp: value.whatsapp !== false,
+    sms: value.sms === true,
+    whatsapp: value.whatsapp === true,
   };
 }

@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
+import { safeInternalPath } from "@/lib/safe-path";
 
 function UnlockForm() {
   const router = useRouter();
@@ -25,16 +26,7 @@ function UnlockForm() {
         setError(body.error || "Unlock failed");
         return;
       }
-      try {
-        localStorage.setItem("fp_site_gate_v1", "ok");
-      } catch {
-        // ignore
-      }
-      const rawNext = search.get("next") || "/";
-      const next =
-        rawNext.startsWith("/") && !rawNext.startsWith("//") && !rawNext.startsWith("/\\")
-          ? rawNext
-          : "/";
+      const next = safeInternalPath(search.get("next"), "/");
       router.replace(next);
       router.refresh();
     } catch {

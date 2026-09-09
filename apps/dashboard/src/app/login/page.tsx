@@ -3,7 +3,8 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiFetch } from "@/lib/auth-headers";
-import { LoginForm, loginSchema, SignupForm, signupSchema } from "@/lib/schemas";
+import { LoginForm, loginSchema, SignupForm, signupSchema, forgotPasswordSchema } from "@/lib/schemas";
+import { safeInternalPath } from "@/lib/safe-path";
 import { canAccessReviewerPortal } from "@/lib/review-access";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { clearRoleCache } from "@/lib/use-require-role";
@@ -11,10 +12,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 
-function safeNext(value: string | null): string | null {
-  if (!value) return null;
-  if (!value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return null;
-  return value;
+function loginNext(value: string | null): string | null {
+  const path = safeInternalPath(value, "");
+  return path || null;
 }
 
 function LoginFormView() {
@@ -23,7 +23,7 @@ function LoginFormView() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
-  const nextPath = safeNext(search.get("next"));
+  const nextPath = loginNext(search.get("next"));
   const commandCentreLogin = Boolean(nextPath && !nextPath.startsWith("/farmer"));
 
   useEffect(() => {
@@ -41,7 +41,7 @@ function LoginFormView() {
       if (!meRes.ok || cancelled) return;
       const me = (await meRes.json().catch(() => ({}))) as { role?: string; roles?: string[] };
       if (cancelled) return;
-      const next = safeNext(search.get("next"));
+      const next = loginNext(search.get("next"));
       if (me.role === "farmer") {
         router.replace(next?.startsWith("/farmer") ? next : "/farmer");
         return;
@@ -64,6 +64,10 @@ function LoginFormView() {
     resolver: zodResolver(signupSchema),
     defaultValues: { email: "", password: "", fullName: "" },
   });
+  const forgotForm = useForm<{ email: string }>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: { email: "" },
+  });
 
   async function onSignIn(data: LoginForm) {
     setError(null);
@@ -78,7 +82,7 @@ function LoginFormView() {
       return;
     }
     clearRoleCache();
-    const next = safeNext(search.get("next"));
+    const next = loginNext(search.get("next"));
     if (body.role === "farmer") {
       router.push(next?.startsWith("/farmer") ? next : "/farmer");
       return;
@@ -160,7 +164,7 @@ function LoginFormView() {
                 <label className="block text-xs font-medium text-slate-700" htmlFor="email">
                   Official email
                 </label>
-                <input id="email" type="email" autoComplete="username" className="fp-input" {...loginForm.register("email")} />
+                <input id="email" type="email" autoComplete="email" className="fp-input" {...loginForm.register("email")} />
                 {loginForm.formState.errors.email && (
                   <p className="mt-1 text-xs text-slate-800" role="alert">
                     {loginForm.formState.errors.email.message}
@@ -247,7 +251,7 @@ function LoginFormView() {
 
           {mode === "forgot" && (
             <form
-              onSubmit={loginForm.handleSubmit((data) => onForgot(data.email))}
+              onSubmit={forgotForm.handleSubmit((data) => onForgot(data.email))}
               className="mt-6 space-y-4"
               noValidate
             >
@@ -255,15 +259,20 @@ function LoginFormView() {
                 <label className="block text-xs font-medium text-slate-700" htmlFor="forgot-email">
                   Email
                 </label>
-                <input id="forgot-email" type="email" autoComplete="email" className="fp-input" {...loginForm.register("email")} />
+                <input id="forgot-email" type="email" autoComplete="email" className="fp-input" {...forgotForm.register("email")} />
+                {forgotForm.formState.errors.email && (
+                  <p className="mt-1 text-xs text-slate-800" role="alert">
+                    {forgotForm.formState.errors.email.message}
+                  </p>
+                )}
               </div>
               {error && (
                 <p className="border border-slate-400 bg-slate-50 px-3 py-2 text-sm text-slate-800" role="alert">
                   {error}
                 </p>
               )}
-              <button type="submit" disabled={loginForm.formState.isSubmitting} className="fp-btn-primary w-full">
-                {loginForm.formState.isSubmitting ? "Sending…" : "Send reset link"}
+              <button type="submit" disabled={forgotForm.formState.isSubmitting} className="fp-btn-primary w-full">
+                {forgotForm.formState.isSubmitting ? "Sending…" : "Send reset link"}
               </button>
             </form>
           )}

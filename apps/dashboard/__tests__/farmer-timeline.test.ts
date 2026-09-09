@@ -97,6 +97,6 @@ describe("farmer timeline", () => {
   it("offsets stage due dates from sowing and rejects invalid alert payloads", () => {
     expect(dueDateFromSowing("2026-06-01", 30)).toBe("2026-07-01");
     expect(parseFarmerAlertPrefs({ sms: false, whatsapp: true })).toEqual({ sms: false, whatsapp: true });
-    expect(parseFarmerAlertPrefs("nope")).toEqual({ sms: true, whatsapp: true });
+    expect(parseFarmerAlertPrefs("nope")).toEqual({ sms: false, whatsapp: false });
   });
 });

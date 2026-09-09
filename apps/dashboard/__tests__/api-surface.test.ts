@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { resolveClaimClientPath } from "../src/lib/claim-routes";
+import * as Api from "../src/lib/api";
 
 /**
  * End-to-end wiring contract: every hosted API that touches farmer/reviewer
@@ -73,5 +75,27 @@ describe("hosted data-plane surface", () => {
     const storageRoutes = DATA_PLANE.filter((e) => e.storage).map((e) => e.route);
     expect(storageRoutes.length).toBeGreaterThan(0);
     expect(storageRoutes.every((r) => r.startsWith("/api/"))).toBe(true);
+  });
+
+  it("claim client resolver is hosted-only and never offers retired paths", () => {
+    const source = readFileSync(join(process.cwd(), "src/lib/claim-routes.ts"), "utf8");
+    expect(source).not.toContain('"/submissions"');
+    expect(source).not.toContain('"/review/queue"');
+    expect(source).not.toContain('"/backend"');
+    expect(resolveClaimClientPath(true, "list").path).toBe("/api/claims");
+    expect(resolveClaimClientPath(false, "submit").path).toBe("/api/claims");
+    expect(resolveClaimClientPath(true, "get", "abc").path).toBe("/api/claims/abc");
+    expect(resolveClaimClientPath(false, "action", "abc").path).toBe("/api/claims/abc/action");
+    expect(onDisk).toContain("/api/claims");
+    expect(onDisk).not.toContain("/submissions");
+    expect(onDisk).not.toContain("/review/queue");
+  });
+
+  it("does not export unused analytics wrappers from the live API client", () => {
+    expect("analyticsByCategory" in Api).toBe(false);
+    expect("analyticsBySeverity" in Api).toBe(false);
+    expect("analyticsByCrop" in Api).toBe(false);
+    expect(typeof Api.listClaims).toBe("function");
+    expect(typeof Api.overviewStats).toBe("function");
   });
 });

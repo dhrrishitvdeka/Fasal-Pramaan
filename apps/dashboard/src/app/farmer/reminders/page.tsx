@@ -25,6 +25,7 @@ import {
   parseFarmerAlertPrefs,
   pickDefaultPlotId,
   todayIsoDate,
+  DEFAULT_FARMER_ALERT_PREFS,
   type FarmerAlertPrefs,
 } from "@/lib/farmer-timeline";
 import { buildDefaultMilestones } from "@/lib/growth-stages";
@@ -38,7 +39,7 @@ export default function FarmerRemindersPage() {
   const t = getFarmerT(lang);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [prefs, setPrefs] = useState<FarmerAlertPrefs>({ sms: true, whatsapp: true });
+  const [prefs, setPrefs] = useState<FarmerAlertPrefs>(DEFAULT_FARMER_ALERT_PREFS);
 
   const sections = useMemo(() => groupMilestonesByPlot(plots, milestones), [plots, milestones]);
   const [selectedPlotId, setSelectedPlotId] = useState("");
@@ -48,7 +49,7 @@ export default function FarmerRemindersPage() {
       const raw = localStorage.getItem(FARMER_ALERT_PREFS_KEY);
       setPrefs(parseFarmerAlertPrefs(raw ? JSON.parse(raw) : {}));
     } catch {
-      setPrefs({ sms: true, whatsapp: true });
+      setPrefs(DEFAULT_FARMER_ALERT_PREFS);
     }
   }, []);
 

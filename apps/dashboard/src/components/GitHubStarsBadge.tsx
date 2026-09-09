@@ -42,7 +42,7 @@ export function GitHubStarsBadge({ className = "", repo }: GitHubStarsBadgeProps
     async function fetchStars() {
       // 1. Try our internal server route first (avoids browser client rate limits)
       try {
-        const res = await fetch(`/api/github/stars?repo=${encodeURIComponent(targetRepo)}`);
+        const res = await fetch("/api/github/stars");
         if (res.ok) {
           const data = (await res.json()) as { stars?: number };
           if (!cancelled && typeof data.stars === "number") {
@@ -60,32 +60,7 @@ export function GitHubStarsBadge({ className = "", repo }: GitHubStarsBadgeProps
           }
         }
       } catch {
-        // Fallback to direct client fetch
-      }
-
-      // 2. Direct GitHub API fallback
-      try {
-        const res = await fetch(`https://api.github.com/repos/${targetRepo}`, {
-          headers: { Accept: "application/vnd.github+json" },
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { stargazers_count?: number };
-          if (!cancelled && typeof data.stargazers_count === "number") {
-            setStars(data.stargazers_count);
-            setLoaded(true);
-            try {
-              localStorage.setItem(
-                `${CACHE_KEY}_${targetRepo}`,
-                JSON.stringify({ count: data.stargazers_count, ts: Date.now() })
-              );
-            } catch {
-              // ignore
-            }
-            return;
-          }
-        }
-      } catch {
-        // Graceful ignore
+        // Same-origin proxy is the only allowed source (CSP blocks api.github.com).
       }
       if (!cancelled) setLoaded(true);
     }

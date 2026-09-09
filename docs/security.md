@@ -11,12 +11,13 @@ Fasal-Pramaan implements a **defense-in-depth security model** engineered to pro
 | **Identity & Passwords** | Supabase Auth | Managed credential hashing and lockout-resistant defaults; the public site additionally sits behind a shared gate password (`SITE_LOCK_PASSWORD`). |
 | **Session & Tokens** | Supabase Auth JWT | Short-lived signed session tokens; global logout revokes the session; server routes verify the JWT before acting. |
 | **Refresh Tokens** | Supabase Token Rotation | Refresh tokens are rotated automatically with reuse detection by Supabase Auth. |
-| **Role-Based Access (RBAC)** | Principle of Least Privilege | Reviewer vs farmer roles resolved from `REVIEWER_EMAILS` (verified emails only) / `app_metadata.roles`; farmers only access their own claims and plots. Confirm email must be ON in the Supabase Auth dashboard — see [deployment.md](./deployment.md#dashboard-checks-that-the-repo-cannot-perform). |
+| **Role-Based Access (RBAC)** | Principle of Least Privilege | Reviewer vs farmer roles resolved from `REVIEWER_EMAILS` (verified emails only) and `app_metadata.roles`. `web_profiles.role` is display-only and is rewritten on each login so allowlist revocation takes effect. Farmers only access their own claims and plots. Confirm email must be ON in the Supabase Auth dashboard — see [deployment.md](./deployment.md#dashboard-checks-that-the-repo-cannot-perform). |
 | **Spatial Fencing** | Plot Ownership Scoping | Farmer data is ownership-scoped in `web_*` tables; plot boundary geometry is stored in Supabase Postgres (PostGIS extension). |
 | **Service-Role Isolation** | Server-Only Keys | Privileged writes use `SUPABASE_SERVICE_ROLE_KEY`. Gemini uses server-only `GEMINI_API_KEY`. Neither is exposed to the browser. |
 | **Evidence Immutability** | Content-Addressed Storage | Object keys are server-generated; direct client file naming is prohibited; uploaded bytes are immutable in the private `fasal-web-evidence` bucket. |
 | **Anti-Tamper & Anti-Fraud** | Checksum + vision | Server recomputes SHA-256 on upload. Gemini rejects screen replays, AI images, and indoor fakes. GPS presence is recorded; it is not proven hardware-only. |
-| **Browser Protection** | CSP | CSP with `frame-ancestors 'none'`. Supabase persists the session with its default storage. |
+| **Browser Protection** | CSP + HSTS | CSP with `frame-ancestors 'none'`, HSTS, and `robots.ts` disallowing gated routes. Auth cookies are httpOnly. |
+| **Auth email redirects** | Canonical origin | Signup and password-reset links use `APP_ORIGIN` / `NEXT_PUBLIC_SITE_URL` / `VERCEL_URL`. Request `Host` / `X-Forwarded-Host` is never trusted. |
 | **Managed Platform Hardening** | Serverless + RLS | Vercel serverless runtime with no long-lived processes; Supabase anon RLS policies on `web_*` tables and storage stay closed. |
 
 ---

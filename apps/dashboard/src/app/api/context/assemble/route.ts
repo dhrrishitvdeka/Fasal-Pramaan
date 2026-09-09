@@ -69,6 +69,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Context assembly failed. Please retry." }, { status: 500 });
   }
 }
-
-// Re-export for internal use without HTTP (claim-pipeline uses @/lib/context/assemble directly)
-export { assembleContext } from "@/lib/context/assemble";

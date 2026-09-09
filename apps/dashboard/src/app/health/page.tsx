@@ -1,12 +1,20 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/auth-headers";
 
 type HealthResponse = {
   ok: boolean;
   status: string;
   timestamp?: string;
-  checks?: { app?: boolean; supabase?: boolean; serviceRole?: boolean; gemini?: boolean };
+};
+
+type SystemStatus = {
+  supabase?: boolean;
+  gemini?: boolean;
+  sentinel?: boolean;
+  imdKey?: boolean;
+  version?: string;
 };
 
 function CheckRow({ label, pass }: { label: string; pass: boolean | undefined }) {
@@ -25,7 +33,7 @@ function CheckRow({ label, pass }: { label: string; pass: boolean | undefined })
 }
 
 export default function HealthPage() {
-  const { data, isLoading, error, refetch, isFetching } = useQuery<HealthResponse>({
+  const health = useQuery<HealthResponse>({
     queryKey: ["system-health"],
     queryFn: async () => {
       const res = await fetch("/api/health", { cache: "no-store" });
@@ -35,36 +43,52 @@ export default function HealthPage() {
     refetchInterval: 30_000,
   });
 
+  const status = useQuery<SystemStatus | null>({
+    queryKey: ["system-status"],
+    queryFn: async () => {
+      const res = await apiFetch("/api/system/status");
+      if (res.status === 403) return null;
+      if (!res.ok) throw new Error("Unable to load system status.");
+      return (await res.json()) as SystemStatus;
+    },
+  });
+
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <div>
         <h1 className="text-lg font-bold text-slate-900">System health</h1>
       </div>
       <div className="fp-panel p-4">
-        <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500">Dependency checks</h2>
-        {isLoading && <p className="mt-2 text-sm text-slate-600">Checking…</p>}
-        {error && (
+        <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500">Liveness</h2>
+        {health.isLoading && <p className="mt-2 text-sm text-slate-600">Checking…</p>}
+        {health.error && (
           <p className="mt-2 text-sm text-rose-700">
-            {error instanceof Error ? error.message : "Health check failed"}
+            {health.error instanceof Error ? health.error.message : "Health check failed"}
           </p>
         )}
-        {data && (
-          <>
-            <p className="mt-2 text-sm text-slate-800">
-              App {data.ok ? "is up" : "reported a failure"} ({data.status}).
-            </p>
-            <ul className="mt-2">
-              <CheckRow label="Next.js app" pass={data.checks?.app} />
-              <CheckRow label="Supabase (database + auth)" pass={data.checks?.supabase} />
-              <CheckRow label="Supabase service role (API writes)" pass={data.checks?.serviceRole} />
-              <CheckRow label="Gemini (AI analysis)" pass={data.checks?.gemini} />
-            </ul>
-          </>
+        {health.data && (
+          <p className="mt-2 text-sm text-slate-800">
+            App {health.data.ok ? "is up" : "reported a failure"} ({health.data.status}).
+          </p>
         )}
-        <button type="button" className="fp-btn-secondary mt-3 text-xs" onClick={() => void refetch()}>
-          {isFetching ? "Refreshing…" : "Refresh"}
+        <button type="button" className="fp-btn-secondary mt-3 text-xs" onClick={() => void health.refetch()}>
+          {health.isFetching ? "Refreshing…" : "Refresh"}
         </button>
       </div>
+      {status.data && (
+        <div className="fp-panel p-4">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-slate-500">Dependency checks</h2>
+          <ul className="mt-2">
+            <CheckRow label="Supabase (database + auth)" pass={status.data.supabase} />
+            <CheckRow label="Gemini (AI analysis)" pass={status.data.gemini} />
+            <CheckRow label="Sentinel / Copernicus" pass={status.data.sentinel} />
+            <CheckRow label="IMD / weather key" pass={status.data.imdKey} />
+          </ul>
+          {status.data.version ? (
+            <p className="mt-3 text-xs text-slate-500">Version {status.data.version}</p>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

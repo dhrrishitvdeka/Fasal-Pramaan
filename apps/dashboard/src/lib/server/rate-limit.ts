@@ -20,7 +20,9 @@ export function checkRateLimit(
   windowMs = 60_000,
   forceEnforce = false,
 ): RateLimitResult {
-  if ((!RATE_LIMIT_ENABLED && !forceEnforce) || process.env.DISABLE_RATE_LIMIT === "true") {
+  // forceEnforce (login / signup / forgot / unlock) is never bypassed by
+  // DISABLE_RATE_LIMIT — that flag is only for non-auth product routes.
+  if (!forceEnforce && (!RATE_LIMIT_ENABLED || process.env.DISABLE_RATE_LIMIT === "true")) {
     return { ok: true };
   }
   const now = Date.now();

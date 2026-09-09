@@ -13,11 +13,11 @@
  * farmer shell ("/farmer") and static assets open without a network.
  */
 
-const VERSION = "v3"; // bump to invalidate all caches on deploy
+const VERSION = "v4"; // bump to invalidate all caches on deploy
 const SHELL_CACHE = `fp-shell-${VERSION}`;
 const ASSET_CACHE = `fp-assets-${VERSION}`;
 const SHELL_URL = "/farmer";
-const AUTH_HTML_PREFIXES = ["/review", "/admin", "/audit", "/login", "/unlock", "/analytics", "/overview", "/map", "/alerts"];
+const AUTH_HTML_PREFIXES = ["/farmer", "/review", "/admin", "/audit", "/login", "/unlock", "/analytics", "/overview", "/map", "/alerts", "/health"];
 
 const SUPABASE_HOST_RE = /\.supabase\.(co|in)$/i;
 

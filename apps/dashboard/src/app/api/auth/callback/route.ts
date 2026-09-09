@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
 import { applyAuthCookies, createAuthClientFromRequest, type CookieToSet } from "@/lib/auth-cookies";
-
-function safeNext(value: string | null): string {
-  if (!value) return "/farmer";
-  if (!value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return "/farmer";
-  return value;
-}
+import { safeInternalPath } from "@/lib/safe-path";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = safeNext(url.searchParams.get("next"));
+  const next = safeInternalPath(url.searchParams.get("next"), "/farmer");
   const redirectTo = new URL(next, url.origin);
 
   if (!code) {

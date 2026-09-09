@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { clientIp } from "@/lib/auth-cookies";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { CANONICAL_GITHUB_REPO, resolveGithubRepo } from "@/lib/github-repo";
 
@@ -6,10 +7,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 300; // 5 minutes cache
 
 export async function GET(request: Request) {
-  // Unauthenticated quota proxy: throttle per IP so callers can't burn the
-  // GITHUB_TOKEN rate budget (arbitrary ?repo= values are still allowed).
-  const forwarded = request.headers.get("x-forwarded-for");
-  const ip = forwarded?.split(",")[0]?.trim() || "unknown";
+  // Unauthenticated quota proxy pinned to the canonical repo.
+  const ip = clientIp(request);
   const limit = checkRateLimit(`github-stars:${ip}`, 20, 60_000);
   if (!limit.ok) {
     return NextResponse.json(
@@ -17,10 +16,7 @@ export async function GET(request: Request) {
       { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
     );
   }
-  const { searchParams } = new URL(request.url);
-  const repo = resolveGithubRepo(
-    searchParams.get("repo") || process.env.NEXT_PUBLIC_GITHUB_REPO || CANONICAL_GITHUB_REPO
-  );
+  const repo = resolveGithubRepo(process.env.NEXT_PUBLIC_GITHUB_REPO || CANONICAL_GITHUB_REPO);
 
   // Validate repo format: owner/name
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) {
@@ -29,7 +25,7 @@ export async function GET(request: Request) {
 
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
-    "User-Agent": "FasalPramaan-App/2.8.1",
+    "User-Agent": "FasalPramaan-App/2.8.2",
   };
 
   if (process.env.GITHUB_TOKEN) {

@@ -263,14 +263,14 @@ All signals are stored on `WebClaimRow.context_signals` (`claim-pipeline.ts:94`)
 
 | Peril | Label (EN/HI) | `minConfidence` | Required Angles `requiredAngles` | Optional | Context Checks `contextChecks` | Guidance Extra |
 |---|---|---|---|---|---|---|
-| `normal` | Normal / सामान्य क्षति | **85** | wide_field, left_context, mid_canopy, right_context, closeup_damage | — | imd, bhuvan, nearby | “Capture all 5 angles clearly. Keep crop in frame.” |
-| `fire_burn` | Fire/Burn / आग/जलना | **70** | wide_field, closeup_damage | mid_canopy | sentinel_fire, imd, bhuvan | “Show burnt patch + surrounding unburnt edge. Satellite will be cross-checked.” |
-| `animal_damage` | Animal / जानवर क्षति | **75** | wide_field, mid_canopy, closeup_damage | left/right_context | wildlife_proximity, imd, bhuvan | “Include footprints/trail if visible. Capture damaged stem at 15 cm.” |
-| `flood` | Flood / बाढ़ | **75** | wide_field, mid_canopy, closeup_damage | left/right_context | imd_weather, sentinel_fire, nearby | “Capture standing water line + submerged base. IMD 7-day rain will be checked.” |
-| `drought` | Drought / सूखा | **80** | wide_field, mid_canopy, closeup_damage | left/right_context | imd_weather, bhuvan, nearby | “Show wilting canopy + soil cracks if any.” |
-| `pest_disease` | Pest/Disease / कीट/रोग | **85** | closeup_damage, mid_canopy, wide_field | left/right_context | imd_weather, nearby, bhuvan | “Closeup must fill frame with lesions. Keep leaf steady.” |
-| `hailstorm` | Hailstorm / ओलावृष्टि | **75** | wide_field, closeup_damage, mid_canopy | left/right_context | imd_weather, nearby, bhuvan | “Show shredded leaves + scattered hail if present.” |
-| `lodging` | Lodging / गिराव | **75** | wide_field, mid_canopy, closeup_damage | left/right_context | imd_weather, nearby, bhuvan | “Stand 10 m back; include lodged vs standing boundary.” |
+| `normal` | Normal / सामान्य क्षति | **85** | photo_1, photo_2, photo_3 | — | imd, bhuvan, nearby | “Capture 3 distinct crop evidence photos.” |
+| `fire_burn` | Fire/Burn / आग/जलना | **70** | photo_1, photo_2, photo_3 | — | sentinel_fire, imd, bhuvan | “Show burnt patch + unburnt edge. Satellite burn scar is cross-checked.” |
+| `animal_damage` | Animal / जानवर क्षति | **75** | photo_1, photo_2, photo_3 | — | wildlife_proximity, imd, bhuvan | “Include footprints/trail if visible.” |
+| `flood` | Flood / बाढ़ | **75** | photo_1, photo_2, photo_3 | — | imd_weather, sentinel_water, nearby | “Capture standing water line + submerged base. Rainfall and NDWI water extent are checked.” |
+| `drought` | Drought / सूखा | **80** | photo_1, photo_2, photo_3 | — | imd_weather, sentinel_ndvi, nearby | “Show wilting canopy + soil cracks. Dry-spell rain and NDVI are checked.” |
+| `pest_disease` | Pest/Disease / कीट/रोग | **85** | photo_1, photo_2, photo_3 | — | imd_weather, nearby, bhuvan | “Closeup must fill frame with lesions.” |
+| `hailstorm` | Hailstorm / ओलावृष्टि | **75** | photo_1, photo_2, photo_3 | — | imd_weather, nearby, bhuvan | “Show shredded leaves. WMO hail codes 96/99 are checked.” |
+| `lodging` | Lodging / गिराव | **75** | photo_1, photo_2, photo_3 | — | imd_weather, nearby, bhuvan | “Include lodged vs standing boundary. Wind gusts are checked.” |
 
 Normalization `normalizePeril(raw)` handles aliases `fire/burn→fire_burn, animal/grazing→animal_damage, flood/waterlogging→flood, dry→drought, pest/disease→pest_disease, hail→hailstorm, wind/lodging→lodging` (`claim-routing.ts:162-173`). Reviewer can override peril; threshold updates reactively.
 

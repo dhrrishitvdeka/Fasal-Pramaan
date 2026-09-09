@@ -503,7 +503,7 @@ export type ClaimStore = {
   updateClaim(id: string, patch: Partial<WebClaimRow>, opts?: ClaimUpdateOptions): Promise<void>;
   getClaim(id: string): Promise<WebClaimRow | null>;
   getPlot?(plotId: string): Promise<{ id?: string; area_hectares?: number | null; crop_type?: string | null } | null>;
-  listClaims(): Promise<WebClaimRow[]>;
+  listClaims(filter?: { createdBy?: string }): Promise<WebClaimRow[]>;
   insertImages(rows: WebImageRow[]): Promise<void>;
   replaceAngleImages(claimId: string, rows: WebImageRow[]): Promise<void>;
   listImages(claimId: string): Promise<WebImageRow[]>;
@@ -1122,7 +1122,6 @@ async function persistAdaptiveResult(
 export type InferRuntimeOptions = {
   apiToken?: string;
   fetchImpl?: typeof fetch;
-  spaceUrl?: string;
   /** Persist + gate + context only; caller schedules Gemini attach (e.g. Next.js `after()`). */
   skipInference?: boolean;
 };
@@ -1182,7 +1181,6 @@ export async function inferAndAttachToClaim(
       extraImages: extras,
       apiToken: inferOptions?.apiToken,
       fetchImpl: inferOptions?.fetchImpl,
-      spaceUrl: inferOptions?.spaceUrl,
       peril: claimRow?.peril || undefined,
       farmerObservation:
         claimRow?.farmer_observations ||
@@ -2230,10 +2228,11 @@ export function createMemoryClaimStore(): ClaimStore & {
     async getPlot(plotId) {
       return plots.get(plotId) ?? null;
     },
-    async listClaims() {
-      return [...claims.values()].sort((a, b) =>
+    async listClaims(filter) {
+      const rows = [...claims.values()].sort((a, b) =>
         String(b.created_at).localeCompare(String(a.created_at)),
       );
+      return filter?.createdBy ? rows.filter((row) => row.created_by === filter.createdBy) : rows;
     },
     async insertImages(rows) {
       for (const row of rows) {

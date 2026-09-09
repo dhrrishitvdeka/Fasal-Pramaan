@@ -131,13 +131,19 @@ export default function MapPage() {
       <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
         <span>{data.length} markers</span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-slate-900" /> High
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#d55e00" }} /> High
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-slate-600" /> Medium
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#e69f00" }} /> Medium / recapture
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-slate-400" /> Low / other
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#56b4e9" }} /> Low
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#009e73" }} /> Verified
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#cc79a7" }} /> Rejected
         </span>
       </div>
     </div>

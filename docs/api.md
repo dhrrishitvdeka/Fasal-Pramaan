@@ -1,7 +1,7 @@
 # API Reference & Data Contracts
 
 Base URL: app origin (`http://localhost:3000` for local dev via `npm run dev`, the Vercel URL in production)  
-All routes are same-origin Next.js Route Handlers under `/api/*`, backed by Supabase and Google Gemini. Leave `NEXT_PUBLIC_API_BASE_URL` unset. Saathi intake lives at `GET /farmer/saathi` (page, not API) and routes to peril-aware capture (`/farmer/capture?peril=&intentId=`).
+All routes are same-origin Next.js Route Handlers under `/api/*`, backed by Supabase and Google Gemini. There is no separate API base URL; the browser talks to `/api/claims` on this origin. Saathi intake lives at `GET /farmer/saathi` (page, not API) and routes to peril-aware capture (`/farmer/capture?peril=&intentId=`).
 
 ---
 

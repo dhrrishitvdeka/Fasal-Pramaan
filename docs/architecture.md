@@ -82,8 +82,7 @@ flowchart TB
   - **Sensor-Only Field GPS Geo-Tagging**: Field coordinates are locked strictly to device hardware sensors (`navigator.geolocation`) without manual text overrides, ensuring authentic geo-spatial baseline tracking compliant with PMFBY regulations.
   - **Authenticity Filter Integration**: After shutter, `POST /api/vision/gate` validates each image before upload (see Gateway layer). Rejected frames require retake.
   - **Client Quality & Integrity Probes**: Real-time Laplacian edge detection for blur, exposure boundary validation, resolution checks; GPS accuracy validated server-side on submit.
-  - **Session Storage & Encryption**: `farmerStore` state persisted in encrypted `sessionStorage` envelopes (`farmerStore.activeIntent`, plots).
-  - **Reviewer Multi-Tab Session Isolation (`review-session.ts`)**: Decouples reviewer authentication and inspection profiles into isolated `sessionStorage` namespaces (`fasal_reviewer_email_v1`), ensuring multi-tab usage never leaks state across portals.
+  - **Session Storage & Encryption**: `farmerStore` state persisted in encrypted `sessionStorage` envelopes (`farmerStore.activeIntent`, plots). Reviewer auth is the cookie-backed Supabase session (`requireWebActor` / `useRequireRole`).
   - **Fasal Saathi Voice Interface**: A **Voice Mode mic toggle** on `/farmer/saathi` opens a full-duplex Gemini Live session — `POST /api/voice/session` mints an ephemeral token, the page opens the Live WebSocket with `bidiGenerateContentSetup` carrying `SAATHI_FUNCTION_DECLARATIONS`, and decoded audio frames play back while the farmer speaks. Incorporates **Anti-Self-Interruption Navigation Architecture**: checks active PCM audio playback via `LiveAudioSession.isPlaying()`. Agent-initiated navigation routes silently via `updateCurrentPath` without emitting barge-in turns, while user route changes defer context synchronization until speech turn completion. Spoken camera orders (`capture_current_angle`) anywhere across the app automatically verify registered plots and launch the capture studio (`/farmer/capture?plotId=...`). Tool calls (`toolCalls`) are answered by `POST /api/saathi/tool` and returned as `toolResponse.functionResponses`. Text intake (`webkitSpeechRecognition` + typed chat, server-side `classify_claim`) remains the fallback when voice is unavailable. The system prompt (`src/lib/saathi-agent.ts buildSystemPrompt`) hard-pins Hindi (Devanagari)/English-only replies, and the Live setup pins the `Kore` voice via `speechConfig`.
   - **Recapture Notifications** (`src/lib/farmer-notifications.ts`): client-side diffing of `needs_recapture` claims against localStorage-seen IDs (`diffNewRecaptures`/`markSeen`, key `fp_seen_recapture_notices_v1`). Unseen notices render as amber toast panels on `/farmer` with a Capture-now deep link + Dismiss; the farmer nav shows a badge dot while any notice is unseen.
   - **PWA Offline Shell** (`public/manifest.webmanifest` + `public/sw.js`, registered prod-only by `src/components/pwa-register.tsx`): installable farmer app (start URL `/farmer`, theme `#1c1915`). The service worker is cache-first for immutable static assets (`/_next/static/*`, icons, fonts), network-first for navigations with a cached `/farmer` shell fallback when offline, and passes `/api/*` and Supabase traffic straight through untouched — evidence and auth are always live. A bilingual offline banner (`src/components/offline-banner.tsx`, shared `use-online-status` hook) shows while the browser reports offline. Honest scope: the shell makes pages *openable* offline; captures are not queued across sessions.
@@ -124,7 +123,7 @@ flowchart TB
 - **Key Subsystems**:
   - **Server-Side Evidence Verification**: Validates declared SHA-256 checksums, MIME types, and byte sizes before writing to storage; flags duplicates across angles.
   - **Evidence Trust & Confidence Engine**: Calculates the 4-component scores ($0.4Q + 0.3C + 0.2X + 0.1I$) and classifies deterministic uncertainty.
-  - **Adaptive Confidence Engine** (`src/lib/context/adaptive-engine.ts`): Wraps evidence scores with peril-specific `ROUTE_CONFIG.minConfidence` and `ContextSignal[]`. Returns `{ level: high|medium|low, nextStep: proceed|request_missing|retake|escalate_to_human, threshold, overall, reasons, reasonsHi, missingAngles }`. Rules: `gateFailed` → `low/retake`, `integrity<50` → `escalate`, `fire_burn` without `sentinel==available` → `medium` until satellite, `animal_damage` without GPS → `medium` (request location), else tiered by `overall` vs `threshold` and `coverage`/`quality`. When `nextStep == request_missing`, the pipeline **auto-creates the recapture request**: the claim is patched straight to status `needs_recapture` with `missing_angles` plus bilingual `recapture_reason`/`recapture_reason_hi` taken from the adaptive reasons — no reviewer round-trip. The persisted `adaptive_result` also carries `previousConfidence` and `confidence_delta` for re-submissions.
+  - **Adaptive Confidence Engine** (`src/lib/context/adaptive-engine.ts`): Wraps evidence scores with peril-specific `ROUTE_CONFIG.minConfidence` and `ContextSignal[]`. Returns `{ level: high|medium|low, nextStep: proceed|request_missing|retake|escalate_to_human, threshold, overall, reasons, reasonsHi, missingAngles }`. Rules: `gateFailed` → `low/retake`, `integrity<50` → `escalate`, satellite perils (`fire_burn` / `flood` / `drought`) without `sentinel==available` → `medium` until raster, `animal_damage` without GPS → `medium`, hail without WMO 96/99 or lodging without strong gusts → cap at `medium`, else tiered by `overall` vs `threshold` and `coverage`/`quality`. When `nextStep == request_missing`, the pipeline **auto-creates the recapture request**: the claim is patched straight to status `needs_recapture` with `missing_angles` plus bilingual `recapture_reason`/`recapture_reason_hi` taken from the adaptive reasons — no reviewer round-trip. The persisted `adaptive_result` also carries `previousConfidence` and `confidence_delta` for re-submissions.
   - **AI Dispatcher**: Calls Gemini vision with the submitted stills (`GEMINI_API_KEY`) for authenticity plus a written field analysis.
 
 ---
@@ -153,7 +152,7 @@ flowchart TB
 
   | Source | Tier 1 (with key/token) | Tier 2 / free fallback | Peril scope |
   |---|---|---|---|
-  | `sentinel` | Real Sentinel-2 L2A NDVI burn-scar check via `POST https://sh.dataspace.copernicus.eu/api/v1/process` (`application/json` FLOAT32 raster; **burn detected when >5% of valid pixels have NDVI < 0.2**, confidence 80, needs `SENTINEL_TOKEN`/`COPERNICUS_TOKEN`) | Free Open-Meteo archive proxy: counts extreme-heat days (>40 °C) over the past ~30 days and reports them honestly as a heat-anomaly plausibility signal (confidence 55, `needsToken: true` in meta) | `fire_burn` only |
+  | `sentinel` | Real Sentinel-2 L2A Process API raster (`POST https://sh.dataspace.copernicus.eu/api/v1/process`). **Fire:** NDVI burn scar (>5% of valid pixels NDVI < 0.2). **Flood:** NDWI water extent (NDWI > 0.2). **Drought:** canopy stress (NDVI < 0.3). Confidence 80; needs `SENTINEL_TOKEN`/`COPERNICUS_TOKEN` | Fire without a token: Open-Meteo extreme-heat proxy (>40 °C days). Flood/drought without a token: Copernicus Browser deep-link (`needsToken: true`) | `fire_burn`, `flood`, `drought` |
   | `imd` | Reserved hook: paid IMD grid/AWS API when `IMD_API_KEY` is set (signal shape unchanged) | Free Open-Meteo forecast: 7-day `precipitation_sum` mapped to IMD categories (0–2 light / 2–10 moderate / >60 heavy), hail days from WMO codes 96/99 (`hailDays7d`), max `wind_gust_10m_max` (>60 km/h supports lodging). **Sowing-window logic**: drought ≥30 days since sowing adds cumulative rainfall since sowing from the Open-Meteo ARCHIVE endpoint — window starts at `max(sowingDate, now−180d)` — persisted in `meta.windowRainfallMm/windowDays/daysSinceSowing`; corroboration is flagged weak below ~25 mm per 30 days. Hailstorm appends an estimated growth stage (early vegetative <30 d, vegetative <60 d, reproductive <100 d, maturity ≥100 d) | all |
   | `bhuvan` | Live WMS GetMap probe against `bhuvan-app1.nrsc.gov.in` — tile fetched → `available` with thumbnail URL; unreachable → `pending` with manual-check link | Same probe (no key exists) | all |
   | `wildlife` | Free Overpass API: forest/`landuse=forest`/protected-area ways within ~10 km (count + names → incursion plausibility, confidence 65) | — (single free source; unreachable → `pending`) | `animal_damage` only |
@@ -165,20 +164,20 @@ flowchart TB
 
 ## 3. Intelligent Adaptive Evidence Collection & Validation
 
-**Variable claims routing (`src/lib/claim-routing.ts`):** `Peril` union `normal | fire_burn | animal_damage | flood | drought | pest_disease | hailstorm | lodging` (8). `ROUTE_CONFIG: Record<Peril, RouteConfig>` where `RouteConfig = { peril, labelEn/Hi, descriptionEn/Hi, requiredAngles, optionalAngles, contextChecks: ContextCheck[], minConfidence, needsSatellite, guidanceExtraEn/Hi }`. Helpers: `normalizePeril(raw)`, `routeForPeril(peril)`, `anglesForPeril(peril)`, `requiredAnglesForPeril(peril)`, `classifyPerilHeuristic(text)`, `ClaimIntent` (`id`, `peril`, `perilLabelEn/Hi`, `crop`, `village`, `plotId`, `sowingDate`, `farmerNote`, `createdAt`, `source: saathi_voice|saathi_text|manual`), `INTENT_STORAGE_KEY`.
+**Variable claims routing (`src/lib/claim-routing.ts`):** `Peril` union `normal | fire_burn | animal_damage | flood | drought | pest_disease | hailstorm | lodging` (8). `ROUTE_CONFIG: Record<Peril, RouteConfig>` where `RouteConfig = { peril, labelEn/Hi, descriptionEn/Hi, requiredAngles, optionalAngles, contextChecks: ContextCheck[], minConfidence, needsSatellite, guidanceExtraEn/Hi }`. Helpers: `normalizePeril(raw)`, `routeForPeril(peril)`, `anglesForPeril(peril)`, `classifyPerilHeuristic(text)`, `ClaimIntent` (`id`, `peril`, `perilLabelEn/Hi`, `crop`, `village`, `plotId`, `sowingDate`, `farmerNote`, `createdAt`, `source: saathi_voice|saathi_text|manual`), `INTENT_STORAGE_KEY`.
 
 **Routing table:**
 
 | Peril | Required angles | Optional angles | Context checks | `minConfidence` | `needsSatellite` |
 |---|---|---|---|---|---|
-| `normal` | `wide_field`, `left_context`, `mid_canopy`, `right_context`, `closeup_damage` (5) | — | `imd_weather`, `bhuvan_landuse`, `nearby_fields` | 85 | false |
-| `fire_burn` | `wide_field`, `closeup_damage` | `mid_canopy` | `sentinel_fire`, `imd_weather`, `bhuvan_landuse` | 70 | **true** |
-| `animal_damage` | `wide_field`, `mid_canopy`, `closeup_damage` | `left_context`, `right_context` | `wildlife_proximity`, `imd_weather`, `bhuvan_landuse` | 75 | false |
-| `flood` | `wide_field`, `mid_canopy`, `closeup_damage` | `left_context`, `right_context` | `imd_weather`, `sentinel_fire`, `nearby_fields` | 75 | false |
-| `drought` | `wide_field`, `mid_canopy`, `closeup_damage` | `left_context`, `right_context` | `imd_weather`, `bhuvan_landuse`, `nearby_fields` | 80 | false |
-| `pest_disease` | `closeup_damage`, `mid_canopy`, `wide_field` | `left_context`, `right_context` | `imd_weather`, `nearby_fields`, `bhuvan_landuse` | 85 | false |
-| `hailstorm` | `wide_field`, `closeup_damage`, `mid_canopy` | `left_context`, `right_context` | `imd_weather`, `nearby_fields`, `bhuvan_landuse` | 75 | false |
-| `lodging` | `wide_field`, `mid_canopy`, `closeup_damage` | `left_context`, `right_context` | `imd_weather`, `nearby_fields`, `bhuvan_landuse` | 75 | false |
+| `normal` | `photo_1`, `photo_2`, `photo_3` | — | `imd_weather`, `bhuvan_landuse`, `nearby_fields` | 85 | false |
+| `fire_burn` | `photo_1`, `photo_2`, `photo_3` | — | `sentinel_fire`, `imd_weather`, `bhuvan_landuse` | 70 | **true** (NDVI burn scar) |
+| `animal_damage` | `photo_1`, `photo_2`, `photo_3` | — | `wildlife_proximity`, `imd_weather`, `bhuvan_landuse` | 75 | false (Overpass forest/protected land) |
+| `flood` | `photo_1`, `photo_2`, `photo_3` | — | `imd_weather`, `sentinel_water`, `nearby_fields` | 75 | **true** (NDWI water extent) |
+| `drought` | `photo_1`, `photo_2`, `photo_3` | — | `imd_weather`, `sentinel_ndvi`, `nearby_fields` | 80 | **true** (canopy NDVI) |
+| `pest_disease` | `photo_1`, `photo_2`, `photo_3` | — | `imd_weather`, `nearby_fields`, `bhuvan_landuse` | 85 | false |
+| `hailstorm` | `photo_1`, `photo_2`, `photo_3` | — | `imd_weather`, `nearby_fields`, `bhuvan_landuse` | 75 | false (WMO hail codes 96/99) |
+| `lodging` | `photo_1`, `photo_2`, `photo_3` | — | `imd_weather`, `nearby_fields`, `bhuvan_landuse` | 75 | false (wind gusts > 60 km/h) |
 
 **Adaptive confidence engine (`src/lib/context/adaptive-engine.ts`):**
 
@@ -187,8 +186,10 @@ Inputs: { quality, coverage, context, integrity, overall, peril, signals?, gateF
 threshold = ROUTE_CONFIG[peril].minConfidence
 gateFailed                          → low / retake (authenticity)
 integrity < 50                      → low / escalate_to_human
-peril==fire_burn && sentinel!=avail → medium (if overall>=threshold) else low / escalate
+needsSatellite && sentinel!=avail   → medium (if overall>=threshold) else low / escalate
+                                      (fire burn-scar, flood NDWI, drought NDVI)
 peril==animal && gps!=available     → medium (if overall>=70) else fall through
+weather conflict (hail/lodging/flood/drought vs Open-Meteo) → cap high at medium
 overall>=threshold && coverage>=60 && quality>=40 → high / proceed
 overall>=threshold-20 && coverage>=40              → medium / request_missing
 otherwise  (coverage<40||quality<30 → retake else escalate) → low

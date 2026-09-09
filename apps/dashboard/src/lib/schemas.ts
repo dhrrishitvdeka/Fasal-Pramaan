@@ -84,7 +84,7 @@ const KNOWN_HINT_CODES = [
 ] as const;
 
 export const claimImageSchema = z.object({
-  imageDataUrl: z.string(),
+  imageDataUrl: z.string().max(6 * 1024 * 1024),
   angleType: z.string().optional().default("closeup_damage"),
   sha256: z.string().optional(),
   lat: optionalBounded(-90, 90),

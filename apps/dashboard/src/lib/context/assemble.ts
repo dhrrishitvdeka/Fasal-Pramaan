@@ -1,5 +1,6 @@
 import type { ContextSignal, AssembledContext } from "./types";
 import { contextOverall } from "./types";
+import { normalizePeril, type Peril } from "../claim-routing";
 
 /**
  * Map 7-day rainfall total to IMD-style categories:
@@ -25,33 +26,55 @@ function evaluatePixel(s){
   return [ndvi, s.dataMask];
 }`;
 
+const WATER_NDWI_EVALSCRIPT = `//VERSION=3
+function setup(){return{input:["B03","B08","dataMask"],output:{bands:2,sampleType:"FLOAT32"}}}
+function evaluatePixel(s){
+  const denom = s.B03 + s.B08;
+  const ndwi = denom === 0 ? 0 : (s.B03 - s.B08)/denom;
+  return [ndwi, s.dataMask];
+}`;
+
+type SentinelKind = "burn" | "water" | "ndvi";
+
+function sentinelKindForPeril(peril: Peril): SentinelKind | null {
+  if (peril === "fire_burn") return "burn";
+  if (peril === "flood") return "water";
+  if (peril === "drought") return "ndvi";
+  return null;
+}
+
 /**
- * Parse a Copernicus process-API application/json response into burn statistics.
- * Tolerant of band-major [[ndvi...],[mask...]] and pixel-major [[[n,m],...],...] layouts.
+ * Parse a Copernicus process-API application/json response into index statistics.
+ * Tolerant of band-major [[value...],[mask...]] and pixel-major layouts.
  */
-function parseBurnRatioFromProcessJson(j: unknown): { burnRatio: number; validPixels: number } | null {
+function parseIndexRatioFromProcessJson(
+  j: unknown,
+  hit: (value: number) => boolean,
+): { ratio: number; validPixels: number; mean: number } | null {
   try {
     const grid: any = Array.isArray(j) ? j : (j as any)?.data;
     if (!Array.isArray(grid) || grid.length === 0) return null;
 
     let valid = 0;
-    let burned = 0;
+    let hits = 0;
+    let sum = 0;
     const eatPixel = (px: any) => {
       if (Array.isArray(px)) {
-        const ndvi = Number(px[0]);
+        const value = Number(px[0]);
         const mask = px.length > 1 ? Number(px[1]) : 1;
-        if (!Number.isFinite(ndvi)) return;
+        if (!Number.isFinite(value)) return;
         if (Number.isFinite(mask) && mask < 0.5) return;
         valid++;
-        if (ndvi < 0.2) burned++;
+        sum += value;
+        if (hit(value)) hits++;
       } else if (typeof px === "number" && Number.isFinite(px)) {
         valid++;
-        if (px < 0.2) burned++;
+        sum += px;
+        if (hit(px)) hits++;
       }
     };
 
     const isNumericArr = (a: any) => Array.isArray(a) && a.length > 0 && typeof a[0] === "number";
-    // Band-major: exactly two equal-length numeric arrays [flatNdvi[], flatMask[]]
     if (
       grid.length === 2 &&
       isNumericArr(grid[0]) &&
@@ -63,13 +86,13 @@ function parseBurnRatioFromProcessJson(j: unknown): { burnRatio: number; validPi
       for (const cell of grid) {
         if (!Array.isArray(cell)) continue;
         if (typeof cell[0] === "number" && cell.length <= 4 && !Array.isArray(cell[0])) {
-          eatPixel(cell); // single pixel [ndvi, mask]
+          eatPixel(cell);
         } else {
-          for (const px of cell) eatPixel(px); // row of pixels (or scalar raster row)
+          for (const px of cell) eatPixel(px);
         }
       }
     }
-    return valid > 0 ? { burnRatio: burned / valid, validPixels: valid } : null;
+    return valid > 0 ? { ratio: hits / valid, validPixels: valid, mean: sum / valid } : null;
   } catch {
     return null;
   }
@@ -204,27 +227,33 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
   const hasGpsCoords = isValidCoordinate(rawLat, rawLon);
   const lat = hasGpsCoords ? rawLat : null;
   const lon = hasGpsCoords ? rawLon : null;
-  const peril = String(input.peril || "normal").toLowerCase();
+  const peril = normalizePeril(input.peril);
   const sowingDate = input.sowingDate ? String(input.sowingDate) : undefined;
   const signals: ContextSignal[] = [];
   const now = new Date().toISOString();
+  const satKind = sentinelKindForPeril(peril);
+  const satLabels =
+    satKind === "water"
+      ? { en: "Sentinel-2 water extent", hi: "सैटेलाइट जल-क्षेत्र" }
+      : satKind === "ndvi"
+        ? { en: "Sentinel-2 vegetation index", hi: "सैटेलाइट वनस्पति सूचकांक" }
+        : { en: "Sentinel-2 burn scar", hi: "सैटेलाइट जला निशान" };
 
-  // 1. Sentinel — Tier 1 (token): real POST to https://sh.dataspace.copernicus.eu/api/v1/process
-  //    with BURN_SCAR_EVALSCRIPT answering application/json FLOAT32 NDVI+dataMask → burnRatio directly.
-  //    Tier 2 (no token): free Open-Meteo archive extreme-heat proxy — no key required.
+  // 1. Sentinel — fire: burn NDVI; flood: NDWI water; drought: canopy NDVI.
+  //    Tier 1 (token): Copernicus Process API. Tier 2 fire: Open-Meteo heat proxy.
   const sentinelToken = process.env.SENTINEL_TOKEN || process.env.COPERNICUS_TOKEN || "";
   const isSentinelTest = process.env.NODE_ENV === "test" || process.env.VITEST === "true" || Boolean((globalThis as any).__vitest_worker__);
-  if (peril === "fire_burn") {
+  if (satKind) {
     if (sentinelToken && lat != null && lon != null) {
       if (isSentinelTest) {
         // Test stub — avoid external network, exercise request structure without fetch
         signals.push({
           source: "sentinel",
           status: "pending",
-          labelEn: "Sentinel-2 burn scar",
-          labelHi: "सैटेलाइट जला निशान",
-          summaryEn: "Sentinel check queued — burn scar verification will be attached after satellite pass.",
-          summaryHi: "सैटेलाइट जाँच कतार में — जले निशान का सत्यापन बाद में जुड़ेगा।",
+          labelEn: satLabels.en,
+          labelHi: satLabels.hi,
+          summaryEn: "Sentinel check queued — satellite corroboration will be attached after the next pass.",
+          summaryHi: "सैटेलाइट जाँच कतार में — अगले पास के बाद जुड़ेगी।",
           confidence: 55,
           meta: { lat, lon, stub: true, testStub: true, evalscript: "burn_scar_ndvi_diff" },
           checkedAt: now,
@@ -256,7 +285,7 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
               height: 256,
               responses: [{ identifier: "default", format: { type: "application/json" } }],
             },
-            evalscript: BURN_SCAR_EVALSCRIPT,
+            evalscript: satKind === "water" ? WATER_NDWI_EVALSCRIPT : BURN_SCAR_EVALSCRIPT,
           };
           const ctrl = new AbortController();
           const t = setTimeout(() => ctrl.abort(), 8000);
@@ -278,32 +307,58 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
           }
           if (res && res.ok) {
             const j: unknown = await res.json().catch(() => null);
-            const parsed = parseBurnRatioFromProcessJson(j);
+            const hit =
+              satKind === "water" ? (value: number) => value > 0.2 : (value: number) => value < (satKind === "ndvi" ? 0.3 : 0.2);
+            const parsed = parseIndexRatioFromProcessJson(j, hit);
             if (parsed) {
-              const pct = (parsed.burnRatio * 100).toFixed(1);
-              const detected = parsed.burnRatio > 0.05;
+              const pct = (parsed.ratio * 100).toFixed(1);
+              const detected = parsed.ratio > 0.05;
+              const summaryEn =
+                satKind === "water"
+                  ? detected
+                    ? `Standing water / inundation signature on ~${pct}% of the area around your plot.`
+                    : "No significant surface-water signature found at this location/date."
+                  : satKind === "ndvi"
+                    ? detected
+                      ? `Low vegetation index on ~${pct}% of the area (mean NDVI ${parsed.mean.toFixed(2)}) — drought stress plausible.`
+                      : `Canopy NDVI looks normal (mean ${parsed.mean.toFixed(2)}) — drought stress not obvious from this pass.`
+                    : detected
+                      ? `Burn scar detected on ~${pct}% of the area around your plot.`
+                      : "No significant burn scar found at this location/date.";
+              const summaryHi =
+                satKind === "water"
+                  ? detected
+                    ? `आपके प्लॉट के आसपास ~${pct}% क्षेत्र में जल-भराव संकेत मिला।`
+                    : "इस स्थान/तिथि पर महत्वपूर्ण जल-क्षेत्र नहीं मिला।"
+                  : satKind === "ndvi"
+                    ? detected
+                      ? `~${pct}% क्षेत्र में कम वनस्पति सूचकांक — सूखा तनाव संभव।`
+                      : "वनस्पति सूचकांक सामान्य दिखता है।"
+                    : detected
+                      ? `आपके प्लॉट के आसपास ~${pct}% क्षेत्र में जला निशान मिला।`
+                      : "इस स्थान/तिथि पर कोई महत्वपूर्ण जला निशान नहीं मिला।";
               signals.push({
                 source: "sentinel",
                 status: "available",
-                labelEn: "Sentinel-2 burn scar",
-                labelHi: "सैटेलाइट जला निशान",
-                summaryEn: detected
-                  ? `Burn scar detected on ~${pct}% of the area around your plot.`
-                  : "No significant burn scar found at this location/date.",
-                summaryHi: detected
-                  ? `आपके प्लॉट के आसपास ~${pct}% क्षेत्र में जला निशान मिला।`
-                  : "इस स्थान/तिथि पर कोई महत्वपूर्ण जला निशान नहीं मिला।",
+                labelEn: satLabels.en,
+                labelHi: satLabels.hi,
+                summaryEn,
+                summaryHi,
                 confidence: 80,
                 meta: {
                   lat,
                   lon,
                   bbox,
-                  burnRatio: parsed.burnRatio,
+                  burnRatio: satKind === "burn" ? parsed.ratio : null,
+                  waterRatio: satKind === "water" ? parsed.ratio : null,
+                  stressRatio: satKind === "ndvi" ? parsed.ratio : null,
+                  meanIndex: parsed.mean,
                   validPixels: parsed.validPixels,
                   thumbnailUrl: null,
                   burnMapUrl: copernicusBurnMapUrl(lat, lon),
-                  evalscript: "burn_scar_ndvi_diff",
+                  evalscript: satKind === "water" ? "ndwi_water" : satKind === "ndvi" ? "ndvi_stress" : "burn_scar_ndvi_diff",
                   stub: false,
+                  kind: satKind,
                 },
                 checkedAt: now,
               });
@@ -311,12 +366,12 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
               signals.push({
                 source: "sentinel",
                 status: "pending",
-                labelEn: "Sentinel-2 burn scar",
-                labelHi: "सैटेलाइट जला निशान",
+                labelEn: satLabels.en,
+                labelHi: satLabels.hi,
                 summaryEn: "Sentinel responded but pixel payload was unreadable — check will retry.",
                 summaryHi: "सैटेलाइट प्रतिक्रिया पढ़ने योग्य नहीं — जाँच दोबारा होगी।",
                 confidence: 55,
-                meta: { lat, lon, bbox, stub: true, httpStatus: res.status },
+                meta: { lat, lon, bbox, stub: true, httpStatus: res.status, kind: satKind },
                 checkedAt: now,
               });
             }
@@ -324,12 +379,12 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
             signals.push({
               source: "sentinel",
               status: "pending",
-              labelEn: "Sentinel-2 burn scar",
-              labelHi: "सैटेलाइट जला निशान",
-              summaryEn: "Sentinel-2 request did not complete — this is not a live NDVI burn scar yet.",
-              summaryHi: "सैटेलाइट अनुरोध पूरा नहीं हुआ — यह लाइव NDVI जला निशान नहीं है।",
+              labelEn: satLabels.en,
+              labelHi: satLabels.hi,
+              summaryEn: "Sentinel-2 request did not complete — live satellite raster is not attached yet.",
+              summaryHi: "सैटेलाइट अनुरोध पूरा नहीं हुआ — लाइव रैस्टर अभी नहीं।",
               confidence: 55,
-              meta: { lat, lon, bbox, stub: true, httpStatus: res?.status ?? null },
+              meta: { lat, lon, bbox, stub: true, httpStatus: res?.status ?? null, kind: satKind },
               checkedAt: now,
             });
           }
@@ -337,30 +392,28 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
           signals.push({
             source: "sentinel",
             status: "pending",
-            labelEn: "Sentinel-2 burn scar",
-            labelHi: "सैटेलाइट जला निशान",
-            summaryEn: "Sentinel-2 request failed — token is configured, but no live NDVI result yet.",
-            summaryHi: "सैटेलाइट अनुरोध विफल — टोकन है, लाइव NDVI अभी नहीं।",
+            labelEn: satLabels.en,
+            labelHi: satLabels.hi,
+            summaryEn: "Sentinel-2 request failed — token is configured, but no live raster yet.",
+            summaryHi: "सैटेलाइट अनुरोध विफल — टोकन है, लाइव रैस्टर अभी नहीं।",
             checkedAt: now,
           });
         }
       }
     } else if (lat != null && lon != null) {
       if (isSentinelTest) {
-        // Test stub — no external network for the free tier either
         signals.push({
           source: "sentinel",
           status: "pending",
-          labelEn: "Sentinel-2 burn scar",
-          labelHi: "सैटेलाइट जला निशान",
-          summaryEn: "Free-tier burn-scar proxy queued (no satellite token configured; external calls skipped in test mode).",
-          summaryHi: "फ्री-टियर जला निशान जाँच कतार में।",
+          labelEn: satLabels.en,
+          labelHi: satLabels.hi,
+          summaryEn: "Free-tier satellite proxy queued (no satellite token configured; external calls skipped in test mode).",
+          summaryHi: "फ्री-टियर सैटेलाइट जाँच कतार में।",
           confidence: 55,
-          meta: { lat, lon, stub: true, testStub: true, proxy: "open-meteo-archive" },
+          meta: { lat, lon, stub: true, testStub: true, proxy: satKind === "burn" ? "open-meteo-archive" : "copernicus-browser", kind: satKind },
           checkedAt: now,
         });
-      } else {
-        // Tier 2 — free heat-anomaly proxy via Open-Meteo archive (no key required)
+      } else if (satKind === "burn") {
         try {
           const hotDays = await fetchHotDays30d(lat, lon);
           if (hotDays == null) throw new Error("open-meteo archive unavailable");
@@ -374,7 +427,7 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
               (hotDays > 0 ? " Heat anomaly plausibly supports the fire claim." : ""),
             summaryHi: `फ्री-टियर जाँच (सैटेलाइट टोकन कॉन्फ़िगर नहीं): पिछले 30 दिनों में ${hotDays} अत्यधिक गर्मी के दिन (>40°C)।`,
             confidence: 55,
-            meta: { lat, lon, proxy: "open-meteo-archive", hotDays, burnRatio: null, thumbnailUrl: null, burnMapUrl: copernicusBurnMapUrl(lat, lon), needsToken: true },
+            meta: { lat, lon, proxy: "open-meteo-archive", hotDays, burnRatio: null, thumbnailUrl: null, burnMapUrl: copernicusBurnMapUrl(lat, lon), needsToken: true, kind: satKind },
             checkedAt: now,
           });
         } catch {
@@ -385,20 +438,35 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
             labelHi: "गर्मी संकेतक (सैटेलाइट NDVI नहीं)",
             summaryEn: "Heat-proxy check unavailable (Open-Meteo archive unreachable) — not a live Sentinel NDVI result.",
             summaryHi: "फ्री-टियर जाँच अभी अनुपलब्ध — दोबारा प्रयास होगा।",
-            meta: { lat, lon, proxy: "open-meteo-archive", needsToken: true },
+            meta: { lat, lon, proxy: "open-meteo-archive", needsToken: true, kind: satKind },
             checkedAt: now,
           });
         }
+      } else {
+        signals.push({
+          source: "sentinel",
+          status: "pending",
+          labelEn: satLabels.en,
+          labelHi: satLabels.hi,
+          summaryEn:
+            satKind === "water"
+              ? "No SENTINEL_TOKEN — open Copernicus Browser for a visual water-extent check. Live NDWI raster needs a CDSE bearer."
+              : "No SENTINEL_TOKEN — open Copernicus Browser for a visual vegetation-index check. Live NDVI raster needs a CDSE bearer.",
+          summaryHi: "सैटेलाइट टोकन नहीं — कोपरनिकस ब्राउज़र से दृश्य जाँच करें।",
+          confidence: 45,
+          meta: { lat, lon, burnMapUrl: copernicusBurnMapUrl(lat, lon), needsToken: true, kind: satKind },
+          checkedAt: now,
+        });
       }
     } else {
       signals.push({
         source: "sentinel",
         status: "pending",
-        labelEn: "Sentinel-2 burn scar",
-        labelHi: "सैटेलाइट जला निशान",
+        labelEn: satLabels.en,
+        labelHi: satLabels.hi,
         summaryEn: "No GPS — satellite check needs location.",
         summaryHi: "जीपीएस नहीं — सैटेलाइट को स्थान चाहिए।",
-        meta: { needsToken: !sentinelToken, lat, lon },
+        meta: { needsToken: !sentinelToken, lat, lon, kind: satKind },
         checkedAt: now,
       });
     }
@@ -610,25 +678,17 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
           throw new Error("imd fetch failed");
         }
       } catch {
-        // Resilient synoptic baseline so external weather API timeouts never leave claims permanently stuck on pending
-        const estRain = peril === "drought" ? 1.5 : peril === "flood" ? 55.0 : 14.5;
-        const cat = imdCategory(estRain);
         signals.push({
           source: "imd",
-          status: "available",
-          labelEn: "IMD / Weather (Regional Normal)",
-          labelHi: "आईएमडी वर्षा (क्षेत्रीय सामान्य)",
-          summaryEn: `7-day regional weather observation: ~${estRain.toFixed(1)} mm rainfall baseline (${cat.category}). Live weather sync queued.`,
-          summaryHi: `7 दिन क्षेत्रीय मौसम: ~${estRain.toFixed(1)} मिमी वर्षा (${cat.categoryHi})। लाइव सिंक कतार में।`,
-          confidence: 65,
+          status: "pending",
+          labelEn: "IMD / Weather",
+          labelHi: "आईएमडी वर्षा",
+          summaryEn: "Live weather sync did not complete — rainfall corroboration will retry.",
+          summaryHi: "लाइव मौसम सिंक पूरा नहीं हुआ — वर्षा जाँच दोबारा होगी।",
+          confidence: 40,
           meta: {
-            rainfall_7d_mm: estRain,
-            daily: [1.0, 2.0, 1.5, 0.5, 2.5, 3.5, 3.5],
-            proxy: "regional_synoptic_model",
+            proxy: "open-meteo",
             hasImdKey: Boolean(imdKey),
-            imdCategory: cat.category,
-            imdCategoryHi: cat.categoryHi,
-            imdThresholds: { light_max: 2, moderate_max: 10, heavy_min: 60 },
             fallback: true,
           },
           checkedAt: now,
@@ -665,8 +725,8 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
     const bhuvanLayers = (process.env.BHUVAN_WMS_LAYERS || "").trim() || "india3";
     const bhuvanWmsUrl =
       `${wmsBase}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap` +
-      `&LAYERS=${encodeURIComponent(bhuvanLayers)}&SRS=EPSG:4326&BBOX=${bbox}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=TRUE&STYLES=` +
-      (bhuvanKey ? `&APIKEY=${encodeURIComponent(bhuvanKey)}` : "");
+      `&LAYERS=${encodeURIComponent(bhuvanLayers)}&SRS=EPSG:4326&BBOX=${bbox}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=TRUE&STYLES=`;
+    const bhuvanProbeUrl = bhuvanKey ? `${bhuvanWmsUrl}&APIKEY=${encodeURIComponent(bhuvanKey)}` : bhuvanWmsUrl;
     const bhuvanUrl = bhuvanWmsUrl;
     const legacyUrl = `https://bhuvan-app1.nrsc.gov.in/bhuvan2d/bhuvan/bhuvan2d.php?lat=${lat}&lon=${lon}`;
     const probeWms = async (timeoutMs: number): Promise<boolean> => {
@@ -675,7 +735,7 @@ export async function assembleContext(input: AssembleInput): Promise<AssembledCo
         const t = setTimeout(() => ctrl.abort(), timeoutMs);
         let res: Response | null = null;
         try {
-          res = await fetch(bhuvanWmsUrl, { signal: ctrl.signal });
+          res = await fetch(bhuvanProbeUrl, { signal: ctrl.signal });
         } finally {
           clearTimeout(t);
         }

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { after, NextResponse } from "next/server";
+import { sniffImageMime } from "@/lib/image-bytes";
 import {
   persistAndInfer,
   recaptureAndInfer,
@@ -28,15 +29,19 @@ function decodeDataUrl(value: string): { bytes: Uint8Array; contentType: string 
   if (!match) {
     throw new Error("Image must be a data URL");
   }
-  const contentType = match[1].toLowerCase();
-  if (!ALLOWED_TYPES.has(contentType)) {
+  const declaredType = match[1].toLowerCase();
+  if (!ALLOWED_TYPES.has(declaredType)) {
     throw new Error("Only JPEG, PNG, and WebP images are allowed");
   }
   const bytes = Uint8Array.from(Buffer.from(match[2], "base64"));
   if (bytes.byteLength === 0 || bytes.byteLength > MAX_BYTES) {
     throw new Error("Each image must be between 1 byte and 4 MB");
   }
-  return { contentType, bytes };
+  const sniffed = sniffImageMime(bytes);
+  if (!sniffed) {
+    throw new Error("Only JPEG, PNG, and WebP images are allowed");
+  }
+  return { contentType: sniffed, bytes };
 }
 
 function clampNumber(value: unknown, min: number, max: number): number | undefined {
@@ -60,13 +65,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ items: [] });
   }
   const store = createSupabaseClaimStore(supabase);
-  const claims = await store.listClaims();
-  const visible = isReviewerRole(auth.actor.role)
-    ? claims
-    : claims.filter((claim) => claim.created_by === auth.actor.userId);
+  const claims = await store.listClaims(
+    isReviewerRole(auth.actor.role) ? undefined : { createdBy: auth.actor.userId },
+  );
   // Per-claim image fetches are independent: run concurrently.
   const items = await Promise.all(
-    visible.map(async (claim) => claimToSubmission(claim, await store.listImages(claim.id))),
+    claims.map(async (claim) => claimToSubmission(claim, await store.listImages(claim.id))),
   );
   return NextResponse.json({ items });
 }

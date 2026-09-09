@@ -1,4 +1,3 @@
-const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseOrigin = (() => {
   if (!supabaseUrl) return "";
@@ -8,18 +7,9 @@ const supabaseOrigin = (() => {
     return "";
   }
 })();
-const apiConnectOrigin = (() => {
-  if (!apiBase) return "";
-  try {
-    return new URL(apiBase).origin;
-  } catch {
-    return "";
-  }
-})();
 
 const connectSrc = [
   "'self'",
-  apiConnectOrigin,
   "https://*.supabase.co",
   "wss://*.supabase.co",
   "https://*.supabase.in",
@@ -87,6 +77,10 @@ const nextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(self)" },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
         ],
       },
     ];

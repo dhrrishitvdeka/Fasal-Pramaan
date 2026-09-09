@@ -8,7 +8,7 @@ Fasal-Pramaan maintains an automated, verifiable time-series record of crop grow
 
 - **Default Cadence**: 30 days (configurable from 14 to 90 days per crop cycle).
 - **Advance Reminder Window**: 3 days prior to due date (configurable from 0 to 7 days).
-- **Target Evidence Contract**: Full 5-angle guided spatial capture (`wide_field`, `left_context`, `mid_canopy`, `right_context`, `closeup_damage`).
+- **Target Evidence Contract**: Hosted capture uses 3 distinct evidence photos (`photo_1`, `photo_2`, `photo_3`) per peril. Older 5-angle names (`wide_field`, `left_context`, `mid_canopy`, `right_context`, `closeup_damage`) remain accepted aliases.
 - **Due Date Advancement**: The next scheduled due date advances **only** after a complete evidence submission has been successfully uploaded, verified, and finalized.
 
 ---

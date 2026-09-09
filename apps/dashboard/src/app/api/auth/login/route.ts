@@ -29,15 +29,14 @@ export async function POST(request: Request) {
     password: parsed.data.password,
   });
   if (error || !data.user) {
-    const unconfirmed = /confirm|not.*confirmed/i.test(error?.message || "");
     return NextResponse.json(
-      { error: unconfirmed ? "Confirm your email before signing in." : "Invalid email or password." },
-      { status: unconfirmed ? 403 : 401 },
+      { error: "Invalid email or password." },
+      { status: 401 },
     );
   }
   if (!data.user.email_confirmed_at) {
     await supabase.auth.signOut();
-    return NextResponse.json({ error: "Confirm your email before signing in." }, { status: 403 });
+    return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
 
   const actor = await actorFromUser(data.user);

@@ -96,13 +96,43 @@ export async function refreshAuthCookies(request: NextRequest, response: NextRes
 }
 
 export function clientIp(request: Request): string {
+  // Prefer the platform-owned header. Client-supplied X-Forwarded-For is last resort.
+  const vercel = request.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
+  if (vercel) return vercel;
+  const real = request.headers.get("x-real-ip")?.trim();
+  if (real) return real;
   const forwarded = request.headers.get("x-forwarded-for");
   const first = forwarded?.split(",")[0]?.trim();
-  return first || request.headers.get("x-real-ip")?.trim() || "unknown";
+  return first || "unknown";
 }
 
+function originFromEnv(raw: string): string | null {
+  const value = raw.trim().replace(/\/$/, "");
+  if (!value) return null;
+  try {
+    const url = new URL(value.includes("://") ? value : `https://${value}`);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Canonical public origin for auth email redirects. Never trust
+ * X-Forwarded-Host — that is password-reset poisoning.
+ */
 export function publicOrigin(request: Request): string {
-  const proto = request.headers.get("x-forwarded-proto") || "http";
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "localhost:3000";
+  const configured =
+    originFromEnv(process.env.APP_ORIGIN || "") ||
+    originFromEnv(process.env.NEXT_PUBLIC_SITE_URL || "");
+  if (configured) return configured;
+  const vercelProd = originFromEnv(process.env.VERCEL_PROJECT_PRODUCTION_URL || "");
+  if (vercelProd) return vercelProd;
+  const vercelUrl = originFromEnv(process.env.VERCEL_URL || "");
+  if (vercelUrl) return vercelUrl;
+  const hostRaw = (request.headers.get("host") || "localhost:3000").split(",")[0].trim();
+  const host = /^[a-zA-Z0-9.-]+(?::\d+)?$/.test(hostRaw) ? hostRaw : "localhost:3000";
+  const proto = process.env.NODE_ENV === "production" ? "https" : "http";
   return `${proto}://${host}`;
 }

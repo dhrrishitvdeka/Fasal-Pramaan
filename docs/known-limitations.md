@@ -27,7 +27,9 @@
 
 ## Product
 
-- Reviewer pages are client-gated; APIs still check JWT + role.
+- Reviewer **data** is API-gated (JWT + role). `proxy.ts` also redirects unauthenticated browsers away from `/farmer`, `/review`, `/overview`, `/map`, `/alerts`, `/admin`, `/audit`, and `/health`. Role UX (`useRequireRole`) is still client-side.
 - `/privacy` and `/terms` are platform operational summaries, not formal legal counsel.
-- Offline PWA opens the farmer shell; it does not queue captures.
-- `/api/health` is liveness only.
+- Offline PWA opens the farmer shell; it does not queue captures. HTML for `/farmer` is not cached.
+- `/api/health` is liveness only (`{ ok, status, timestamp }`). Dependency booleans are administrator-only on `/api/system/status`.
+- In-memory rate limits are per Vercel isolate. Login/signup/forgot/unlock always throttle; a shared store (Upstash/KV) is still the right next step if the deployment scales horizontally.
+- `IMD_API_KEY` does not call IMD. Weather is Open-Meteo. Sentinel flood/drought rasters need `SENTINEL_TOKEN`.

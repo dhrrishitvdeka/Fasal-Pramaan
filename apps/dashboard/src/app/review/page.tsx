@@ -338,6 +338,7 @@ function ReviewQueuePage() {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             type="search"
+            aria-label="Search claims by ID, plot, crop, or peril"
             placeholder="Search by ID, plot, crop, peril…"
             value={searchQuery}
             onChange={(e) => setParam("q", e.target.value)}

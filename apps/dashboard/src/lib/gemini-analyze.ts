@@ -9,6 +9,7 @@ import {
   resolveGeminiVisionModel,
 } from "./gemini-models";
 import { isCropMatch } from "./crop-synonyms";
+import { sniffImageMime } from "./image-bytes";
 
 export type WorkflowGrade = "A" | "B" | "C" | "U";
 
@@ -60,7 +61,6 @@ export type InferCropDiseaseInput = {
   extraImages?: Array<{ angleType: string; bytes: Uint8Array }>;
   apiToken?: string;
   fetchImpl?: typeof fetch;
-  spaceUrl?: string;
   peril?: string;
   farmerObservation?: string;
 };
@@ -82,35 +82,6 @@ function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(value);
   });
   return btoa(binary);
-}
-
-function sniffMime(bytes: Uint8Array): string {
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return "image/jpeg";
-  }
-  if (
-    bytes.length >= 8 &&
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47
-  ) {
-    return "image/png";
-  }
-  if (
-    bytes.length >= 12 &&
-    bytes[0] === 0x52 &&
-    bytes[1] === 0x49 &&
-    bytes[2] === 0x46 &&
-    bytes[3] === 0x46 &&
-    bytes[8] === 0x57 &&
-    bytes[9] === 0x45 &&
-    bytes[10] === 0x42 &&
-    bytes[11] === 0x50
-  ) {
-    return "image/webp";
-  }
-  return "image/jpeg";
 }
 
 function isWorkflowGrade(value: unknown): value is WorkflowGrade {
@@ -281,11 +252,6 @@ export function parseGeminiAnalysis(payload: unknown, modelId = geminiVisionMode
   };
 }
 
-/** @deprecated Alias kept so older tests that parsed Space JSON still compile. */
-export function parseSpacePrediction(payload: unknown): HfPrediction {
-  return parseGeminiAnalysis(payload);
-}
-
 function buildPrompt(input: InferCropDiseaseInput): string {
   const crop = input.expectedCrop?.trim() || "unknown (identify from foliage)";
   const peril = input.peril?.trim() || "normal";
@@ -310,6 +276,14 @@ Hard authenticity rules (fail closed):
 Then, only if the photos look like a real outdoor agricultural field:
 - Identify the crop you see (declared crop is "${crop}", note common regional synonyms such as paddy/rice/dhan, maize/corn, gram/chickpea, wheat/gehun). If it is a different species, say so — do not rubber-stamp the declared crop.
 - Describe damage visible (or healthy canopy) and whether it matches peril "${peril}".
+- Peril-specific visual cues to look for (set peril_match true only when they are present):
+  fire_burn: charred stubble, ash, blackened soil, burnt leaf edges, unburnt boundary.
+  flood: standing water, silt on stems, waterline stains, lodged plants in wet soil.
+  drought: wilted/rolled leaves, soil cracks, sparse canopy, dry stubble without burn.
+  animal_damage: grazed/bitten tillers, hoof prints, trampled rows, droppings.
+  hailstorm: shredded leaves, pockmarks, broken panicles, ice-impact bruising.
+  lodging: stems flattened in wind rows, root lodging, standing vs fallen boundary.
+  pest_disease: lesions, fungal spots, insect feeding, chlorosis on living tissue.
 - Estimate severity as none|low|medium|high and affected_area_pct 0-100 if you can see a plot; otherwise null.
 - Screening grade: A healthy field crop, B uncertain, C clear damage/disease pattern, U unusable or not a farm crop.
 - visual_findings: EXACTLY 1–2 short sentences a reviewer can read in five seconds (what plant, field vs garden, damage or not).
@@ -369,7 +343,7 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
     { text: buildPrompt(input) },
   ];
   for (const image of extras.slice(0, 6)) {
-    const mime = sniffMime(image.bytes);
+    const mime = sniffImageMime(image.bytes) || "image/jpeg";
     if (!ALLOWED_TYPES.has(mime)) continue;
     parts.push({ text: `Angle: ${image.angleType}` });
     parts.push({ inlineData: { mimeType: mime, data: bytesToBase64(image.bytes) } });
@@ -492,16 +466,4 @@ export async function inferCropDisease(input: InferCropDiseaseInput): Promise<Hf
     }
   }
   return { ...parsed, modelId: usedModel };
-}
-
-export function resolveHfModelId(): string {
-  return geminiVisionModel();
-}
-
-export const FASAL_MODEL_REPO = "gemini-vision";
-export const FASAL_SPACE_ID = "";
-export const DEFAULT_HF_SPACE_URL = "";
-
-export function resolveHfSpaceUrl(_explicit?: string): string {
-  return "";
 }

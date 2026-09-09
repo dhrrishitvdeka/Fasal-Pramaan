@@ -1,5 +1,4 @@
 import type { Page, Route } from "@playwright/test";
-import { deflateSync } from "node:zlib";
 import { test } from "@playwright/test";
 
 export const E2E_CLAIM_ID = "e2e-claim-0001";
@@ -25,6 +24,14 @@ export function json(route: Route, body: unknown, status = 200) {
 
 /** AppShell session probe — grants roles so guarded portals render. */
 export async function mockMe(page: Page, role: "farmer" | "reviewer" | "administrator") {
+  await page.context().addCookies([
+    {
+      name: "sb-e2e-auth-token",
+      value: "e2e-session",
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
   await page.route("**/api/me", (route) =>
     json(route, {
       userId: "e2e-user-1",
@@ -111,59 +118,4 @@ export function submissionFixture(overrides: Record<string, unknown> = {}) {
     },
     ...overrides,
   };
-}
-
-/**
- * Build a 1x1 opaque white PNG at runtime (no binary fixtures in the repo).
- * Used to exercise the gallery/file-upload fallback path in headless runs
- * where camera permission prompts are unavailable.
- */
-export function whitePngBuffer(): Buffer {
-  const width = 1;
-  const height = 1;
-
-  const crcTable = new Uint32Array(256);
-  for (let n = 0; n < 256; n += 1) {
-    let c = n;
-    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    crcTable[n] = c >>> 0;
-  }
-  function crc32(bytes: Uint8Array): number {
-    let c = 0xffffffff;
-    for (const b of bytes) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8);
-    return (c ^ 0xffffffff) >>> 0;
-  }
-
-  // zlib stream wrapping the filtered scanlines (filter byte + white RGB).
-  const raw = new Uint8Array([0x00, 0xff, 0xff, 0xff]);
-  const zlib = new Uint8Array(deflateSync(Buffer.from(raw)));
-
-  function chunk(type: string, data: Uint8Array): Uint8Array {
-    const out = new Uint8Array(12 + data.length);
-    const view = new DataView(out.buffer);
-    view.setUint32(0, data.length);
-    for (let i = 0; i < 4; i += 1) out[4 + i] = type.charCodeAt(i);
-    out.set(data, 8);
-    view.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
-    return out;
-  }
-
-  const ihdr = new Uint8Array(13);
-  const ihdrView = new DataView(ihdr.buffer);
-  ihdrView.setUint32(0, width);
-  ihdrView.setUint32(4, height);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 2; // color type: truecolor RGB
-  const signature = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  const iend = new Uint8Array(0);
-
-  const parts = [signature, chunk("IHDR", ihdr), chunk("IDAT", zlib), chunk("IEND", iend)];
-  const total = parts.reduce((sum, p) => sum + p.length, 0);
-  const png = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    png.set(part, offset);
-    offset += part.length;
-  }
-  return Buffer.from(png);
 }

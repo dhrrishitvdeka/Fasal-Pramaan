@@ -35,6 +35,16 @@ describe("fixed-window rate limiter", () => {
     expect(checkRateLimit(key, 2, 60_000, true)).toEqual({ ok: true });
   });
 
+  it("keeps forced auth limits on even when DISABLE_RATE_LIMIT is set", () => {
+    const previous = process.env.DISABLE_RATE_LIMIT;
+    process.env.DISABLE_RATE_LIMIT = "true";
+    const key = `auth-forced:${Date.now()}`;
+    expect(checkRateLimit(key, 1, 60_000, true)).toEqual({ ok: true });
+    expect(checkRateLimit(key, 1, 60_000, true).ok).toBe(false);
+    if (previous === undefined) delete process.env.DISABLE_RATE_LIMIT;
+    else process.env.DISABLE_RATE_LIMIT = previous;
+  });
+
   it("isolates different keys so one exhausted bucket never blocks another when enforced", () => {
     expect(checkRateLimit("route:key-x", 1, 60_000, true)).toEqual({ ok: true });
     expect(checkRateLimit("route:key-x", 1, 60_000, true).ok).toBe(false);

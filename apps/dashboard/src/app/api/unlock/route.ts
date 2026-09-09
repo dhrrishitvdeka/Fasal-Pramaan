@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { clientIp } from "@/lib/auth-cookies";
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import {
   SITE_LOCK_COOKIE,
@@ -11,7 +12,7 @@ function cookieOptions() {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.VERCEL === "1",
+    secure: process.env.VERCEL === "1" || process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   };
@@ -33,13 +34,6 @@ async function timingSafeEqualStrings(a: string, b: string): Promise<boolean> {
   return mismatch === 0;
 }
 
-/** Best-effort client IP for per-actor throttling (Vercel/CDN aware). */
-function clientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const first = forwarded?.split(",")[0]?.trim();
-  return first || request.headers.get("x-real-ip")?.trim() || "unknown";
-}
-
 export async function POST(request: Request) {
   if (!isSiteLockActive()) {
     return NextResponse.json({ ok: true, locked: false });
@@ -58,7 +52,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Site lock is not configured" }, { status: 503 });
   }
   const body = (await request.json().catch(() => ({}))) as { password?: string };
-  if (!(await timingSafeEqualStrings(String(body.password || ""), expected))) {
+  const submitted = String(body.password || "").slice(0, 256);
+  if (!(await timingSafeEqualStrings(submitted, expected))) {
     return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
   }
   const response = NextResponse.json({ ok: true });

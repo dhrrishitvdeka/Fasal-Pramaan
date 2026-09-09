@@ -97,7 +97,7 @@ export async function executeSaathiTool(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[saathi-tool] ${name} threw:`, msg);
-    return { ok: false, error: msg };
+    return { ok: false, error: "Saathi tool failed. Please retry." };
   }
 }
 
@@ -534,7 +534,8 @@ async function registerPlotServer(
   };
   const { error } = await client.from("web_plots").insert(row);
   if (error) {
-    return { ok: false, error: error.message };
+    console.error("saathi register_plot failed:", error.message);
+    return { ok: false, error: "Could not register the plot. Please retry." };
   }
   try {
     const milestones = buildDefaultMilestones({

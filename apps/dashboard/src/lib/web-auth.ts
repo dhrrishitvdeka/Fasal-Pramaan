@@ -38,14 +38,12 @@ export function resolveWebRole(input: {
   if (appRoles.some((role) => role === "administrator" || role === "admin")) {
     return "administrator";
   }
-  const profileRole = String(input.profileRole || "")
-    .trim()
-    .toLowerCase();
-  if (appRoles.includes("reviewer") || profileRole === "reviewer" || profileRole === "admin" || profileRole === "administrator") {
+  // web_profiles.role is display-only. Authorisation comes from server-set
+  // app_metadata and the verified REVIEWER_EMAILS allowlist so a stale
+  // profile row cannot keep reviewer access after revocation.
+  if (appRoles.includes("reviewer")) {
     return "reviewer";
   }
-  // The email allowlist only counts for verified addresses: otherwise anyone
-  // could register a listed email on an unverified account and inherit review.
   const email = (input.email || "").trim().toLowerCase();
   if (email && input.emailConfirmed && reviewerEmailAllowlist().has(email)) {
     return "reviewer";
@@ -99,7 +97,7 @@ export async function actorFromUser(user: User): Promise<WebActor> {
     appRoles: user.app_metadata?.roles,
     profileRole,
   });
-  if (server && !hasProfile) {
+  if (server && (!hasProfile || profileRole !== role)) {
     await server.from("web_profiles").upsert(
       {
         id: user.id,

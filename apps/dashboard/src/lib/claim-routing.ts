@@ -11,19 +11,10 @@ export type Peril =
   | "hailstorm"
   | "lodging";
 
-export const PERIL_TYPES: readonly Peril[] = [
-  "normal",
-  "fire_burn",
-  "animal_damage",
-  "flood",
-  "drought",
-  "pest_disease",
-  "hailstorm",
-  "lodging",
-] as const;
-
 export type ContextCheck =
   | "sentinel_fire"
+  | "sentinel_water"
+  | "sentinel_ndvi"
   | "wildlife_proximity"
   | "imd_weather"
   | "bhuvan_landuse"
@@ -106,25 +97,25 @@ export const ROUTE_CONFIG: Record<Peril, RouteConfig> = {
     descriptionHi: "आईएमडी वर्षा + सैटेलाइट जल-भराव मिलान व 3 साक्ष्य तस्वीरें।",
     requiredAngles: ["photo_1", "photo_2", "photo_3"],
     optionalAngles: [],
-    contextChecks: ["imd_weather", "sentinel_fire", "nearby_fields"],
+    contextChecks: ["imd_weather", "sentinel_water", "nearby_fields"],
     minConfidence: 75,
-    needsSatellite: false,
-    guidanceExtraEn: "Capture standing water line, submerged base, and canopy impact across 3 photos. IMD 7-day rain will be checked.",
-    guidanceExtraHi: "खड़ा पानी, डूबा आधार व फसल स्थिति की 3 तस्वीरें लें। आईएमडी वर्षा जाँची जाएगी।",
+    needsSatellite: true,
+    guidanceExtraEn: "Capture standing water line, submerged base, and canopy impact across 3 photos. Rainfall and satellite water extent will be checked.",
+    guidanceExtraHi: "खड़ा पानी, डूबा आधार व फसल स्थिति की 3 तस्वीरें लें। वर्षा और सैटेलाइट जल-क्षेत्र जाँचे जाएंगे।",
   },
   drought: {
     peril: "drought",
     labelEn: "Drought",
     labelHi: "सूखा",
-    descriptionEn: "Gradual stress — canopy + soil moisture context; IMD dry spell check across 3 photos.",
-    descriptionHi: "धीरे सूखना — छत्र + मिट्टी नमी, 3 साक्ष्य तस्वीरें।",
+    descriptionEn: "Gradual stress — canopy + soil moisture context; IMD dry spell and satellite NDVI across 3 photos.",
+    descriptionHi: "धीरे सूखना — छत्र + मिट्टी नमी, सैटेलाइट NDVI व 3 साक्ष्य तस्वीरें।",
     requiredAngles: ["photo_1", "photo_2", "photo_3"],
     optionalAngles: [],
-    contextChecks: ["imd_weather", "bhuvan_landuse", "nearby_fields"],
+    contextChecks: ["imd_weather", "sentinel_ndvi", "nearby_fields"],
     minConfidence: 80,
-    needsSatellite: false,
-    guidanceExtraEn: "Show wilting canopy, soil cracks, and plot context across 3 distinct photos.",
-    guidanceExtraHi: "मुरझाई पत्तियाँ, दरकी मिट्टी व पूरे क्षेत्र की 3 तस्वीरें दिखाएँ।",
+    needsSatellite: true,
+    guidanceExtraEn: "Show wilting canopy, soil cracks, and plot context across 3 distinct photos. Dry-spell rainfall and vegetation index will be checked.",
+    guidanceExtraHi: "मुरझाई पत्तियाँ, दरकी मिट्टी व पूरे क्षेत्र की 3 तस्वीरें दिखाएँ। सूखा वर्षा और वनस्पति सूचकांक जाँचे जाएंगे।",
   },
   pest_disease: {
     peril: "pest_disease",
@@ -171,14 +162,29 @@ export const ROUTE_CONFIG: Record<Peril, RouteConfig> = {
 };
 
 export function normalizePeril(raw: unknown): Peril {
-  const v = String(raw || "").trim().toLowerCase();
-  if (v === "fire" || v === "fire_burn" || v === "burn") return "fire_burn";
-  if (v === "animal" || v === "animal_damage" || v === "grazing") return "animal_damage";
-  if (v === "flood" || v === "waterlogging") return "flood";
-  if (v === "drought" || v === "dry") return "drought";
-  if (v === "pest" || v === "disease" || v === "pest_disease") return "pest_disease";
-  if (v === "hail" || v === "hailstorm") return "hailstorm";
-  if (v === "lodging" || v === "lodging_wind" || v === "wind") return "lodging";
+  const v = String(raw || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (v === "fire" || v === "fire_burn" || v === "burn" || v === "aag" || v === "jalna") return "fire_burn";
+  if (
+    v === "animal" ||
+    v === "animal_damage" ||
+    v === "grazing" ||
+    v === "wild_boar" ||
+    v === "nilgai" ||
+    v === "wildlife"
+  ) {
+    return "animal_damage";
+  }
+  if (v === "flood" || v === "waterlogging" || v === "water_logging" || v === "inundation" || v === "jalbharav") {
+    return "flood";
+  }
+  if (v === "drought" || v === "dry" || v === "dry_spell" || v === "sukha" || v === "sookha") return "drought";
+  if (v === "pest" || v === "disease" || v === "pest_disease" || v === "keet" || v === "fungus" || v === "blight") {
+    return "pest_disease";
+  }
+  if (v === "hail" || v === "hailstorm" || v === "hail_storm" || v === "ola" || v === "olavrishti") return "hailstorm";
+  if (v === "lodging" || v === "lodging_wind" || v === "wind" || v === "wind_damage" || v === "crop_lodging") {
+    return "lodging";
+  }
   if ((Object.keys(ROUTE_CONFIG) as Peril[]).includes(v as Peril)) return v as Peril;
   return "normal";
 }

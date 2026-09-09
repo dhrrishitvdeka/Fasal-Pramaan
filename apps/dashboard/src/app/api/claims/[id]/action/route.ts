@@ -6,6 +6,8 @@ import { actorUnauthorized, isReviewerRole, requireWebActor } from "@/lib/web-au
 import { checkRateLimit } from "@/lib/server/rate-limit";
 import { REVIEW_ACTION_IDS, reviewActionSchema } from "@/lib/schemas";
 
+export const maxDuration = 60;
+
 const ALLOWED_ACTIONS = new Set<string>(REVIEW_ACTION_IDS);
 const RATE_LIMIT_MAX = 30;
 const RATE_LIMIT_WINDOW_MS = 60_000;

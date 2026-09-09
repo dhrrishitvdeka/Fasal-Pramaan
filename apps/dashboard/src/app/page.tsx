@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import HeroSlideshow from "@/components/HeroSlideshow";
 import { listClaims, type Submission } from "@/lib/api";
+import { apiFetch } from "@/lib/auth-headers";
+import { canAccessReviewerPortal } from "@/lib/review-access";
 import { LANDING_ACTIONS } from "@/lib/landing-actions";
 import {
   PERIL_OPTIONS,
@@ -60,6 +62,8 @@ export default function HomePage() {
   const [claims, setClaims] = useState<Submission[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [claimHrefBase, setClaimHrefBase] = useState("/farmer/claims");
+  const [queueHref, setQueueHref] = useState("/farmer/claims");
 
   const fetchRecent = () => {
     setLoaded(false);
@@ -79,6 +83,24 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchRecent();
+    void apiFetch("/api/me")
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return (await res.json()) as { role?: string; roles?: string[] };
+      })
+      .then((me) => {
+        if (me && canAccessReviewerPortal(me.roles || (me.role ? [me.role] : []))) {
+          setClaimHrefBase("/review");
+          setQueueHref("/review");
+        } else if (me?.role === "farmer") {
+          setClaimHrefBase("/farmer/claims");
+          setQueueHref("/farmer/claims");
+        } else {
+          setClaimHrefBase("/login");
+          setQueueHref("/login");
+        }
+      })
+      .catch(() => undefined);
   }, []);
 
   const summarizeClaim = (claim: Submission) => {
@@ -133,15 +155,15 @@ export default function HomePage() {
               className="inline-flex h-10 min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-2.5 py-2 text-center text-xs font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--canvas)] sm:h-auto sm:min-h-11 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
             >
               <Camera className="h-4 w-4 shrink-0 text-[var(--ink-muted)]" />
-              <span>Farmer</span>
+              <span>{lang === "hi" ? "किसान पोर्टल" : "Farmer"}</span>
             </Link>
 
             <Link
-              href="/overview"
+              href={LANDING_ACTIONS[1].href}
               className="inline-flex h-10 min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-2.5 py-2 text-center text-xs font-medium text-[var(--ink)] transition-colors hover:border-[var(--ink)] hover:bg-[var(--canvas)] sm:h-auto sm:min-h-11 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm"
             >
               <ShieldCheck className="h-4 w-4 shrink-0 text-[var(--accent)]" />
-              <span>Reviewer</span>
+              <span>{lang === "hi" ? LANDING_ACTIONS[1].hi : LANDING_ACTIONS[1].en}</span>
             </Link>
           </div>
         </div>
@@ -206,7 +228,7 @@ export default function HomePage() {
                 : t.recentClaimsSubDemo}
             </p>
           </div>
-          <Link href="/review" className="fp-link fp-ui text-sm font-medium">
+          <Link href={queueHref} className="fp-link fp-ui text-sm font-medium">
             {t.openQueueLink}
           </Link>
         </div>
@@ -238,7 +260,7 @@ export default function HomePage() {
                 return (
                   <Link
                     key={claim.id}
-                    href={`/review/${claim.id}`}
+                    href={`${claimHrefBase}/${claim.id}`}
                     className="fp-panel block p-3 transition-colors hover:border-[var(--ink)]"
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -306,7 +328,7 @@ export default function HomePage() {
                           )}
                         </td>
                         <td className="text-right">
-                          <Link href={`/review/${claim.id}`} className="fp-link font-medium">
+                          <Link href={`${claimHrefBase}/${claim.id}`} className="fp-link font-medium">
                             {t.btnReview}
                           </Link>
                         </td>

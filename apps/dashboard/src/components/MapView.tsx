@@ -36,7 +36,7 @@ function FitBounds({ markers }: { markers: MapMarker[] }) {
  * only signal. In particular needs_recapture (amber) no longer collides with
  * none/U (grey).
  */
-function severityColor(severity?: string | null, status?: string) {
+export function severityColor(severity?: string | null, status?: string) {
   if (status === "needs_recapture") return "#e69f00";
   if (status === "verified") return "#009e73";
   if (status === "rejected") return "#cc79a7";
