@@ -1,8 +1,8 @@
 # Fasal-Pramaan (फसल प्रमाण)
 
 <p align="center">
-  <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan/releases">
-    <img src="https://img.shields.io/badge/Release-v2.8.2-blue?style=for-the-badge" alt="Latest Release v2.8.2" />
+  <a href="https://github.com/dhrrishitvdeka/Fasal-Pramaan/releases/latest">
+    <img src="https://img.shields.io/github/v/release/dhrrishitvdeka/Fasal-Pramaan?style=for-the-badge&label=Release" alt="Latest GitHub release" />
   </a>
   <img src="https://img.shields.io/badge/Next.js%2016-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
   <img src="https://img.shields.io/badge/Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
